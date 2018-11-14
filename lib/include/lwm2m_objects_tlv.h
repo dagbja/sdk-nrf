@@ -1,4 +1,9 @@
-/*$$$LICENCE_NORDIC_STANDARD<2015>$$$*/
+/*
+ * Copyright (c) 2018 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
 /**@file lwm2m_objects_tlv.h
  *
  * @defgroup iot_sdk_lwm2m_objects_tlv OMA LWM2M object TLV encoder and decoder API
@@ -11,7 +16,7 @@
 #define LWM2M_OBJECTS_TLV_H__
 
 #include <stdint.h>
-#include "lwm2m_objects.h"
+#include <lwm2m_objects.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,4 +1,9 @@
-/*$$$LICENCE_NORDIC_STANDARD<2015>$$$*/
+/*
+ * Copyright (c) 2018 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
 /**@file lwm2m_objects.h
  *
  * @defgroup iot_sdk_lwm2m_objects OMA LWM2M objects definitions and types
@@ -16,7 +21,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "lwm2m_api.h"
+#include <lwm2m_api.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -137,6 +142,7 @@ extern "C" {
 #define LWM2M_DEVICE_MEMORY_TOTAL               21
 
 #define LWM2M_DEVICE_MAX_POWER_SOURCES          8
+#define LWM2M_DEVICE_MAX_ERROR_CODES            8
 
 /* LWM2M Location */
 #define LWM2M_LOCATION_LATITUDE                 0

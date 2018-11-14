@@ -1,4 +1,9 @@
-/*$$$LICENCE_NORDIC_STANDARD<2016>$$$*/
+/*
+ * Copyright (c) 2018 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
 /** @file lwm2m_remote.h
  *
  * @defgroup iot_sdk_lwm2m_remote_api LWM2M Remote API interface
@@ -10,7 +15,7 @@
 #ifndef LWM2M_REMOTE_H__
 #define LWM2M_REMOTE_H__
 
-#include "lwm2m_api.h"
+#include <lwm2m_api.h>
 
 /**
  * @brief      Initialize this module.

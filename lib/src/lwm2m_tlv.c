@@ -1,9 +1,14 @@
-/*$$$LICENCE_NORDIC_STANDARD<2015>$$$*/
+/*
+ * Copyright (c) 2015 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
 #include <stdint.h>
 #include <string.h>
-#include "lwm2m_tlv.h"
-#include "lwm2m_objects.h"
-#include "iot_errors.h"
+
+#include <lwm2m_tlv.h>
+#include <lwm2m_objects.h>
 
 
 uint32_t lwm2m_tlv_bytebuffer_to_int32(uint8_t * p_buffer, uint8_t val_len, int32_t * p_result)
@@ -41,11 +46,11 @@ uint32_t lwm2m_tlv_bytebuffer_to_int32(uint8_t * p_buffer, uint8_t val_len, int3
         }
 
         default:
-            return NRF_ERROR_DATA_SIZE;
+            return EMSGSIZE;
     }
 
     *p_result = res;
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -92,11 +97,11 @@ static uint32_t lwm2m_tlv_bytebuffer_to_uint32(uint8_t * p_buffer, uint8_t val_l
         }
 
         default:
-            return NRF_ERROR_DATA_SIZE;
+            return EMSGSIZE;
     }
 
     *p_result = res;
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -125,11 +130,11 @@ uint32_t lwm2m_tlv_bytebuffer_to_uint16(uint8_t * p_buffer, uint8_t val_len, uin
         }
 
         default:
-            return NRF_ERROR_DATA_SIZE;
+            return EMSGSIZE;
     }
 
     *p_result = res;
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -232,10 +237,10 @@ static uint32_t lwm2m_tlv_list_item_length(const lwm2m_list_t * p_list,
             break;
 
         default:
-            return NRF_ERROR_INTERNAL;
+            return EINVAL;
     }
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -285,7 +290,7 @@ static uint32_t lwm2m_tlv_list_item_encode(uint8_t            * p_buffer,
                 break;
 
             default:
-                return NRF_ERROR_INTERNAL;
+                return EINVAL;
         }
 
         lwm2m_tlv_int32_to_bytebuffer(value_buffer, &value_length, value);
@@ -315,12 +320,12 @@ uint32_t lwm2m_tlv_list_decode(lwm2m_tlv_t    tlv_range,
     {
         if (p_list->len >= p_list->max_len)
         {
-            return NRF_ERROR_DATA_SIZE;
+            return EMSGSIZE;
         }
 
         err_code = lwm2m_tlv_decode(&tlv, &index, tlv_range.value, tlv_range.length);
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
             return err_code;
         }
@@ -331,7 +336,7 @@ uint32_t lwm2m_tlv_list_decode(lwm2m_tlv_t    tlv_range,
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value, tlv.length, &value);
 
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     return err_code;
                 }
@@ -344,7 +349,7 @@ uint32_t lwm2m_tlv_list_decode(lwm2m_tlv_t    tlv_range,
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value, tlv.length, &value);
 
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     return err_code;
                 }
@@ -357,7 +362,7 @@ uint32_t lwm2m_tlv_list_decode(lwm2m_tlv_t    tlv_range,
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value, tlv.length, &value);
 
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     return err_code;
                 }
@@ -375,7 +380,7 @@ uint32_t lwm2m_tlv_list_decode(lwm2m_tlv_t    tlv_range,
 
                 err_code = lwm2m_bytebuffer_to_string((char *)tlv.value, tlv.length, &string);
 
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     return err_code;
                 }
@@ -386,7 +391,7 @@ uint32_t lwm2m_tlv_list_decode(lwm2m_tlv_t    tlv_range,
             }
 
             default:
-                return NRF_ERROR_INTERNAL;
+                return EINVAL;
         }
 
         if (p_list->p_id)
@@ -397,7 +402,7 @@ uint32_t lwm2m_tlv_list_decode(lwm2m_tlv_t    tlv_range,
         p_list->len++;
     }
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -420,7 +425,7 @@ uint32_t lwm2m_tlv_list_encode(uint8_t            * p_buffer,
         // Nothing to encode
         *p_buffer_len = 0;
 
-        return NRF_SUCCESS;
+        return 0;
     }
 
     lwm2m_tlv_t tlv =
@@ -444,14 +449,14 @@ uint32_t lwm2m_tlv_list_encode(uint8_t            * p_buffer,
 
         err_code = lwm2m_tlv_list_item_length(p_list, i, &tlv.length);
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
             return err_code;
         }
 
         err_code = lwm2m_tlv_header_encode(header_buffer, &header_buffer_len, &tlv);
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
             return err_code;
         }
@@ -467,7 +472,7 @@ uint32_t lwm2m_tlv_list_encode(uint8_t            * p_buffer,
     uint32_t buffer_len = *p_buffer_len;
     err_code = lwm2m_tlv_header_encode(p_buffer, p_buffer_len, &tlv);
 
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         return err_code;
     }
@@ -484,7 +489,7 @@ uint32_t lwm2m_tlv_list_encode(uint8_t            * p_buffer,
         buffer_len = *p_buffer_len;
         err_code = lwm2m_tlv_list_item_encode(p_buffer, p_buffer_len, p_list, i);
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
             return err_code;
         }
@@ -526,7 +531,7 @@ uint32_t lwm2m_tlv_decode(lwm2m_tlv_t * p_tlv,
 
     err_code = lwm2m_tlv_bytebuffer_to_uint16(&p_buffer[index], id_len_size, &p_tlv->id);
 
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         return err_code;
     }
@@ -541,7 +546,7 @@ uint32_t lwm2m_tlv_decode(lwm2m_tlv_t * p_tlv,
     else
     {
         err_code = lwm2m_tlv_bytebuffer_to_uint32(&p_buffer[index], length_len, &length);
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
             return err_code;
         }
@@ -552,14 +557,14 @@ uint32_t lwm2m_tlv_decode(lwm2m_tlv_t * p_tlv,
 
     if (p_tlv->length > buffer_len)
     {
-        return (IOT_LWM2M_ERR_BASE | NRF_ERROR_INVALID_DATA);
+        return EINVAL;
     }
 
     p_tlv->value = &p_buffer[index];
 
     *p_index = index + p_tlv->length;
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -609,7 +614,7 @@ uint32_t lwm2m_tlv_header_encode(uint8_t * p_buffer, uint32_t * p_buffer_len, lw
         // Length can not be larger than 24-bit.
         if (length_len > TLV_LEN_TYPE_24BIT)
         {
-            return (IOT_LWM2M_ERR_BASE | NRF_ERROR_INVALID_PARAM);
+            return EINVAL;
         }
 
         type |= (length_len << TLV_LEN_TYPE_BIT_POS);
@@ -618,7 +623,7 @@ uint32_t lwm2m_tlv_header_encode(uint8_t * p_buffer, uint32_t * p_buffer_len, lw
     // Check if the buffer is large enough.
     if (*p_buffer_len < (id_len + length_len + 1)) // + 1 for the type byte
     {
-        return (IOT_LWM2M_ERR_BASE | NRF_ERROR_DATA_SIZE);
+        return EMSGSIZE;
     }
 
     // Copy the type to the buffer.
@@ -639,7 +644,7 @@ uint32_t lwm2m_tlv_header_encode(uint8_t * p_buffer, uint32_t * p_buffer_len, lw
     // Set length of the output buffer.
     *p_buffer_len = index;
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -648,7 +653,7 @@ uint32_t lwm2m_tlv_encode(uint8_t * p_buffer, uint32_t * p_buffer_len, lwm2m_tlv
     uint32_t header_len = *p_buffer_len;
     uint32_t err_code   = lwm2m_tlv_header_encode(p_buffer, &header_len, p_tlv);
 
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         return err_code;
     }
@@ -658,7 +663,7 @@ uint32_t lwm2m_tlv_encode(uint8_t * p_buffer, uint32_t * p_buffer_len, lwm2m_tlv
         // Check if the buffer is large enough.
         if (*p_buffer_len < (header_len + p_tlv->length))
         {
-            return (IOT_LWM2M_ERR_BASE | NRF_ERROR_DATA_SIZE);
+            return EMSGSIZE;
         }
 
         // Copy the value to buffer.
@@ -668,7 +673,7 @@ uint32_t lwm2m_tlv_encode(uint8_t * p_buffer, uint32_t * p_buffer_len, lwm2m_tlv
     // Set length of the output buffer.
     *p_buffer_len = (header_len + p_tlv->length);
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 

@@ -1,9 +1,14 @@
-/*$$$LICENCE_NORDIC_STANDARD<2015>$$$*/
+/*
+ * Copyright (c) 2018 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
 #include <string.h>
 #include <stddef.h>
 
-#include "lwm2m_objects.h"
-#include "lwm2m.h"
+#include <lwm2m_objects.h>
+#include <lwm2m.h>
 
 // Connectivity Monitoring object
 static int32_t        m_available_network_bearer[LWM2M_CONNECTIVITY_MONITORING_MAX_NETWORK_BEARERS];
@@ -33,7 +38,7 @@ uint32_t lwm2m_bytebuffer_to_string(char * p_payload, uint16_t payload_len, lwm2
 
     if (p_value == NULL)
     {
-        return NRF_ERROR_NO_MEM;
+        return ENOMEM;
     }
 
     memcpy(p_value, p_payload, payload_len);
@@ -46,7 +51,7 @@ uint32_t lwm2m_bytebuffer_to_string(char * p_payload, uint16_t payload_len, lwm2
     p_string->p_val = p_value;
     p_string->len   = payload_len;
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -398,5 +403,3 @@ void lwm2m_instance_software_update_init(lwm2m_software_update_t * p_instance)
     p_instance->resource_ids[7] = LWM2M_SW_UPDATE_UPDATE_STATE;
     p_instance->resource_ids[8] = LWM2M_SW_UPDATE_SUPPORTED_OBJECTS;
 }
-
-

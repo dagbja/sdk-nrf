@@ -1,39 +1,19 @@
-/*$$$LICENCE_NORDIC_STANDARD<2016>$$$*/
+/*
+ * Copyright (c) 2016 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
+#define LOG_MODULE_NAME lwm2m
+#define NET_LOG_LEVEL CONFIG_LWM2M_LOG_LEVEL
+
 #include <string.h>
 
-#include "lwm2m_acl.h"
-#include "lwm2m_tlv.h"
-#include "lwm2m_objects.h"
+#include <lwm2m_acl.h>
+#include <lwm2m_tlv.h>
+#include <lwm2m_objects.h>
 
-#if LWM2M_CONFIG_LOG_ENABLED
-
-#define NRF_LOG_MODULE_NAME lwm2m
-
-#define NRF_LOG_LEVEL       LWM2M_CONFIG_LOG_LEVEL
-#define NRF_LOG_INFO_COLOR  LWM2M_CONFIG_INFO_COLOR
-#define NRF_LOG_DEBUG_COLOR LWM2M_CONFIG_DEBUG_COLOR
-
-#include "nrf_log.h"
-
-#define LWM2M_TRC     NRF_LOG_DEBUG                                                                 /**< Used for getting trace of execution in the module. */
-#define LWM2M_ERR     NRF_LOG_ERROR                                                                 /**< Used for logging errors in the module. */
-#define LWM2M_DUMP    NRF_LOG_HEXDUMP_DEBUG                                                         /**< Used for dumping octet information to get details of bond information etc. */
-
-#define LWM2M_ENTRY() LWM2M_TRC(">> %s", __func__)
-#define LWM2M_EXIT()  LWM2M_TRC("<< %s", __func__)
-
-#else // LWM2M_CONFIG_LOG_ENABLED
-
-#define LWM2M_TRC(...)                                                                              /**< Disables traces. */
-#define LWM2M_DUMP(...)                                                                             /**< Disables dumping of octet streams. */
-#define LWM2M_ERR(...)                                                                              /**< Disables error logs. */
-
-#define LWM2M_ENTRY(...)
-#define LWM2M_EXIT(...)
-
-#endif // LWM2M_CONFIG_LOG_ENABLED
-
-#define LWM2M_ACL_INTERNAL_NOT_FOUND      65537
+#define LWM2M_ACL_INTERNAL_NOT_FOUND 65537
 
 uint16_t m_index_counter;
 
@@ -79,7 +59,7 @@ static void index_buffer_len_update(uint32_t * index, uint32_t * buffer_len, uin
 uint32_t lwm2m_acl_init(void)
 {
     m_index_counter = 0;
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -95,7 +75,7 @@ uint32_t lwm2m_acl_permissions_init(lwm2m_instance_t * p_instance,
     p_instance->acl.owner     = owner;
     m_index_counter++;
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -114,7 +94,7 @@ uint32_t lwm2m_acl_permissions_check(uint16_t         * p_access,
 
         LWM2M_TRC("[ACL  ]: << lwm2m_acl_permissions_check. %u is owner.\r\n", short_server_id);
 
-        return NRF_SUCCESS;
+        return 0;
     }
 
     // Find index
@@ -134,7 +114,7 @@ uint32_t lwm2m_acl_permissions_check(uint16_t         * p_access,
 
             LWM2M_TRC("[ACL  ]: << lwm2m_acl_permissions_check. %u was not found.\r\n", short_server_id);
 
-            return LWM2M_ERROR(NRF_ERROR_NOT_FOUND);
+            return ENOENT;
         }
     }
 
@@ -142,7 +122,7 @@ uint32_t lwm2m_acl_permissions_check(uint16_t         * p_access,
 
     LWM2M_TRC("[ACL  ]: << lwm2m_acl_permissions_check. Success.\r\n");
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -165,14 +145,14 @@ uint32_t lwm2m_acl_permissions_add(lwm2m_instance_t * p_instance,
 
         if (index == LWM2M_ACL_INTERNAL_NOT_FOUND)
         {
-            return LWM2M_ERROR(NRF_ERROR_NO_MEM);
+            return ENOMEM;
         }
     }
 
     p_instance->acl.access[index] = access;
     p_instance->acl.server[index] = short_server_id;
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -193,14 +173,14 @@ uint32_t lwm2m_acl_permissions_remove(lwm2m_instance_t * p_instance,
 
         if (index == LWM2M_ACL_INTERNAL_NOT_FOUND)
         {
-            return LWM2M_ERROR(NRF_ERROR_NOT_FOUND);
+            return ENOENT;
         }
     }
 
     p_instance->acl.server[index] = 0;
     p_instance->acl.access[index] = 0;
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -217,7 +197,7 @@ uint32_t lwm2m_acl_serialize_tlv(uint8_t          * p_buffer,
                                         LWM2M_ACL_OBJECT_ID,
                                         p_instance->object_id);
 
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         return err_code;
     }
@@ -229,7 +209,7 @@ uint32_t lwm2m_acl_serialize_tlv(uint8_t          * p_buffer,
                                         LWM2M_ACL_INSTANCE_ID,
                                         p_instance->instance_id);
 
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         return err_code;
     }
@@ -258,7 +238,7 @@ uint32_t lwm2m_acl_serialize_tlv(uint8_t          * p_buffer,
 
     err_code = lwm2m_tlv_list_encode(p_buffer + index, p_buffer_len, LWM2M_ACL_ACL, &list);
 
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         return err_code;
     }
@@ -270,7 +250,7 @@ uint32_t lwm2m_acl_serialize_tlv(uint8_t          * p_buffer,
                                         LWM2M_ACL_CONTROL_OWNER,
                                         p_instance->acl.owner);
 
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         return err_code;
     }
@@ -279,5 +259,5 @@ uint32_t lwm2m_acl_serialize_tlv(uint8_t          * p_buffer,
 
     *p_buffer_len = index;
 
-    return NRF_SUCCESS;
+    return 0;
 }

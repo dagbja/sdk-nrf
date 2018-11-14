@@ -1,4 +1,9 @@
-/*$$$LICENCE_NORDIC_STANDARD<2015>$$$*/
+/*
+ * Copyright (c) 2018 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
 /** @file lwm2m_register.h
  *
  * @defgroup iot_sdk_lwm2m_register_api LWM2M register API interface
@@ -11,7 +16,7 @@
 #define LWM2M_REGISTER_H__
 
 #include <stdint.h>
-#include "lwm2m_api.h"
+#include <lwm2m_api.h>
 
 #ifdef __cplusplus
 extern "C" {

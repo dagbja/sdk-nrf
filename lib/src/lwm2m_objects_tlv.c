@@ -1,6 +1,11 @@
-/*$$$LICENCE_NORDIC_STANDARD<2015>$$$*/
-#include "lwm2m_objects_tlv.h"
-#include "lwm2m_tlv.h"
+/*
+ * Copyright (c) 2018 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
+#include <lwm2m_objects_tlv.h>
+#include <lwm2m_tlv.h>
 
 
 static void index_buffer_len_update(uint32_t * index, uint32_t * buffer_len, uint32_t max_buffer)
@@ -72,12 +77,12 @@ uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
 
             default:
             {
-                err_code = NRF_ERROR_NOT_FOUND;
+                err_code = ENOENT;
                 break;
             }
         }
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
             return err_code;
         }
@@ -87,7 +92,7 @@ uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
 
     *p_buffer_len = index;
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -106,7 +111,7 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t * p_security,
     {
         err_code = lwm2m_tlv_decode(&tlv, &index, p_buffer, buffer_len);
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
             return err_code;
         }
@@ -200,13 +205,13 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t * p_security,
                 break;
         }
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
-            return NRF_ERROR_INVALID_DATA;
+            return EINVAL;
         }
     }
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -342,7 +347,7 @@ uint32_t lwm2m_tlv_security_encode(uint8_t          * p_buffer,
 
         default:
         {
-            err_code = NRF_ERROR_NOT_FOUND;
+            err_code = ENOENT;
             break;
         }
     }
@@ -365,7 +370,7 @@ uint32_t lwm2m_tlv_server_decode(lwm2m_server_t * p_server,
     while (index < buffer_len)
     {
         err_code = lwm2m_tlv_decode(&tlv, &index, p_buffer, buffer_len);
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
             return err_code;
         }
@@ -442,13 +447,13 @@ uint32_t lwm2m_tlv_server_decode(lwm2m_server_t * p_server,
                 break;
         }
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
-            return NRF_ERROR_INVALID_DATA;
+            return EINVAL;
         }
     }
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -546,7 +551,7 @@ uint32_t lwm2m_tlv_server_encode(uint8_t        * p_buffer,
 
         default:
         {
-            err_code = NRF_ERROR_NOT_FOUND;
+            err_code = ENOENT;
             break;
         }
     }
@@ -570,7 +575,7 @@ uint32_t lwm2m_tlv_connectivity_monitoring_decode(lwm2m_connectivity_monitoring_
     {
         err_code = lwm2m_tlv_decode(&tlv, &index, p_buffer, buffer_len);
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
             return err_code;
         }
@@ -659,13 +664,13 @@ uint32_t lwm2m_tlv_connectivity_monitoring_decode(lwm2m_connectivity_monitoring_
                 break;
         }
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
-            return NRF_ERROR_INVALID_DATA;
+            return EINVAL;
         }
     }
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -792,7 +797,7 @@ uint32_t lwm2m_tlv_connectivity_monitoring_encode(uint8_t                       
 
         default:
         {
-            err_code = NRF_ERROR_NOT_FOUND;
+            err_code = ENOENT;
             break;
         }
     }
@@ -816,7 +821,7 @@ uint32_t lwm2m_tlv_device_decode(lwm2m_device_t * p_device,
     {
         err_code = lwm2m_tlv_decode(&tlv, &index, p_buffer, buffer_len);
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
             return err_code;
         }
@@ -848,17 +853,17 @@ uint32_t lwm2m_tlv_device_decode(lwm2m_device_t * p_device,
             }
 
             default:
-                err_code = NRF_ERROR_NOT_SUPPORTED;
+                err_code = ENOTSUP;
                 break;
         }
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
-            return NRF_ERROR_INVALID_DATA;
+            return EINVAL;
         }
     }
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -1057,7 +1062,7 @@ uint32_t lwm2m_tlv_device_encode(uint8_t        * p_buffer,
 
         default:
         {
-            err_code = NRF_ERROR_NOT_FOUND;
+            err_code = ENOENT;
             break;
         }
     }

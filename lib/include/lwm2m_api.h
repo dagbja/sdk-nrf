@@ -1,4 +1,9 @@
-/*$$$LICENCE_NORDIC_STANDARD<2015>$$$*/
+/*
+ * Copyright (c) 2018 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
 /** @file lwm2m_api.h
  *
  * @defgroup iot_sdk_lwm2m_api LWM2M Application Programming Interface
@@ -10,12 +15,21 @@
 #define LWM2M_API_H__
 
 #include <stdint.h>
-#include "net/socket.h"
-#include "lwm2m.h"
+#include <net/socket.h>
+#include <lwm2m.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define LWM2M_COAP_HANDLER_MAX_INSTANCES CONFIG_NRF_LWM2M_COAP_HANDLER_MAX_INSTANCES
+#define LWM2M_COAP_HANDLER_MAX_OBJECTS   CONFIG_NRF_LWM2M_COAP_HANDLER_MAX_OBJECTS
+#define LWM2M_MAX_SERVERS                CONFIG_NRF_LWM2M_MAX_SERVERS
+#define LWM2M_REGISTER_MAX_LOCATION_LEN  CONFIG_NRF_LWM2M_REGISTER_MAX_LOCATION_LEN
+#define LWM2M_CONNECTIVITY_MONITORING_MAX_NETWORK_BEARERS CONFIG_NRF_LWM2M_CONNECTIVITY_MONITORING_MAX_NETWORK_BEARERS
+#define LWM2M_CONNECTIVITY_MONITORING_MAX_IP_ADDRESSES CONFIG_NRF_LWM2M_CONNECTIVITY_MONITORING_MAX_IP_ADDRESSES
+#define LWM2M_CONNECTIVITY_MONITORING_MAX_APNS CONFIG_NRF_LWM2M_CONNECTIVITY_MONITORING_MAX_APNS
+
 
 /**@addtogroup LWM2M_opcodes Types
  * @{
@@ -159,7 +173,7 @@ typedef struct lwm2m_instance_t lwm2m_instance_t;
  *
  * @retval A valid memory address on success, else NULL.
  */
-typedef void * (*lwm2m_alloc_t) (uint32_t size);
+typedef void * (*lwm2m_alloc_t) (size_t size);
 
 /**@brief Signature of function registered by the application with
  *        module to free the memory allocated by the module.

@@ -1,8 +1,14 @@
-/*$$$LICENCE_NORDIC_STANDARD<2018>$$$*/
+/*
+ * Copyright (c) 2018 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
 #include <stdlib.h>
 
-#include "lwm2m_objects_plain_text.h"
-#include "lwm2m_objects.h"
+#include <lwm2m_objects_plain_text.h>
+#include <lwm2m_objects.h>
+
 
 static uint32_t lwm2m_plain_text_to_int32(uint8_t * p_payload, uint16_t payload_len, int32_t * p_value)
 {
@@ -20,12 +26,12 @@ static uint32_t lwm2m_plain_text_to_int32(uint8_t * p_payload, uint16_t payload_
 
     if (p_end != (payload + payload_len))
     {
-        return NRF_ERROR_NOT_FOUND;
+        return ENOENT;
     }
 
     *p_value = value;
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 uint32_t lwm2m_plain_text_server_decode(lwm2m_server_t * p_server,
@@ -47,7 +53,7 @@ uint32_t lwm2m_plain_text_server_decode(lwm2m_server_t * p_server,
                                                  buffer_len,
                                                  &value);
 
-            if (err_code == NRF_SUCCESS)
+            if (err_code == 0)
             {
                 if ((value >= 0) && (value <= UINT16_MAX))
                 {
@@ -55,7 +61,7 @@ uint32_t lwm2m_plain_text_server_decode(lwm2m_server_t * p_server,
                 }
                 else
                 {
-                    err_code = NRF_ERROR_INVALID_DATA;
+                    err_code = EINVAL;
                 }
             }
             break;
@@ -99,7 +105,7 @@ uint32_t lwm2m_plain_text_server_decode(lwm2m_server_t * p_server,
                                                  buffer_len,
                                                  &value);
 
-            if (err_code == NRF_SUCCESS)
+            if (err_code == 0)
             {
                 if ((value >= 0) && (value <= UINT8_MAX))
                 {
@@ -107,7 +113,7 @@ uint32_t lwm2m_plain_text_server_decode(lwm2m_server_t * p_server,
                 }
                 else
                 {
-                    err_code = NRF_ERROR_INVALID_DATA;
+                    err_code = EINVAL;
                 }
             }
             break;
@@ -122,7 +128,7 @@ uint32_t lwm2m_plain_text_server_decode(lwm2m_server_t * p_server,
         }
 
         default:
-            err_code = NRF_ERROR_NOT_SUPPORTED;
+            err_code = ENOTSUP;
             break;
     }
 
@@ -167,7 +173,7 @@ uint32_t lwm2m_plain_text_device_decode(lwm2m_device_t * p_device,
         }
 
         default:
-            err_code = NRF_ERROR_NOT_SUPPORTED;
+            err_code = ENOTSUP;
             break;
     }
 

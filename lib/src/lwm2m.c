@@ -1,54 +1,31 @@
-/*$$$LICENCE_NORDIC_STANDARD<2015>$$$*/
+/*
+ * Copyright (c) 2015 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
+#define LOG_MODULE_NAME lwm2m
+#define NET_LOG_LEVEL CONFIG_LWM2M_LOG_LEVEL
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
 
-#include "lwm2m_api.h"
-#include "lwm2m_register.h"
-#include "lwm2m_bootstrap.h"
-#include "lwm2m_acl.h"
-#include "lwm2m_tlv.h"
-#include "lwm2m_objects.h"
-#include "lwm2m_remote.h"
-#include "sdk_os.h"
-#include "lwm2m.h"
-#include "sdk_config.h"
-
-#if LWM2M_CONFIG_LOG_ENABLED
-
-#define NRF_LOG_MODULE_NAME lwm2m
-
-#define NRF_LOG_LEVEL       LWM2M_CONFIG_LOG_LEVEL
-#define NRF_LOG_INFO_COLOR  LWM2M_CONFIG_INFO_COLOR
-#define NRF_LOG_DEBUG_COLOR LWM2M_CONFIG_DEBUG_COLOR
-
-#include "nrf_log.h"
-NRF_LOG_MODULE_REGISTER();
-
-#define LWM2M_TRC     NRF_LOG_DEBUG                                                                 /**< Used for getting trace of execution in the module. */
-#define LWM2M_ERR     NRF_LOG_ERROR                                                                 /**< Used for logging errors in the module. */
-#define LWM2M_DUMP    NRF_LOG_HEXDUMP_DEBUG                                                         /**< Used for dumping octet information to get details of bond information etc. */
-
-#define LWM2M_ENTRY() LWM2M_TRC(">> %s", __func__)
-#define LWM2M_EXIT()  LWM2M_TRC("<< %s", __func__)
-
-#else // LWM2M_CONFIG_LOG_ENABLED
-
-#define LWM2M_TRC(...)                                                                              /**< Disables traces. */
-#define LWM2M_DUMP(...)                                                                             /**< Disables dumping of octet streams. */
-#define LWM2M_ERR(...)                                                                              /**< Disables error logs. */
-
-#define LWM2M_ENTRY(...)
-#define LWM2M_EXIT(...)
-
-#endif // LWM2M_CONFIG_LOG_ENABLED
+#include <lwm2m_api.h>
+#include <lwm2m_register.h>
+#include <lwm2m_bootstrap.h>
+#include <lwm2m_acl.h>
+#include <lwm2m_tlv.h>
+#include <lwm2m_objects.h>
+#include <lwm2m_remote.h>
+#include <lwm2m.h>
 
 static lwm2m_alloc_t   m_alloc_fn = NULL;                                                           /**< Memory allocator function, populated on @lwm2m_init. */
 static lwm2m_free_t    m_free_fn = NULL;                                                            /**< Memory free function, populated on @lwm2m_init. */
 
 
-void * lwm2m_malloc(uint32_t size)
+void * lwm2m_malloc(size_t size)
 {
     if (m_alloc_fn)
     {
@@ -70,7 +47,7 @@ void lwm2m_free(void * p_memory)
 }
 
 
-#if (LWM2M_CONFIG_LOG_ENABLED != 0)
+//#if (LWM2M_CONFIG_LOG_ENABLED != 0)
 
 static uint8_t op_desc_idx_lookup(uint8_t bitmask)
 {
@@ -99,9 +76,10 @@ static const char m_operation_desc[8][9] = {
 };
 
 
-#endif
+//#endif
 
-SDK_MUTEX_DEFINE(m_lwm2m_mutex) /**< Mutex variable. Currently unused, this declaration does not occupy any space in RAM. */
+/** Mutex used by LwM2M implementation. */
+struct k_mutex m_lwm2m_mutex;
 
 static lwm2m_object_t   * m_objects[LWM2M_COAP_HANDLER_MAX_OBJECTS];
 static lwm2m_instance_t * m_instances[LWM2M_COAP_HANDLER_MAX_INSTANCES];
@@ -149,13 +127,13 @@ static uint16_t internal_get_allowed_operations(lwm2m_instance_t * p_instance,
                                            p_instance,
                                            short_server_id);
 
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         err_code = lwm2m_acl_permissions_check(&acl_access,
                                                p_instance,
                                                LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
              // Should not happen as instance_resolve should not return NULL.
         }
@@ -184,16 +162,16 @@ static uint32_t instance_resolve(lwm2m_instance_t  ** p_instance,
         {
             if (m_instances[i]->callback == NULL)
             {
-                return LWM2M_INVALID_INSTANCE_CALLBACK;
+                return EINVAL;
             }
 
             *p_instance = m_instances[i];
 
-            return NRF_SUCCESS;
+            return 0;
         }
     }
 
-    return LWM2M_INSTANCE_NOT_FOUND;
+    return ENOENT;
 }
 
 
@@ -206,16 +184,16 @@ static uint32_t object_resolve(lwm2m_object_t  ** p_instance,
         {
             if (m_objects[i]->callback == NULL)
             {
-                return LWM2M_INVALID_OBJECT_CALLBACK;
+                return EINVAL;
             }
 
             *p_instance = m_objects[i];
 
-            return NRF_SUCCESS;
+            return 0;
         }
     }
 
-    return LWM2M_OBJECT_NOT_FOUND;
+    return ENOENT;
 }
 
 
@@ -232,11 +210,11 @@ static uint32_t op_code_resolve(lwm2m_instance_t * p_instance,
         {
             *operation = operations[i];
 
-            return NRF_SUCCESS;
+            return 0;
         }
     }
 
-    return NRF_ERROR_NOT_FOUND;
+    return ENOENT;
 }
 
 
@@ -282,7 +260,7 @@ static uint32_t internal_gen_acl_link(uint8_t * p_buffer, uint32_t * p_len)
         }
         else
         {
-            return NRF_ERROR_NO_MEM;
+            return ENOMEM;
         }
     }
 
@@ -296,7 +274,7 @@ static uint32_t internal_gen_acl_link(uint8_t * p_buffer, uint32_t * p_len)
     }
 
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -316,7 +294,7 @@ static uint32_t internal_acl_save_from_tlv(uint8_t          * buffer,
     {
         err_code = lwm2m_tlv_decode(&tlv, &index, buffer, buffer_len);
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
             break;
         }
@@ -366,7 +344,7 @@ static uint32_t internal_acl_save_from_tlv(uint8_t          * buffer,
         {
             err_code = lwm2m_tlv_decode(&tlv, &index, acl_list.value, acl_list.length);
 
-            if (err_code != NRF_SUCCESS)
+            if (err_code != 0)
             {
                 break;
             }
@@ -374,7 +352,7 @@ static uint32_t internal_acl_save_from_tlv(uint8_t          * buffer,
             (void)lwm2m_acl_permissions_remove(p_instance, tlv.id);
             err_code = lwm2m_acl_permissions_add(p_instance, tlv.value[0], tlv.id);
 
-            if (err_code != NRF_SUCCESS)
+            if (err_code != 0)
             {
                 break;
             }
@@ -382,7 +360,7 @@ static uint32_t internal_acl_save_from_tlv(uint8_t          * buffer,
     }
     else
     {
-        return LWM2M_INVALID_REQUEST;
+        return EINVAL;
     }
 
     return err_code;
@@ -395,7 +373,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                                             uint8_t          operation,
                                             uint16_t         short_server_id)
 {
-    uint32_t           err_code        = NRF_ERROR_NOT_FOUND;
+    uint32_t           err_code        = ENOENT;
     uint32_t           index           = 0;
     uint32_t           buffer_max_size = LWM2M_COAP_HANDLER_MAX_INSTANCES * LWM2M_ACL_TLV_SIZE;
     uint32_t           buffer_len      = buffer_max_size;
@@ -418,9 +396,9 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                 for(int i = 0; i < m_num_instances; ++i)
                 {
                     err_code = lwm2m_acl_serialize_tlv(buffer + index, &buffer_len, m_instances[i]);
-                    if (err_code != NRF_SUCCESS)
+                    if (err_code != 0)
                     {
-                        // NRF_ERROR_NO_MEM should not happen. Then it is a bug.
+                        // ENOMEM should not happen. Then it is a bug.
                         break;
                     }
 
@@ -441,7 +419,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
             case LWM2M_OPERATION_CODE_DISCOVER:
             {
                 err_code = internal_gen_acl_link(buffer, &buffer_len);
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     // This should not happen, it is a bug if the buffer is too small.
                     break;
@@ -483,7 +461,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
 
         if (current_instance == NULL)
         {
-            return LWM2M_INSTANCE_NOT_FOUND;
+            return ENOENT;
         }
 
         switch (operation)
@@ -496,7 +474,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                     if (m_instances[i]->acl.id == p_path[1])
                     {
                         err_code = lwm2m_acl_serialize_tlv(buffer, &buffer_len, m_instances[i]);
-                        if (err_code != NRF_SUCCESS)
+                        if (err_code != 0)
                         {
                              // This should not happen, it is a bug if the buffer is too small.
                              break;
@@ -511,7 +489,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
 
                 if (!found)
                 {
-                    err_code = NRF_ERROR_NOT_FOUND;
+                    err_code = ENOENT;
                 }
 
                 break;
@@ -526,11 +504,11 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                     err_code = lwm2m_handler_error(short_server_id,
                                                    current_instance,
                                                    p_request,
-                                                   LWM2M_ACL_ACCESS_DENIED);
+                                                   EACCES);
 
                     LWM2M_MUTEX_LOCK();
 
-                    if (err_code != NRF_SUCCESS)
+                    if (err_code != 0)
                     {
                         err_code = lwm2m_respond_with_code(COAP_CODE_401_UNAUTHORIZED, p_request);
                         break;
@@ -539,7 +517,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
 
 
                 err_code = internal_acl_save_from_tlv(p_request->p_payload, p_request->payload_len, current_instance);
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     LWM2M_MUTEX_UNLOCK();
 
@@ -550,7 +528,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
 
                     LWM2M_MUTEX_LOCK();
 
-                    if (err_code != NRF_SUCCESS)
+                    if (err_code != 0)
                     {
                         err_code = lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
                     }
@@ -587,7 +565,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                     }
                 }
 
-                err_code = NRF_ERROR_NOT_FOUND;
+                err_code = ENOENT;
                 break;
             }
             case LWM2M_OPERATION_CODE_OBSERVE:
@@ -622,7 +600,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
 
         if (current_instance == NULL)
         {
-            return LWM2M_INSTANCE_NOT_FOUND;
+            return ENOENT;
         }
 
         switch (p_path[2])
@@ -640,7 +618,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                                                         LWM2M_ACL_OBJECT_ID,
                                                         current_instance->object_id);
 
-                    if (err_code != NRF_SUCCESS)
+                    if (err_code != 0)
                     {
                         return err_code;
                     }
@@ -659,7 +637,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                                                         LWM2M_ACL_INSTANCE_ID,
                                                         current_instance->instance_id);
 
-                    if (err_code != NRF_SUCCESS)
+                    if (err_code != 0)
                     {
                         return err_code;
                     }
@@ -696,7 +674,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
 
                     err_code = lwm2m_tlv_list_encode(buffer, &buffer_len, LWM2M_ACL_ACL, &list);
 
-                    if (err_code != NRF_SUCCESS)
+                    if (err_code != 0)
                     {
                         return err_code;
                     }
@@ -714,7 +692,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                                                        LWM2M_ACL_CONTROL_OWNER,
                                                        current_instance->acl.owner);
 
-                    if (err_code != NRF_SUCCESS)
+                    if (err_code != 0)
                     {
                         return err_code;
                     }
@@ -754,7 +732,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
     uint32_t content_type = 0;
 
     err_code = coap_message_ct_mask_get(p_request, &content_type);
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         return err_code;
     }
@@ -800,11 +778,11 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
             err_code = lwm2m_handler_error(short_server_id,
                                            NULL,
                                            p_request,
-                                           LWM2M_INVALID_REQUEST);
+                                           EINVAL);
 
             LWM2M_MUTEX_LOCK();
 
-            if (err_code != NRF_SUCCESS)
+            if (err_code != 0)
             {
                 err_code = lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
             }
@@ -827,7 +805,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
     }
 
 
-    err_code = NRF_ERROR_NOT_FOUND;
+    err_code = ENOENT;
 
     switch (path_len)
     {
@@ -855,11 +833,11 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
                 err_code = lwm2m_handler_error(short_server_id,
                                                NULL,
                                                p_request,
-                                               LWM2M_INVALID_REQUEST);
+                                               EINVAL);
 
                 LWM2M_MUTEX_LOCK();
 
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     err_code = lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
                 }
@@ -878,7 +856,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
             err_code = object_resolve(&p_object, p_path[0]);
 
-            if (err_code != NRF_SUCCESS)
+            if (err_code != 0)
             {
                 LWM2M_MUTEX_UNLOCK();
 
@@ -889,7 +867,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
                 LWM2M_MUTEX_LOCK();
 
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     err_code = lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
                 }
@@ -905,7 +883,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
             LWM2M_TRC("[CoAP      ]:   << %s object /%u/, result: %s\r\n",
                       m_operation_desc[op_desc_idx_lookup(operation)],
                       p_path[0],
-                      (err_code == NRF_SUCCESS) ? "SUCCESS" : "NOT_FOUND");
+                      (err_code == 0) ? "SUCCESS" : "NOT_FOUND");
 
             break;
         }
@@ -921,18 +899,18 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
             err_code = instance_resolve(&p_instance, p_path[0], p_path[1]);
 
-            if (err_code == LWM2M_INVALID_INSTANCE_CALLBACK)
+            if (err_code == EINVAL)
             {
                 LWM2M_MUTEX_UNLOCK();
 
                 err_code = lwm2m_handler_error(short_server_id,
                                                NULL,
                                                p_request,
-                                               LWM2M_INVALID_INSTANCE_CALLBACK);
+                                               EINVAL);
 
                 LWM2M_MUTEX_LOCK();
 
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     err_code = lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
                 }
@@ -941,7 +919,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
 
 
-            if (err_code == NRF_SUCCESS)
+            if (err_code == 0)
             {
 
                 // Lookup ACL.
@@ -961,12 +939,12 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
                           m_operation_desc[op_desc_idx_lookup(operation)],
                           p_path[0],
                           p_path[1],
-                          (err_code == NRF_SUCCESS) ? "SUCCESS" : "NOT_FOUND");
+                          (err_code == 0) ? "SUCCESS" : "NOT_FOUND");
                 break;
             }
 
             // Bootstrap can write to non-existing instances
-            if (err_code == LWM2M_INSTANCE_NOT_FOUND &&
+            if (err_code == ENOENT &&
                 operation == LWM2M_OPERATION_CODE_WRITE &&
                 p_request->header.code == COAP_CODE_PUT)
             {
@@ -979,7 +957,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
                 err_code = object_resolve(&p_object, p_path[0]);
 
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     LWM2M_MUTEX_UNLOCK();
 
@@ -990,7 +968,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
                     LWM2M_MUTEX_LOCK();
 
-                    if (err_code != NRF_SUCCESS)
+                    if (err_code != 0)
                     {
                         err_code = lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
                     }
@@ -1007,10 +985,10 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
                           m_operation_desc[op_desc_idx_lookup(operation)],
                           p_path[0],
                           p_path[1],
-                          (err_code == NRF_SUCCESS) ? "SUCCESS" : "NOT_FOUND");
+                          (err_code == 0) ? "SUCCESS" : "NOT_FOUND");
             }
 
-            if (err_code == LWM2M_INSTANCE_NOT_FOUND &&
+            if (err_code == ENOENT &&
                 operation == LWM2M_OPERATION_CODE_WRITE &&
                 p_request->header.code == COAP_CODE_POST)
             {
@@ -1022,18 +1000,18 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
                 err_code = object_resolve(&p_object, p_path[0]);
 
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     LWM2M_MUTEX_UNLOCK();
 
                     err_code = lwm2m_handler_error(short_server_id,
                                                    NULL,
                                                    p_request,
-                                                   LWM2M_OBJECT_NOT_FOUND);
+                                                   ENOENT);
 
                     LWM2M_MUTEX_LOCK();
 
-                    if (err_code != NRF_SUCCESS)
+                    if (err_code != 0)
                     {
                         err_code = lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
                     }
@@ -1052,23 +1030,23 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
                 LWM2M_TRC("[CoAP      ]:   << CREATE object /%u/%u/, result: %s\r\n",
                           p_path[0],
                           p_path[1],
-                          (err_code == NRF_SUCCESS) ? "SUCCESS" : "NOT_FOUND");
+                          (err_code == 0) ? "SUCCESS" : "NOT_FOUND");
                 break;
             }
 
             // Instance was not found
-            if (err_code == LWM2M_INSTANCE_NOT_FOUND)
+            if (err_code == ENOENT)
             {
                 LWM2M_MUTEX_UNLOCK();
 
                 err_code = lwm2m_handler_error(short_server_id,
                                                NULL,
                                                p_request,
-                                               LWM2M_INSTANCE_NOT_FOUND);
+                                               ENOENT);
 
                 LWM2M_MUTEX_LOCK();
 
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     err_code = lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
                 }
@@ -1087,11 +1065,11 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
                 err_code = lwm2m_handler_error(short_server_id,
                                                NULL,
                                                p_request,
-                                               LWM2M_INVALID_REQUEST);
+                                               EINVAL);
 
                 LWM2M_MUTEX_LOCK();
 
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     err_code = lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
                 }
@@ -1101,7 +1079,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
             lwm2m_instance_t * p_instance;
 
             err_code = instance_resolve(&p_instance, p_path[0], p_path[1]);
-            if (err_code != NRF_SUCCESS)
+            if (err_code != 0)
             {
                 LWM2M_MUTEX_UNLOCK();
 
@@ -1112,7 +1090,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
                 LWM2M_MUTEX_LOCK();
 
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     err_code = lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
                 }
@@ -1126,7 +1104,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
                 uint8_t resource_operation = 0;
                 err_code = op_code_resolve(p_instance, p_path[2], &resource_operation);
 
-                if (err_code != NRF_SUCCESS)
+                if (err_code != 0)
                 {
                     // Op code for requested resource not found.
                     break;
@@ -1167,7 +1145,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
                         p_path[0],
                         p_path[1],
                         p_path[2],
-                        (err_code == NRF_SUCCESS) ? "SUCCESS" : "NOT_FOUND");
+                        (err_code == 0) ? "SUCCESS" : "NOT_FOUND");
 
             break;
         }
@@ -1191,7 +1169,7 @@ static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
 
     bool     is_numbers_only = true;
     uint16_t path_index      = 0;
-    uint32_t err_code        = NRF_SUCCESS;
+    uint32_t err_code        = 0;
 
     LWM2M_MUTEX_LOCK();
 
@@ -1219,13 +1197,13 @@ static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
 
                 if (endptr == ((char *)option_data))
                 {
-                    err_code = NRF_ERROR_NOT_FOUND;
+                    err_code = ENOENT;
                     break;
                 }
 
                 if (endptr != ((char *)option_data + option_len))
                 {
-                    err_code = NRF_ERROR_NOT_FOUND;
+                    err_code = ENOENT;
                     break;
                 }
             }
@@ -1237,15 +1215,15 @@ static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
         }
     }
 
-    if (err_code == NRF_SUCCESS)
+    if (err_code == 0)
     {
         err_code = lwm2m_remote_short_server_id_find(&short_server_id, p_request->p_remote);
-        if (err_code == LWM2M_ERROR(NRF_ERROR_NOT_FOUND))
+        if (err_code == ENOENT)
         {
             // LWM2M remote not found. Setting it to be default short server id.
             short_server_id = LWM2M_ACL_DEFAULT_SHORT_SERVER_ID;
         }
-        else if (err_code != NRF_SUCCESS)
+        else if (err_code != 0)
         {
             // Should not happen. See lwm2m_remote_short_server_id_find return values.
             return err_code;
@@ -1274,7 +1252,7 @@ static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
 
             if (requested_uri == NULL)
             {
-                err_code = NRF_ERROR_NOT_FOUND;
+                err_code = ENOENT;
             }
             else
             {
@@ -1288,7 +1266,7 @@ static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
                         {
                             if (m_objects[i]->callback == NULL)
                             {
-                                err_code = LWM2M_INVALID_OBJECT_CALLBACK;
+                                err_code = EINVAL;
                                 break;
                             }
 
@@ -1307,7 +1285,7 @@ static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
                     else
                     {
                         // This is not a name object, return error code.
-                        err_code = NRF_ERROR_NOT_FOUND;
+                        err_code = ENOENT;
                         break;
                     }
                 }
@@ -1315,7 +1293,7 @@ static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
         }
     }
 
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         LWM2M_MUTEX_UNLOCK();
 
@@ -1326,7 +1304,7 @@ static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
 
         LWM2M_MUTEX_LOCK();
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
             err_code = lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
         }
@@ -1353,7 +1331,7 @@ uint32_t lwm2m_coap_handler_instance_add(lwm2m_instance_t * p_instance)
     {
         LWM2M_MUTEX_UNLOCK();
 
-        return NRF_ERROR_NO_MEM;
+        return ENOMEM;
     }
 
     m_instances[m_num_instances] = p_instance;
@@ -1361,7 +1339,7 @@ uint32_t lwm2m_coap_handler_instance_add(lwm2m_instance_t * p_instance)
 
     LWM2M_MUTEX_UNLOCK();
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -1386,13 +1364,13 @@ uint32_t lwm2m_coap_handler_instance_delete(lwm2m_instance_t * p_instance)
 
             LWM2M_MUTEX_UNLOCK();
 
-            return NRF_SUCCESS;
+            return 0;
         }
     }
 
     LWM2M_MUTEX_UNLOCK();
 
-    return NRF_ERROR_NOT_FOUND;
+    return ENOENT;
 }
 
 
@@ -1408,7 +1386,7 @@ uint32_t lwm2m_coap_handler_object_add(lwm2m_object_t * p_object)
     {
         LWM2M_MUTEX_UNLOCK();
 
-        return NRF_ERROR_NO_MEM;
+        return ENOMEM;
     }
 
     m_objects[m_num_objects] = p_object;
@@ -1416,7 +1394,7 @@ uint32_t lwm2m_coap_handler_object_add(lwm2m_object_t * p_object)
 
     LWM2M_MUTEX_UNLOCK();
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -1440,13 +1418,13 @@ uint32_t lwm2m_coap_handler_object_delete(lwm2m_object_t * p_object)
 
             LWM2M_MUTEX_UNLOCK();
 
-            return NRF_SUCCESS;
+            return 0;
         }
     }
 
     LWM2M_MUTEX_UNLOCK();
 
-    return NRF_ERROR_NOT_FOUND;
+    return ENOENT;
 }
 
 
@@ -1527,7 +1505,7 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint8_t * p_buffer, uint16_t * p_buf
                 {
                     LWM2M_MUTEX_UNLOCK();
 
-                    return NRF_ERROR_NO_MEM;
+                    return ENOMEM;
                 }
 
                 first_entry = false;
@@ -1554,7 +1532,7 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint8_t * p_buffer, uint16_t * p_buf
             {
                 LWM2M_MUTEX_UNLOCK();
 
-                return NRF_ERROR_NO_MEM;
+                return ENOMEM;
             }
 
             first_entry = false;
@@ -1585,10 +1563,10 @@ uint32_t lwm2m_init(lwm2m_alloc_t alloc_fn, lwm2m_free_t free_fn)
 {
     if ((alloc_fn == NULL) || (free_fn == NULL))
     {
-        return (NRF_ERROR_NULL | IOT_LWM2M_ERR_BASE);
+        return EINVAL;
     }
 
-    SDK_MUTEX_INIT(m_lwm2m_mutex);
+    k_mutex_init(&m_lwm2m_mutex);
 
     LWM2M_MUTEX_LOCK();
 
@@ -1598,21 +1576,21 @@ uint32_t lwm2m_init(lwm2m_alloc_t alloc_fn, lwm2m_free_t free_fn)
     m_free_fn  = free_fn;
 
     err_code = internal_lwm2m_register_init();
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         LWM2M_MUTEX_UNLOCK();
         return err_code;
     }
 
     err_code = internal_lwm2m_bootstrap_init();
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         LWM2M_MUTEX_UNLOCK();
         return err_code;
     }
 
     err_code = coap_error_handler_register(coap_error_handler);
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         LWM2M_MUTEX_UNLOCK();
         return err_code;

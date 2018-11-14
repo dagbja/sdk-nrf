@@ -1,4 +1,9 @@
-/*$$$LICENCE_NORDIC_STANDARD<2015>$$$*/
+/*
+ * Copyright (c) 2018 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
 /** @file lwm2m_bootstrap.h
  *
  * @defgroup iot_sdk_lwm2m_bootstrap_api LWM2M bootstrap API interface

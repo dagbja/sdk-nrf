@@ -1,47 +1,23 @@
-/*$$$LICENCE_NORDIC_STANDARD<2015>$$$*/
+/*
+ * Copyright (c) 2015 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
+#define LOG_MODULE_NAME lwm2m
+#define NET_LOG_LEVEL CONFIG_LWM2M_LOG_LEVEL
+
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
-#include "lwm2m_api.h"
-#include "lwm2m_bootstrap.h"
-#include "lwm2m.h"
-#include "coap_api.h"
-#include "coap_message.h"
-#include "coap_codes.h"
-#include "sdk_config.h"
-#include "app_util.h"
 
-#if LWM2M_CONFIG_LOG_ENABLED
-
-#define NRF_LOG_MODULE_NAME lwm2m
-
-#define NRF_LOG_LEVEL       LWM2M_CONFIG_LOG_LEVEL
-#define NRF_LOG_INFO_COLOR  LWM2M_CONFIG_INFO_COLOR
-#define NRF_LOG_DEBUG_COLOR LWM2M_CONFIG_DEBUG_COLOR
-
-#include "nrf_log.h"
-
-#define LWM2M_TRC     NRF_LOG_DEBUG                                                                 /**< Used for getting trace of execution in the module. */
-#define LWM2M_ERR     NRF_LOG_ERROR                                                                 /**< Used for logging errors in the module. */
-#define LWM2M_DUMP    NRF_LOG_HEXDUMP_DEBUG                                                         /**< Used for dumping octet information to get details of bond information etc. */
-
-#define LWM2M_ENTRY() LWM2M_TRC(">> %s", __func__)
-#define LWM2M_EXIT()  LWM2M_TRC("<< %s", __func__)
-
-#else // LWM2M_CONFIG_LOG_ENABLED
-
-#define LWM2M_TRC(...)                                                                              /**< Disables traces. */
-#define LWM2M_DUMP(...)                                                                             /**< Disables dumping of octet streams. */
-#define LWM2M_ERR(...)                                                                              /**< Disables error logs. */
-
-#define LWM2M_ENTRY(...)
-#define LWM2M_EXIT(...)
-
-#endif // LWM2M_CONFIG_LOG_ENABLED
+#include <lwm2m_api.h>
+#include <lwm2m_bootstrap.h>
+#include <lwm2m.h>
+#include <coap_api.h>
 
 #define LWM2M_BOOTSTRAP_URI_PATH "bs"
-
-#define TOKEN_START              0x012A
+#define TOKEN_START 0x012A
 
 static uint16_t m_token = TOKEN_START;
 
@@ -74,21 +50,22 @@ static uint32_t internal_message_new(coap_message_t         ** pp_msg,
 /**@brief Function to be used as callback function upon a bootstrap request. */
 static void lwm2m_bootstrap_cb(uint32_t status, void * p_arg, coap_message_t * p_message)
 {
-    LWM2M_TRC("[Bootstrap]: lwm2m_bootstrap_cb, status: %ul, CoAP code: %u",
+    LWM2M_TRC("[Bootstrap]: lwm2m_bootstrap_cb, status: %lu, CoAP code: %u",
               status,
               p_message->header.code);
 
     lwm2m_notification(LWM2M_NOTIFCATION_TYPE_BOOTSTRAP,
                        p_message->p_remote,
                        p_message->header.code,
-                       NRF_SUCCESS);
+                       0);
 }
 
 
 uint32_t internal_lwm2m_bootstrap_init(void)
 {
     m_token = TOKEN_START;
-    return NRF_SUCCESS;
+
+    return 0;
 }
 
 
@@ -112,18 +89,18 @@ uint32_t lwm2m_bootstrap(struct sockaddr         * p_remote,
     endpoint.len   = 2;
 
     err_code = internal_message_new(&p_msg, COAP_CODE_POST, lwm2m_bootstrap_cb, p_transport);
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         LWM2M_MUTEX_UNLOCK();
         return err_code;
     }
 
-    if (err_code == NRF_SUCCESS)
+    if (err_code == 0)
     {
         err_code = coap_message_remote_addr_set(p_msg, p_remote);
     }
 
-    if (err_code == NRF_SUCCESS)
+    if (err_code == 0)
     {
         err_code = coap_message_opt_str_add(p_msg,
                                             COAP_OPT_URI_PATH,
@@ -131,9 +108,9 @@ uint32_t lwm2m_bootstrap(struct sockaddr         * p_remote,
                                             endpoint.len); // end_point length is always 2
     }
 
-    if (err_code == NRF_SUCCESS)
+    if (err_code == 0)
     {
-        char buffer[40];
+        char buffer[128];
         buffer[0] = 'e';
         buffer[1] = 'p';
         buffer[2] = '=';
@@ -145,13 +122,13 @@ uint32_t lwm2m_bootstrap(struct sockaddr         * p_remote,
                                             p_id->type + 3);
     }
 
-    if (err_code == NRF_SUCCESS)
+    if (err_code == 0)
     {
         uint32_t msg_handle;
         err_code = coap_message_send(&msg_handle, p_msg);
     }
 
-    if (err_code == NRF_SUCCESS)
+    if (err_code == 0)
     {
         err_code = coap_message_delete(p_msg);
     }
@@ -168,5 +145,3 @@ uint32_t lwm2m_bootstrap(struct sockaddr         * p_remote,
 
     return err_code;
 }
-
-

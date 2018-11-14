@@ -1,28 +1,26 @@
-/*$$$LICENCE_NORDIC_STANDARD<2015>$$$*/
+/*
+ * Copyright (c) 2015 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
+#include <zephyr.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <sys/socket.h>
+#include <stdio.h>
+#include <net/socket.h>
+#include <dk_buttons_and_leds.h>
+//#include <lte_lc.h>
+#include <nrf.h>
 
-#define BUTTONS_AND_LEDS (0)
-
-#if BUTTONS_AND_LEDS
-#include "boards.h"
-#endif // BUTTONS_AND_LEDS
-
-#include "bsd.h"
-#include "nordic_common.h"
-#include "sdk_config.h"
-#include "app_timer.h"
-#include "app_mem_manager.h"
-#include "iot_timer.h"
-#include "coap_api.h"
-#include "coap_option.h"
-#include "lwm2m_api.h"
-#include "lwm2m_remote.h"
-#include "lwm2m_acl.h"
-#include "lwm2m_objects_tlv.h"
-#include "lwm2m_objects_plain_text.h"
+#include <coap_api.h>
+#include <coap_option.h>
+#include <lwm2m_api.h>
+#include <lwm2m_remote.h>
+#include <lwm2m_acl.h>
+#include <lwm2m_objects_tlv.h>
+#include <lwm2m_objects_plain_text.h>
 
 // Set to 0 to skip bootstrap
 #define BOOTSTRAP 1
@@ -37,19 +35,8 @@
 #define LWM2M_BOOTSTRAP_SERVER_REMOTE_PORT    5684                                            /**< Remote port of the LWM2M bootstrap server. */
 #define LWM2M_SERVER_REMORT_PORT              5684                                            /**< Remote port of the LWM2M server. */
 
-
 #define BOOTSTRAP_URI                   "coaps://my.bootstrapserver.com:5684"                 /**< Server URI to the bootstrap server when using security (DTLS). */
-#define CLIENT_UUID                     "0a18de70-0ce0-4570-bce9-7f5895db6c70"                /**< UUID of the device. */
-#define CLIENT_IMEI_MSISDN              "urn:imei-msisdn:004402990020129-0123456789"          /**< IMEI-MSISDN of the device. */
-
-#if BUTTONS_AND_LEDS
-#define LED_ONE                         BSP_LED_0_MASK
-#define LED_TWO                         BSP_LED_1_MASK
-#define LED_THREE                       BSP_LED_2_MASK
-#define LED_FOUR                        BSP_LED_3_MASK
-#define ALL_APP_LED                    (BSP_LED_0_MASK | BSP_LED_1_MASK | \
-                                        BSP_LED_2_MASK | BSP_LED_3_MASK)                      /**< Define used for simultaneous operation of all application LEDs. */
-#endif // BUTTONS_AND_LEDS
+#define CLIENT_IMEI_MSISDN              "urn:imei-msisdn:004402990020434-0123456789"          /**< IMEI-MSISDN of the device. */
 
 #define LED_BLINK_INTERVAL_MS           30000                                                 /**< LED blinking interval. */
 #define COAP_TICK_INTERVAL_MS           50000                                                 /**< Interval between periodic callbacks to CoAP module. */
@@ -58,24 +45,20 @@
 
 #define BOOTSTRAP_SECURITY_INSTANCE_IDX 0                                                     /**< Index of bootstrap security instance. */
 #define SERVER_SECURITY_INSTANCE_IDX    1                                                     /**< Index of server security instance. */
-#define APP_RTR_SOLICITATION_DELAY      500                                                   /**< Time before host sends an initial solicitation in ms. */
-
-#define DEAD_BEEF                       0xDEADBEEF                                            /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
-#define MAX_LENGTH_FILENAME             128                                                   /**< Max length of filename to copy for the debug error handler. */
 
 #define APP_ENABLE_LOGS                 0                                                     /**< Enable logs in the application. */
 
-#define APP_BOOTSRAP_SEC_TAG            25                                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
-#define APP_BOOTSRAP_SEC_PSK            "d6160c2e7c90399ee7d207a22611e3d3a87241b0462976b935341d000a91e747" /**< Pre-shared key used for bootstrap server in hex format. */
-#define APP_BOOTSRAP_SEC_IDENTITY       "urn:imei-msisdn:004402990020129-0123456789"          /**< Client identity used for bootstrap server. */
+#define APP_BOOTSTRAP_SEC_TAG           25                                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
+#define APP_BOOTSTRAP_SEC_PSK           "d6160c2e7c90399ee7d207a22611e3d3a87241b0462976b935341d000a91e747" /**< Pre-shared key used for bootstrap server in hex format. */
+#define APP_BOOTSTRAP_SEC_IDENTITY      "urn:imei-msisdn:004402990020434-0123456789"          /**< Client identity used for bootstrap server. */
 
 #define APP_SERVER_SEC_TAG              26                                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
 #if (DM_SERVER == 1)
-#define APP_SERVER_SEC_PSK              "b0373712dc63bfce4be1f37ad8c5c15d3af5f831652af5f46a52c34d39535644" /**< Pre-shared key used for resource server in hex format. */
+#define APP_SERVER_SEC_PSK              "a3676691ce05a04801d9b2b43e4a31db342d6428a4028e10d6c96ebbc07fd128" /**< Pre-shared key used for resource server in hex format. */
 #else
-#define APP_SERVER_SEC_PSK              "77aec743382c61ea43f7af126080146bdf2448b18036b28d2a5bd5006df6fb75" /**< Pre-shared key used for resource server in hex format. */
+#define APP_SERVER_SEC_PSK              "c16451b3c745dbd0b13b1daaf90b7f18da420ac0c344089f6cb8cb2f8e48f6fd" /**< Pre-shared key used for resource server in hex format. */
 #endif
-#define APP_SERVER_SEC_IDENTITY         "004402990020129"                                     /**< Client identity used for resource server. */
+#define APP_SERVER_SEC_IDENTITY         "004402990020434"                                     /**< Client identity used for resource server. */
 
 #define APP_MAX_AT_READ_LENGTH          100
 #define APP_MAX_AT_WRITE_LENGTH         256
@@ -94,6 +77,25 @@
 
 #endif // APP_ENABLE_LOGS
 
+#define APP_ERROR_CHECK(error_code) \
+    do { \
+        if (error_code != 0) { \
+            printk("Error: %lu\n", error_code); \
+            while (1) \
+                ; \
+        } \
+    } while (0)
+
+#define APP_ERROR_CHECK_BOOL(boolean_value) \
+    do { \
+        const uint32_t local_value = (boolean_value); \
+        if (!local_value) { \
+            printk("BOOL check failure\n"); \
+            while (1) \
+                ; \
+        } \
+    } while (0)
+
 typedef enum
 {
     APP_STATE_IDLE = 0,
@@ -108,7 +110,7 @@ typedef enum
     APP_STATE_DISCONNECT
 } app_state_t;
 
-APP_TIMER_DEF(m_iot_timer_tick_src_id);                                                       /**< App timer instance used to update the IoT timer wall clock. */
+//APP_TIMER_DEF(m_iot_timer_tick_src_id);                                                       /**< App timer instance used to update the IoT timer wall clock. */
 
 static lwm2m_server_config_t               m_server_conf;                                     /**< Server configuration structure. */
 static lwm2m_client_identity_t             m_client_id;                                       /**< Client ID structure to hold the client's UUID. */
@@ -140,79 +142,37 @@ static volatile app_state_t m_app_state = APP_STATE_IDLE;                       
 static char m_at_write_buffer[APP_MAX_AT_WRITE_LENGTH];                                       /**< Buffer used to write AT commands. */
 static char m_at_read_buffer[APP_MAX_AT_READ_LENGTH];                                         /**< Buffer used to read AT commands. */
 
-#define APP_COAP_BUFFER_COUNT_PER_PORT 2                                                      /**< Number of buffers needed per port - one for RX and one for TX */
-#define APP_COAP_BUFFER_PER_PORT       (COAP_MESSAGE_DATA_MAX_SIZE * APP_COAP_BUFFER_COUNT_PER_PORT)
-#define APP_COAP_MAX_BUFFER_SIZE       (APP_COAP_BUFFER_PER_PORT * COAP_PORT_COUNT)           /**< Maximum memory buffer used for memory allocator for CoAP */
-
-#define APP_STRING_BUFFER_SIZE         64                                                     /**< Maximum string length in LwM2M objects. */
-#define APP_STRING_BUFFER_COUNT        10                                                     /**< Number of strings in LwM2M objects. */
-#define APP_STRING_BUFFER_MEM_SIZE     (APP_STRING_BUFFER_SIZE * APP_STRING_BUFFER_COUNT)     /**< Memory size needed for strings. */
-
-#define APP_MEM_MAX_BUFFER_SIZE        (APP_STRING_BUFFER_MEM_SIZE + APP_COAP_MAX_BUFFER_SIZE)/**< Maximum memory buffers. */
-#define APP_MEM_POOL_COUNT             2                                                      /**< Number of memory pools used. */
-
-// TODO: Fine-tune memory blocks used for LwM2M strings
-static uint8_t m_app_coap_data_buffer[APP_MEM_MAX_BUFFER_SIZE];                               /**< Buffer contributed by CoAP for its use. */
-
-/**< Pool submitted to the memory management. */
-static const nrf_mem_pool_t m_app_coap_pool[APP_MEM_POOL_COUNT] =
-{
-    {
-        .size  = APP_STRING_BUFFER_SIZE,
-        .count = APP_STRING_BUFFER_COUNT
-    },
-    {
-        .size  = COAP_MESSAGE_DATA_MAX_SIZE,
-        .count = (APP_COAP_BUFFER_COUNT_PER_PORT * COAP_PORT_COUNT)
-    }
-};
-
-/**< Configuration used for memory contribution. */
-static const nrf_mem_desc_t app_coap_mem_desc =
-{
-    .mem_type       = NRF_MEM_TYPE_DEFAULT,
-    .policy         = NRF_MEM_POLICY_DEFAULT,
-    .p_memory       = (uint8_t *)m_app_coap_data_buffer,
-    .memory_size    = APP_MEM_MAX_BUFFER_SIZE,
-    .pool_list_size = APP_MEM_POOL_COUNT,
-    .p_pool_list    = (nrf_mem_pool_t *)m_app_coap_pool
-};
-
 #if defined(APP_USE_AF_INET6)
 
 static struct sockaddr_in6 m_bs_server =
 {
     .sin_port   = LWM2M_BOOTSTRAP_SERVER_REMOTE_PORT,
     .sin_family = AF_INET6,
-    .sin_len    = sizeof(struct sockaddr_in6)
 };
 
 static struct sockaddr_in6 m_server =
 {
     .sin_port   = LWM2M_SERVER_REMORT_PORT,
     .sin_family = AF_INET6,
-    .sin_len    = sizeof(struct sockaddr_in6)
 };
 
 #else //APP_USE_AF_INET6
 
 static struct sockaddr_in m_bs_server =
 {
-    .sin_port        = HTONS(LWM2M_BOOTSTRAP_SERVER_REMOTE_PORT),
+    .sin_port        = htons(LWM2M_BOOTSTRAP_SERVER_REMOTE_PORT),
     .sin_family      = AF_INET,
-    .sin_len         = sizeof(struct sockaddr_in),
-    .sin_addr.s_addr = HTONL(0xCF4720E5) // 207.71.32.229
+    .sin_addr.s_addr = htonl(0xCF4720E5) // 207.71.32.229
 };
 
 static struct sockaddr_in m_server =
 {
-    .sin_port        = HTONS(LWM2M_SERVER_REMORT_PORT),
+    .sin_port        = htons(LWM2M_SERVER_REMORT_PORT),
     .sin_family      = AF_INET,
-    .sin_len         = sizeof(struct sockaddr_in),
 #if (DM_SERVER == 1)
-    .sin_addr.s_addr = HTONL(0xCF4720E6) // 207.71.32.230 = DM server
+    .sin_addr.s_addr = htonl(0xCF4720E6) // 207.71.32.230 = DM server
 #else
-    .sin_addr.s_addr = HTONL(0xCF4720E7) // 207.71.32.231 = Repository server
+    .sin_addr.s_addr = htonl(0xCF4720E7) // 207.71.32.231 = Repository server
 #endif
 };
 
@@ -224,26 +184,10 @@ static const struct sockaddr *   mp_remote_server = (struct sockaddr *)&m_server
 static void app_server_update(uint16_t instance_id);
 
 
-/**@brief Callback function for asserts.
- *
- * This function will be called in case of an assert.
- *
- * @warning This handler is an example only and does not fit a final product. You need to analyze
- *          how your product is supposed to react in case of Assert.
- *
- * @param[in]   line_num   Line number of the failing ASSERT call.
- * @param[in]   file_name  File name of the failing ASSERT call.
- */
-void assert_nrf_callback(uint16_t line_num, const uint8_t * p_file_name)
-{
-    app_error_handler(DEAD_BEEF, line_num, p_file_name);
-}
-
-
 /**@brief Recoverable BSD library error. */
 void bsd_recoverable_error_handler(uint32_t error)
 {
-    UNUSED_VARIABLE(error);
+    ARG_UNUSED(error);
 
     while (true)
     {
@@ -255,7 +199,7 @@ void bsd_recoverable_error_handler(uint32_t error)
 /**@brief Irrecoverable BSD library error. */
 void bsd_irrecoverable_error_handler(uint32_t error)
 {
-    UNUSED_VARIABLE(error);
+    ARG_UNUSED(error);
 
     while (true)
     {
@@ -264,28 +208,28 @@ void bsd_irrecoverable_error_handler(uint32_t error)
 }
 
 
-/**@brief Function for the LEDs initialization.
- *
- * @details Initializes all LEDs used by this application.
- */
-static void leds_init(void)
+/**@brief Callback for button events from the DK buttons and LEDs library. */
+static void button_handler(u32_t buttons, u32_t has_changed)
 {
-#if BUTTONS_AND_LEDS
-    // Configure LEDs.
-    LEDS_CONFIGURE((LED_ONE | LED_TWO | LED_THREE | LED_FOUR));
 
-    // Turn LEDs off.
-    LEDS_OFF((LED_ONE | LED_TWO | LED_THREE | LED_FOUR));
-#endif // BUTTONS_AND_LEDS
+}
+
+
+/**@brief Initializes buttons and LEDs, using the DK buttons and LEDs library. */
+static void buttons_leds_init(void)
+{
+    dk_buttons_and_leds_init(button_handler);
+    dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
 }
 
 
 /**@brief Timer callback used for controlling board LEDs to represent application state.
  *
  */
+#if 0
 static void blink_timeout_handler(iot_timer_time_in_ms_t wall_clock_value)
 {
-    UNUSED_PARAMETER(wall_clock_value);
+    ARG_UNUSED(wall_clock_value);
 #if BUTTONS_AND_LEDS
     switch (m_app_state)
     {
@@ -321,7 +265,7 @@ static void blink_timeout_handler(iot_timer_time_in_ms_t wall_clock_value)
 
 /**@brief Function for handling CoAP periodically time ticks.
 */
-static void app_coap_time_tick(iot_timer_time_in_ms_t wall_clock_value)
+static void app_coap_time_tick(struct k_work *work)
 {
     // Pass a tick to CoAP in order to re-transmit any pending messages.
     //(void)coap_time_tick();
@@ -332,7 +276,7 @@ static void app_coap_time_tick(iot_timer_time_in_ms_t wall_clock_value)
  */
 static void iot_timer_tick_callback(void * p_context)
 {
-    UNUSED_VARIABLE(p_context);
+    ARG_UNUSED(p_context);
     uint32_t err_code = iot_timer_update();
     APP_ERROR_CHECK(err_code);
 }
@@ -385,7 +329,7 @@ static void iot_timer_init(void)
                                NULL);
     APP_ERROR_CHECK(err_code);
 }
-
+#endif
 
 /**@brief Application implementation of the root handler interface.
  *
@@ -399,7 +343,7 @@ uint32_t lwm2m_coap_handler_root(uint8_t op_code, coap_message_t * p_request)
 
     // Delete any existing objects or instances if needed.
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -414,7 +358,7 @@ uint32_t lwm2m_parse_uri_and_save_remote(uint16_t short_server_id,
 
     // Register the short_server_id
     err_code = lwm2m_remote_register(short_server_id);
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         return err_code;
     }
@@ -422,7 +366,7 @@ uint32_t lwm2m_parse_uri_and_save_remote(uint16_t short_server_id,
     // Save the short_server_id
     err_code = lwm2m_remote_remote_save((struct sockaddr *)p_remote, short_server_id);
 
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         return err_code;
     }
@@ -445,7 +389,7 @@ uint32_t lwm2m_access_remote_get(uint16_t         * p_access,
     err_code = lwm2m_acl_permissions_check(p_access, p_instance, short_server_id);
 
     // If we can't find the permission we return defaults.
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         err_code = lwm2m_acl_permissions_check(p_access,
                                                p_instance,
@@ -470,7 +414,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
         if (mp_link_format_string != NULL)
         {
             // No more attempts, clean up.
-            app_nrf_free(mp_link_format_string);
+            k_free(mp_link_format_string);
             mp_link_format_string = NULL;
         }
     }
@@ -493,14 +437,13 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
                                    uint8_t          op_code,
                                    coap_message_t * p_request)
 {
-#if BUTTONS_AND_LEDS
-    LEDS_ON(LED_THREE);
-#endif
+    dk_set_leds(DK_LED3_MSK);
+
     (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
 
     m_app_state = APP_STATE_BOOTSTRAPED;
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -525,7 +468,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
     if (op_code == 0)
     {
         (void)lwm2m_respond_with_code(COAP_CODE_401_UNAUTHORIZED, p_request);
-        return NRF_SUCCESS;
+        return 0;
     }
 
     uint16_t instance_id = p_instance->instance_id;
@@ -540,10 +483,10 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                                            resource_id,
                                            &m_instance_server[instance_id]);
 
-        if (err_code == NRF_ERROR_NOT_FOUND)
+        if (err_code == ENOENT)
         {
             (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
-            return NRF_SUCCESS;
+            return 0;
         }
 
         APP_ERROR_CHECK(err_code);
@@ -555,10 +498,10 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
         uint32_t mask = 0;
         err_code = coap_message_ct_mask_get(p_request, &mask);
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
             (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-            return NRF_SUCCESS;
+            return 0;
         }
 
         if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
@@ -577,14 +520,14 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
         else
         {
             (void)lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_request);
-            return NRF_SUCCESS;
+            return 0;
         }
 
-        if (err_code == NRF_SUCCESS)
+        if (err_code == 0)
         {
             (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
         }
-        else if (err_code == NRF_ERROR_NOT_SUPPORTED)
+        else if (err_code == ENOTSUP)
         {
             (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
         }
@@ -614,7 +557,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
             default:
             {
                 (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
-                return NRF_SUCCESS;
+                return 0;
             }
         }
     }
@@ -648,7 +591,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
     if (op_code == 0)
     {
         (void)lwm2m_respond_with_code(COAP_CODE_401_UNAUTHORIZED, p_request);
-        return NRF_SUCCESS;
+        return 0;
     }
 
     uint16_t instance_id = p_instance->instance_id;
@@ -656,7 +599,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
     if (instance_id != 0)
     {
         (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
-        return NRF_SUCCESS;
+        return 0;
     }
 
     if (op_code == LWM2M_OPERATION_CODE_READ)
@@ -669,10 +612,10 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
                                            resource_id,
                                            &m_instance_device);
 
-        if (err_code == NRF_ERROR_NOT_FOUND)
+        if (err_code == ENOENT)
         {
             (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
-            return NRF_SUCCESS;
+            return 0;
         }
 
         APP_ERROR_CHECK(err_code);
@@ -684,10 +627,10 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
         uint32_t mask = 0;
         err_code = coap_message_ct_mask_get(p_request, &mask);
 
-        if (err_code != NRF_SUCCESS)
+        if (err_code != 0)
         {
             (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-            return NRF_SUCCESS;
+            return 0;
         }
 
         if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
@@ -706,14 +649,14 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
         else
         {
             (void)lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_request);
-            return NRF_SUCCESS;
+            return 0;
         }
 
-        if (err_code == NRF_SUCCESS)
+        if (err_code == 0)
         {
             (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
         }
-        else if (err_code == NRF_ERROR_NOT_SUPPORTED)
+        else if (err_code == ENOTSUP)
         {
             (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
         }
@@ -748,7 +691,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
             default:
             {
                 (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
-                return NRF_SUCCESS;
+                return 0;
             }
         }
     }
@@ -782,7 +725,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
     if (op_code == 0)
     {
         (void)lwm2m_respond_with_code(COAP_CODE_401_UNAUTHORIZED, p_request);
-        return NRF_SUCCESS;
+        return 0;
     }
 
     uint16_t instance_id = p_instance->instance_id;
@@ -790,7 +733,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
     if (instance_id != 0)
     {
         (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
-        return NRF_SUCCESS;
+        return 0;
     }
 
     if (op_code == LWM2M_OPERATION_CODE_READ)
@@ -802,10 +745,10 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                                                             &buffer_size,
                                                             resource_id,
                                                             &m_instance_conn_mon);
-        if (err_code == NRF_ERROR_NOT_FOUND)
+        if (err_code == ENOENT)
         {
             (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
-            return NRF_SUCCESS;
+            return 0;
         }
 
         APP_ERROR_CHECK(err_code);
@@ -829,7 +772,7 @@ uint32_t server_object_callback(lwm2m_object_t * p_object,
 {
     APPL_LOG("lwm2m: server_object_callback");
 
-    uint32_t err_code = NRF_SUCCESS;
+    uint32_t err_code = 0;
 
     if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
@@ -887,7 +830,7 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
     if (op_code == 0)
     {
         (void)lwm2m_respond_with_code(COAP_CODE_401_UNAUTHORIZED, p_request);
-        return NRF_SUCCESS;
+        return 0;
     }
 
     if (op_code == LWM2M_OPERATION_CODE_WRITE)
@@ -925,7 +868,7 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
         (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
     }
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -945,6 +888,13 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
                                                       p_request->p_payload,
                                                       p_request->payload_len);
         APP_ERROR_CHECK(err_code);
+
+        // FIXME: Provision keys instead of print.
+        printk("Secret Key %u: ", instance_id);
+        for (int i = 0; i < m_instance_security[instance_id].secret_key.len; i++) {
+            printk("%02x", m_instance_security[instance_id].secret_key.p_val[i]);
+        }
+        printk("\n");
 
         APPL_LOG("lwm2m: decoded security.");
 
@@ -985,7 +935,7 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
         (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
     }
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -1001,9 +951,8 @@ static void app_lwm2m_factory_bootstrap(void)
 
     m_instance_server[0].proto.callback = server_instance_callback;
 
-    (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[0],
-                                     LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-
+    // FIXME: Fix the ACL issue
+#if 0
     // Set default access to LWM2M_PERMISSION_READ.
     (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[0],
                                     LWM2M_PERMISSION_READ,
@@ -1014,6 +963,7 @@ static void app_lwm2m_factory_bootstrap(void)
                                     (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
                                      LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE),
                                     102);
+#endif
 
     (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[0]);
 
@@ -1067,6 +1017,21 @@ static void app_lwm2m_factory_bootstrap(void)
                                     1000);
 
     (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[1]);
+
+    // FIXME: Init ACL for bootstrap server here to make DM server[1] get ACL /2/0 which is according to Verizon spec
+    (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[0],
+                                     LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
+
+    // Set default access to LWM2M_PERMISSION_READ.
+    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[0],
+                                    LWM2M_PERMISSION_READ,
+                                    LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
+
+    // Set server access.
+    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[0],
+                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
+                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE),
+                                    102);
 
 #if (BOOTSTRAP == 0) && (DM_SERVER == 1)
     // Register the short_server_id.
@@ -1262,7 +1227,7 @@ static void app_lwm2m_factory_bootstrap(void)
  */
 static void lwm2m_setup(void)
 {
-    (void)lwm2m_init(app_nrf_malloc, app_nrf_free);
+    (void)lwm2m_init(k_malloc, k_free);
     (void)lwm2m_remote_init();
     (void)lwm2m_acl_init();
 
@@ -1326,9 +1291,8 @@ static void app_bootstrap_connect(void)
 
             const struct sockaddr_in client_addr =
             {
-                .sin6_port   = HTONS(LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT),
+                .sin6_port   = htons(LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT),
                 .sin6_family = AF_INET6,
-                .sin6_len    = sizeof(struct sockaddr_in6),
                 .sin
             };
 
@@ -1336,9 +1300,8 @@ static void app_bootstrap_connect(void)
 
             const struct sockaddr_in client_addr =
             {
-                .sin_port        = HTONS(LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT),
+                .sin_port        = htons(LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT),
                 .sin_family      = AF_INET,
-                .sin_len         =  sizeof(struct sockaddr_in),
                 .sin_addr.s_addr = 0
             };
 
@@ -1347,13 +1310,14 @@ static void app_bootstrap_connect(void)
             #define SEC_TAG_COUNT 1
 
             struct sockaddr * p_localaddr = (struct sockaddr *)&client_addr;
-            nrf_sec_tag_t     sec_tag_list[SEC_TAG_COUNT] = {APP_BOOTSRAP_SEC_TAG};
 
-            nrf_sec_config_t setting =
+            sec_tag_t sec_tag_list[SEC_TAG_COUNT] = {APP_BOOTSTRAP_SEC_TAG};
+
+            coap_sec_config_t setting =
             {
                 .role           = 0,    // 0 -> Client role
                 .sec_tag_count  = SEC_TAG_COUNT,
-                .p_sec_tag_list = &sec_tag_list[0]
+                .p_sec_tag_list = sec_tag_list
             };
 
 
@@ -1361,13 +1325,13 @@ static void app_bootstrap_connect(void)
             {
                 .p_addr    = p_localaddr,
                 .p_setting = &setting,
-                .protocol  = SPROTO_DTLS1v2
+                .protocol  = IPPROTO_DTLS_1_2
             };
 
             // NOTE: This method initiates a DTLS handshake and may block for a some seconds.
             err_code = coap_security_setup(&local_port, mp_bs_remote_server);
 
-            if (err_code == NRF_SUCCESS)
+            if (err_code == 0)
             {
                 mp_lwm2m_bs_transport = local_port.p_transport;
                 m_app_state = APP_STATE_BS_CONNECTED;
@@ -1383,7 +1347,7 @@ static void app_bootstrap_connect(void)
 static void app_bootstrap(void)
 {
     uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)mp_bs_remote_server, &m_client_id, mp_lwm2m_bs_transport);
-    if (err_code == NRF_SUCCESS)
+    if (err_code == 0)
     {
         m_app_state = APP_STATE_BOOTRAP_REQUESTED;
     }
@@ -1408,9 +1372,8 @@ static void app_server_connect(void)
 
         const struct sockaddr_in client_addr =
         {
-            .sin6_port   = HTONS(LWM2M_LOCAL_CLIENT_PORT)
-            .sin6_family = HTONS(AF_INET6),
-            .sin6_len    = sizeof(struct sockaddr_in6);
+            .sin6_port   = htons(LWM2M_LOCAL_CLIENT_PORT)
+            .sin6_family = htons(AF_INET6),
             .sin
         };
 
@@ -1418,9 +1381,8 @@ static void app_server_connect(void)
 
         const struct sockaddr_in client_addr =
         {
-            .sin_port        = HTONS(LWM2M_LOCAL_CLIENT_PORT),
+            .sin_port        = htons(LWM2M_LOCAL_CLIENT_PORT),
             .sin_family      = AF_INET,
-            .sin_len         =  sizeof(struct sockaddr_in),
             .sin_addr.s_addr = 0
         };
 
@@ -1429,13 +1391,14 @@ static void app_server_connect(void)
         #define SEC_TAG_COUNT 1
 
         struct sockaddr * p_localaddr = (struct sockaddr *)&client_addr;
-        nrf_sec_tag_t     sec_tag_list[SEC_TAG_COUNT] = {APP_SERVER_SEC_TAG};
 
-        nrf_sec_config_t setting =
+        sec_tag_t sec_tag_list[SEC_TAG_COUNT] = {APP_SERVER_SEC_TAG};
+
+        coap_sec_config_t setting =
         {
             .role           = 0,    // 0 -> Client role
             .sec_tag_count  = SEC_TAG_COUNT,
-            .p_sec_tag_list = &sec_tag_list[0]
+            .p_sec_tag_list = sec_tag_list
         };
 
 
@@ -1443,13 +1406,13 @@ static void app_server_connect(void)
         {
             .p_addr    = p_localaddr,
             .p_setting = &setting,
-            .protocol  = SPROTO_DTLS1v2
+            .protocol  = IPPROTO_DTLS_1_2
         };
 
         // NOTE: This method initiates a DTLS handshake and may block for some seconds.
         err_code = coap_security_setup(&local_port, mp_remote_server);
 
-        if (err_code == NRF_SUCCESS)
+        if (err_code == 0)
         {
             mp_lwm2m_transport = local_port.p_transport;
 
@@ -1472,7 +1435,7 @@ static void app_server_register(void)
     APP_ERROR_CHECK(err_code);
 
     // Allocate the needed amount of memory.
-    mp_link_format_string = app_nrf_malloc(m_link_format_string_len);
+    mp_link_format_string = k_malloc(m_link_format_string_len);
 
     if (mp_link_format_string != NULL)
     {
@@ -1487,9 +1450,10 @@ static void app_server_register(void)
                                   mp_link_format_string,
                                   (uint16_t)m_link_format_string_len);
 
-        if (err_code == NRF_SUCCESS)
+        if (err_code == 0)
         {
             m_app_state = APP_STATE_SERVER_REGISTERED;
+            dk_set_leds(DK_LED4_MSK);
         }
     }
 }
@@ -1500,7 +1464,7 @@ static void app_server_update(uint16_t instance_id)
     uint32_t err_code;
 
     // TODO: check instance_id
-    UNUSED_PARAMETER(instance_id);
+    ARG_UNUSED(instance_id);
 
     err_code = lwm2m_update((struct sockaddr *)mp_remote_server,
                             &m_server_conf,
@@ -1538,26 +1502,32 @@ void app_lwm2m_process(void)
     {
         case APP_STATE_BS_CONNECT:
         {
+            printk("app_bootstrap_connect()\n");
             app_bootstrap_connect();
             break;
         }
         case APP_STATE_BS_CONNECTED:
         {
+            dk_set_leds(DK_LED2_MSK);
+            printk("app_bootstrap()\n");
             app_bootstrap();
             break;
         }
         case APP_STATE_BOOTSTRAPED:
         {
+            printk("app_server_connect()\n");
             app_server_connect();
             break;
         }
         case APP_STATE_SERVER_CONNECTED:
         {
+            printk("app_server_register()\n");
             app_server_register();
             break;
         }
         case APP_STATE_DISCONNECT:
         {
+            printk("app_disconnect()\n");
             app_disconnect();
             break;
         }
@@ -1570,24 +1540,19 @@ void app_lwm2m_process(void)
 
 void app_coap_init(void)
 {
-    // Contribute memory needed for CoAP.
-    nrf_mem_id_t mem_pid;
-    uint32_t err_code = app_nrf_mem_register(&mem_pid, &app_coap_mem_desc);
-    APP_ERROR_CHECK(err_code);
+    uint32_t err_code;
 
     #if defined(APP_USE_AF_INET6)
     struct sockaddr_in6 local_client_addr =
     {
-        .sin6_port   = HTONS(COAP_LOCAL_LISTENER_PORT),
+        .sin6_port   = htons(COAP_LOCAL_LISTENER_PORT),
         .sin6_family = AF_INET6,
-        .sin6_len    = sizeof(struct sockaddr_in6)
     };
     #else // APP_USE_AF_INET6
     struct sockaddr_in local_client_addr =
     {
-        .sin_port   = HTONS(COAP_LOCAL_LISTENER_PORT),
+        .sin_port   = htons(COAP_LOCAL_LISTENER_PORT),
         .sin_family = AF_INET,
-        .sin_len    = sizeof(struct sockaddr_in)
     };
     #endif // APP_USE_AF_INET6
 
@@ -1606,11 +1571,11 @@ void app_coap_init(void)
     coap_transport_init_t port_list;
     port_list.p_port_table = &local_port_list[0];
 
-    err_code = coap_init(17, &port_list, app_nrf_malloc, app_nrf_free);
+    err_code = coap_init(17, &port_list, k_malloc, k_free);
     APP_ERROR_CHECK(err_code);
 
     mp_coap_transport = local_port_list[0].p_transport;
-    UNUSED_VARIABLE(mp_coap_transport);
+    ARG_UNUSED(mp_coap_transport);
 }
 
 
@@ -1629,71 +1594,71 @@ static void app_provision(void)
     #define PSK_CODE      3
 
     memset (m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
-    UNUSED_RETURN_VALUE(snprintf(m_at_write_buffer,
+    snprintf(m_at_write_buffer,
                                  APP_MAX_AT_WRITE_LENGTH,
                                  "AT%%CMNG=%d,%d,%d,\"%s\"",
                                  WRITE_OPCODE,
-                                 APP_BOOTSRAP_SEC_TAG,
+                                 APP_BOOTSTRAP_SEC_TAG,
                                  IDENTITY_CODE,
-                                 APP_BOOTSRAP_SEC_IDENTITY));
+                                 APP_BOOTSTRAP_SEC_IDENTITY);
 
-    bytes_written = write(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer));
+    bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
     APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
 
-    bytes_read = read(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH);
+    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
     APP_ERROR_CHECK_BOOL(bytes_read >= 2);
     APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
 
     memset (m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
-    UNUSED_RETURN_VALUE(snprintf(m_at_write_buffer,
+    snprintf(m_at_write_buffer,
                                  APP_MAX_AT_WRITE_LENGTH,
                                  "AT%%CMNG=%d,%d,%d,\"%s\"",
                                  WRITE_OPCODE,
-                                 APP_BOOTSRAP_SEC_TAG,
+                                 APP_BOOTSTRAP_SEC_TAG,
                                  PSK_CODE,
-                                 APP_BOOTSRAP_SEC_PSK));
+                                 APP_BOOTSTRAP_SEC_PSK);
 
-    bytes_written = write(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer));
+    bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
     APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
 
-    bytes_read = read(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH);
+    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
     APP_ERROR_CHECK_BOOL(bytes_read >= 2);
     APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
 
 
     memset (m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
-    UNUSED_RETURN_VALUE(snprintf(m_at_write_buffer,
+    snprintf(m_at_write_buffer,
                                  APP_MAX_AT_WRITE_LENGTH,
                                  "AT%%CMNG=%d,%d,%d,\"%s\"",
                                  WRITE_OPCODE,
                                  APP_SERVER_SEC_TAG,
                                  IDENTITY_CODE,
-                                 APP_SERVER_SEC_IDENTITY));
+                                 APP_SERVER_SEC_IDENTITY);
 
-    bytes_written = write(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer));
+    bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
     APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
 
-    bytes_read = read(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH);
+    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
     APP_ERROR_CHECK_BOOL(bytes_read >= 2);
     APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
 
     memset (m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
-    UNUSED_RETURN_VALUE(snprintf(m_at_write_buffer,
+    snprintf(m_at_write_buffer,
                                  APP_MAX_AT_WRITE_LENGTH,
                                  "AT%%CMNG=%d,%d,%d,\"%s\"",
                                  WRITE_OPCODE,
                                  APP_SERVER_SEC_TAG,
                                  PSK_CODE,
-                                 APP_SERVER_SEC_PSK));
+                                 APP_SERVER_SEC_PSK);
 
-    bytes_written = write(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer));
+    bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
     APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
 
-    bytes_read = read(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH);
+    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
     APP_ERROR_CHECK_BOOL(bytes_read >= 2);
     APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
 
-    UNUSED_RETURN_VALUE(close(at_socket_fd));
+    ARG_UNUSED(close(at_socket_fd));
 }
 
 
@@ -1707,23 +1672,23 @@ static void app_modem_configure(void)
     at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
     APP_ERROR_CHECK_BOOL(at_socket_fd >= 0);
 
-    bytes_written = write(at_socket_fd, "AT+CEREG=2", 10);
+    bytes_written = send(at_socket_fd, "AT+CEREG=2", 10, 0);
     APP_ERROR_CHECK_BOOL(bytes_written == 10);
 
-    bytes_read = read(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH);
+    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
     APP_ERROR_CHECK_BOOL(bytes_read >= 2);
     APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
 
-    bytes_written = write(at_socket_fd, "AT+CFUN=1", 9);
+    bytes_written = send(at_socket_fd, "AT+CFUN=1", 9, 0);
     APP_ERROR_CHECK_BOOL(bytes_written == 9);
 
-    bytes_read = read(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH);
+    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
     APP_ERROR_CHECK_BOOL(bytes_read >= 2);
     APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
 
     while (true)
     {
-        bytes_read = read(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH);
+        bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
 
         if ((strncmp("+CEREG: 1", m_at_read_buffer, 9) == 0) ||
             (strncmp("+CEREG:1", m_at_read_buffer, 8) == 0) ||
@@ -1733,7 +1698,7 @@ static void app_modem_configure(void)
             break;
         }
     }
-    UNUSED_RETURN_VALUE(close(at_socket_fd));
+    ARG_UNUSED(close(at_socket_fd));
 
 #if (BOOTSTRAP == 1)
     m_app_state = APP_STATE_BS_CONNECT;
@@ -1747,16 +1712,12 @@ static void app_modem_configure(void)
  */
 int main(void)
 {
-    // Initialize application memory manager.
-    UNUSED_RETURN_VALUE(app_nrf_mem_init());
-
-    // Initialize the BSD layer.
-    bsd_init();
+    printk("Application started\n");
 
     // Provision credentials used for the bootstrap server.
     app_provision();
 
-     // Initialize CoAP.
+    // Initialize CoAP.
     app_coap_init();
 
     // Setup LWM2M endpoints.
@@ -1764,14 +1725,19 @@ int main(void)
 
     // Establish LTE link.
     app_modem_configure();
+    //lte_lc_init_and_connect();
 
-    // Initialize LEDS and Timers.
-    leds_init();
-    timers_init();
-    iot_timer_init();
+    // Initialize LEDs and Buttons.
+    buttons_leds_init();
+
+    // Initialize Timers.
+    //timers_init();
+    //iot_timer_init();
 
     // Create LwM2M factory bootstraped objects.
     app_lwm2m_factory_bootstrap();
+
+    dk_set_leds(DK_LED1_MSK);
 
     // Enter main loop
     for (;;)

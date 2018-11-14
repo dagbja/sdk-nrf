@@ -1,9 +1,13 @@
-/*$$$LICENCE_NORDIC_STANDARD<2015>$$$*/
+/*
+ * Copyright (c) 2015 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
 #include <string.h>
-#include "coap_api.h"
-#include "coap_message.h"
-#include "coap_codes.h"
-#include "lwm2m.h"
+
+#include <lwm2m.h>
+#include <coap_api.h>
 
 
 uint32_t lwm2m_respond_with_code(coap_msg_code_t code, coap_message_t * p_request)
@@ -35,13 +39,13 @@ uint32_t lwm2m_respond_with_code(coap_msg_code_t code, coap_message_t * p_reques
 
     coap_message_t * p_response;
     uint32_t         err_code = coap_message_new(&p_response, &response_config);
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         return err_code;
     }
 
     err_code = coap_message_remote_addr_set(p_response, p_request->p_remote);
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         (void)coap_message_delete(p_response);
         return err_code;
@@ -49,7 +53,7 @@ uint32_t lwm2m_respond_with_code(coap_msg_code_t code, coap_message_t * p_reques
 
     uint32_t msg_handle;
     err_code = coap_message_send(&msg_handle, p_response);
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         (void)coap_message_delete(p_response);
         return err_code;
@@ -94,7 +98,7 @@ uint32_t lwm2m_respond_with_payload(uint8_t             * p_payload,
 
     coap_message_t * p_response;
     uint32_t         err_code = coap_message_new(&p_response, &response_config);
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         return err_code;
     }
@@ -103,21 +107,21 @@ uint32_t lwm2m_respond_with_payload(uint8_t             * p_payload,
     err_code = coap_message_opt_uint_add(p_response,
                                          COAP_OPT_CONTENT_FORMAT,
                                          content_type);
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         (void)coap_message_delete(p_response);
         return err_code;
     }
 
     err_code = coap_message_payload_set(p_response, p_payload, payload_len);
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         (void)coap_message_delete(p_response);
         return err_code;
     }
 
     err_code = coap_message_remote_addr_set(p_response, p_request->p_remote);
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         (void)coap_message_delete(p_response);
         return err_code;
@@ -125,7 +129,7 @@ uint32_t lwm2m_respond_with_payload(uint8_t             * p_payload,
 
     uint32_t msg_handle;
     err_code = coap_message_send(&msg_handle, p_response);
-    if (err_code != NRF_SUCCESS)
+    if (err_code != 0)
     {
         (void)coap_message_delete(p_response);
         return err_code;
@@ -135,5 +139,3 @@ uint32_t lwm2m_respond_with_payload(uint8_t             * p_payload,
 
     return err_code;
 }
-
-

@@ -1,36 +1,16 @@
-/*$$$LICENCE_NORDIC_STANDARD<2016>$$$*/
+/*
+ * Copyright (c) 2016 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
+#define LOG_MODULE_NAME lwm2m
+#define NET_LOG_LEVEL CONFIG_LWM2M_LOG_LEVEL
+
 #include <string.h>
 
-#include "lwm2m.h"
-#include "lwm2m_api.h"
-
-#if LWM2M_CONFIG_LOG_ENABLED
-
-#define NRF_LOG_MODULE_NAME lwm2m
-
-#define NRF_LOG_LEVEL       LWM2M_CONFIG_LOG_LEVEL
-#define NRF_LOG_INFO_COLOR  LWM2M_CONFIG_INFO_COLOR
-#define NRF_LOG_DEBUG_COLOR LWM2M_CONFIG_DEBUG_COLOR
-
-#include "nrf_log.h"
-
-#define LWM2M_TRC     NRF_LOG_DEBUG                                                                 /**< Used for getting trace of execution in the module. */
-#define LWM2M_ERR     NRF_LOG_ERROR                                                                 /**< Used for logging errors in the module. */
-#define LWM2M_DUMP    NRF_LOG_HEXDUMP_DEBUG                                                         /**< Used for dumping octet information to get details of bond information etc. */
-
-#define LWM2M_ENTRY() LWM2M_TRC(">> %s", __func__)
-#define LWM2M_EXIT()  LWM2M_TRC("<< %s", __func__)
-
-#else // LWM2M_CONFIG_LOG_ENABLED
-
-#define LWM2M_TRC(...)                                                                              /**< Disables traces. */
-#define LWM2M_DUMP(...)                                                                             /**< Disables dumping of octet streams. */
-#define LWM2M_ERR(...)                                                                              /**< Disables error logs. */
-
-#define LWM2M_ENTRY(...)
-#define LWM2M_EXIT(...)
-
-#endif // LWM2M_CONFIG_LOG_ENABLED
+#include <lwm2m.h>
+#include <lwm2m_api.h>
 
 uint16_t             m_count;
 uint16_t             m_short_server_id[LWM2M_MAX_SERVERS];
@@ -43,7 +23,7 @@ uint16_t             m_location_len[LWM2M_MAX_SERVERS];
     IDX = find_index(ID);                        \
     if (IDX < 0)                                 \
     {                                            \
-       return LWM2M_ERROR(NRF_ERROR_NOT_FOUND);  \
+       return ENOENT;                            \
     }
 
 
@@ -64,7 +44,7 @@ static int find_index(uint16_t short_server_id)
 uint32_t lwm2m_remote_init()
 {
     m_count = 0;
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -78,7 +58,7 @@ uint32_t lwm2m_remote_register(uint16_t short_server_id)
     {
         if (m_count + 1 > LWM2M_MAX_SERVERS)
         {
-            return LWM2M_ERROR(NRF_ERROR_NO_MEM);
+            return ENOMEM;
         }
 
         m_short_server_id[m_count] = short_server_id;
@@ -87,7 +67,7 @@ uint32_t lwm2m_remote_register(uint16_t short_server_id)
 
     LWM2M_TRC("[Remote  ]: << lwm2m_remote_register.\r\n");
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -114,7 +94,7 @@ uint32_t lwm2m_remote_deregister(uint16_t short_server_id)
 
     LWM2M_TRC("[Remote  ]: << lwm2m_remote_deregister.\r\n");
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -139,7 +119,7 @@ uint32_t lwm2m_remote_remote_save(struct sockaddr * p_remote, uint16_t short_ser
 
     LWM2M_TRC("[Remote  ]: << lwm2m_remote_remote_save.\r\n");
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -162,7 +142,7 @@ uint32_t lwm2m_remote_short_server_id_find(uint16_t        * p_short_server_id,
                 *p_short_server_id = m_short_server_id[i];
                 LWM2M_TRC("[Remote  ]: << lwm2m_remote_short_server_id_find. Found: %u\r\n",
                           m_short_server_id[i]);
-                return NRF_SUCCESS;
+                return 0;
             }
         }
 
@@ -173,14 +153,14 @@ uint32_t lwm2m_remote_short_server_id_find(uint16_t        * p_short_server_id,
                 *p_short_server_id = m_short_server_id[i];
                 LWM2M_TRC("[Remote  ]: << lwm2m_remote_short_server_id_find. Found: %u\r\n",
                           m_short_server_id[i]);
-                return NRF_SUCCESS;
+                return 0;
             }
         }
     }
 
     LWM2M_TRC("[Remote  ]: << lwm2m_remote_short_server_id_find. Not Found.\r\n");
 
-    return LWM2M_ERROR(NRF_ERROR_NOT_FOUND);
+    return ENOENT;
 }
 
 
@@ -199,7 +179,7 @@ uint32_t lwm2m_short_server_id_remote_find(struct sockaddr ** pp_remote,
 
     LWM2M_TRC("[Remote  ]: << lwm2m_short_server_id_remote_find.\r\n");
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -211,7 +191,7 @@ uint32_t lwm2m_remote_location_save(char   * p_location,
 
     if (location_len > LWM2M_REGISTER_MAX_LOCATION_LEN)
     {
-        return LWM2M_ERROR(NRF_ERROR_NO_MEM);
+        return ENOMEM;
     }
 
     int index;
@@ -222,7 +202,7 @@ uint32_t lwm2m_remote_location_save(char   * p_location,
 
     LWM2M_TRC("[Remote  ]: << lwm2m_remote_location_save.\r\n");
 
-    return NRF_SUCCESS;
+    return 0;
 }
 
 
@@ -243,5 +223,5 @@ uint32_t lwm2m_remote_location_find(char    ** pp_location,
 
     LWM2M_TRC("[Remote  ]: << lwm2m_remote_location_find.\r\n");
 
-    return NRF_SUCCESS;
+    return 0;
 }

@@ -1,4 +1,9 @@
-/*$$$LICENCE_NORDIC_STANDARD<2016>$$$*/
+/*
+ * Copyright (c) 2018 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
 /** @file lwm2m_acl.h
  *
  * @defgroup iot_sdk_lwm2m_acl_api LWM2M ACL API interface
@@ -10,8 +15,8 @@
 #ifndef LWM2M_ACL_H__
 #define LWM2M_ACL_H__
 
-#include "lwm2m.h"
-#include "lwm2m_api.h"
+#include <lwm2m.h>
+#include <lwm2m_api.h>
 
 #define LWM2M_ACL_NO_PERM                    0
 #define LWM2M_ACL_FULL_PERM                  (LWM2M_PERMISSION_READ    | \

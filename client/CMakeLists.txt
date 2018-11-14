@@ -1,0 +1,16 @@
+#
+# Copyright (c) 2018 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+#
+
+cmake_minimum_required(VERSION 3.8.2)
+
+include($ENV{ZEPHYR_BASE}/cmake/app/boilerplate.cmake NO_POLICY_SCOPE)
+project(NONE)
+
+target_sources(app PRIVATE src/main.c)
+zephyr_include_directories(src)
+
+add_subdirectory(.. ${PROJECT_BINARY_DIR}/zephyr/nrf_lwm2m)
+target_link_libraries(app PRIVATE nrf_lwm2m)
