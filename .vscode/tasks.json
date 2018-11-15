@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "cd ${workspaceRoot}/build; ZEPHYR_BASE=${workspaceRoot}/../zephyr ninja",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "flash",
+            "type": "shell",
+            "command": "cd ${workspaceRoot}/build; ZEPHYR_BASE=${workspaceRoot}/../zephyr ninja flash",
+            "problemMatcher": [],
+            "group": "build"
+        }
+    ]
+}
