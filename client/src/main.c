@@ -10,7 +10,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <net/socket.h>
-#include <dk_buttons_and_leds.h>
 //#include <lte_lc.h>
 #include <nrf.h>
 
@@ -22,6 +21,9 @@
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
 
+#define APP_USE_BUTTONS_AND_LEDS 1
+#define APP_USE_AF_INET6 0
+
 // Set to 0 to skip bootstrap
 #define BOOTSTRAP 1
 
@@ -29,13 +31,17 @@
 // Set to 0 to connect to Repository Server
 #define DM_SERVER 0
 
+#if APP_USE_BUTTONS_AND_LEDS
+#include <dk_buttons_and_leds.h>
+#endif
+
 #define COAP_LOCAL_LISTENER_PORT              5683                                            /**< Local port to listen on any traffic, client or server. Not bound to any specific LWM2M functionality.*/
 #define LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT     9998                                            /**< Local port to connect to the LWM2M bootstrap server. */
 #define LWM2M_LOCAL_CLIENT_PORT               9999                                            /**< Local port to connect to the LWM2M server. */
 #define LWM2M_BOOTSTRAP_SERVER_REMOTE_PORT    5684                                            /**< Remote port of the LWM2M bootstrap server. */
 #define LWM2M_SERVER_REMORT_PORT              5684                                            /**< Remote port of the LWM2M server. */
 
-#define BOOTSTRAP_URI                   "coaps://my.bootstrapserver.com:5684"                 /**< Server URI to the bootstrap server when using security (DTLS). */
+#define BOOTSTRAP_URI                   "coaps://ddocdpboot.do.motive.com:5684"               /**< Server URI to the bootstrap server when using security (DTLS). */
 #define CLIENT_IMEI_MSISDN              "urn:imei-msisdn:004402990020434-0123456789"          /**< IMEI-MSISDN of the device. */
 
 #define LED_BLINK_INTERVAL_MS           30000                                                 /**< LED blinking interval. */
@@ -112,9 +118,10 @@ typedef enum
 
 //APP_TIMER_DEF(m_iot_timer_tick_src_id);                                                       /**< App timer instance used to update the IoT timer wall clock. */
 
+static char m_security_server_uri[1+LWM2M_MAX_SERVERS][SECURITY_SERVER_URI_SIZE_MAX];
+
 static lwm2m_server_config_t               m_server_conf;                                     /**< Server configuration structure. */
 static lwm2m_client_identity_t             m_client_id;                                       /**< Client ID structure to hold the client's UUID. */
-static bool                                m_use_dtls[1+LWM2M_MAX_SERVERS] = {true, true};    /**< Array to keep track of which of the connections to bootstrap server and server is using a secure link. */
 static uint8_t *                           mp_link_format_string    = NULL;                   /**< Pointer to hold a link format string across a button press initiated registration and retry. */
 static uint32_t                            m_link_format_string_len = 0;                      /**< Length of the link format string that is used in registration attempts. */
 
@@ -142,44 +149,16 @@ static volatile app_state_t m_app_state = APP_STATE_IDLE;                       
 static char m_at_write_buffer[APP_MAX_AT_WRITE_LENGTH];                                       /**< Buffer used to write AT commands. */
 static char m_at_read_buffer[APP_MAX_AT_READ_LENGTH];                                         /**< Buffer used to read AT commands. */
 
-#if defined(APP_USE_AF_INET6)
+#if (APP_USE_AF_INET6 == 1)
+static struct sockaddr_in6 m_bs_server;
+static struct sockaddr_in6 m_server;
+#else // APP_USE_AF_INET6
+static struct sockaddr_in m_bs_server;
+static struct sockaddr_in m_server;
+#endif // APP_USE_AF_INET6
 
-static struct sockaddr_in6 m_bs_server =
-{
-    .sin_port   = LWM2M_BOOTSTRAP_SERVER_REMOTE_PORT,
-    .sin_family = AF_INET6,
-};
-
-static struct sockaddr_in6 m_server =
-{
-    .sin_port   = LWM2M_SERVER_REMORT_PORT,
-    .sin_family = AF_INET6,
-};
-
-#else //APP_USE_AF_INET6
-
-static struct sockaddr_in m_bs_server =
-{
-    .sin_port        = htons(LWM2M_BOOTSTRAP_SERVER_REMOTE_PORT),
-    .sin_family      = AF_INET,
-    .sin_addr.s_addr = htonl(0xCF4720E5) // 207.71.32.229
-};
-
-static struct sockaddr_in m_server =
-{
-    .sin_port        = htons(LWM2M_SERVER_REMORT_PORT),
-    .sin_family      = AF_INET,
-#if (DM_SERVER == 1)
-    .sin_addr.s_addr = htonl(0xCF4720E6) // 207.71.32.230 = DM server
-#else
-    .sin_addr.s_addr = htonl(0xCF4720E7) // 207.71.32.231 = Repository server
-#endif
-};
-
-#endif
-
-static const struct sockaddr *   mp_bs_remote_server = (struct sockaddr *)&m_bs_server;       /**< Pointer to remote bootstrap server address to connect to. */
-static const struct sockaddr *   mp_remote_server = (struct sockaddr *)&m_server;             /**< Pointer to remote secure server address to connect to. */
+static struct sockaddr * mp_bs_remote_server = (struct sockaddr *)&m_bs_server;               /**< Pointer to remote bootstrap server address to connect to. */
+static struct sockaddr * mp_remote_server = (struct sockaddr *)&m_server;                     /**< Pointer to remote secure server address to connect to. */
 
 static void app_server_update(uint16_t instance_id);
 
@@ -208,18 +187,22 @@ void bsd_irrecoverable_error_handler(uint32_t error)
 }
 
 
+#if APP_USE_BUTTONS_AND_LEDS
 /**@brief Callback for button events from the DK buttons and LEDs library. */
-static void button_handler(u32_t buttons, u32_t has_changed)
+static void app_button_handler(u32_t buttons, u32_t has_changed)
 {
 
 }
+#endif
 
 
 /**@brief Initializes buttons and LEDs, using the DK buttons and LEDs library. */
-static void buttons_leds_init(void)
+static void app_buttons_leds_init(void)
 {
-    dk_buttons_and_leds_init(button_handler);
+#if APP_USE_BUTTONS_AND_LEDS
+    dk_buttons_and_leds_init(app_button_handler);
     dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
+#endif
 }
 
 
@@ -230,7 +213,7 @@ static void buttons_leds_init(void)
 static void blink_timeout_handler(iot_timer_time_in_ms_t wall_clock_value)
 {
     ARG_UNUSED(wall_clock_value);
-#if BUTTONS_AND_LEDS
+#if APP_USE_BUTTONS_AND_LEDS
     switch (m_app_state)
     {
         case APP_STATE_IDLE:
@@ -347,12 +330,78 @@ uint32_t lwm2m_coap_handler_root(uint8_t op_code, coap_message_t * p_request)
 }
 
 
+static uint32_t app_resolve_server_uri(lwm2m_string_t  * server_uri,
+                                       struct sockaddr * addr,
+                                       bool            * secure)
+{
+    /*
+     * Create a null-terminated string copy for two reasons:
+     *  1. Be able to use string.h functions without length checks.
+     *  2. Null-terminate hostname within the string without a new copy.
+     */
+    char *server_uri_val = k_malloc(server_uri->len + 1);
+    strncpy(server_uri_val, server_uri->p_val, server_uri->len);
+    server_uri_val[server_uri->len] = '\0';
+
+    const char *hostname;
+    uint16_t port;
+
+    if (strncmp(server_uri_val, "coaps://", 8) == 0) {
+        hostname = &server_uri_val[8];
+        port = 5684;
+        *secure = true;
+    } else if (strncmp(server_uri_val, "coap://", 7) == 0) {
+        hostname = &server_uri_val[7];
+        port = 5683;
+        *secure = false;
+    } else {
+        k_free(server_uri_val);
+        return EINVAL;
+    }
+
+    char *sep = strchr(hostname, ':');
+    if (sep) {
+        *sep = '\0';
+        port = atoi(sep + 1);
+    }
+
+    struct addrinfo hints = {
+#if (APP_USE_AF_INET6 == 1)
+        .ai_family = AF_INET6,
+#else // APP_USE_AF_INET6
+        .ai_family = AF_INET,
+#endif // APP_USE_AF_INET6
+        .ai_socktype = SOCK_DGRAM
+    };
+    struct addrinfo *result;
+    int ret_val = getaddrinfo(hostname, NULL, &hints, &result);
+    k_free(server_uri_val);
+
+    if (ret_val != 0) {
+        return errno;
+    }
+
+    if (result->ai_family == AF_INET) {
+        ((struct sockaddr_in *)addr)->sin_family = result->ai_family;
+        ((struct sockaddr_in *)addr)->sin_port = htons(port);
+        ((struct sockaddr_in *)addr)->sin_addr.s_addr = ((struct sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
+    } else {
+        ((struct sockaddr_in6 *)addr)->sin6_family = result->ai_family;
+        ((struct sockaddr_in6 *)addr)->sin6_port = htons(port);
+        memcpy(((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr, ((struct sockaddr_in6 *)result->ai_addr)->sin6_addr.s6_addr, 16);
+    }
+
+    freeaddrinfo(result);
+
+    return 0;
+}
+
+
 /**@brief Helper function to parse the uri and save the remote to the LWM2M remote database. */
-uint32_t lwm2m_parse_uri_and_save_remote(uint16_t short_server_id,
-                                         char   * p_str,
-                                         uint16_t str_len,
-                                         bool   * p_use_dtls,
-                                         const struct sockaddr * p_remote)
+static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_server_id,
+                                                    lwm2m_string_t  * server_uri,
+                                                    bool            * secure,
+                                                    struct sockaddr * p_remote)
 {
     uint32_t err_code;
 
@@ -360,6 +409,14 @@ uint32_t lwm2m_parse_uri_and_save_remote(uint16_t short_server_id,
     err_code = lwm2m_remote_register(short_server_id);
     if (err_code != 0)
     {
+        return err_code;
+    }
+
+    // Use DNS to lookup the IP
+    err_code = app_resolve_server_uri(server_uri, p_remote, secure);
+    if (err_code != 0)
+    {
+        printf("app_resolve_server_uri(\"%s\") failed %lu\n", server_uri->p_val, err_code);
         return err_code;
     }
 
@@ -376,9 +433,9 @@ uint32_t lwm2m_parse_uri_and_save_remote(uint16_t short_server_id,
 
 
 /**@brief Helper function to get the access from an instance and a remote. */
-uint32_t lwm2m_access_remote_get(uint16_t         * p_access,
-                                 lwm2m_instance_t * p_instance,
-                                 struct sockaddr  * p_remote)
+static uint32_t app_lwm2m_access_remote_get(uint16_t         * p_access,
+                                            lwm2m_instance_t * p_instance,
+                                            struct sockaddr  * p_remote)
 {
     uint32_t err_code;
     uint16_t short_server_id;
@@ -437,7 +494,9 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
                                    uint8_t          op_code,
                                    coap_message_t * p_request)
 {
+#if APP_USE_BUTTONS_AND_LEDS
     dk_set_leds(DK_LED3_MSK);
+#endif
 
     (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
 
@@ -456,9 +515,9 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
     APPL_LOG("lwm2m: server_instance_callback");
 
     uint16_t access = 0;
-    uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                p_instance,
-                                                p_request->p_remote);
+    uint32_t err_code = app_lwm2m_access_remote_get(&access,
+                                                    p_instance,
+                                                    p_request->p_remote);
     APP_ERROR_CHECK(err_code);
 
     // Set op_code to 0 if access not allowed for that op_code.
@@ -579,9 +638,9 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
     APPL_LOG("lwm2m: device_instance_callback");
 
     uint16_t access = 0;
-    uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                p_instance,
-                                                p_request->p_remote);
+    uint32_t err_code = app_lwm2m_access_remote_get(&access,
+                                                    p_instance,
+                                                    p_request->p_remote);
     APP_ERROR_CHECK(err_code);
 
     // Set op_code to 0 if access not allowed for that op_code.
@@ -713,9 +772,9 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
     APPL_LOG("lwm2m: conn_mon_instance_callback");
 
     uint16_t access = 0;
-    uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                p_instance,
-                                                p_request->p_remote);
+    uint32_t err_code = app_lwm2m_access_remote_get(&access,
+                                                    p_instance,
+                                                    p_request->p_remote);
     APP_ERROR_CHECK(err_code);
 
     // Set op_code to 0 if access not allowed for that op_code.
@@ -818,9 +877,9 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
     APPL_LOG("lwm2m: security_instance_callback");
 
     uint16_t access = 0;
-    uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                p_instance,
-                                                p_request->p_remote);
+    uint32_t err_code = app_lwm2m_access_remote_get(&access,
+                                                    p_instance,
+                                                    p_request->p_remote);
     APP_ERROR_CHECK(err_code);
 
     // Set op_code to 0 if access not allowed for that op_code.
@@ -847,13 +906,16 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
         // Copy the URI. Can be changed to handle all resources in the instance.
         if (m_instance_security[instance_id].server_uri.len < SECURITY_SERVER_URI_SIZE_MAX)
         {
-            // Parse URI to remote and save it.
-            err_code = lwm2m_parse_uri_and_save_remote(m_instance_security[instance_id].short_server_id,
-                                                       m_instance_security[instance_id].server_uri.p_val,
-                                                       m_instance_security[instance_id].server_uri.len,
-                                                       &m_use_dtls[instance_id],
-                                                       p_request->p_remote);
-            APP_ERROR_CHECK(err_code);
+            // Copy the lwm2m_string_t server_uri into a application allocated memory space
+            // and point to that one.
+            memset(m_security_server_uri[instance_id], 0, SECURITY_SERVER_URI_SIZE_MAX);
+
+            memcpy(m_security_server_uri[instance_id],
+                   m_instance_security[instance_id].server_uri.p_val,
+                   m_instance_security[instance_id].server_uri.len);
+
+            m_instance_security[instance_id].server_uri.p_val =
+                (char *)m_security_server_uri[instance_id];
 
             (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
         }
@@ -907,20 +969,22 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
             // No ACL object for security objects.
             ((lwm2m_instance_t *)&m_instance_security[instance_id])->acl.id = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
 
+            // Copy the lwm2m_string_t server_uri into a application allocated memory space
+            // and point to that one.
+            memset(m_security_server_uri[instance_id], 0, SECURITY_SERVER_URI_SIZE_MAX);
+
+            memcpy(m_security_server_uri[instance_id],
+                   m_instance_security[instance_id].server_uri.p_val,
+                   m_instance_security[instance_id].server_uri.len);
+
+            m_instance_security[instance_id].server_uri.p_val =
+                (char *)m_security_server_uri[instance_id];
+
             // Cast the instance to its prototype and add it to the CoAP handler to become a
             // public instance. We can only have one so we delete the first if any.
             (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_security[instance_id]);
 
             (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_security[instance_id]);
-
-            // Parse URI to remote and save it
-            err_code = lwm2m_parse_uri_and_save_remote(m_instance_security[instance_id].short_server_id,
-                                                       m_instance_security[instance_id].server_uri.p_val,
-                                                       m_instance_security[instance_id].server_uri.len,
-                                                       &m_use_dtls[instance_id],
-                                                       mp_bs_remote_server);
-
-            APP_ERROR_CHECK(err_code);
 
             (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
         }
@@ -945,6 +1009,19 @@ static void app_lwm2m_factory_bootstrap(void)
     char * binding_uq  = "UQ";
 
     //
+    // Bootstrap security instances.
+    //
+    m_instance_security[0].server_uri.p_val = BOOTSTRAP_URI;
+    m_instance_security[0].server_uri.len = strlen(BOOTSTRAP_URI);
+
+#if (BOOTSTRAP == 0)
+    m_instance_security[1].server_uri.p_val = "coaps://ddocdp.do.motive.com:5684";
+    m_instance_security[1].server_uri.len = 34;
+    m_instance_security[3].server_uri.p_val = "coaps://xvzwmpctii.xdev.motive.com:5684";
+    m_instance_security[3].server_uri.len = 40;
+#endif
+
+    //
     // Bootstrap server instance.
     //
     m_instance_server[0].short_server_id = 100;
@@ -966,14 +1043,6 @@ static void app_lwm2m_factory_bootstrap(void)
 #endif
 
     (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[0]);
-
-#if (BOOTSTRAP == 0)
-    // Register the short_server_id.
-    (void)lwm2m_remote_register(m_instance_server[0].short_server_id);
-
-    // Save the short_server_id.
-    (void)lwm2m_remote_remote_save((struct sockaddr *)mp_bs_remote_server, m_instance_server[0].short_server_id);
-#endif
 
     //
     // DM server instance.
@@ -1032,14 +1101,6 @@ static void app_lwm2m_factory_bootstrap(void)
                                     (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
                                      LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE),
                                     102);
-
-#if (BOOTSTRAP == 0) && (DM_SERVER == 1)
-    // Register the short_server_id.
-    (void)lwm2m_remote_register(m_instance_server[1].short_server_id);
-
-    // Save the short_server_id.
-    (void)lwm2m_remote_remote_save((struct sockaddr *)mp_remote_server, m_instance_server[1].short_server_id);
-#endif
 
     //
     // Diagnostics server instance.
@@ -1106,14 +1167,6 @@ static void app_lwm2m_factory_bootstrap(void)
                                     1000);
 
     (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[3]);
-
-#if (BOOTSTRAP == 0) && (DM_SERVER == 0)
-    // Register the short_server_id.
-    (void)lwm2m_remote_register(m_instance_server[3].short_server_id);
-
-    // Save the short_server_id.
-    (void)lwm2m_remote_remote_save((struct sockaddr *)mp_remote_server, m_instance_server[3].short_server_id);
-#endif
 
     //
     // Device instance.
@@ -1225,18 +1278,11 @@ static void app_lwm2m_factory_bootstrap(void)
  *          of existing instances. If bootstrap is not performed, the registration to the server
  *          will use what is initialized in this function.
  */
-static void lwm2m_setup(void)
+static void app_lwm2m_setup(void)
 {
     (void)lwm2m_init(k_malloc, k_free);
     (void)lwm2m_remote_init();
     (void)lwm2m_acl_init();
-
-    // Save the remote address of the bootstrap server.
-    (void)lwm2m_parse_uri_and_save_remote(LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
-                                          BOOTSTRAP_URI,
-                                          (uint16_t)strlen(BOOTSTRAP_URI),
-                                          &m_use_dtls[BOOTSTRAP_SECURITY_INSTANCE_IDX],
-                                          mp_bs_remote_server);
 
     m_bootstrap_server.object_id    = LWM2M_NAMED_OBJECT;
     m_bootstrap_server.callback     = bootstrap_object_callback;
@@ -1282,30 +1328,31 @@ static void lwm2m_setup(void)
 static void app_bootstrap_connect(void)
 {
     uint32_t err_code;
+    bool secure;
 
-    if (m_use_dtls[BOOTSTRAP_SECURITY_INSTANCE_IDX] == true)
+    // Save the remote address of the bootstrap server.
+    (void)app_lwm2m_parse_uri_and_save_remote(LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
+                                              &m_instance_security[0].server_uri,
+                                              &secure,
+                                              mp_bs_remote_server);
+
+    if (secure == true)
     {
         APPL_LOG("SECURE session (bootstrap)");
 
-        #if defined(APP_USE_AF_INET6)
-
-            const struct sockaddr_in client_addr =
+#if (APP_USE_AF_INET6 == 1)
+            const struct sockaddr_in6 client_addr =
             {
                 .sin6_port   = htons(LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT),
                 .sin6_family = AF_INET6,
-                .sin
             };
-
-        #else // APP_USE_AF_INET6
-
+#else // APP_USE_AF_INET6
             const struct sockaddr_in client_addr =
             {
-                .sin_port        = htons(LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT),
-                .sin_family      = AF_INET,
-                .sin_addr.s_addr = 0
+                .sin_port   = htons(LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT),
+                .sin_family = AF_INET,
             };
-
-        #endif // APP_USE_AF_INET6
+#endif // APP_USE_AF_INET6
 
             #define SEC_TAG_COUNT 1
 
@@ -1357,6 +1404,7 @@ static void app_bootstrap(void)
 static void app_server_connect(void)
 {
     uint32_t err_code;
+    bool secure;
 
     // Initialize server configuration structure.
     memset(&m_server_conf, 0, sizeof(lwm2m_server_config_t));
@@ -1365,28 +1413,34 @@ static void app_server_connect(void)
     // Set the short server id of the server in the config.
     m_server_conf.short_server_id = m_instance_security[SERVER_SECURITY_INSTANCE_IDX].short_server_id;
 
-    if (m_use_dtls[SERVER_SECURITY_INSTANCE_IDX] == true)
+#if (DM_SERVER == 1)
+    int instance = 1;
+#else
+    int instance = 3;
+#endif
+
+    // Save the remote address of the server.
+    (void)app_lwm2m_parse_uri_and_save_remote(m_instance_server[instance].short_server_id,
+                                              &m_instance_security[instance].server_uri,
+                                              &secure,
+                                              mp_remote_server);
+
+    if (secure == true)
     {
         APPL_LOG("SECURE session (register)");
-    #if defined(APP_USE_AF_INET6)
-
+#if (APP_USE_AF_INET6 == 1)
+        const struct sockaddr_in6 client_addr =
+        {
+            .sin6_port   = htons(LWM2M_LOCAL_CLIENT_PORT),
+            .sin6_family = AF_INET6,
+        };
+#else // APP_USE_AF_INET6
         const struct sockaddr_in client_addr =
         {
-            .sin6_port   = htons(LWM2M_LOCAL_CLIENT_PORT)
-            .sin6_family = htons(AF_INET6),
-            .sin
+            .sin_port   = htons(LWM2M_LOCAL_CLIENT_PORT),
+            .sin_family = AF_INET,
         };
-
-    #else // APP_USE_AF_INET6
-
-        const struct sockaddr_in client_addr =
-        {
-            .sin_port        = htons(LWM2M_LOCAL_CLIENT_PORT),
-            .sin_family      = AF_INET,
-            .sin_addr.s_addr = 0
-        };
-
-    #endif // APP_USE_AF_INET6
+#endif // APP_USE_AF_INET6
 
         #define SEC_TAG_COUNT 1
 
@@ -1453,7 +1507,9 @@ static void app_server_register(void)
         if (err_code == 0)
         {
             m_app_state = APP_STATE_SERVER_REGISTERED;
+#if APP_USE_BUTTONS_AND_LEDS
             dk_set_leds(DK_LED4_MSK);
+#endif
         }
     }
 }
@@ -1478,13 +1534,13 @@ static void app_disconnect(void)
     uint32_t err_code;
 
     // Destroy the secure session if any.
-    if (m_use_dtls[BOOTSTRAP_SECURITY_INSTANCE_IDX] == true)
+    if (mp_lwm2m_bs_transport)
     {
         err_code = coap_security_destroy(mp_lwm2m_bs_transport);
         APP_ERROR_CHECK(err_code);
     }
 
-    if (m_use_dtls[SERVER_SECURITY_INSTANCE_IDX] == true)
+    if (mp_lwm2m_transport)
     {
         err_code = coap_security_destroy(mp_lwm2m_transport);
         APP_ERROR_CHECK(err_code);
@@ -1494,7 +1550,7 @@ static void app_disconnect(void)
 }
 
 
-void app_lwm2m_process(void)
+static void app_lwm2m_process(void)
 {
     coap_input();
 
@@ -1508,7 +1564,9 @@ void app_lwm2m_process(void)
         }
         case APP_STATE_BS_CONNECTED:
         {
+#if APP_USE_BUTTONS_AND_LEDS
             dk_set_leds(DK_LED2_MSK);
+#endif
             printk("app_bootstrap()\n");
             app_bootstrap();
             break;
@@ -1538,23 +1596,23 @@ void app_lwm2m_process(void)
     }
 }
 
-void app_coap_init(void)
+static void app_coap_init(void)
 {
     uint32_t err_code;
 
-    #if defined(APP_USE_AF_INET6)
+#if (APP_USE_AF_INET6 == 1)
     struct sockaddr_in6 local_client_addr =
     {
         .sin6_port   = htons(COAP_LOCAL_LISTENER_PORT),
         .sin6_family = AF_INET6,
     };
-    #else // APP_USE_AF_INET6
+#else // APP_USE_AF_INET6
     struct sockaddr_in local_client_addr =
     {
         .sin_port   = htons(COAP_LOCAL_LISTENER_PORT),
         .sin_family = AF_INET,
     };
-    #endif // APP_USE_AF_INET6
+#endif // APP_USE_AF_INET6
 
     // If bootstrap server and server is using different port we can
     // register the ports individually.
@@ -1699,12 +1757,6 @@ static void app_modem_configure(void)
         }
     }
     ARG_UNUSED(close(at_socket_fd));
-
-#if (BOOTSTRAP == 1)
-    m_app_state = APP_STATE_BS_CONNECT;
-#else
-    m_app_state = APP_STATE_BOOTSTRAPED;
-#endif
 }
 
 
@@ -1721,23 +1773,31 @@ int main(void)
     app_coap_init();
 
     // Setup LWM2M endpoints.
-    lwm2m_setup();
+    app_lwm2m_setup();
+
+    // Create LwM2M factory bootstraped objects.
+    app_lwm2m_factory_bootstrap();
 
     // Establish LTE link.
     app_modem_configure();
     //lte_lc_init_and_connect();
 
     // Initialize LEDs and Buttons.
-    buttons_leds_init();
+    app_buttons_leds_init();
 
     // Initialize Timers.
     //timers_init();
     //iot_timer_init();
 
-    // Create LwM2M factory bootstraped objects.
-    app_lwm2m_factory_bootstrap();
+#if (BOOTSTRAP == 1)
+    m_app_state = APP_STATE_BS_CONNECT;
+#else
+    m_app_state = APP_STATE_BOOTSTRAPED;
+#endif
 
+#if APP_USE_BUTTONS_AND_LEDS
     dk_set_leds(DK_LED1_MSK);
+#endif
 
     // Enter main loop
     for (;;)
