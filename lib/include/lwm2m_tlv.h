@@ -56,6 +56,15 @@ typedef struct
     uint8_t * value;   /**< Value of the TLV. */
 } lwm2m_tlv_t;
 
+/**@brief Callback function to handle unknown TLV resources.
+ *
+ * @param[in] p_tlv Pointer to the unknown TLV.
+ *
+ * @retval NRF_SUCCESS If decoding was successful.
+ * @retval NRF_ERROR_NOT_FOUND If resource was not found.
+ */
+typedef uint32_t (* lwm2m_tlv_callback_t)(lwm2m_instance_t * p_instance, lwm2m_tlv_t * p_tlv);
+
 /**@brief Decode a LWM2M TLV byte buffer into a TLV structure.
  *
  * @param[out]   p_tlv        This struct will be filled with id, length, type and pointer to value.

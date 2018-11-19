@@ -96,9 +96,10 @@ uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
 }
 
 
-uint32_t lwm2m_tlv_security_decode(lwm2m_security_t * p_security,
-                                   uint8_t          * p_buffer,
-                                   uint32_t           buffer_len)
+uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
+                                   uint8_t            * p_buffer,
+                                   uint32_t             buffer_len,
+                                   lwm2m_tlv_callback_t resource_callback)
 {
     NULL_PARAM_CHECK(p_security);
     NULL_PARAM_CHECK(p_buffer);
@@ -202,7 +203,13 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t * p_security,
             }
 
             default:
+            {
+                if (resource_callback)
+                {
+                    err_code = resource_callback((lwm2m_instance_t *)p_security, &tlv);
+                }
                 break;
+            }
         }
 
         if (err_code != 0)
@@ -356,9 +363,10 @@ uint32_t lwm2m_tlv_security_encode(uint8_t          * p_buffer,
 }
 
 
-uint32_t lwm2m_tlv_server_decode(lwm2m_server_t * p_server,
-                                 uint8_t        * p_buffer,
-                                 uint32_t         buffer_len)
+uint32_t lwm2m_tlv_server_decode(lwm2m_server_t     * p_server,
+                                 uint8_t            * p_buffer,
+                                 uint32_t             buffer_len,
+                                 lwm2m_tlv_callback_t resource_callback)
 {
     NULL_PARAM_CHECK(p_server);
     NULL_PARAM_CHECK(p_buffer);
@@ -444,7 +452,13 @@ uint32_t lwm2m_tlv_server_decode(lwm2m_server_t * p_server,
             }
 
             default:
+            {
+                if (resource_callback)
+                {
+                    err_code = resource_callback((lwm2m_instance_t *)p_server, &tlv);
+                }
                 break;
+            }
         }
 
         if (err_code != 0)
@@ -562,7 +576,8 @@ uint32_t lwm2m_tlv_server_encode(uint8_t        * p_buffer,
 
 uint32_t lwm2m_tlv_connectivity_monitoring_decode(lwm2m_connectivity_monitoring_t * p_conn_mon,
                                                   uint8_t                         * p_buffer,
-                                                  uint32_t                          buffer_len)
+                                                  uint32_t                          buffer_len,
+                                                  lwm2m_tlv_callback_t              resource_callback)
 {
     NULL_PARAM_CHECK(p_conn_mon);
     NULL_PARAM_CHECK(p_buffer);
@@ -661,7 +676,13 @@ uint32_t lwm2m_tlv_connectivity_monitoring_decode(lwm2m_connectivity_monitoring_
             }
 
             default:
+            {
+                if (resource_callback)
+                {
+                    err_code = resource_callback((lwm2m_instance_t *)p_conn_mon, &tlv);
+                }
                 break;
+            }
         }
 
         if (err_code != 0)
@@ -806,9 +827,10 @@ uint32_t lwm2m_tlv_connectivity_monitoring_encode(uint8_t                       
 }
 
 
-uint32_t lwm2m_tlv_device_decode(lwm2m_device_t * p_device,
-                                 uint8_t        * p_buffer,
-                                 uint32_t         buffer_len)
+uint32_t lwm2m_tlv_device_decode(lwm2m_device_t     * p_device,
+                                 uint8_t            * p_buffer,
+                                 uint32_t             buffer_len,
+                                 lwm2m_tlv_callback_t resource_callback)
 {
     NULL_PARAM_CHECK(p_device);
     NULL_PARAM_CHECK(p_buffer);
@@ -853,8 +875,13 @@ uint32_t lwm2m_tlv_device_decode(lwm2m_device_t * p_device,
             }
 
             default:
-                err_code = ENOTSUP;
+            {
+                if (resource_callback)
+                {
+                    err_code = resource_callback((lwm2m_instance_t *)p_device, &tlv);
+                }
                 break;
+            }
         }
 
         if (err_code != 0)

@@ -17,6 +17,7 @@
 
 #include <stdint.h>
 #include <lwm2m_objects.h>
+#include <lwm2m_tlv.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,12 +46,14 @@ uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
  * @param[out] p_security Pointer to a LWM2M server object to be filled by the decoded TLVs.
  * @param[in]  p_buffer   Pointer to the TLV byte buffer to be decoded.
  * @param[in]  buffer_len Size of the buffer to be decoded.
+ * @param[in]  resource_callback Callback function to handle vendor specific TLV resources.
  *
  * @retval NRF_SUCCESS If decoding was successful.
  */
-uint32_t lwm2m_tlv_security_decode(lwm2m_security_t * p_security,
-                                   uint8_t          * p_buffer,
-                                   uint32_t           buffer_len);
+uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
+                                   uint8_t            * p_buffer,
+                                   uint32_t             buffer_len,
+                                   lwm2m_tlv_callback_t resource_callback);
 
 /**@brief Encode a LWM2M security object to a TLV byte buffer.
  *
@@ -77,12 +80,14 @@ uint32_t lwm2m_tlv_security_encode(uint8_t          * p_buffer,
  * @param[out] p_server   Pointer to a LWM2M server object to be filled by the decoded TLVs.
  * @param[in]  p_buffer   Pointer to the TLV byte buffer to be decoded.
  * @param[in]  buffer_len Size of the buffer to be decoded.
+ * @param[in]  resource_callback Callback function to handle vendor specific TLV resources.
  *
  * @retval NRF_SUCCESS If decoding was successful.
  */
-uint32_t lwm2m_tlv_server_decode(lwm2m_server_t * p_server,
-                                 uint8_t        * p_buffer,
-                                 uint32_t         buffer_len);
+uint32_t lwm2m_tlv_server_decode(lwm2m_server_t     * p_server,
+                                 uint8_t            * p_buffer,
+                                 uint32_t             buffer_len,
+                                 lwm2m_tlv_callback_t resource_callback);
 
 /**@brief Encode a LWM2M server object to a TLV byte buffer.
  *
@@ -110,12 +115,14 @@ uint32_t lwm2m_tlv_server_encode(uint8_t        * p_buffer,
  *                        the decoded TLVs.
  * @param[in]  p_buffer   Pointer to the TLV byte buffer to be decoded.
  * @param[in]  buffer_len Size of the buffer to be decoded.
+ * @param[in]  resource_callback Callback function to handle vendor specific TLV resources.
  *
  * @retval NRF_SUCCESS If decoding was successful.
  */
 uint32_t lwm2m_tlv_connectivity_monitoring_decode(lwm2m_connectivity_monitoring_t * p_conn_mon,
                                                   uint8_t                         * p_buffer,
-                                                  uint32_t                          buffer_len);
+                                                  uint32_t                          buffer_len,
+                                                  lwm2m_tlv_callback_t              resource_callback);
 
 /**@brief Encode a LWM2M connectivity monitoring object to a TLV byte buffer.
  *
@@ -144,12 +151,14 @@ uint32_t lwm2m_tlv_connectivity_monitoring_encode(uint8_t                       
  *                        the decoded TLVs.
  * @param[in]  p_buffer   Pointer to the TLV byte buffer to be decoded.
  * @param[in]  buffer_len Size of the buffer to be decoded.
+ * @param[in]  resource_callback Callback function to handle vendor specific TLV resources.
  *
  * @retval NRF_SUCCESS If decoding was successful.
  */
-uint32_t lwm2m_tlv_device_decode(lwm2m_device_t * p_device,
-                                 uint8_t        * p_buffer,
-                                 uint32_t         buffer_len);
+uint32_t lwm2m_tlv_device_decode(lwm2m_device_t     * p_device,
+                                 uint8_t            * p_buffer,
+                                 uint32_t             buffer_len,
+                                 lwm2m_tlv_callback_t resource_callback);
 
 /**@brief Encode a LWM2M device object to a TLV byte buffer.
  *

@@ -140,6 +140,14 @@ static lwm2m_server_t                      m_instance_server[1+LWM2M_MAX_SERVERS
 static lwm2m_device_t                      m_instance_device;                                 /**< Device object instance. */
 static lwm2m_connectivity_monitoring_t     m_instance_conn_mon;                               /**< Connectivity Monitoring object instance. */
 
+#define VERIZON_RESOURCE 30000
+
+static int32_t                             m_security_hold_off_timer[1+LWM2M_MAX_SERVERS];
+static int32_t                             m_security_is_bootstrapped[1+LWM2M_MAX_SERVERS];
+static int32_t                             m_server_is_registered[1+LWM2M_MAX_SERVERS];
+static int32_t                             m_server_client_hold_off_timer[1+LWM2M_MAX_SERVERS];
+static lwm2m_string_t                      m_apn[4];                                          /**< Verizon specific APN names. */
+
 static coap_transport_handle_t *           mp_coap_transport     = NULL;                      /**< CoAP transport handle for the non bootstrap server. */
 static coap_transport_handle_t *           mp_lwm2m_bs_transport = NULL;                      /**< CoAP transport handle for the secure bootstrap server. Obtained on @coap_security_setup. */
 static coap_transport_handle_t *           mp_lwm2m_transport    = NULL;                      /**< CoAP transport handle for the secure server. Obtained on @coap_security_setup. */
@@ -506,6 +514,250 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 }
 
 
+static uint32_t tlv_security_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
+{
+    uint32_t    index = 0;
+    uint32_t    err_code = 0;
+    lwm2m_tlv_t tlv;
+
+    while (index < p_tlv->length)
+    {
+        err_code = lwm2m_tlv_decode(&tlv, &index, p_tlv->value, p_tlv->length);
+
+        if (err_code != 0)
+        {
+            return err_code;
+        }
+
+        switch (tlv.id)
+        {
+            case 0: // HoldOffTimer
+            {
+                err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
+                                                         tlv.length,
+                                                         &m_security_hold_off_timer[instance_id]);
+                break;
+            }
+            case 1: // IsBootstrapped
+            {
+                err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
+                                                         tlv.length,
+                                                         &m_security_is_bootstrapped[instance_id]);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    return err_code;
+}
+
+
+static uint32_t tlv_security_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
+{
+    uint32_t err_code;
+
+    switch (p_tlv->id)
+    {
+        case VERIZON_RESOURCE:
+            err_code = tlv_security_verizon_decode(instance_id, p_tlv);
+            break;
+
+        default:
+            err_code = ENOENT;
+            break;
+    }
+
+    return err_code;
+}
+
+
+static uint32_t tlv_server_verizon_encode(uint16_t instance_id, uint8_t * p_buffer, uint32_t * p_buffer_len)
+{
+    int32_t list_values[2] =
+    {
+        m_server_is_registered[instance_id],
+        m_server_client_hold_off_timer[instance_id]
+    };
+
+    lwm2m_list_t list =
+    {
+        .type        = LWM2M_LIST_TYPE_INT32,
+        .p_id        = NULL,
+        .val.p_int32 = list_values,
+        .len         = 2
+    };
+
+    return lwm2m_tlv_list_encode(p_buffer, p_buffer_len, VERIZON_RESOURCE, &list);
+}
+
+
+static uint32_t tlv_server_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
+{
+    uint32_t    index = 0;
+    uint32_t    err_code = 0;
+    lwm2m_tlv_t tlv;
+
+    while (index < p_tlv->length)
+    {
+        err_code = lwm2m_tlv_decode(&tlv, &index, p_tlv->value, p_tlv->length);
+
+        if (err_code != 0)
+        {
+            return err_code;
+        }
+
+        switch (tlv.id)
+        {
+            case 0: // IsRegistered
+            {
+                err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
+                                                         tlv.length,
+                                                         &m_server_is_registered[instance_id]);
+                break;
+            }
+            case 1: // ClientHoldOffTimer
+            {
+                err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
+                                                         tlv.length,
+                                                         &m_server_client_hold_off_timer[instance_id]);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    return err_code;
+}
+
+
+static uint32_t tlv_server_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
+{
+    uint32_t err_code;
+
+    switch (p_tlv->id)
+    {
+        case VERIZON_RESOURCE:
+            err_code = tlv_server_verizon_decode(instance_id, p_tlv);
+            break;
+
+        default:
+            err_code = ENOENT;
+            break;
+    }
+
+    return err_code;
+}
+
+
+static uint32_t tlv_conn_mon_verizon_encode(uint16_t instance_id, uint8_t * p_buffer, uint32_t * p_buffer_len)
+{
+    ARG_UNUSED(instance_id);
+
+    lwm2m_list_t list =
+    {
+        .type         = LWM2M_LIST_TYPE_STRING,
+        .val.p_string = m_apn,
+        .len          = 3,
+        .max_len      = ARRAY_SIZE(m_apn)
+    };
+
+    return lwm2m_tlv_list_encode(p_buffer, p_buffer_len, VERIZON_RESOURCE, &list);
+}
+
+
+static uint32_t tlv_conn_mon_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
+{
+    uint32_t    index = 0;
+    uint32_t    err_code = 0;
+    lwm2m_tlv_t tlv;
+
+    while (index < p_tlv->length)
+    {
+        err_code = lwm2m_tlv_decode(&tlv, &index, p_tlv->value, p_tlv->length);
+
+        if (err_code != 0)
+        {
+            return err_code;
+        }
+
+        switch (tlv.id)
+        {
+            case 0: // Class 2 APN
+            {
+                // READ only
+                err_code = ENOENT;
+                break;
+            }
+
+            case 1: // Class 3 APN for Internet
+            case 2: // Class 6 APN for Enterprise
+            case 3: // Class 7 APN for Thingspace
+            {
+                err_code = lwm2m_bytebuffer_to_string((char *)tlv.value,
+                                                      tlv.length,
+                                                      &m_apn[tlv.id]);
+                break;
+            }
+
+            default:
+                err_code = ENOENT;
+                break;
+        }
+    }
+
+    return err_code;
+}
+
+
+static uint32_t tlv_conn_mon_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
+{
+    uint32_t err_code;
+
+    switch (p_tlv->id)
+    {
+        case VERIZON_RESOURCE:
+            err_code = tlv_conn_mon_verizon_decode(instance_id, p_tlv);
+            break;
+
+        default:
+            err_code = ENOENT;
+            break;
+    }
+
+    return err_code;
+}
+
+
+uint32_t resource_tlv_callback(lwm2m_instance_t * p_instance, lwm2m_tlv_t * p_tlv)
+{
+    uint32_t err_code;
+
+    switch (p_instance->object_id)
+    {
+        case LWM2M_OBJ_SECURITY:
+            err_code = tlv_security_resource_decode(p_instance->instance_id, p_tlv);
+            break;
+
+        case LWM2M_OBJ_SERVER:
+            err_code = tlv_server_resource_decode(p_instance->instance_id, p_tlv);
+            break;
+
+        case LWM2M_OBJ_CONN_MON:
+            err_code = tlv_conn_mon_resource_decode(p_instance->instance_id, p_tlv);
+            break;
+
+        default:
+            err_code = ENOENT;
+            break;
+    }
+
+    return err_code;
+}
+
+
 /**@brief Callback function for LWM2M server instances. */
 uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                                   uint16_t           resource_id,
@@ -537,15 +789,29 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
         uint8_t  buffer[200];
         uint32_t buffer_size = sizeof(buffer);
 
-        err_code = lwm2m_tlv_server_encode(buffer,
-                                           &buffer_size,
-                                           resource_id,
-                                           &m_instance_server[instance_id]);
-
-        if (err_code == ENOENT)
+        if (resource_id == VERIZON_RESOURCE)
         {
-            (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
-            return 0;
+            err_code = tlv_server_verizon_encode(instance_id, buffer, &buffer_size);
+        }
+        else
+        {
+            err_code = lwm2m_tlv_server_encode(buffer,
+                                               &buffer_size,
+                                               resource_id,
+                                               &m_instance_server[instance_id]);
+
+            if (err_code == ENOENT)
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
+                return 0;
+            }
+
+            if (resource_id == LWM2M_NAMED_OBJECT)
+            {
+                uint32_t added_size = sizeof(buffer) - buffer_size;
+                err_code = tlv_server_verizon_encode(instance_id, buffer + buffer_size, &added_size);
+                buffer_size += added_size;
+            }
         }
 
         APP_ERROR_CHECK(err_code);
@@ -567,7 +833,8 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
         {
             err_code = lwm2m_tlv_server_decode(&m_instance_server[instance_id],
                                                p_request->p_payload,
-                                               p_request->payload_len);
+                                               p_request->payload_len,
+                                               resource_tlv_callback);
         }
         else if ((mask & COAP_CT_MASK_PLAIN_TEXT) || (mask & COAP_CT_MASK_APP_OCTET_STREAM))
         {
@@ -696,7 +963,8 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
         {
             err_code = lwm2m_tlv_device_decode(&m_instance_device,
                                                p_request->p_payload,
-                                               p_request->payload_len);
+                                               p_request->payload_len,
+                                               resource_tlv_callback);
         }
         else if ((mask & COAP_CT_MASK_PLAIN_TEXT) || (mask & COAP_CT_MASK_APP_OCTET_STREAM))
         {
@@ -800,19 +1068,70 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
         uint8_t  buffer[200];
         uint32_t buffer_size = sizeof(buffer);
 
-        err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
-                                                            &buffer_size,
-                                                            resource_id,
-                                                            &m_instance_conn_mon);
-        if (err_code == ENOENT)
+        if (resource_id == VERIZON_RESOURCE)
         {
-            (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
-            return 0;
+            err_code = tlv_conn_mon_verizon_encode(instance_id, buffer, &buffer_size);
+        }
+        else
+        {
+            err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
+                                                                &buffer_size,
+                                                                resource_id,
+                                                                &m_instance_conn_mon);
+            if (err_code == ENOENT)
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
+                return 0;
+            }
+
+            if (resource_id == LWM2M_NAMED_OBJECT)
+            {
+                uint32_t added_size = sizeof(buffer) - buffer_size;
+                err_code = tlv_conn_mon_verizon_encode(instance_id, buffer + buffer_size, &added_size);
+                buffer_size += added_size;
+            }
         }
 
         APP_ERROR_CHECK(err_code);
 
         (void)lwm2m_respond_with_payload(buffer, buffer_size, COAP_CT_APP_LWM2M_TLV, p_request);
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_WRITE)
+    {
+        uint32_t mask = 0;
+        err_code = coap_message_ct_mask_get(p_request, &mask);
+
+        if (err_code != 0)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            return 0;
+        }
+
+        if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
+        {
+            err_code = lwm2m_tlv_connectivity_monitoring_decode(&m_instance_conn_mon,
+                                                                p_request->p_payload,
+                                                                p_request->payload_len,
+                                                                resource_tlv_callback);
+        }
+        else
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_request);
+            return 0;
+        }
+
+        if (err_code == 0)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+        }
+        else if (err_code == ENOTSUP)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+        }
+        else
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+        }
     }
     else
     {
@@ -839,9 +1158,8 @@ uint32_t server_object_callback(lwm2m_object_t * p_object,
         // They will be freed after this callback.
         (void)lwm2m_tlv_server_decode(&m_instance_server[instance_id],
                                       p_request->p_payload,
-                                      p_request->payload_len);
-
-
+                                      p_request->payload_len,
+                                      resource_tlv_callback);
 
         m_instance_server[instance_id].proto.instance_id = instance_id;
         m_instance_server[instance_id].proto.object_id   = p_object->object_id;
@@ -867,6 +1185,34 @@ uint32_t server_object_callback(lwm2m_object_t * p_object,
     return err_code;
 }
 
+#if 0
+uint32_t security_resource_callback(lwm2m_instance_t * p_instance,
+                                    uint16_t           resource_id,
+                                    uint8_t            op_code,
+                                    coap_message_t   * p_request)
+{
+    uint16_t instance_id = p_instance->instance_id;
+    uint32_t err_code = 0;
+
+    if (op_code == LWM2M_OPERATION_CODE_READ)
+    {
+        // Write to p_request->p_payload, update p_request->payload_len
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_WRITE)
+    {
+        // uint32_t mask = 0;
+        // err_code = coap_message_ct_mask_get(p_request, &mask);
+
+        // Read from p_request->payload, from offset XXX
+    }
+    else
+    {
+        err_code = ENOENT;
+    }
+
+    return err_code;
+}
+#endif
 
 /**@brief Callback function for LWM2M security instances. */
 uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
@@ -900,7 +1246,8 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
         // They will be freed after this callback
         err_code = lwm2m_tlv_security_decode(&m_instance_security[instance_id],
                                              p_request->p_payload,
-                                             p_request->payload_len);
+                                             p_request->payload_len,
+                                             resource_tlv_callback);
         APP_ERROR_CHECK(err_code);
 
         // Copy the URI. Can be changed to handle all resources in the instance.
@@ -948,7 +1295,8 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
         // They will be freed after this callback
         uint32_t err_code = lwm2m_tlv_security_decode(&m_instance_security[instance_id],
                                                       p_request->p_payload,
-                                                      p_request->payload_len);
+                                                      p_request->payload_len,
+                                                      resource_tlv_callback);
         APP_ERROR_CHECK(err_code);
 
         // FIXME: Provision keys instead of print.
@@ -1028,6 +1376,9 @@ static void app_lwm2m_factory_bootstrap(void)
 
     m_instance_server[0].proto.callback = server_instance_callback;
 
+    m_server_is_registered[0]         = 1;
+    m_server_client_hold_off_timer[0] = 30;
+
     // FIXME: Fix the ACL issue
 #if 0
     // Set default access to LWM2M_PERMISSION_READ.
@@ -1056,6 +1407,9 @@ static void app_lwm2m_factory_bootstrap(void)
     (void)lwm2m_bytebuffer_to_string(binding_uqs, strlen(binding_uqs), &m_instance_server[1].binding);
 
     m_instance_server[1].proto.callback = server_instance_callback;
+
+    m_server_is_registered[1]         = 1;
+    m_server_client_hold_off_timer[1] = 30;
 
     // Initialize ACL on the instance.
 #if (BOOTSTRAP == 0)
@@ -1114,6 +1468,9 @@ static void app_lwm2m_factory_bootstrap(void)
 
     m_instance_server[2].proto.callback = server_instance_callback;
 
+    m_server_is_registered[2]         = 1;
+    m_server_client_hold_off_timer[2] = 30;
+
     (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[2],
                                      LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
 
@@ -1142,6 +1499,9 @@ static void app_lwm2m_factory_bootstrap(void)
     (void)lwm2m_bytebuffer_to_string(binding_uq, strlen(binding_uq), &m_instance_server[3].binding);
 
     m_instance_server[3].proto.callback = server_instance_callback;
+
+    m_server_is_registered[3]         = 1;
+    m_server_client_hold_off_timer[3] = 30;
 
     // Initialize ACL on the instance.
     (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[3],
@@ -1253,6 +1613,15 @@ static void app_lwm2m_factory_bootstrap(void)
     m_instance_conn_mon.smcc = 1;
 
     m_instance_conn_mon.proto.callback = conn_mon_instance_callback;
+
+    char * class2_apn = "VZWADMIN";
+    (void)lwm2m_bytebuffer_to_string(class2_apn, strlen(class2_apn), &m_apn[0]);
+    char * class3_apn = "VZWINTERNET";
+    (void)lwm2m_bytebuffer_to_string(class3_apn, strlen(class3_apn), &m_apn[1]);
+    char * class6_apn = "VZWCLASS6";
+    (void)lwm2m_bytebuffer_to_string(class6_apn, strlen(class6_apn), &m_apn[2]);
+    char * class7_apn = "VZWIOTTS";
+    (void)lwm2m_bytebuffer_to_string(class7_apn, strlen(class7_apn), &m_apn[3]);
 
     // Set bootstrap server as owner.
     (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_conn_mon,
