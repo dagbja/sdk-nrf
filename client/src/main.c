@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <net/socket.h>
+#include <nvs/nvs.h>
 //#include <lte_lc.h>
 #include <nrf.h>
 
@@ -21,15 +22,13 @@
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
 
-#define APP_USE_BUTTONS_AND_LEDS 1
-#define APP_USE_AF_INET6 0
+/* Hardcoded IMEI for now, will be fetched from modem using AT+CGSN=1 */
+#define IMEI            "004402990020434"
 
-// Set to 0 to skip bootstrap
-#define BOOTSTRAP 1
-
-// Set to 1 to connect to DM Server
-// Set to 0 to connect to Repository Server
-#define DM_SERVER 0
+#define APP_ACL_DM_SERVER_HACK          1
+#define APP_USE_BUTTONS_AND_LEDS        1
+#define APP_USE_AF_INET6                0
+#define APP_USE_NVS                     0
 
 #if APP_USE_BUTTONS_AND_LEDS
 #include <dk_buttons_and_leds.h>
@@ -42,29 +41,28 @@
 #define LWM2M_SERVER_REMORT_PORT              5684                                            /**< Remote port of the LWM2M server. */
 
 #define BOOTSTRAP_URI                   "coaps://ddocdpboot.do.motive.com:5684"               /**< Server URI to the bootstrap server when using security (DTLS). */
-#define CLIENT_IMEI_MSISDN              "urn:imei-msisdn:004402990020434-0123456789"          /**< IMEI-MSISDN of the device. */
+#define CLIENT_IMEI_MSISDN              "urn:imei-msisdn:" IMEI "-0123456789"                 /**< IMEI-MSISDN of the device. */
 
 #define LED_BLINK_INTERVAL_MS           30000                                                 /**< LED blinking interval. */
 #define COAP_TICK_INTERVAL_MS           50000                                                 /**< Interval between periodic callbacks to CoAP module. */
 
 #define SECURITY_SERVER_URI_SIZE_MAX    64                                                    /**< Max size of server URIs. */
-
-#define BOOTSTRAP_SECURITY_INSTANCE_IDX 0                                                     /**< Index of bootstrap security instance. */
-#define SERVER_SECURITY_INSTANCE_IDX    1                                                     /**< Index of server security instance. */
+#define SECURITY_SMS_NUMBER_SIZE_MAX    20                                                    /**< Max size of server SMS number. */
+#define SERVER_BINDING_SIZE_MAX         4                                                     /**< Max size of server binding. */
 
 #define APP_ENABLE_LOGS                 0                                                     /**< Enable logs in the application. */
 
 #define APP_BOOTSTRAP_SEC_TAG           25                                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
 #define APP_BOOTSTRAP_SEC_PSK           "d6160c2e7c90399ee7d207a22611e3d3a87241b0462976b935341d000a91e747" /**< Pre-shared key used for bootstrap server in hex format. */
-#define APP_BOOTSTRAP_SEC_IDENTITY      "urn:imei-msisdn:004402990020434-0123456789"          /**< Client identity used for bootstrap server. */
+#define APP_BOOTSTRAP_SEC_IDENTITY      CLIENT_IMEI_MSISDN                                    /**< Client identity used for bootstrap server. */
 
-#define APP_SERVER_SEC_TAG              26                                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
-#if (DM_SERVER == 1)
-#define APP_SERVER_SEC_PSK              "a3676691ce05a04801d9b2b43e4a31db342d6428a4028e10d6c96ebbc07fd128" /**< Pre-shared key used for resource server in hex format. */
-#else
-#define APP_SERVER_SEC_PSK              "c16451b3c745dbd0b13b1daaf90b7f18da420ac0c344089f6cb8cb2f8e48f6fd" /**< Pre-shared key used for resource server in hex format. */
-#endif
-#define APP_SERVER_SEC_IDENTITY         "004402990020434"                                     /**< Client identity used for resource server. */
+#define APP_DM_SERVER_SEC_TAG           26                                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
+#define APP_DM_SERVER_SEC_PSK           "ea61b935048a556a99590ac6f5ace87d18e68a88504dd10bec6a9caeefc8c975" /**< Pre-shared key used for resource server in hex format. */
+#define APP_DM_SERVER_SEC_IDENTITY      IMEI                                                  /**< Client identity used for resource server. */
+
+#define APP_RS_SERVER_SEC_TAG           27                                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
+#define APP_RS_SERVER_SEC_PSK           "c16451b3c745dbd0b13b1daaf90b7f18da420ac0c344089f6cb8cb2f8e48f6fd" /**< Pre-shared key used for resource server in hex format. */
+#define APP_RS_SERVER_SEC_IDENTITY      IMEI                                                  /**< Client identity used for resource server. */
 
 #define APP_MAX_AT_READ_LENGTH          100
 #define APP_MAX_AT_WRITE_LENGTH         256
@@ -118,8 +116,6 @@ typedef enum
 
 //APP_TIMER_DEF(m_iot_timer_tick_src_id);                                                       /**< App timer instance used to update the IoT timer wall clock. */
 
-static char m_security_server_uri[1+LWM2M_MAX_SERVERS][SECURITY_SERVER_URI_SIZE_MAX];
-
 static lwm2m_server_config_t               m_server_conf;                                     /**< Server configuration structure. */
 static lwm2m_client_identity_t             m_client_id;                                       /**< Client ID structure to hold the client's UUID. */
 static uint8_t *                           mp_link_format_string    = NULL;                   /**< Pointer to hold a link format string across a button press initiated registration and retry. */
@@ -153,6 +149,7 @@ static coap_transport_handle_t *           mp_lwm2m_bs_transport = NULL;        
 static coap_transport_handle_t *           mp_lwm2m_transport    = NULL;                      /**< CoAP transport handle for the secure server. Obtained on @coap_security_setup. */
 
 static volatile app_state_t m_app_state = APP_STATE_IDLE;                                     /**< Application state. Should be one of @ref app_state_t. */
+static volatile uint16_t    m_server_instance;
 
 static char m_at_write_buffer[APP_MAX_AT_WRITE_LENGTH];                                       /**< Buffer used to write AT commands. */
 static char m_at_read_buffer[APP_MAX_AT_READ_LENGTH];                                         /**< Buffer used to read AT commands. */
@@ -168,6 +165,56 @@ static struct sockaddr_in m_server;
 static struct sockaddr * mp_bs_remote_server = (struct sockaddr *)&m_bs_server;               /**< Pointer to remote bootstrap server address to connect to. */
 static struct sockaddr * mp_remote_server = (struct sockaddr *)&m_server;                     /**< Pointer to remote secure server address to connect to. */
 
+/**@brief Bootstrap values to store in app persistent storage. */
+typedef struct
+{
+    uint16_t short_server_id;
+
+    // Security object values
+    char     server_uri[SECURITY_SERVER_URI_SIZE_MAX];                 /**< Server URI to the server. */
+    bool     is_bootstrap_server;
+    uint8_t  sms_security_mode;
+    //char     sms_binding_key_param[6];
+    //char     sms_binding_secret_keys[48];
+    char     sms_number[SECURITY_SMS_NUMBER_SIZE_MAX];
+    time_t   client_hold_off_time;
+
+    // Server object values
+    time_t   lifetime;
+    time_t   default_minimum_period;
+    time_t   default_maximum_period;
+    time_t   disable_timeout;
+    bool     notification_storing_on_disabled;
+    char     binding[SERVER_BINDING_SIZE_MAX];
+
+    // ACL values
+    uint16_t access[1+LWM2M_MAX_SERVERS];                              /**< ACL array. */
+    uint16_t server[1+LWM2M_MAX_SERVERS];                              /**< Short server id to ACL array index. */
+    uint16_t owner;                                                    /**< Owner of this ACL entry. Short server id */
+
+    // Local values
+    bool     is_bootstrapped;
+    bool     is_registered;
+    time_t   hold_off_timer;
+} server_settings_t;
+
+static server_settings_t     m_server_settings[1+LWM2M_MAX_SERVERS];
+
+#if APP_USE_NVS
+/* NVS-related defines */
+#define NVS_SECTOR_SIZE    FLASH_ERASE_BLOCK_SIZE    /* Multiple of FLASH_PAGE_SIZE */
+#define NVS_SECTOR_COUNT   3                         /* At least 2 sectors */
+#define NVS_STORAGE_OFFSET FLASH_AREA_STORAGE_OFFSET /* Start address of the filesystem in flash */
+
+static struct nvs_fs fs = {
+    .sector_size  = NVS_SECTOR_SIZE,
+    .sector_count = NVS_SECTOR_COUNT,
+    .offset       = NVS_STORAGE_OFFSET,
+};
+#endif
+
+
+static uint32_t app_store_bootstrap_server_values(uint16_t instance_id);
 static void app_server_update(uint16_t instance_id);
 
 
@@ -338,18 +385,13 @@ uint32_t lwm2m_coap_handler_root(uint8_t op_code, coap_message_t * p_request)
 }
 
 
-static uint32_t app_resolve_server_uri(lwm2m_string_t  * server_uri,
+static uint32_t app_resolve_server_uri(char            * server_uri,
                                        struct sockaddr * addr,
                                        bool            * secure)
 {
-    /*
-     * Create a null-terminated string copy for two reasons:
-     *  1. Be able to use string.h functions without length checks.
-     *  2. Null-terminate hostname within the string without a new copy.
-     */
-    char *server_uri_val = k_malloc(server_uri->len + 1);
-    strncpy(server_uri_val, server_uri->p_val, server_uri->len);
-    server_uri_val[server_uri->len] = '\0';
+    // Create a string copy to null-terminate hostname within the server_uri.
+    char server_uri_val[SECURITY_SERVER_URI_SIZE_MAX];
+    strcpy(server_uri_val, server_uri);
 
     const char *hostname;
     uint16_t port;
@@ -363,7 +405,6 @@ static uint32_t app_resolve_server_uri(lwm2m_string_t  * server_uri,
         port = 5683;
         *secure = false;
     } else {
-        k_free(server_uri_val);
         return EINVAL;
     }
 
@@ -383,7 +424,6 @@ static uint32_t app_resolve_server_uri(lwm2m_string_t  * server_uri,
     };
     struct addrinfo *result;
     int ret_val = getaddrinfo(hostname, NULL, &hints, &result);
-    k_free(server_uri_val);
 
     if (ret_val != 0) {
         return errno;
@@ -407,7 +447,7 @@ static uint32_t app_resolve_server_uri(lwm2m_string_t  * server_uri,
 
 /**@brief Helper function to parse the uri and save the remote to the LWM2M remote database. */
 static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_server_id,
-                                                    lwm2m_string_t  * server_uri,
+                                                    char            * server_uri,
                                                     bool            * secure,
                                                     struct sockaddr * p_remote)
 {
@@ -424,7 +464,7 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_serv
     err_code = app_resolve_server_uri(server_uri, p_remote, secure);
     if (err_code != 0)
     {
-        printf("app_resolve_server_uri(\"%s\") failed %lu\n", server_uri->p_val, err_code);
+        printf("app_resolve_server_uri(\"%s\") failed %lu\n", server_uri, err_code);
         return err_code;
     }
 
@@ -851,7 +891,14 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
 
         if (err_code == 0)
         {
-            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            if (app_store_bootstrap_server_values(instance_id) == 0)
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            }
         }
         else if (err_code == ENOTSUP)
         {
@@ -997,8 +1044,23 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
         switch (resource_id)
         {
             case LWM2M_DEVICE_REBOOT:
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+
+                // TODO: Shutdown and reboot
+                NVIC_SystemReset();
+                break;
+            }
+
             case LWM2M_DEVICE_FACTORY_RESET:
             {
+#if APP_USE_NVS
+                for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+                {
+                    nvs_delete(&fs, i);
+                }
+#endif
+
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
 
                 // TODO: Shutdown and reboot
@@ -1142,6 +1204,81 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
 }
 
 
+static uint32_t app_store_bootstrap_security_values(uint16_t instance_id)
+{
+    if ((m_instance_security[instance_id].server_uri.len >= SECURITY_SERVER_URI_SIZE_MAX) ||
+        (m_instance_security[instance_id].sms_number.len >= SECURITY_SMS_NUMBER_SIZE_MAX))
+    {
+        // URI or SMS number was to long to be copied.
+        return EINVAL;
+    }
+
+    m_server_settings[instance_id].is_bootstrap_server  = m_instance_security[instance_id].bootstrap_server;
+    m_server_settings[instance_id].sms_security_mode    = m_instance_security[instance_id].sms_security_mode;
+    m_server_settings[instance_id].short_server_id      = m_instance_security[instance_id].short_server_id;
+    m_server_settings[instance_id].client_hold_off_time = m_instance_security[instance_id].client_hold_off_time;
+
+    // Copy the URI.
+    memset(m_server_settings[instance_id].server_uri, 0, SECURITY_SERVER_URI_SIZE_MAX);
+    memcpy(m_server_settings[instance_id].server_uri,
+           m_instance_security[instance_id].server_uri.p_val,
+           m_instance_security[instance_id].server_uri.len);
+    m_instance_security[instance_id].server_uri.p_val = m_server_settings[instance_id].server_uri;
+
+    // Copy SMS number.
+    memset(m_server_settings[instance_id].sms_number, 0, SECURITY_SMS_NUMBER_SIZE_MAX);
+    memcpy(m_server_settings[instance_id].sms_number,
+           m_instance_security[instance_id].sms_number.p_val,
+           m_instance_security[instance_id].sms_number.len);
+    m_instance_security[instance_id].sms_number.p_val = m_server_settings[instance_id].sms_number;
+
+#if APP_USE_NVS
+    nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[instance_id]));
+#endif
+
+    return 0;
+}
+
+static uint32_t app_store_bootstrap_server_values(uint16_t instance_id)
+{
+    if (m_instance_server[instance_id].binding.len >= SERVER_BINDING_SIZE_MAX)
+    {
+        // Binding was to long to be copied.
+        return EINVAL;
+    }
+
+    m_server_settings[instance_id].lifetime = m_instance_server[instance_id].lifetime;
+    m_server_settings[instance_id].default_minimum_period = m_instance_server[instance_id].default_minimum_period;
+    m_server_settings[instance_id].default_maximum_period = m_instance_server[instance_id].default_maximum_period;
+    m_server_settings[instance_id].disable_timeout = m_instance_server[instance_id].disable_timeout;
+    m_server_settings[instance_id].notification_storing_on_disabled = m_instance_server[instance_id].notification_storing_on_disabled;
+
+    // Copy Binding.
+    memset(m_server_settings[instance_id].binding, 0, SERVER_BINDING_SIZE_MAX);
+    memcpy(m_server_settings[instance_id].binding,
+           m_instance_server[instance_id].binding.p_val,
+           m_instance_server[instance_id].binding.len);
+
+    // Copy ACL.
+    lwm2m_instance_t * p_instance = (lwm2m_instance_t *) &m_instance_server[instance_id].proto;
+    for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++)
+    {
+        if (p_instance->acl.server[i])
+        {
+            m_server_settings[instance_id].access[i] = p_instance->acl.access[i];
+            m_server_settings[instance_id].server[i] = p_instance->acl.server[i];
+        }
+    }
+    m_server_settings[instance_id].owner = p_instance->acl.owner;
+
+#if APP_USE_NVS
+    nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[instance_id]));
+#endif
+
+    return 0;
+}
+
+
 /**@brief Callback function for LWM2M server objects. */
 uint32_t server_object_callback(lwm2m_object_t * p_object,
                                 uint16_t         instance_id,
@@ -1154,8 +1291,6 @@ uint32_t server_object_callback(lwm2m_object_t * p_object,
 
     if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
-        // Remember to make a copy of lwm2m_string_t and lwm2m_opaque_t you want to keep.
-        // They will be freed after this callback.
         (void)lwm2m_tlv_server_decode(&m_instance_server[instance_id],
                                       p_request->p_payload,
                                       p_request->payload_len,
@@ -1165,17 +1300,24 @@ uint32_t server_object_callback(lwm2m_object_t * p_object,
         m_instance_server[instance_id].proto.object_id   = p_object->object_id;
         m_instance_server[instance_id].proto.callback    = server_instance_callback;
 
-        // Cast the instance to its prototype and add it.
-        (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_server[instance_id]);
-        (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[instance_id]);
+        if (app_store_bootstrap_server_values(instance_id) == 0)
+        {
+            // Cast the instance to its prototype and add it.
+            (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_server[instance_id]);
+            (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[instance_id]);
 
-        // Initialize ACL on the instance
-        // The owner (second parameter) is set to LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID.
-        // This will grant the Bootstrap server full permission to this instance.
-        (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[instance_id],
-                                         LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
+            // Initialize ACL on the instance
+            // The owner (second parameter) is set to LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID.
+            // This will grant the Bootstrap server full permission to this instance.
+            (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[instance_id],
+                                            LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
 
-        (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+        }
+        else
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+        }
     }
     else
     {
@@ -1214,6 +1356,7 @@ uint32_t security_resource_callback(lwm2m_instance_t * p_instance,
 }
 #endif
 
+
 /**@brief Callback function for LWM2M security instances. */
 uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
                                     uint16_t           resource_id,
@@ -1242,33 +1385,18 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
     {
         uint16_t instance_id = p_instance->instance_id;
 
-        // Remember to make a copy of lwm2m_string_t and lwm2m_opaque_t you want to keep.
-        // They will be freed after this callback
         err_code = lwm2m_tlv_security_decode(&m_instance_security[instance_id],
                                              p_request->p_payload,
                                              p_request->payload_len,
                                              resource_tlv_callback);
         APP_ERROR_CHECK(err_code);
 
-        // Copy the URI. Can be changed to handle all resources in the instance.
-        if (m_instance_security[instance_id].server_uri.len < SECURITY_SERVER_URI_SIZE_MAX)
+        if (app_store_bootstrap_security_values(instance_id) == 0)
         {
-            // Copy the lwm2m_string_t server_uri into a application allocated memory space
-            // and point to that one.
-            memset(m_security_server_uri[instance_id], 0, SECURITY_SERVER_URI_SIZE_MAX);
-
-            memcpy(m_security_server_uri[instance_id],
-                   m_instance_security[instance_id].server_uri.p_val,
-                   m_instance_security[instance_id].server_uri.len);
-
-            m_instance_security[instance_id].server_uri.p_val =
-                (char *)m_security_server_uri[instance_id];
-
             (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
         }
         else
         {
-            // URI was to long to be copied.
             (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
         }
     }
@@ -1291,8 +1419,6 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
 
     if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
-        // Remember to make a copy of lwm2m_string_t and lwm2m_opaque_t you want to keep.
-        // They will be freed after this callback
         uint32_t err_code = lwm2m_tlv_security_decode(&m_instance_security[instance_id],
                                                       p_request->p_payload,
                                                       p_request->payload_len,
@@ -1312,21 +1438,10 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
         m_instance_security[instance_id].proto.object_id   = p_object->object_id;
         m_instance_security[instance_id].proto.callback    = security_instance_callback;
 
-        if (m_instance_security[instance_id].server_uri.len < SECURITY_SERVER_URI_SIZE_MAX)
+        if (app_store_bootstrap_security_values(instance_id) == 0)
         {
             // No ACL object for security objects.
             ((lwm2m_instance_t *)&m_instance_security[instance_id])->acl.id = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
-
-            // Copy the lwm2m_string_t server_uri into a application allocated memory space
-            // and point to that one.
-            memset(m_security_server_uri[instance_id], 0, SECURITY_SERVER_URI_SIZE_MAX);
-
-            memcpy(m_security_server_uri[instance_id],
-                   m_instance_security[instance_id].server_uri.p_val,
-                   m_instance_security[instance_id].server_uri.len);
-
-            m_instance_security[instance_id].server_uri.p_val =
-                (char *)m_security_server_uri[instance_id];
 
             // Cast the instance to its prototype and add it to the CoAP handler to become a
             // public instance. We can only have one so we delete the first if any.
@@ -1351,182 +1466,217 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
 }
 
 
-static void app_lwm2m_factory_bootstrap(void)
+/**@brief Create factory bootstrapped server objects.
+ *        Depends on carrier, this is Verizon / MotiveBridge.
+ */
+static void app_factory_bootstrap_server_object(uint16_t instance_id)
 {
-    char * binding_uqs = "UQS";
-    char * binding_uq  = "UQ";
+    uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
+                            LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE);
 
-    //
-    // Bootstrap security instances.
-    //
-    m_instance_security[0].server_uri.p_val = BOOTSTRAP_URI;
-    m_instance_security[0].server_uri.len = strlen(BOOTSTRAP_URI);
+    switch (instance_id)
+    {
+        case 0: // Bootstrap server
+        {
+            memset(&m_server_settings[0], 0, sizeof(m_server_settings[0]));
+            m_server_settings[0].short_server_id = 100;
+            strcpy(m_server_settings[0].server_uri, BOOTSTRAP_URI);
+            m_server_settings[0].is_bootstrap_server = true;
+            m_server_settings[0].access[0] = rwde_access;
+            m_server_settings[0].server[0] = 102;
+            m_server_settings[0].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
+            break;
+        }
 
-#if (BOOTSTRAP == 0)
-    m_instance_security[1].server_uri.p_val = "coaps://ddocdp.do.motive.com:5684";
-    m_instance_security[1].server_uri.len = 34;
-    m_instance_security[3].server_uri.p_val = "coaps://xvzwmpctii.xdev.motive.com:5684";
-    m_instance_security[3].server_uri.len = 40;
-#endif
+        case 1: // DM server
+        {
+            memset(&m_server_settings[1], 0, sizeof(m_server_settings[1]));
+            break;
+        }
 
-    //
-    // Bootstrap server instance.
-    //
-    m_instance_server[0].short_server_id = 100;
+        case 2: // Diagnostics server
+        {
+            memset(&m_server_settings[2], 0, sizeof(m_server_settings[2]));
+            m_server_settings[2].short_server_id = 101;
+            strcpy(m_server_settings[2].server_uri, "");
+            m_server_settings[2].lifetime = 86400;
+            m_server_settings[2].default_minimum_period = 300;
+            m_server_settings[2].default_maximum_period = 6000;
+            m_server_settings[2].notification_storing_on_disabled = 1;
+            strcpy(m_server_settings[2].binding, "UQS");
+            m_server_settings[2].access[0] = rwde_access;
+            m_server_settings[2].server[0] = 102;
+            m_server_settings[2].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
+            break;
+        }
 
-    m_instance_server[0].proto.callback = server_instance_callback;
+        case 3: // Repository server
+        {
+            memset(&m_server_settings[3], 0, sizeof(m_server_settings[3]));
+            break;
+        }
 
-    m_server_is_registered[0]         = 1;
-    m_server_client_hold_off_timer[0] = 30;
+        default:
+            break;
+    }
+}
 
-    // FIXME: Fix the ACL issue
-#if 0
-    // Set default access to LWM2M_PERMISSION_READ.
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[0],
-                                    LWM2M_PERMISSION_READ,
-                                    LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
 
-    // Set server access.
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[0],
-                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE),
-                                    102);
-#endif
+static void app_read_flash_storage(void)
+{
+#if APP_USE_NVS
+    int rc;
 
-    (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[0]);
+    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+    {
+        rc = nvs_read(&fs, i, &m_server_settings[i], sizeof(m_server_settings[i]));
+        if (rc <= 0)
+        {
+            // Not found, create new factory bootstrapped object.
+            app_factory_bootstrap_server_object(i);
 
-    //
-    // DM server instance.
-    //
-    m_instance_server[1].short_server_id                  = 102;
-    m_instance_server[1].lifetime                         = 2592000;
-    m_instance_server[1].default_minimum_period           = 1;
-    m_instance_server[1].default_maximum_period           = 60;
-    m_instance_server[1].disable_timeout                  = 86400;
-    m_instance_server[1].notification_storing_on_disabled = 1;
-    (void)lwm2m_bytebuffer_to_string(binding_uqs, strlen(binding_uqs), &m_instance_server[1].binding);
-
-    m_instance_server[1].proto.callback = server_instance_callback;
-
-    m_server_is_registered[1]         = 1;
-    m_server_client_hold_off_timer[1] = 30;
-
-    // Initialize ACL on the instance.
-#if (BOOTSTRAP == 0)
-    (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[1],
-                                     102);
+            if (m_server_settings[i].short_server_id)
+            {
+                // Write settings for initialized server objects.
+                nvs_write(&fs, i, &m_server_settings[i], sizeof(m_server_settings[i]));
+            }
+        }
+    }
 #else
-    (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[1],
-                                     LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
+    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+    {
+        app_factory_bootstrap_server_object(i);
+    }
+
+    // Workaround for not storing is_bootstrapped:
+    // - Switch 1 will determine if doing bootstrap
+    // - Switch 2 will determine if connecting to DM or Repository server
+
+    u32_t button_state = 0;
+    dk_read_buttons(&button_state, NULL);
+
+    if (button_state & 0x04) // Switch 1 in left position
+    {
+        m_server_settings[0].is_bootstrapped = false;
+    }
+    else
+    {
+        m_server_settings[0].is_bootstrapped = true;
+    }
+
+    if (button_state & 0x08) // Switch 2 in left position
+    {
+        m_server_instance = 1; // Connect to DM server
+    }
+    else
+    {
+        m_server_instance = 3; // Connect to Repository server
+    }
+
+    // Bootstrap values (will be fetched from NVS after bootstrap)
+    uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
+                            LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE);
+
+
+    // DM server
+    m_server_settings[1].short_server_id = 102;
+    strcpy(m_server_settings[1].server_uri, "coaps://ddocdp.do.motive.com:5684");
+    m_server_settings[1].lifetime = 2592000;
+    m_server_settings[1].default_minimum_period = 1;
+    m_server_settings[1].default_maximum_period = 60;
+    m_server_settings[1].disable_timeout = 86400;
+    m_server_settings[1].notification_storing_on_disabled = 1;
+    strcpy(m_server_settings[1].binding, "UQS");
+    m_server_settings[1].access[0] = rwde_access;
+    m_server_settings[1].server[0] = 101;
+    m_server_settings[1].access[1] = rwde_access;
+    m_server_settings[1].server[1] = 102;
+    m_server_settings[1].access[2] = rwde_access;
+    m_server_settings[1].server[2] = 1000;
+
+    if (m_server_settings[0].is_bootstrapped)
+    {
+        m_server_settings[1].owner = 102;
+    }
+    else
+    {
+        m_server_settings[1].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
+    }
+
+    // Repository server
+    m_server_settings[3].short_server_id = 1000;
+    strcpy(m_server_settings[3].server_uri, "coaps://xvzwmpctii.xdev.motive.com:5684");
+    m_server_settings[3].lifetime = 86400;
+    m_server_settings[3].default_minimum_period = 1;
+    m_server_settings[3].default_maximum_period = 6000;
+    m_server_settings[3].disable_timeout = 86400;
+    m_server_settings[3].notification_storing_on_disabled = 1;
+    strcpy(m_server_settings[3].binding, "UQ");
+    m_server_settings[3].access[0] = rwde_access;
+    m_server_settings[3].server[0] = 101;
+    m_server_settings[3].access[1] = rwde_access;
+    m_server_settings[3].server[1] = 102;
+    m_server_settings[3].access[2] = rwde_access;
+    m_server_settings[3].server[2] = 1000;
+    m_server_settings[3].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
+#endif
+}
+
+
+static void app_lwm2m_create_objects(void)
+{
+    app_read_flash_storage();
+
+    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+    {
+        m_instance_server[i].short_server_id = m_server_settings[i].short_server_id;
+        m_instance_server[i].lifetime = m_server_settings[i].lifetime;
+        m_instance_server[i].default_minimum_period = m_server_settings[i].default_minimum_period;
+        m_instance_server[i].default_maximum_period = m_server_settings[i].default_maximum_period;
+        m_instance_server[i].disable_timeout = m_server_settings[i].disable_timeout;
+        m_instance_server[i].notification_storing_on_disabled = m_server_settings[i].notification_storing_on_disabled;
+
+        (void)lwm2m_bytebuffer_to_string(m_server_settings[i].binding,
+                                         strlen(m_server_settings[i].binding),
+                                         &m_instance_server[i].binding);
+
+        m_instance_server[i].proto.callback = server_instance_callback;
+
+        m_server_is_registered[i] = 1;
+        m_server_client_hold_off_timer[i] = 30;
+
+#if APP_ACL_DM_SERVER_HACK
+    }
+
+    // FIXME: Init ACL for DM server[1] first to get ACL /2/0 which is according to Verizon spec
+    uint32_t acl_init_order[] = { 1, 0, 2, 3 };
+    for (uint32_t k = 0; k < ARRAY_SIZE(acl_init_order); k++)
+    {
+        uint32_t i = acl_init_order[k];
 #endif
 
-    // Set default access to LWM2M_PERMISSION_READ.
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[1],
-                                    LWM2M_PERMISSION_READ,
-                                    LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
+        // Initialize ACL on the instance.
+        (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[i],
+                                        m_server_settings[i].owner);
 
-    // Set server access.
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[1],
-                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE),
-                                    101);
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[1],
-                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE),
-                                    102);
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[1],
-                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE),
-                                    1000);
+        // Set default access to LWM2M_PERMISSION_READ.
+        (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[i],
+                                        LWM2M_PERMISSION_READ,
+                                        LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
 
-    (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[1]);
+        for (uint32_t j = 0; j < ARRAY_SIZE(m_server_settings[i].server); j++)
+        {
+            if (m_server_settings[i].server[j] != 0)
+            {
+                // Set server access.
+                (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[i],
+                                                m_server_settings[i].access[j],
+                                                m_server_settings[i].server[j]);
+            }
+        }
 
-    // FIXME: Init ACL for bootstrap server here to make DM server[1] get ACL /2/0 which is according to Verizon spec
-    (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[0],
-                                     LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-
-    // Set default access to LWM2M_PERMISSION_READ.
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[0],
-                                    LWM2M_PERMISSION_READ,
-                                    LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
-
-    // Set server access.
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[0],
-                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE),
-                                    102);
-
-    //
-    // Diagnostics server instance.
-    //
-    m_instance_server[2].short_server_id                  = 101;
-    m_instance_server[2].lifetime                         = 86400;
-    m_instance_server[2].default_minimum_period           = 300;
-    m_instance_server[2].default_maximum_period           = 6000;
-    m_instance_server[2].notification_storing_on_disabled = 1;
-    (void)lwm2m_bytebuffer_to_string(binding_uqs, strlen(binding_uqs), &m_instance_server[2].binding);
-
-    m_instance_server[2].proto.callback = server_instance_callback;
-
-    m_server_is_registered[2]         = 1;
-    m_server_client_hold_off_timer[2] = 30;
-
-    (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[2],
-                                     LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-
-    // Set default access to LWM2M_PERMISSION_READ.
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[2],
-                                    LWM2M_PERMISSION_READ,
-                                    LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
-
-    // Set server access.
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[2],
-                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE),
-                                    102);
-
-    (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[2]);
-
-    //
-    // Repository server instance.
-    //
-    m_instance_server[3].short_server_id                  = 1000;
-    m_instance_server[3].lifetime                         = 86400;
-    m_instance_server[3].default_minimum_period           = 1;
-    m_instance_server[3].default_maximum_period           = 6000;
-    m_instance_server[3].disable_timeout                  = 86400;
-    m_instance_server[3].notification_storing_on_disabled = 1;
-    (void)lwm2m_bytebuffer_to_string(binding_uq, strlen(binding_uq), &m_instance_server[3].binding);
-
-    m_instance_server[3].proto.callback = server_instance_callback;
-
-    m_server_is_registered[3]         = 1;
-    m_server_client_hold_off_timer[3] = 30;
-
-    // Initialize ACL on the instance.
-    (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[3],
-                                     LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-
-    // Set default access to LWM2M_PERMISSION_READ.
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[3],
-                                    LWM2M_PERMISSION_READ,
-                                    LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
-
-    // Set server access.
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[3],
-                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE),
-                                    101);
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[3],
-                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE),
-                                    102);
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_server[3],
-                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE),
-                                    1000);
-
-    (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[3]);
+        (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[i]);
+    }
 
     //
     // Device instance.
@@ -1562,7 +1712,7 @@ static void app_lwm2m_factory_bootstrap(void)
     (void)lwm2m_bytebuffer_to_string(utc_offset, strlen(utc_offset), &m_instance_device.utc_offset);
     char * timezone = "Europe/Oslo";
     (void)lwm2m_bytebuffer_to_string(timezone, strlen(timezone),&m_instance_device.timezone);
-    (void)lwm2m_bytebuffer_to_string(binding_uqs, strlen(binding_uqs), &m_instance_device.supported_bindings);
+    (void)lwm2m_bytebuffer_to_string("UQS", 3, &m_instance_device.supported_bindings);
     m_instance_device.device_type.p_val = "Smart Device";
     m_instance_device.device_type.len = strlen(m_instance_device.device_type.p_val);
     m_instance_device.hardware_version.p_val = "1.0";
@@ -1701,7 +1851,7 @@ static void app_bootstrap_connect(void)
 
     // Save the remote address of the bootstrap server.
     (void)app_lwm2m_parse_uri_and_save_remote(LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
-                                              &m_instance_security[0].server_uri,
+                                              (char *)&m_server_settings[0].server_uri,
                                               &secure,
                                               mp_bs_remote_server);
 
@@ -1780,17 +1930,11 @@ static void app_server_connect(void)
     m_server_conf.lifetime = 1000;
 
     // Set the short server id of the server in the config.
-    m_server_conf.short_server_id = m_instance_security[SERVER_SECURITY_INSTANCE_IDX].short_server_id;
-
-#if (DM_SERVER == 1)
-    int instance = 1;
-#else
-    int instance = 3;
-#endif
+    m_server_conf.short_server_id = m_server_settings[m_server_instance].short_server_id;
 
     // Save the remote address of the server.
-    (void)app_lwm2m_parse_uri_and_save_remote(m_instance_server[instance].short_server_id,
-                                              &m_instance_security[instance].server_uri,
+    (void)app_lwm2m_parse_uri_and_save_remote(m_instance_server[m_server_instance].short_server_id,
+                                              (char *)&m_server_settings[m_server_instance].server_uri,
                                               &secure,
                                               mp_remote_server);
 
@@ -1815,7 +1959,16 @@ static void app_server_connect(void)
 
         struct sockaddr * p_localaddr = (struct sockaddr *)&client_addr;
 
-        sec_tag_t sec_tag_list[SEC_TAG_COUNT] = {APP_SERVER_SEC_TAG};
+        sec_tag_t sec_tag_list[SEC_TAG_COUNT];
+
+        if (m_server_instance == 1)
+        {
+            sec_tag_list[0] = APP_DM_SERVER_SEC_TAG;
+        }
+        else
+        {
+            sec_tag_list[0] = APP_RS_SERVER_SEC_TAG;
+        }
 
         coap_sec_config_t setting =
         {
@@ -1942,7 +2095,7 @@ static void app_lwm2m_process(void)
         }
         case APP_STATE_BOOTSTRAPED:
         {
-            printk("app_server_connect()\n");
+            printk("app_server_connect(\"%s server\")\n", (m_server_instance == 1) ? "DM" : "Repository");
             app_server_connect();
             break;
         }
@@ -2058,9 +2211,9 @@ static void app_provision(void)
                                  APP_MAX_AT_WRITE_LENGTH,
                                  "AT%%CMNG=%d,%d,%d,\"%s\"",
                                  WRITE_OPCODE,
-                                 APP_SERVER_SEC_TAG,
+                                 APP_DM_SERVER_SEC_TAG,
                                  IDENTITY_CODE,
-                                 APP_SERVER_SEC_IDENTITY);
+                                 APP_DM_SERVER_SEC_IDENTITY);
 
     bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
     APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
@@ -2074,9 +2227,42 @@ static void app_provision(void)
                                  APP_MAX_AT_WRITE_LENGTH,
                                  "AT%%CMNG=%d,%d,%d,\"%s\"",
                                  WRITE_OPCODE,
-                                 APP_SERVER_SEC_TAG,
+                                 APP_DM_SERVER_SEC_TAG,
                                  PSK_CODE,
-                                 APP_SERVER_SEC_PSK);
+                                 APP_DM_SERVER_SEC_PSK);
+
+    bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
+    APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
+
+    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
+    APP_ERROR_CHECK_BOOL(bytes_read >= 2);
+    APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
+
+
+    memset (m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
+    snprintf(m_at_write_buffer,
+                                 APP_MAX_AT_WRITE_LENGTH,
+                                 "AT%%CMNG=%d,%d,%d,\"%s\"",
+                                 WRITE_OPCODE,
+                                 APP_RS_SERVER_SEC_TAG,
+                                 IDENTITY_CODE,
+                                 APP_RS_SERVER_SEC_IDENTITY);
+
+    bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
+    APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
+
+    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
+    APP_ERROR_CHECK_BOOL(bytes_read >= 2);
+    APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
+
+    memset (m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
+    snprintf(m_at_write_buffer,
+                                 APP_MAX_AT_WRITE_LENGTH,
+                                 "AT%%CMNG=%d,%d,%d,\"%s\"",
+                                 WRITE_OPCODE,
+                                 APP_RS_SERVER_SEC_TAG,
+                                 PSK_CODE,
+                                 APP_RS_SERVER_SEC_PSK);
 
     bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
     APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
@@ -2129,11 +2315,28 @@ static void app_modem_configure(void)
 }
 
 
+/**@brief Initialize Non-volatile Storage. */
+static void app_flash_init(void)
+{
+#if APP_USE_NVS
+    int rc = nvs_init(&fs, DT_FLASH_DEV_NAME);
+    if (rc) {
+        printk("Flash init failed: %d\n", rc);
+    }
+#endif
+}
+
+
 /**@brief Function for application main entry.
  */
 int main(void)
 {
     printk("Application started\n");
+
+    // Initialize LEDs and Buttons.
+    app_buttons_leds_init();
+
+    app_flash_init();
 
     // Provision credentials used for the bootstrap server.
     app_provision();
@@ -2145,24 +2348,24 @@ int main(void)
     app_lwm2m_setup();
 
     // Create LwM2M factory bootstraped objects.
-    app_lwm2m_factory_bootstrap();
+    app_lwm2m_create_objects();
 
     // Establish LTE link.
     app_modem_configure();
     //lte_lc_init_and_connect();
 
-    // Initialize LEDs and Buttons.
-    app_buttons_leds_init();
-
     // Initialize Timers.
     //timers_init();
     //iot_timer_init();
 
-#if (BOOTSTRAP == 1)
-    m_app_state = APP_STATE_BS_CONNECT;
-#else
-    m_app_state = APP_STATE_BOOTSTRAPED;
-#endif
+    if (m_server_settings[0].is_bootstrapped)
+    {
+        m_app_state = APP_STATE_BOOTSTRAPED;
+    }
+    else
+    {
+        m_app_state = APP_STATE_BS_CONNECT;
+    }
 
 #if APP_USE_BUTTONS_AND_LEDS
     dk_set_leds(DK_LED1_MSK);
