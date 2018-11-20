@@ -29,6 +29,7 @@
 #define APP_USE_BUTTONS_AND_LEDS        1
 #define APP_USE_AF_INET6                0
 #define APP_USE_NVS                     0
+#define APP_MODEM_TRACE                 0
 
 #if APP_USE_BUTTONS_AND_LEDS
 #include <dk_buttons_and_leds.h>
@@ -2440,11 +2441,51 @@ static void app_flash_init(void)
 }
 
 
+#if APP_MODEM_TRACE
+static void modem_trace_enable(void)
+{
+    /* GPIO configurations for trace and debug */
+    #define CS_PIN_CFG_TRACE_CLK    21 //GPIO_OUT_PIN21_Pos
+    #define CS_PIN_CFG_TRACE_DATA0  22 //GPIO_OUT_PIN22_Pos
+    #define CS_PIN_CFG_TRACE_DATA1  23 //GPIO_OUT_PIN23_Pos
+    #define CS_PIN_CFG_TRACE_DATA2  24 //GPIO_OUT_PIN24_Pos
+    #define CS_PIN_CFG_TRACE_DATA3  25 //GPIO_OUT_PIN25_Pos
+
+    // Configure outputs.
+    // CS_PIN_CFG_TRACE_CLK
+    NRF_GPIO_NS->PIN_CNF[CS_PIN_CFG_TRACE_CLK] = (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
+                                                 (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
+    // CS_PIN_CFG_TRACE_DATA0
+    NRF_GPIO_NS->PIN_CNF[CS_PIN_CFG_TRACE_DATA0] = (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
+                                                   (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
+    // CS_PIN_CFG_TRACE_DATA1
+    NRF_GPIO_NS->PIN_CNF[CS_PIN_CFG_TRACE_DATA1] = (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
+                                                   (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
+    // CS_PIN_CFG_TRACE_DATA2
+    NRF_GPIO_NS->PIN_CNF[CS_PIN_CFG_TRACE_DATA2] = (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
+                                                   (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
+    // CS_PIN_CFG_TRACE_DATA3
+    NRF_GPIO_NS->PIN_CNF[CS_PIN_CFG_TRACE_DATA3] = (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
+                                                   (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
+    NRF_GPIO_NS->DIR = 0xFFFFFFFF;
+}
+#endif
+
+
 /**@brief Function for application main entry.
  */
 int main(void)
 {
     printk("Application started\n");
+
+#if APP_MODEM_TRACE
+    modem_trace_enable();
+#endif
 
     // Initialize LEDs and Buttons.
     app_buttons_leds_init();
