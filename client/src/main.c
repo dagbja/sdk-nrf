@@ -32,7 +32,19 @@
 
 #if APP_USE_BUTTONS_AND_LEDS
 #include <dk_buttons_and_leds.h>
+
+/* Structure for delayed work */
+static struct k_delayed_work leds_update_work;
 #endif
+
+#define LED_ON(x)                       (x)
+#define LED_BLINK(x)                    ((x) << 8)
+#define LED_INDEX(x)                    ((x) << 16)
+#define LED_GET_ON(x)                   ((x) & 0xFF)
+#define LED_GET_BLINK(x)                (((x) >> 8) & 0xFF)
+
+/* Interval in milliseconds between each time status LEDs are updated. */
+#define APP_LEDS_UPDATE_INTERVAL        500
 
 #define COAP_LOCAL_LISTENER_PORT              5683                                            /**< Local port to listen on any traffic, client or server. Not bound to any specific LWM2M functionality.*/
 #define LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT     9998                                            /**< Local port to connect to the LWM2M bootstrap server. */
@@ -102,16 +114,17 @@
 
 typedef enum
 {
-    APP_STATE_IDLE = 0,
-    APP_STATE_IP_INTERFACE_UP,
-    APP_STATE_BS_CONNECT,
-    APP_STATE_BS_CONNECTED,
-    APP_STATE_BOOTRAP_REQUESTED,
-    APP_STATE_BOOTSTRAPED,
-    APP_STATE_SERVER_CONNECT_INITIATE,
-    APP_STATE_SERVER_CONNECTED,
-    APP_STATE_SERVER_REGISTERED,
-    APP_STATE_DISCONNECT
+    APP_STATE_IDLE                    = LED_BLINK(DK_LED1_MSK),
+    APP_STATE_IP_INTERFACE_UP         = LED_ON(DK_LED1_MSK),
+    APP_STATE_BS_CONNECT              = LED_BLINK(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK),
+    APP_STATE_BS_CONNECTED            = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK),
+    APP_STATE_BOOTRAP_REQUESTED       = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK) | LED_INDEX(1),
+    APP_STATE_BOOTSTRAPED             = LED_BLINK(DK_LED1_MSK) | LED_BLINK(DK_LED3_MSK),
+    APP_STATE_SERVER_CONNECTED        = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED3_MSK),
+    APP_STATE_SERVER_REGISTERED       = LED_ON(DK_LED1_MSK) | LED_ON(DK_LED3_MSK),
+    APP_STATE_SERVER_DEREGISTER       = LED_BLINK(DK_LED1_MSK) | LED_ON(DK_LED3_MSK),
+    APP_STATE_SERVER_DEREGISTERING    = LED_BLINK(DK_LED1_MSK) | LED_ON(DK_LED3_MSK) | LED_INDEX(1),
+    APP_STATE_DISCONNECT              = LED_BLINK(DK_LED1_MSK) | LED_ON(DK_LED3_MSK) | LED_INDEX(2)
 } app_state_t;
 
 //APP_TIMER_DEF(m_iot_timer_tick_src_id);                                                       /**< App timer instance used to update the IoT timer wall clock. */
@@ -150,6 +163,7 @@ static coap_transport_handle_t *           mp_lwm2m_transport    = NULL;        
 
 static volatile app_state_t m_app_state = APP_STATE_IDLE;                                     /**< Application state. Should be one of @ref app_state_t. */
 static volatile uint16_t    m_server_instance;
+static volatile bool        m_did_bootstrap;
 
 static char m_at_write_buffer[APP_MAX_AT_WRITE_LENGTH];                                       /**< Buffer used to write AT commands. */
 static char m_at_read_buffer[APP_MAX_AT_READ_LENGTH];                                         /**< Buffer used to read AT commands. */
@@ -216,6 +230,7 @@ static struct nvs_fs fs = {
 
 static uint32_t app_store_bootstrap_server_values(uint16_t instance_id);
 static void app_server_update(uint16_t instance_id);
+static void app_server_deregister(uint16_t instance_id);
 
 
 /**@brief Recoverable BSD library error. */
@@ -246,7 +261,65 @@ void bsd_irrecoverable_error_handler(uint32_t error)
 /**@brief Callback for button events from the DK buttons and LEDs library. */
 static void app_button_handler(u32_t buttons, u32_t has_changed)
 {
+    if (buttons & 0x01) // Button 1 has changed
+    {
+        if (m_app_state == APP_STATE_IP_INTERFACE_UP)
+        {
+            if (m_server_settings[0].is_bootstrapped)
+            {
+                m_app_state = APP_STATE_BOOTSTRAPED;
+            }
+            else
+            {
+                m_app_state = APP_STATE_BS_CONNECT;
+            }
+        }
+        else if (m_app_state == APP_STATE_SERVER_REGISTERED)
+        {
+            printk("app_server_update()\n");
+            app_server_update(m_server_instance);
+        }
+    }
+    else if (buttons & 0x02) // Button 2 has changed
+    {
+        if (m_app_state == APP_STATE_SERVER_REGISTERED)
+        {
+            m_app_state = APP_STATE_SERVER_DEREGISTER;
+        }
+    }
+}
 
+/**@brief Update LEDs state. */
+static void app_leds_update(struct k_work *work)
+{
+        static bool led_on;
+        static u8_t current_led_on_mask;
+        u8_t led_on_mask;
+
+        ARG_UNUSED(work);
+
+        /* Set led_on_mask to match current state. */
+        led_on_mask = LED_GET_ON(m_app_state);
+
+        if (m_did_bootstrap)
+        {
+            /* Only turn on LED2 if bootstrap was done. */
+            led_on_mask |= LED_ON(DK_LED2_MSK);
+        }
+
+        led_on = !led_on;
+        if (led_on) {
+                led_on_mask |= LED_GET_BLINK(m_app_state);
+        } else {
+                led_on_mask &= ~LED_GET_BLINK(m_app_state);
+        }
+
+        if (led_on_mask != current_led_on_mask) {
+                dk_set_leds(led_on_mask);
+                current_led_on_mask = led_on_mask;
+        }
+
+        k_delayed_work_submit(&leds_update_work, APP_LEDS_UPDATE_INTERVAL);
 }
 #endif
 
@@ -257,6 +330,9 @@ static void app_buttons_leds_init(void)
 #if APP_USE_BUTTONS_AND_LEDS
     dk_buttons_and_leds_init(app_button_handler);
     dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
+
+    k_delayed_work_init(&leds_update_work, app_leds_update);
+    k_delayed_work_submit(&leds_update_work, APP_LEDS_UPDATE_INTERVAL);
 #endif
 }
 
@@ -515,13 +591,21 @@ void lwm2m_notification(lwm2m_notification_type_t type,
 
     if (type == LWM2M_NOTIFCATION_TYPE_REGISTER)
     {
-        // We have successfully registered, free up the allocated link format string.
+    }
+    else if (type == LWM2M_NOTIFCATION_TYPE_UPDATE)
+    {
+    }
+    else if (type == LWM2M_NOTIFCATION_TYPE_DEREGISTER)
+    {
+        // We have successfully deregistered, free up the allocated link format string.
         if (mp_link_format_string != NULL)
         {
             // No more attempts, clean up.
             k_free(mp_link_format_string);
             mp_link_format_string = NULL;
         }
+
+        m_app_state = APP_STATE_DISCONNECT;
     }
 }
 
@@ -542,13 +626,11 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
                                    uint8_t          op_code,
                                    coap_message_t * p_request)
 {
-#if APP_USE_BUTTONS_AND_LEDS
-    dk_set_leds(DK_LED3_MSK);
-#endif
-
     (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
 
     m_app_state = APP_STATE_BOOTSTRAPED;
+    m_server_settings[0].is_bootstrapped = true;
+    m_did_bootstrap = true;
 
     return 0;
 }
@@ -2029,9 +2111,6 @@ static void app_server_register(void)
         if (err_code == 0)
         {
             m_app_state = APP_STATE_SERVER_REGISTERED;
-#if APP_USE_BUTTONS_AND_LEDS
-            dk_set_leds(DK_LED4_MSK);
-#endif
         }
     }
 }
@@ -2051,6 +2130,21 @@ static void app_server_update(uint16_t instance_id)
 }
 
 
+static void app_server_deregister(uint16_t instance_id)
+{
+    uint32_t err_code;
+
+    // TODO: check instance_id
+    ARG_UNUSED(instance_id);
+
+    err_code = lwm2m_deregister((struct sockaddr *)mp_remote_server,
+                                mp_lwm2m_transport);
+    APP_ERROR_CHECK(err_code);
+
+    m_app_state = APP_STATE_SERVER_DEREGISTERING;
+}
+
+
 static void app_disconnect(void)
 {
     uint32_t err_code;
@@ -2060,12 +2154,16 @@ static void app_disconnect(void)
     {
         err_code = coap_security_destroy(mp_lwm2m_bs_transport);
         APP_ERROR_CHECK(err_code);
+
+        mp_lwm2m_bs_transport = NULL;
     }
 
     if (mp_lwm2m_transport)
     {
         err_code = coap_security_destroy(mp_lwm2m_transport);
         APP_ERROR_CHECK(err_code);
+
+        mp_lwm2m_transport = NULL;
     }
 
     m_app_state = APP_STATE_IP_INTERFACE_UP;
@@ -2086,9 +2184,6 @@ static void app_lwm2m_process(void)
         }
         case APP_STATE_BS_CONNECTED:
         {
-#if APP_USE_BUTTONS_AND_LEDS
-            dk_set_leds(DK_LED2_MSK);
-#endif
             printk("app_bootstrap()\n");
             app_bootstrap();
             break;
@@ -2103,6 +2198,12 @@ static void app_lwm2m_process(void)
         {
             printk("app_server_register()\n");
             app_server_register();
+            break;
+        }
+        case APP_STATE_SERVER_DEREGISTER:
+        {
+            printk("app_server_deregister()\n");
+            app_server_deregister(m_server_instance);
             break;
         }
         case APP_STATE_DISCONNECT:
@@ -2366,10 +2467,6 @@ int main(void)
     {
         m_app_state = APP_STATE_BS_CONNECT;
     }
-
-#if APP_USE_BUTTONS_AND_LEDS
-    dk_set_leds(DK_LED1_MSK);
-#endif
 
     // Enter main loop
     for (;;)
