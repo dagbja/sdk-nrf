@@ -64,17 +64,23 @@ static struct k_delayed_work leds_update_work;
 
 #define APP_ENABLE_LOGS                 0                                                     /**< Enable logs in the application. */
 
+#define APP_SEC_TAG_OFFSET              25
+
 #define APP_BOOTSTRAP_SEC_TAG           25                                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
 #define APP_BOOTSTRAP_SEC_PSK           "d6160c2e7c90399ee7d207a22611e3d3a87241b0462976b935341d000a91e747" /**< Pre-shared key used for bootstrap server in hex format. */
 #define APP_BOOTSTRAP_SEC_IDENTITY      CLIENT_IMEI_MSISDN                                    /**< Client identity used for bootstrap server. */
 
+#if 0
 #define APP_DM_SERVER_SEC_TAG           26                                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
 #define APP_DM_SERVER_SEC_PSK           "ea61b935048a556a99590ac6f5ace87d18e68a88504dd10bec6a9caeefc8c975" /**< Pre-shared key used for resource server in hex format. */
 #define APP_DM_SERVER_SEC_IDENTITY      IMEI                                                  /**< Client identity used for resource server. */
 
-#define APP_RS_SERVER_SEC_TAG           27                                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
+//      APP_DIAG_SERVER_SEC_TAG         27
+
+#define APP_RS_SERVER_SEC_TAG           28                                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
 #define APP_RS_SERVER_SEC_PSK           "c16451b3c745dbd0b13b1daaf90b7f18da420ac0c344089f6cb8cb2f8e48f6fd" /**< Pre-shared key used for resource server in hex format. */
 #define APP_RS_SERVER_SEC_IDENTITY      IMEI                                                  /**< Client identity used for resource server. */
+#endif
 
 #define APP_MAX_AT_READ_LENGTH          100
 #define APP_MAX_AT_WRITE_LENGTH         256
@@ -165,6 +171,9 @@ static volatile app_state_t m_app_state = APP_STATE_IDLE;                       
 static volatile uint16_t    m_server_instance;
 static volatile bool        m_did_bootstrap;
 
+static char *               m_public_key[1+LWM2M_MAX_SERVERS];
+static char *               m_secret_key[1+LWM2M_MAX_SERVERS];
+
 static char m_at_write_buffer[APP_MAX_AT_WRITE_LENGTH];                                       /**< Buffer used to write AT commands. */
 static char m_at_read_buffer[APP_MAX_AT_READ_LENGTH];                                         /**< Buffer used to read AT commands. */
 
@@ -231,6 +240,7 @@ static struct nvs_fs fs = {
 static uint32_t app_store_bootstrap_server_values(uint16_t instance_id);
 static void app_server_update(uint16_t instance_id);
 static void app_server_deregister(uint16_t instance_id);
+static void app_provision_secret_key(void);
 
 
 /**@brief Recoverable BSD library error. */
@@ -238,9 +248,16 @@ void bsd_recoverable_error_handler(uint32_t error)
 {
     ARG_UNUSED(error);
 
-    while (true)
-    {
-        ;
+    k_delayed_work_cancel(&leds_update_work);
+
+    /* Blinking all LEDs ON/OFF in pairs (1 and 3, 2 and 4)
+     * if there is an recoverable error.
+     */
+    while (true) {
+        dk_set_leds_state(DK_LED1_MSK | DK_LED3_MSK, DK_LED2_MSK | DK_LED4_MSK);
+        k_sleep(250);
+        dk_set_leds_state(DK_LED2_MSK | DK_LED4_MSK, DK_LED1_MSK | DK_LED3_MSK);
+        k_sleep(250);
     }
 }
 
@@ -250,9 +267,14 @@ void bsd_irrecoverable_error_handler(uint32_t error)
 {
     ARG_UNUSED(error);
 
-    while (true)
-    {
-        ;
+    k_delayed_work_cancel(&leds_update_work);
+
+    /* Blinking all LEDs ON/OFF if there is an irrecoverable error. */
+    while (true) {
+        dk_set_leds_state(DK_ALL_LEDS_MSK, 0x00);
+        k_sleep(250);
+        dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
+        k_sleep(250);
     }
 }
 
@@ -538,12 +560,14 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_serv
     }
 
     // Use DNS to lookup the IP
+    printk(" -> doing DNS lookup\n");
     err_code = app_resolve_server_uri(server_uri, p_remote, secure);
     if (err_code != 0)
     {
         printf("app_resolve_server_uri(\"%s\") failed %lu\n", server_uri, err_code);
         return err_code;
     }
+    printk(" -> done\n");
 
     // Save the short_server_id
     err_code = lwm2m_remote_remote_save((struct sockaddr *)p_remote, short_server_id);
@@ -628,6 +652,8 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
                                    coap_message_t * p_request)
 {
     (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+
+    app_provision_secret_key();
 
     m_app_state = APP_STATE_BOOTSTRAPED;
     m_server_settings[0].is_bootstrapped = true;
@@ -1508,12 +1534,21 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
                                                       resource_tlv_callback);
         APP_ERROR_CHECK(err_code);
 
-        // FIXME: Provision keys instead of print.
-        printk("Secret Key %u: ", instance_id);
+        // Copy public key as string
+        size_t public_key_len = m_instance_security[instance_id].public_key.len;
+        m_public_key[instance_id] = k_malloc(public_key_len + 1);
+        memcpy(m_public_key[instance_id], m_instance_security[instance_id].public_key.p_val, public_key_len);
+        m_public_key[instance_id][public_key_len] = 0;
+
+        // Convert secret key from binary to string
+        size_t secret_key_len = m_instance_security[instance_id].secret_key.len * 2;
+        m_secret_key[instance_id] = k_malloc(secret_key_len + 1);
         for (int i = 0; i < m_instance_security[instance_id].secret_key.len; i++) {
-            printk("%02x", m_instance_security[instance_id].secret_key.p_val[i]);
+            sprintf(&m_secret_key[instance_id][i*2], "%02x", m_instance_security[instance_id].secret_key.p_val[i]);
         }
-        printk("\n");
+        m_secret_key[instance_id][secret_key_len] = 0;
+
+        printk(" -> secret key %d: %s\n", instance_id, m_secret_key[instance_id]);
 
         APPL_LOG("lwm2m: decoded security.");
 
@@ -2042,16 +2077,7 @@ static void app_server_connect(void)
 
         struct sockaddr * p_localaddr = (struct sockaddr *)&client_addr;
 
-        sec_tag_t sec_tag_list[SEC_TAG_COUNT];
-
-        if (m_server_instance == 1)
-        {
-            sec_tag_list[0] = APP_DM_SERVER_SEC_TAG;
-        }
-        else
-        {
-            sec_tag_list[0] = APP_RS_SERVER_SEC_TAG;
-        }
+        sec_tag_t sec_tag_list[SEC_TAG_COUNT] = { APP_SEC_TAG_OFFSET + m_server_instance };
 
         coap_sec_config_t setting =
         {
@@ -2261,28 +2287,18 @@ static void app_coap_init(void)
 }
 
 
-/**@brief Function to provision credentials used for secure transport by the CoAP client. */
-static void app_provision(void)
+static void app_provision_psk(int at_socket_fd, int sec_tag, char * identity, char * psk)
 {
-    int at_socket_fd  = -1;
-    int bytes_written = 0;
-    int bytes_read    = 0;
-
-    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
-    APP_ERROR_CHECK_BOOL(at_socket_fd >= 0);
+    int bytes_written;
+    int bytes_read;
 
     #define WRITE_OPCODE  0
     #define IDENTITY_CODE 4
     #define PSK_CODE      3
 
-    memset (m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
-    snprintf(m_at_write_buffer,
-                                 APP_MAX_AT_WRITE_LENGTH,
-                                 "AT%%CMNG=%d,%d,%d,\"%s\"",
-                                 WRITE_OPCODE,
-                                 APP_BOOTSTRAP_SEC_TAG,
-                                 IDENTITY_CODE,
-                                 APP_BOOTSTRAP_SEC_IDENTITY);
+    memset(m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
+    snprintf(m_at_write_buffer, APP_MAX_AT_WRITE_LENGTH, "AT%%CMNG=%d,%d,%d,\"%s\"",
+            WRITE_OPCODE, sec_tag, IDENTITY_CODE, identity);
 
     bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
     APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
@@ -2291,14 +2307,9 @@ static void app_provision(void)
     APP_ERROR_CHECK_BOOL(bytes_read >= 2);
     APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
 
-    memset (m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
-    snprintf(m_at_write_buffer,
-                                 APP_MAX_AT_WRITE_LENGTH,
-                                 "AT%%CMNG=%d,%d,%d,\"%s\"",
-                                 WRITE_OPCODE,
-                                 APP_BOOTSTRAP_SEC_TAG,
-                                 PSK_CODE,
-                                 APP_BOOTSTRAP_SEC_PSK);
+    memset(m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
+    snprintf(m_at_write_buffer, APP_MAX_AT_WRITE_LENGTH, "AT%%CMNG=%d,%d,%d,\"%s\"",
+             WRITE_OPCODE, sec_tag, PSK_CODE, psk);
 
     bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
     APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
@@ -2306,72 +2317,72 @@ static void app_provision(void)
     bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
     APP_ERROR_CHECK_BOOL(bytes_read >= 2);
     APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
+}
 
 
-    memset (m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
-    snprintf(m_at_write_buffer,
-                                 APP_MAX_AT_WRITE_LENGTH,
-                                 "AT%%CMNG=%d,%d,%d,\"%s\"",
-                                 WRITE_OPCODE,
-                                 APP_DM_SERVER_SEC_TAG,
-                                 IDENTITY_CODE,
-                                 APP_DM_SERVER_SEC_IDENTITY);
+static void app_provision_secret_key(void)
+{
+    int at_socket_fd  = -1;
+    int bytes_written;
+    int bytes_read;
 
-    bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
-    APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
+    printk("app_provision_secret_key()\n");
+    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
+    APP_ERROR_CHECK_BOOL(at_socket_fd >= 0);
 
-    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-    APP_ERROR_CHECK_BOOL(bytes_read >= 2);
-    APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
-
-    memset (m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
-    snprintf(m_at_write_buffer,
-                                 APP_MAX_AT_WRITE_LENGTH,
-                                 "AT%%CMNG=%d,%d,%d,\"%s\"",
-                                 WRITE_OPCODE,
-                                 APP_DM_SERVER_SEC_TAG,
-                                 PSK_CODE,
-                                 APP_DM_SERVER_SEC_PSK);
-
-    bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
-    APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
+    // Enter flight mode
+    bytes_written = send(at_socket_fd, "AT+CFUN=4", 9, 0);
+    APP_ERROR_CHECK_BOOL(bytes_written == 9);
 
     bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
     APP_ERROR_CHECK_BOOL(bytes_read >= 2);
     APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
 
+    printk(" -> flight mode ok\n");
+    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+    {
+        if (m_public_key[i] && m_secret_key[i])
+        {
+            // FIXME: use correct sec_tag
+            app_provision_psk(at_socket_fd, APP_SEC_TAG_OFFSET+i, m_public_key[i], m_secret_key[i]);
 
-    memset (m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
-    snprintf(m_at_write_buffer,
-                                 APP_MAX_AT_WRITE_LENGTH,
-                                 "AT%%CMNG=%d,%d,%d,\"%s\"",
-                                 WRITE_OPCODE,
-                                 APP_RS_SERVER_SEC_TAG,
-                                 IDENTITY_CODE,
-                                 APP_RS_SERVER_SEC_IDENTITY);
+            k_free(m_public_key[i]);
+            m_public_key[i] = NULL;
+            k_free(m_secret_key[i]);
+            m_secret_key[i] = NULL;
+        }
+    }
 
-    bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
-    APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
-
-    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-    APP_ERROR_CHECK_BOOL(bytes_read >= 2);
-    APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
-
-    memset (m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
-    snprintf(m_at_write_buffer,
-                                 APP_MAX_AT_WRITE_LENGTH,
-                                 "AT%%CMNG=%d,%d,%d,\"%s\"",
-                                 WRITE_OPCODE,
-                                 APP_RS_SERVER_SEC_TAG,
-                                 PSK_CODE,
-                                 APP_RS_SERVER_SEC_PSK);
-
-    bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
-    APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
+    printk(" -> provision secret key ok\n");
+    // Enter normal mode
+    bytes_written = send(at_socket_fd, "AT+CFUN=1", 9, 0);
+    APP_ERROR_CHECK_BOOL(bytes_written == 9);
 
     bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
     APP_ERROR_CHECK_BOOL(bytes_read >= 2);
     APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
+
+    printk(" -> done\n");
+    ARG_UNUSED(close(at_socket_fd));
+
+    // FIXME: figure out why this is needed.
+    k_sleep(5000);
+}
+
+
+/**@brief Function to provision credentials used for secure transport by the CoAP client. */
+static void app_provision(void)
+{
+    int at_socket_fd  = -1;
+
+    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
+    APP_ERROR_CHECK_BOOL(at_socket_fd >= 0);
+
+    app_provision_psk(at_socket_fd, APP_BOOTSTRAP_SEC_TAG, APP_BOOTSTRAP_SEC_IDENTITY, APP_BOOTSTRAP_SEC_PSK);
+#if 0
+    app_provision_psk(at_socket_fd, APP_DM_SERVER_SEC_TAG, APP_DM_SERVER_SEC_IDENTITY, APP_DM_SERVER_SEC_PSK);
+    app_provision_psk(at_socket_fd, APP_RS_SERVER_SEC_TAG, APP_RS_SERVER_SEC_IDENTITY, APP_RS_SERVER_SEC_PSK);
+#endif
 
     ARG_UNUSED(close(at_socket_fd));
 }
