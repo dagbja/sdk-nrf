@@ -328,7 +328,8 @@ static void app_leds_update(struct k_work *work)
 static void app_buttons_leds_init(void)
 {
 #if APP_USE_BUTTONS_AND_LEDS
-    dk_buttons_and_leds_init(app_button_handler);
+    dk_buttons_init(app_button_handler);
+    dk_leds_init();
     dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
 
     k_delayed_work_init(&leds_update_work, app_leds_update);
