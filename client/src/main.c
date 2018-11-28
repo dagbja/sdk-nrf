@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <net/socket.h>
 #include <nvs/nvs.h>
-//#include <lte_lc.h>
+#include <lte_lc.h>
 #include <nrf.h>
 
 #include <coap_api.h>
@@ -67,21 +67,9 @@ static struct k_delayed_work leds_update_work;
 
 #define APP_SEC_TAG_OFFSET              25
 
-#define APP_BOOTSTRAP_SEC_TAG           25                                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
+#define APP_BOOTSTRAP_SEC_TAG           APP_SEC_TAG_OFFSET                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
 #define APP_BOOTSTRAP_SEC_PSK           "d6160c2e7c90399ee7d207a22611e3d3a87241b0462976b935341d000a91e747" /**< Pre-shared key used for bootstrap server in hex format. */
 #define APP_BOOTSTRAP_SEC_IDENTITY      CLIENT_IMEI_MSISDN                                    /**< Client identity used for bootstrap server. */
-
-#if 0
-#define APP_DM_SERVER_SEC_TAG           26                                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
-#define APP_DM_SERVER_SEC_PSK           "ea61b935048a556a99590ac6f5ace87d18e68a88504dd10bec6a9caeefc8c975" /**< Pre-shared key used for resource server in hex format. */
-#define APP_DM_SERVER_SEC_IDENTITY      IMEI                                                  /**< Client identity used for resource server. */
-
-//      APP_DIAG_SERVER_SEC_TAG         27
-
-#define APP_RS_SERVER_SEC_TAG           28                                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
-#define APP_RS_SERVER_SEC_PSK           "c16451b3c745dbd0b13b1daaf90b7f18da420ac0c344089f6cb8cb2f8e48f6fd" /**< Pre-shared key used for resource server in hex format. */
-#define APP_RS_SERVER_SEC_IDENTITY      IMEI                                                  /**< Client identity used for resource server. */
-#endif
 
 #define APP_MAX_AT_READ_LENGTH          100
 #define APP_MAX_AT_WRITE_LENGTH         256
@@ -100,6 +88,38 @@ static struct k_delayed_work leds_update_work;
 
 #endif // APP_ENABLE_LOGS
 
+#if APP_USE_BUTTONS_AND_LEDS
+#define APP_ERROR_CHECK(error_code) \
+    do { \
+        if (error_code != 0) { \
+            printk("Error: %lu\n", error_code); \
+            k_delayed_work_cancel(&leds_update_work); \
+            /* Blinking all LEDs ON/OFF in pairs (1 and 2, 3 and 4) if there is an error. */ \
+            while (true) { \
+                dk_set_leds_state(DK_LED1_MSK | DK_LED2_MSK, DK_LED3_MSK | DK_LED4_MSK); \
+                k_sleep(250); \
+                dk_set_leds_state(DK_LED3_MSK | DK_LED4_MSK, DK_LED1_MSK | DK_LED2_MSK); \
+                k_sleep(250); \
+            } \
+        } \
+    } while (0)
+
+#define APP_ERROR_CHECK_BOOL(boolean_value) \
+    do { \
+        const uint32_t local_value = (boolean_value); \
+        if (!local_value) { \
+            printk("BOOL check failure\n"); \
+            k_delayed_work_cancel(&leds_update_work); \
+            /* Blinking all LEDs ON/OFF in pairs (1 and 2, 3 and 4) if there is an error. */ \
+            while (true) { \
+                dk_set_leds_state(DK_LED1_MSK | DK_LED2_MSK, DK_LED3_MSK | DK_LED4_MSK); \
+                k_sleep(250); \
+                dk_set_leds_state(DK_LED3_MSK | DK_LED4_MSK, DK_LED1_MSK | DK_LED2_MSK); \
+                k_sleep(250); \
+            } \
+        } \
+    } while (0)
+#else
 #define APP_ERROR_CHECK(error_code) \
     do { \
         if (error_code != 0) { \
@@ -118,6 +138,7 @@ static struct k_delayed_work leds_update_work;
                 ; \
         } \
     } while (0)
+#endif
 
 typedef enum
 {
@@ -174,9 +195,6 @@ static volatile bool        m_did_bootstrap;
 
 static char *               m_public_key[1+LWM2M_MAX_SERVERS];
 static char *               m_secret_key[1+LWM2M_MAX_SERVERS];
-
-static char m_at_write_buffer[APP_MAX_AT_WRITE_LENGTH];                                       /**< Buffer used to write AT commands. */
-static char m_at_read_buffer[APP_MAX_AT_READ_LENGTH];                                         /**< Buffer used to read AT commands. */
 
 #if (APP_USE_AF_INET6 == 1)
 static struct sockaddr_in6 m_bs_server;
@@ -241,7 +259,8 @@ static struct nvs_fs fs = {
 static uint32_t app_store_bootstrap_server_values(uint16_t instance_id);
 static void app_server_update(uint16_t instance_id);
 static void app_server_deregister(uint16_t instance_id);
-static void app_provision_secret_key(void);
+static void app_provision_psk(int sec_tag, char * identity, char * psk);
+static void app_provision_secret_keys(void);
 
 
 /**@brief Recoverable BSD library error. */
@@ -255,10 +274,12 @@ void bsd_recoverable_error_handler(uint32_t error)
      * if there is an recoverable error.
      */
     while (true) {
+#if APP_USE_BUTTONS_AND_LEDS
         dk_set_leds_state(DK_LED1_MSK | DK_LED3_MSK, DK_LED2_MSK | DK_LED4_MSK);
         k_sleep(250);
         dk_set_leds_state(DK_LED2_MSK | DK_LED4_MSK, DK_LED1_MSK | DK_LED3_MSK);
         k_sleep(250);
+#endif
     }
 }
 
@@ -272,10 +293,12 @@ void bsd_irrecoverable_error_handler(uint32_t error)
 
     /* Blinking all LEDs ON/OFF if there is an irrecoverable error. */
     while (true) {
+#if APP_USE_BUTTONS_AND_LEDS
         dk_set_leds_state(DK_ALL_LEDS_MSK, 0x00);
         k_sleep(250);
         dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
         k_sleep(250);
+#endif
     }
 }
 
@@ -654,11 +677,17 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 {
     (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
 
-    app_provision_secret_key();
+    app_provision_secret_keys();
 
     m_app_state = APP_STATE_BOOTSTRAPED;
     m_server_settings[0].is_bootstrapped = true;
     m_did_bootstrap = true;
+
+    // Close connection to bootstrap server.
+    uint32_t err_code = coap_security_destroy(mp_lwm2m_bs_transport);
+    APP_ERROR_CHECK(err_code);
+
+    mp_lwm2m_bs_transport = NULL;
 
     return 0;
 }
@@ -1604,6 +1633,9 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             m_server_settings[0].access[0] = rwde_access;
             m_server_settings[0].server[0] = 102;
             m_server_settings[0].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
+
+            app_provision_psk(APP_BOOTSTRAP_SEC_TAG, APP_BOOTSTRAP_SEC_IDENTITY, APP_BOOTSTRAP_SEC_PSK);
+
             break;
         }
 
@@ -2288,18 +2320,25 @@ static void app_coap_init(void)
 }
 
 
-static void app_provision_psk(int at_socket_fd, int sec_tag, char * identity, char * psk)
+static void app_provision_psk(int sec_tag, char * identity, char * psk)
 {
+    int at_socket_fd;
     int bytes_written;
     int bytes_read;
+
+    char m_at_write_buffer[APP_MAX_AT_WRITE_LENGTH];
+    char m_at_read_buffer[APP_MAX_AT_READ_LENGTH];
 
     #define WRITE_OPCODE  0
     #define IDENTITY_CODE 4
     #define PSK_CODE      3
 
+    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
+    APP_ERROR_CHECK_BOOL(at_socket_fd >= 0);
+
     memset(m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
     snprintf(m_at_write_buffer, APP_MAX_AT_WRITE_LENGTH, "AT%%CMNG=%d,%d,%d,\"%s\"",
-            WRITE_OPCODE, sec_tag, IDENTITY_CODE, identity);
+             WRITE_OPCODE, sec_tag, IDENTITY_CODE, identity);
 
     bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
     APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
@@ -2318,34 +2357,23 @@ static void app_provision_psk(int at_socket_fd, int sec_tag, char * identity, ch
     bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
     APP_ERROR_CHECK_BOOL(bytes_read >= 2);
     APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
+
+    ARG_UNUSED(close(at_socket_fd));
 }
 
 
-static void app_provision_secret_key(void)
+static void app_provision_secret_keys(void)
 {
-    int at_socket_fd  = -1;
-    int bytes_written;
-    int bytes_read;
+    printk("app_provision_secret_keys()\n");
 
-    printk("app_provision_secret_key()\n");
-    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
-    APP_ERROR_CHECK_BOOL(at_socket_fd >= 0);
+    lte_lc_offline();
+    printk(" -> offline mode\n");
 
-    // Enter flight mode
-    bytes_written = send(at_socket_fd, "AT+CFUN=4", 9, 0);
-    APP_ERROR_CHECK_BOOL(bytes_written == 9);
-
-    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-    APP_ERROR_CHECK_BOOL(bytes_read >= 2);
-    APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
-
-    printk(" -> flight mode ok\n");
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
         if (m_public_key[i] && m_secret_key[i])
         {
-            // FIXME: use correct sec_tag
-            app_provision_psk(at_socket_fd, APP_SEC_TAG_OFFSET+i, m_public_key[i], m_secret_key[i]);
+            app_provision_psk(APP_SEC_TAG_OFFSET + i, m_public_key[i], m_secret_key[i]);
 
             k_free(m_public_key[i]);
             m_public_key[i] = NULL;
@@ -2353,79 +2381,14 @@ static void app_provision_secret_key(void)
             m_secret_key[i] = NULL;
         }
     }
+    printk(" -> wrote secret keys\n");
 
-    printk(" -> provision secret key ok\n");
-    // Enter normal mode
-    bytes_written = send(at_socket_fd, "AT+CFUN=1", 9, 0);
-    APP_ERROR_CHECK_BOOL(bytes_written == 9);
-
-    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-    APP_ERROR_CHECK_BOOL(bytes_read >= 2);
-    APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
-
-    printk(" -> done\n");
-    ARG_UNUSED(close(at_socket_fd));
+    lte_lc_normal();
+    printk(" -> normal mode\n");
 
     // FIXME: figure out why this is needed.
     k_sleep(5000);
-}
-
-
-/**@brief Function to provision credentials used for secure transport by the CoAP client. */
-static void app_provision(void)
-{
-    int at_socket_fd  = -1;
-
-    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
-    APP_ERROR_CHECK_BOOL(at_socket_fd >= 0);
-
-    app_provision_psk(at_socket_fd, APP_BOOTSTRAP_SEC_TAG, APP_BOOTSTRAP_SEC_IDENTITY, APP_BOOTSTRAP_SEC_PSK);
-#if 0
-    app_provision_psk(at_socket_fd, APP_DM_SERVER_SEC_TAG, APP_DM_SERVER_SEC_IDENTITY, APP_DM_SERVER_SEC_PSK);
-    app_provision_psk(at_socket_fd, APP_RS_SERVER_SEC_TAG, APP_RS_SERVER_SEC_IDENTITY, APP_RS_SERVER_SEC_PSK);
-#endif
-
-    ARG_UNUSED(close(at_socket_fd));
-}
-
-
-/**@brief Function to configure the modem and create a LTE connection. */
-static void app_modem_configure(void)
-{
-    int at_socket_fd  = -1;
-    int bytes_written = 0;
-    int bytes_read    = 0;
-
-    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
-    APP_ERROR_CHECK_BOOL(at_socket_fd >= 0);
-
-    bytes_written = send(at_socket_fd, "AT+CEREG=2", 10, 0);
-    APP_ERROR_CHECK_BOOL(bytes_written == 10);
-
-    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-    APP_ERROR_CHECK_BOOL(bytes_read >= 2);
-    APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
-
-    bytes_written = send(at_socket_fd, "AT+CFUN=1", 9, 0);
-    APP_ERROR_CHECK_BOOL(bytes_written == 9);
-
-    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-    APP_ERROR_CHECK_BOOL(bytes_read >= 2);
-    APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
-
-    while (true)
-    {
-        bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-
-        if ((strncmp("+CEREG: 1", m_at_read_buffer, 9) == 0) ||
-            (strncmp("+CEREG:1", m_at_read_buffer, 8) == 0) ||
-            (strncmp("+CEREG: 5", m_at_read_buffer, 9) == 0) ||
-            (strncmp("+CEREG:5", m_at_read_buffer, 8) == 0))
-        {
-            break;
-        }
-    }
-    ARG_UNUSED(close(at_socket_fd));
+    printk(" -> done\n");
 }
 
 
@@ -2490,10 +2453,8 @@ int main(void)
     // Initialize LEDs and Buttons.
     app_buttons_leds_init();
 
+    // Initialize Non-volatile Storage.
     app_flash_init();
-
-    // Provision credentials used for the bootstrap server.
-    app_provision();
 
     // Initialize CoAP.
     app_coap_init();
@@ -2505,8 +2466,7 @@ int main(void)
     app_lwm2m_create_objects();
 
     // Establish LTE link.
-    app_modem_configure();
-    //lte_lc_init_and_connect();
+    lte_lc_init_and_connect();
 
     // Initialize Timers.
     //timers_init();
