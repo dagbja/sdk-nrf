@@ -179,10 +179,6 @@ static lwm2m_connectivity_monitoring_t     m_instance_conn_mon;                 
 
 #define VERIZON_RESOURCE 30000
 
-static int32_t                             m_security_hold_off_timer[1+LWM2M_MAX_SERVERS];
-static int32_t                             m_security_is_bootstrapped[1+LWM2M_MAX_SERVERS];
-static int32_t                             m_server_is_registered[1+LWM2M_MAX_SERVERS];
-static int32_t                             m_server_client_hold_off_timer[1+LWM2M_MAX_SERVERS];
 static lwm2m_string_t                      m_apn[4];                                          /**< Verizon specific APN names. */
 
 static coap_transport_handle_t *           mp_coap_transport     = NULL;                      /**< CoAP transport handle for the non bootstrap server. */
@@ -235,9 +231,12 @@ typedef struct
     uint16_t owner;                                                    /**< Owner of this ACL entry. Short server id */
 
     // Local values
-    bool     is_bootstrapped;
-    bool     is_registered;
-    time_t   hold_off_timer;
+    union {
+        uint32_t bootstrapped;
+        uint32_t registered;
+    } is;
+    uint32_t hold_off_timer;      /**< The number of seconds to wait before attempting bootstrap or registration. */
+    uint32_t retry_count;         /**< The number of unsuccessful registration retries to reach the server. */
 } server_settings_t;
 
 static server_settings_t     m_server_settings[1+LWM2M_MAX_SERVERS];
@@ -311,7 +310,7 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
     {
         if (m_app_state == APP_STATE_IP_INTERFACE_UP)
         {
-            if (m_server_settings[0].is_bootstrapped)
+            if (m_server_settings[0].is.bootstrapped)
             {
                 m_app_state = APP_STATE_BOOTSTRAPED;
             }
@@ -334,6 +333,7 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
         }
     }
 }
+
 
 /**@brief Update LEDs state. */
 static void app_leds_update(struct k_work *work)
@@ -668,7 +668,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     app_provision_secret_keys();
 
     m_app_state = APP_STATE_BOOTSTRAPED;
-    m_server_settings[0].is_bootstrapped = true;
+    m_server_settings[0].is.bootstrapped = true;  // TODO: this should be set by bootstrap server when bootstrapped
     m_did_bootstrap = true;
 
     // Close connection to bootstrap server.
@@ -702,14 +702,14 @@ static uint32_t tlv_security_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * 
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
                                                          tlv.length,
-                                                         &m_security_hold_off_timer[instance_id]);
+                                                         &m_server_settings[instance_id].hold_off_timer);
                 break;
             }
             case 1: // IsBootstrapped
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
                                                          tlv.length,
-                                                         &m_security_is_bootstrapped[instance_id]);
+                                                         &m_server_settings[instance_id].is.bootstrapped);
                 break;
             }
             default:
@@ -744,8 +744,8 @@ static uint32_t tlv_server_verizon_encode(uint16_t instance_id, uint8_t * p_buff
 {
     int32_t list_values[2] =
     {
-        m_server_is_registered[instance_id],
-        m_server_client_hold_off_timer[instance_id]
+        m_server_settings[instance_id].is.registered,
+        m_server_settings[instance_id].hold_off_timer
     };
 
     lwm2m_list_t list =
@@ -781,14 +781,14 @@ static uint32_t tlv_server_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * p_
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
                                                          tlv.length,
-                                                         &m_server_is_registered[instance_id]);
+                                                         &m_server_settings[instance_id].is.registered);
                 break;
             }
             case 1: // ClientHoldOffTimer
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
                                                          tlv.length,
-                                                         &m_server_client_hold_off_timer[instance_id]);
+                                                         &m_server_settings[instance_id].hold_off_timer);
                 break;
             }
             default:
@@ -1621,6 +1621,8 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             m_server_settings[0].access[0] = rwde_access;
             m_server_settings[0].server[0] = 102;
             m_server_settings[0].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
+            m_server_settings[0].is.bootstrapped = 0;
+            m_server_settings[0].hold_off_timer = 10;
 
             app_provision_psk(APP_BOOTSTRAP_SEC_TAG, APP_BOOTSTRAP_SEC_IDENTITY, APP_BOOTSTRAP_SEC_PSK);
 
@@ -1646,6 +1648,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             m_server_settings[2].access[0] = rwde_access;
             m_server_settings[2].server[0] = 102;
             m_server_settings[2].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
+            m_server_settings[2].hold_off_timer = 30;
             break;
         }
 
@@ -1687,7 +1690,7 @@ static void app_read_flash_storage(void)
         app_factory_bootstrap_server_object(i);
     }
 
-    // Workaround for not storing is_bootstrapped:
+    // Workaround for not storing is.bootstrapped:
     // - Switch 1 will determine if doing bootstrap
     // - Switch 2 will determine if connecting to DM or Repository server
 
@@ -1696,11 +1699,11 @@ static void app_read_flash_storage(void)
 
     if (button_state & 0x04) // Switch 1 in left position
     {
-        m_server_settings[0].is_bootstrapped = false;
+        m_server_settings[0].is.bootstrapped = false;
     }
     else
     {
-        m_server_settings[0].is_bootstrapped = true;
+        m_server_settings[0].is.bootstrapped = true;
     }
 
     if (button_state & 0x08) // Switch 2 in left position
@@ -1732,8 +1735,10 @@ static void app_read_flash_storage(void)
     m_server_settings[1].server[1] = 102;
     m_server_settings[1].access[2] = rwde_access;
     m_server_settings[1].server[2] = 1000;
+    m_server_settings[1].hold_off_timer = 30;
 
-    if (m_server_settings[0].is_bootstrapped)
+
+    if (m_server_settings[0].is.bootstrapped)
     {
         m_server_settings[1].owner = 102;
     }
@@ -1758,6 +1763,7 @@ static void app_read_flash_storage(void)
     m_server_settings[3].access[2] = rwde_access;
     m_server_settings[3].server[2] = 1000;
     m_server_settings[3].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
+    m_server_settings[3].hold_off_timer = 30;
 #endif
 }
 
@@ -1780,9 +1786,6 @@ static void app_lwm2m_create_objects(void)
                                          &m_instance_server[i].binding);
 
         m_instance_server[i].proto.callback = server_instance_callback;
-
-        m_server_is_registered[i] = 1;
-        m_server_client_hold_off_timer[i] = 30;
 
 #if APP_ACL_DM_SERVER_HACK
     }
@@ -2461,7 +2464,7 @@ int main(void)
     //timers_init();
     //iot_timer_init();
 
-    if (m_server_settings[0].is_bootstrapped)
+    if (m_server_settings[0].is.bootstrapped)
     {
         m_app_state = APP_STATE_BOOTSTRAPED;
     }
