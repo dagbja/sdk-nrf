@@ -4,8 +4,11 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
+#define LWM2M_LOG_MODULE_NAME lwm2m_objects_plain_text
+
 #include <stdlib.h>
 
+#include <lwm2m.h>
 #include <lwm2m_objects_plain_text.h>
 #include <lwm2m_objects.h>
 

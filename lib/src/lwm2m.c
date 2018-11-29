@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#define LOG_MODULE_NAME lwm2m
-#define NET_LOG_LEVEL CONFIG_LWM2M_LOG_LEVEL
+#define LWM2M_LOG_MODULE_NAME lwm2m
 
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
 
+#include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_register.h>
 #include <lwm2m_bootstrap.h>
@@ -19,7 +19,6 @@
 #include <lwm2m_tlv.h>
 #include <lwm2m_objects.h>
 #include <lwm2m_remote.h>
-#include <lwm2m.h>
 
 static lwm2m_alloc_t   m_alloc_fn = NULL;                                                           /**< Memory allocator function, populated on @lwm2m_init. */
 static lwm2m_free_t    m_free_fn = NULL;                                                            /**< Memory free function, populated on @lwm2m_init. */

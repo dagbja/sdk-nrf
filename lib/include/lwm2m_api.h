@@ -15,8 +15,8 @@
 #define LWM2M_API_H__
 
 #include <stdint.h>
+
 #include <net/socket.h>
-#include <lwm2m.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -15,7 +15,6 @@
 #ifndef LWM2M_ACL_H__
 #define LWM2M_ACL_H__
 
-#include <lwm2m.h>
 #include <lwm2m_api.h>
 
 #define LWM2M_ACL_NO_PERM                    0

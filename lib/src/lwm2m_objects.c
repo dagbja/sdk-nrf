@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
+#define LWM2M_LOG_MODULE_NAME lwm2m_objects
+
 #include <string.h>
 #include <stddef.h>
 
-#include <lwm2m_objects.h>
 #include <lwm2m.h>
+#include <lwm2m_objects.h>
 
 // Connectivity Monitoring object
 static int32_t        m_available_network_bearer[LWM2M_CONNECTIVITY_MONITORING_MAX_NETWORK_BEARERS];

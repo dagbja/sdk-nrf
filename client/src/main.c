@@ -17,6 +17,7 @@
 
 #include <coap_api.h>
 #include <coap_option.h>
+#include <coap_message.h>
 #include <lwm2m_api.h>
 #include <lwm2m_remote.h>
 #include <lwm2m_acl.h>

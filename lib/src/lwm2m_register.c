@@ -4,17 +4,16 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#define LOG_MODULE_NAME lwm2m
-#define NET_LOG_LEVEL CONFIG_LWM2M_LOG_LEVEL
+#define LWM2M_LOG_MODULE_NAME lwm2m_register
 
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
 
+#include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_register.h>
 #include <lwm2m_remote.h>
-#include <lwm2m.h>
 #include <coap_api.h>
 
 #define LWM2M_REGISTER_URI_PATH "rd"
