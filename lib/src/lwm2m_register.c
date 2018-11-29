@@ -154,7 +154,7 @@ static void lwm2m_register_cb(uint32_t status, void * p_arg, coap_message_t * p_
     uint16_t short_server_id = (uint32_t)p_arg;
 
     // Save the remote to lwm2m_remote. Pass the error to lwm2m_notification if we failed.
-    uint32_t err_code = lwm2m_remote_remote_save(p_message->p_remote, short_server_id);
+    uint32_t err_code = lwm2m_remote_register(short_server_id, p_message->p_remote);
     if (err_code != 0)
     {
         lwm2m_notification(LWM2M_NOTIFCATION_TYPE_REGISTER,
@@ -215,12 +215,6 @@ uint32_t lwm2m_register(struct sockaddr         * p_remote,
     {
         LWM2M_MUTEX_UNLOCK();
         return err_code;
-    }
-
-
-    if (err_code == 0)
-    {
-        err_code = lwm2m_remote_register(p_config->short_server_id);
     }
 
     if (err_code == 0)

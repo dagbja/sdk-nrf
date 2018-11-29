@@ -537,6 +537,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
         port = atoi(sep + 1);
     }
 
+    printk(" -> doing DNS lookup\n");
     struct addrinfo hints = {
 #if (APP_USE_AF_INET6 == 1)
         .ai_family = AF_INET6,
@@ -546,9 +547,11 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
         .ai_socktype = SOCK_DGRAM
     };
     struct addrinfo *result;
+
     int ret_val = getaddrinfo(hostname, NULL, &hints, &result);
 
     if (ret_val != 0) {
+        printf(" -> failed to lookup \"%s\": %d\n", server_uri, ret_val);
         return errno;
     }
 
@@ -563,6 +566,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     }
 
     freeaddrinfo(result);
+    printk(" -> done\n");
 
     return 0;
 }
@@ -576,29 +580,13 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_serv
 {
     uint32_t err_code;
 
-    // Register the short_server_id
-    err_code = lwm2m_remote_register(short_server_id);
-    if (err_code != 0)
-    {
-        return err_code;
-    }
-
     // Use DNS to lookup the IP
-    printk(" -> doing DNS lookup\n");
     err_code = app_resolve_server_uri(server_uri, p_remote, secure);
-    if (err_code != 0)
-    {
-        printf("app_resolve_server_uri(\"%s\") failed %lu\n", server_uri, err_code);
-        return err_code;
-    }
-    printk(" -> done\n");
 
-    // Save the short_server_id
-    err_code = lwm2m_remote_remote_save((struct sockaddr *)p_remote, short_server_id);
-
-    if (err_code != 0)
+    if (err_code == 0)
     {
-        return err_code;
+        // Register the short_server_id
+        err_code = lwm2m_remote_register(short_server_id, (struct sockaddr *)p_remote);
     }
 
     return err_code;
@@ -2083,11 +2071,12 @@ static void app_server_connect(void)
     // Set the short server id of the server in the config.
     m_server_conf.short_server_id = m_server_settings[m_server_instance].short_server_id;
 
-    // Save the remote address of the server.
-    (void)app_lwm2m_parse_uri_and_save_remote(m_instance_server[m_server_instance].short_server_id,
-                                              (char *)&m_server_settings[m_server_instance].server_uri,
-                                              &secure,
-                                              mp_remote_server);
+    err_code = app_resolve_server_uri((char *)&m_server_settings[m_server_instance].server_uri,
+                                      mp_remote_server, &secure);
+    if (err_code != 0)
+    {
+        return;
+    }
 
     if (secure == true)
     {

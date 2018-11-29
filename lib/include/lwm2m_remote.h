@@ -30,11 +30,12 @@ uint32_t lwm2m_remote_init(void);
  *
  * @param[in]  short_server_id  Short server id associated with Server and Security instances. The value MUST correspond
  *                              with the short server ids used for Server and Security instances.
+ * @param[in]  p_remote         Remote to save.
  *
  * @return     NRF_SUCCESS      Registration succeeded.
  * @return     NRF_ERROR_NO_MEM The remote list is full.
  */
-uint32_t lwm2m_remote_register(uint16_t short_server_id);
+uint32_t lwm2m_remote_register(uint16_t short_server_id, struct sockaddr * p_remote);
 
 /**
  * @brief      Deregister this short server id.
@@ -46,18 +47,6 @@ uint32_t lwm2m_remote_register(uint16_t short_server_id);
  * @return     NRF_ERROR_NOT_FOUND The short_server_id was not found.
  */
 uint32_t lwm2m_remote_deregister(uint16_t short_server_id);
-
-/**
- * @brief      Associate a lwm2m_remote with a short server id. Makes a copy of the
- *             struct sockaddr.
- *
- * @param[in]  p_remote         Remote to save.
- * @param[in]  short_server_id  Short server id to associate with.
- *
- * @return     NRF_SUCCESS         The remote was saved.
- * @return     NRF_ERROR_NOT_FOUND The short_server_id was not found.
- */
-uint32_t lwm2m_remote_remote_save(struct sockaddr * p_remote, uint16_t short_server_id);
 
 /**
  * @brief      Find the short server id from a given remote struct.
