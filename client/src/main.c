@@ -12,6 +12,7 @@
 #include <net/socket.h>
 #include <nvs/nvs.h>
 #include <lte_lc.h>
+#include <nrf_inbuilt_key.h>
 #include <nrf.h>
 
 #include <coap_api.h>
@@ -2343,43 +2344,17 @@ static void app_coap_init(void)
 
 static void app_provision_psk(int sec_tag, char * identity, char * psk)
 {
-    int at_socket_fd;
-    int bytes_written;
-    int bytes_read;
+    uint32_t err_code;
 
-    char m_at_write_buffer[APP_MAX_AT_WRITE_LENGTH];
-    char m_at_read_buffer[APP_MAX_AT_READ_LENGTH];
+    err_code = nrf_inbuilt_key_write(sec_tag,
+                                     NRF_KEY_MGMT_CRED_TYPE_IDENTITY,
+                                     identity, strlen(identity));
+    APP_ERROR_CHECK(err_code);
 
-    #define WRITE_OPCODE  0
-    #define IDENTITY_CODE 4
-    #define PSK_CODE      3
-
-    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
-    APP_ERROR_CHECK_BOOL(at_socket_fd >= 0);
-
-    memset(m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
-    snprintf(m_at_write_buffer, APP_MAX_AT_WRITE_LENGTH, "AT%%CMNG=%d,%d,%d,\"%s\"",
-             WRITE_OPCODE, sec_tag, IDENTITY_CODE, identity);
-
-    bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
-    APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
-
-    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-    APP_ERROR_CHECK_BOOL(bytes_read >= 2);
-    APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
-
-    memset(m_at_write_buffer, 0, APP_MAX_AT_WRITE_LENGTH);
-    snprintf(m_at_write_buffer, APP_MAX_AT_WRITE_LENGTH, "AT%%CMNG=%d,%d,%d,\"%s\"",
-             WRITE_OPCODE, sec_tag, PSK_CODE, psk);
-
-    bytes_written = send(at_socket_fd, m_at_write_buffer, strlen(m_at_write_buffer), 0);
-    APP_ERROR_CHECK_BOOL(bytes_written == strlen(m_at_write_buffer));
-
-    bytes_read = recv(at_socket_fd, m_at_read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-    APP_ERROR_CHECK_BOOL(bytes_read >= 2);
-    APP_ERROR_CHECK_BOOL(strncmp("OK", m_at_read_buffer, 2) == 0);
-
-    ARG_UNUSED(close(at_socket_fd));
+    err_code = nrf_inbuilt_key_write(sec_tag,
+                                     NRF_KEY_MGMT_CRED_TYPE_PSK,
+                                     psk, strlen(psk));
+    APP_ERROR_CHECK(err_code);
 }
 
 
