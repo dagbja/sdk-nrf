@@ -25,5 +25,5 @@ The LEDs will show status as follows:
 * LED1: Blink when connecting to LTE network or creating a DTLS session, steady when online.
 * LED2: Blink when bootstrapping, steady when bootstrapped.
 * LED3: Blink when registering, steady when registered.
-* LED4: Currently unused.
+* LED4: Blink when app is connected and running.
 

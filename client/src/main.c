@@ -147,7 +147,8 @@ typedef enum
     APP_STATE_BS_CONNECT              = LED_BLINK(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK),
     APP_STATE_BS_CONNECTED            = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK),
     APP_STATE_BOOTRAP_REQUESTED       = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK) | LED_INDEX(1),
-    APP_STATE_BOOTSTRAPED             = LED_BLINK(DK_LED1_MSK) | LED_BLINK(DK_LED3_MSK),
+    APP_STATE_BOOTSTRAPED             = LED_ON(DK_LED1_MSK) | LED_ON(DK_LED2_MSK),
+    APP_STATE_SERVER_CONNECT          = LED_BLINK(DK_LED1_MSK) | LED_BLINK(DK_LED3_MSK),
     APP_STATE_SERVER_CONNECTED        = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED3_MSK),
     APP_STATE_SERVER_REGISTERED       = LED_ON(DK_LED1_MSK) | LED_ON(DK_LED3_MSK),
     APP_STATE_SERVER_DEREGISTER       = LED_BLINK(DK_LED1_MSK) | LED_ON(DK_LED3_MSK),
@@ -312,7 +313,7 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
         {
             if (m_server_settings[0].is.bootstrapped)
             {
-                m_app_state = APP_STATE_BOOTSTRAPED;
+                m_app_state = APP_STATE_SERVER_CONNECT;
             }
             else
             {
@@ -356,8 +357,13 @@ static void app_leds_update(struct k_work *work)
         led_on = !led_on;
         if (led_on) {
                 led_on_mask |= LED_GET_BLINK(m_app_state);
+                if (!LED_GET_BLINK(m_app_state)) {
+                    // Only blink LED4 if no other led is blinking
+                    led_on_mask |= DK_LED4_MSK;
+                }
         } else {
                 led_on_mask &= ~LED_GET_BLINK(m_app_state);
+                led_on_mask &= ~DK_LED4_MSK;
         }
 
         if (led_on_mask != current_led_on_mask) {
@@ -663,19 +669,35 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
                                    uint8_t          op_code,
                                    coap_message_t * p_request)
 {
+    s64_t time_stamp;
+    s64_t milliseconds_spent;
+
     (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-
-    app_provision_secret_keys();
-
-    m_app_state = APP_STATE_BOOTSTRAPED;
-    m_server_settings[0].is.bootstrapped = true;  // TODO: this should be set by bootstrap server when bootstrapped
-    m_did_bootstrap = true;
+    k_sleep(10); // TODO: figure out why this is needed before closing the connection
 
     // Close connection to bootstrap server.
     uint32_t err_code = coap_security_destroy(mp_lwm2m_bs_transport);
     APP_ERROR_CHECK(err_code);
 
     mp_lwm2m_bs_transport = NULL;
+
+    m_app_state = APP_STATE_BOOTSTRAPED;
+
+    time_stamp = k_uptime_get();
+
+    app_provision_secret_keys();
+
+    m_server_settings[0].is.bootstrapped = true;  // TODO: this should be set by bootstrap server when bootstrapped
+    m_did_bootstrap = true;
+
+    milliseconds_spent = k_uptime_delta(&time_stamp);
+
+    // FIXME: handle this with a timer.
+    s32_t hold_off_time = (m_server_settings[m_server_instance].hold_off_timer * 1000) - milliseconds_spent;
+    printk("ClientHoldOffTimer: sleeping %d milliseconds...\n", hold_off_time);
+    k_sleep(hold_off_time);
+
+    m_app_state = APP_STATE_SERVER_CONNECT;
 
     return 0;
 }
@@ -2240,7 +2262,7 @@ static void app_lwm2m_process(void)
             app_bootstrap();
             break;
         }
-        case APP_STATE_BOOTSTRAPED:
+        case APP_STATE_SERVER_CONNECT:
         {
             printk("app_server_connect(\"%s server\")\n", (m_server_instance == 1) ? "DM" : "Repository");
             app_server_connect();
@@ -2377,10 +2399,6 @@ static void app_provision_secret_keys(void)
 
     lte_lc_normal();
     printk(" -> normal mode\n");
-
-    // FIXME: figure out why this is needed.
-    k_sleep(5000);
-    printk(" -> done\n");
 }
 
 
@@ -2466,7 +2484,7 @@ int main(void)
 
     if (m_server_settings[0].is.bootstrapped)
     {
-        m_app_state = APP_STATE_BOOTSTRAPED;
+        m_app_state = APP_STATE_SERVER_CONNECT;
     }
     else
     {
