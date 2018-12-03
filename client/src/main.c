@@ -33,9 +33,6 @@
 
 #if APP_USE_BUTTONS_AND_LEDS
 #include <dk_buttons_and_leds.h>
-
-/* Structure for delayed work */
-static struct k_delayed_work leds_update_work;
 #endif
 
 #define LED_ON(x)                       (x)
@@ -44,8 +41,8 @@ static struct k_delayed_work leds_update_work;
 #define LED_GET_ON(x)                   ((x) & 0xFF)
 #define LED_GET_BLINK(x)                (((x) >> 8) & 0xFF)
 
-/* Interval in milliseconds between each time status LEDs are updated. */
-#define APP_LEDS_UPDATE_INTERVAL        500
+#define APP_LEDS_UPDATE_INTERVAL        500                                                   /**< Interval in milliseconds between each time status LEDs are updated. */
+#define APP_COAP_UPDATE_INTERVAL        1000                                                  /**< Interval between periodic callbacks to CoAP module. */
 
 #define COAP_LOCAL_LISTENER_PORT              5683                                            /**< Local port to listen on any traffic, client or server. Not bound to any specific LWM2M functionality.*/
 #define LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT     9998                                            /**< Local port to connect to the LWM2M bootstrap server. */
@@ -55,9 +52,6 @@ static struct k_delayed_work leds_update_work;
 
 #define BOOTSTRAP_URI                   "coaps://ddocdpboot.do.motive.com:5684"               /**< Server URI to the bootstrap server when using security (DTLS). */
 #define CLIENT_IMEI_MSISDN              "urn:imei-msisdn:" IMEI "-0123456789"                 /**< IMEI-MSISDN of the device. */
-
-#define LED_BLINK_INTERVAL_MS           30000                                                 /**< LED blinking interval. */
-#define COAP_TICK_INTERVAL_MS           50000                                                 /**< Interval between periodic callbacks to CoAP module. */
 
 #define SECURITY_SERVER_URI_SIZE_MAX    64                                                    /**< Max size of server URIs. */
 #define SECURITY_SMS_NUMBER_SIZE_MAX    20                                                    /**< Max size of server SMS number. */
@@ -192,6 +186,12 @@ static volatile bool        m_did_bootstrap;
 
 static char *               m_public_key[1+LWM2M_MAX_SERVERS];
 static char *               m_secret_key[1+LWM2M_MAX_SERVERS];
+
+/* Structures for delayed work */
+#if APP_USE_BUTTONS_AND_LEDS
+static struct k_delayed_work leds_update_work;
+#endif
+static struct k_delayed_work coap_update_work;
 
 #if (APP_USE_AF_INET6 == 1)
 static struct sockaddr_in6 m_bs_server;
@@ -390,6 +390,19 @@ static void app_buttons_leds_init(void)
 }
 
 
+/**@brief Function for handling CoAP periodically time ticks.
+*/
+static void app_coap_time_tick(struct k_work *work)
+{
+    ARG_UNUSED(work);
+
+    // Pass a tick to CoAP in order to re-transmit any pending messages.
+    ARG_UNUSED(coap_time_tick());
+
+    k_delayed_work_submit(&coap_update_work, APP_COAP_UPDATE_INTERVAL);
+}
+
+
 /**@brief Timer callback used for controlling board LEDs to represent application state.
  *
  */
@@ -427,15 +440,6 @@ static void blink_timeout_handler(iot_timer_time_in_ms_t wall_clock_value)
         }
     }
 #endif
-}
-
-
-/**@brief Function for handling CoAP periodically time ticks.
-*/
-static void app_coap_time_tick(struct k_work *work)
-{
-    // Pass a tick to CoAP in order to re-transmit any pending messages.
-    //(void)coap_time_tick();
 }
 
 
@@ -2331,6 +2335,9 @@ static void app_coap_init(void)
 
     mp_coap_transport = local_port_list[0].p_transport;
     ARG_UNUSED(mp_coap_transport);
+
+    k_delayed_work_init(&coap_update_work, app_coap_time_tick);
+    k_delayed_work_submit(&coap_update_work, APP_COAP_UPDATE_INTERVAL);
 }
 
 
