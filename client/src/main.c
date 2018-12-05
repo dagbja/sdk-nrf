@@ -140,13 +140,18 @@ typedef enum
     APP_STATE_IDLE                    = LED_BLINK(DK_LED1_MSK),
     APP_STATE_IP_INTERFACE_UP         = LED_ON(DK_LED1_MSK),
     APP_STATE_BS_CONNECT              = LED_BLINK(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK),
-    APP_STATE_BS_CONNECTED            = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK),
-    APP_STATE_BOOTRAP_REQUESTED       = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK) | LED_INDEX(1),
-    APP_STATE_BOOTSTRAPED             = LED_ON(DK_LED1_MSK) | LED_ON(DK_LED2_MSK),
+    APP_STATE_BS_CONNECT_WAIT         = LED_BLINK(DK_LED2_MSK) | LED_BLINK(DK_LED4_MSK),
+    APP_STATE_BS_CONNECTED            = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK) | LED_INDEX(0),
+    APP_STATE_BOOTSTRAP_REQUESTED     = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK) | LED_INDEX(1),
+    APP_STATE_BOOTSTRAP_WAIT          = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK) | LED_BLINK(DK_LED4_MSK) | LED_INDEX(0),
+    APP_STATE_BOOTSTRAPPING           = LED_ON(DK_LED1_MSK) | LED_ON(DK_LED2_MSK) | LED_BLINK(DK_LED4_MSK) | LED_INDEX(1),
+    APP_STATE_BOOTSTRAPPED            = LED_ON(DK_LED1_MSK) | LED_ON(DK_LED2_MSK),
     APP_STATE_SERVER_CONNECT          = LED_BLINK(DK_LED1_MSK) | LED_BLINK(DK_LED3_MSK),
+    APP_STATE_SERVER_CONNECT_WAIT     = LED_BLINK(DK_LED3_MSK) | LED_BLINK(DK_LED4_MSK),
     APP_STATE_SERVER_CONNECTED        = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED3_MSK),
+    APP_STATE_SERVER_REGISTER_WAIT    = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED3_MSK) | LED_BLINK(DK_LED4_MSK),
     APP_STATE_SERVER_REGISTERED       = LED_ON(DK_LED1_MSK) | LED_ON(DK_LED3_MSK),
-    APP_STATE_SERVER_DEREGISTER       = LED_BLINK(DK_LED1_MSK) | LED_ON(DK_LED3_MSK),
+    APP_STATE_SERVER_DEREGISTER       = LED_BLINK(DK_LED1_MSK) | LED_ON(DK_LED3_MSK) | LED_INDEX(0),
     APP_STATE_SERVER_DEREGISTERING    = LED_BLINK(DK_LED1_MSK) | LED_ON(DK_LED3_MSK) | LED_INDEX(1),
     APP_STATE_DISCONNECT              = LED_BLINK(DK_LED1_MSK) | LED_ON(DK_LED3_MSK) | LED_INDEX(2)
 } app_state_t;
@@ -184,11 +189,13 @@ static coap_transport_handle_t *           mp_lwm2m_transport    = NULL;        
 static volatile app_state_t m_app_state = APP_STATE_IDLE;                                     /**< Application state. Should be one of @ref app_state_t. */
 static volatile uint16_t    m_server_instance;
 static volatile bool        m_did_bootstrap;
+static volatile bool        m_update_server;
 
 static char *               m_public_key[1+LWM2M_MAX_SERVERS];
 static char *               m_secret_key[1+LWM2M_MAX_SERVERS];
 
 /* Structures for delayed work */
+static struct k_delayed_work state_update_work;
 #if APP_USE_BUTTONS_AND_LEDS
 static struct k_delayed_work leds_update_work;
 #endif
@@ -323,8 +330,7 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
         }
         else if (m_app_state == APP_STATE_SERVER_REGISTERED)
         {
-            printk("app_server_update()\n");
-            app_server_update(m_server_instance);
+            m_update_server = true;
         }
     }
     else if (buttons & 0x02) // Button 2 has changed
@@ -430,7 +436,7 @@ static void blink_timeout_handler(iot_timer_time_in_ms_t wall_clock_value)
             LEDS_INVERT(LED_TWO);
             break;
         }
-        case APP_STATE_BOOTSTRAPED:
+        case APP_STATE_BOOTSTRAPPED:
         {
             LEDS_ON(LED_TWO);
             break;
@@ -548,7 +554,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
         port = atoi(sep + 1);
     }
 
-    printk(" -> doing DNS lookup\n");
+    printk(" -> doing DNS lookup");
     struct addrinfo hints = {
 #if (APP_USE_AF_INET6 == 1)
         .ai_family = AF_INET6,
@@ -562,7 +568,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     int ret_val = getaddrinfo(hostname, NULL, &hints, &result);
 
     if (ret_val != 0) {
-        printf(" -> failed to lookup \"%s\": %d\n", server_uri, ret_val);
+        printf("\n -> failed to lookup \"%s\": %d\n", hostname, ret_val);
         return errno;
     }
 
@@ -577,7 +583,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     }
 
     freeaddrinfo(result);
-    printk(" -> done\n");
+    printk(", done\n");
 
     return 0;
 }
@@ -629,6 +635,36 @@ static uint32_t app_lwm2m_access_remote_get(uint16_t         * p_access,
 }
 
 
+/**@brief Helper function to start a retry delay. */
+void app_start_retry_delay(int instance_id)
+{
+    // TODO: different retries for different vendors?
+    static s32_t app_retry_delay[] = { 2*60, 4*60, 6*60, 8*60, 24*60*60 };
+
+    if (instance_id == 0 && m_server_settings[instance_id].retry_count == sizeof app_retry_delay - 1)
+    {
+        // Bootstrap retry does not use the last retry value and does not continue before next power up.
+        m_app_state = APP_STATE_IP_INTERFACE_UP;
+        m_server_settings[instance_id].retry_count = 0;
+        printk("Bootstrap procedure failed\n");
+        return;
+    }
+
+    if (m_server_settings[instance_id].retry_count == sizeof app_retry_delay)
+    {
+        // Retry counter wrap around
+        m_server_settings[instance_id].retry_count = 0;
+    }
+
+    s32_t retry_delay = app_retry_delay[m_server_settings[instance_id].retry_count];
+
+    printk(" -> retry delay for %d minutes...\n", retry_delay / 60);
+    k_delayed_work_submit(&state_update_work, retry_delay * 1000);
+
+    m_server_settings[instance_id].retry_count++;
+}
+
+
 /**@brief LWM2M notification handler. */
 void lwm2m_notification(lwm2m_notification_type_t type,
                         struct sockaddr *         p_remote,
@@ -637,8 +673,40 @@ void lwm2m_notification(lwm2m_notification_type_t type,
 {
     APPL_LOG("Got LWM2M notifcation %d ", type);
 
-    if (type == LWM2M_NOTIFCATION_TYPE_REGISTER)
+    static char *str_type[] = { "Bootstrap", "Register", "Update", "Deregister" };
+    printk("lwm2m_notification: %s  CoAP %d.%02d  err:%lu\n", str_type[type], coap_code >> 5, coap_code & 0x1f, err_code);
+
+    if (type == LWM2M_NOTIFCATION_TYPE_BOOTSTRAP)
     {
+        if (coap_code == COAP_CODE_204_CHANGED)
+        {
+            m_app_state = APP_STATE_BOOTSTRAPPING;
+            printk(" -> bootstrap timeout set to 20 seconds\n");
+            k_delayed_work_submit(&state_update_work, 20 * 1000);
+        }
+        else if (coap_code == 0 || coap_code == COAP_CODE_403_FORBIDDEN)
+        {
+            // No response or received a 4.03 error.
+            m_app_state = APP_STATE_BOOTSTRAP_WAIT;
+            app_start_retry_delay(0);
+        }
+        else
+        {
+            // TODO: What to do here?
+        }
+    }
+    else if (type == LWM2M_NOTIFCATION_TYPE_REGISTER)
+    {
+        if (coap_code == COAP_CODE_201_CREATED)
+        {
+            m_app_state = APP_STATE_SERVER_REGISTERED;
+            m_server_settings[m_server_instance].retry_count = 0;
+        }
+        else
+        {
+            m_app_state = APP_STATE_SERVER_REGISTER_WAIT;
+            app_start_retry_delay(m_server_instance);
+        }
     }
     else if (type == LWM2M_NOTIFCATION_TYPE_UPDATE)
     {
@@ -677,6 +745,9 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     s64_t time_stamp;
     s64_t milliseconds_spent;
 
+    printk(" -> bootstrap done, timeout cancelled\n");
+    k_delayed_work_cancel(&state_update_work);
+
     (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
     k_sleep(10); // TODO: figure out why this is needed before closing the connection
 
@@ -686,7 +757,8 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 
     mp_lwm2m_bs_transport = NULL;
 
-    m_app_state = APP_STATE_BOOTSTRAPED;
+    m_app_state = APP_STATE_BOOTSTRAPPED;
+    m_server_settings[0].retry_count = 0;
 
     time_stamp = k_uptime_get();
 
@@ -697,12 +769,10 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 
     milliseconds_spent = k_uptime_delta(&time_stamp);
 
-    // FIXME: handle this with a timer.
+    m_app_state = APP_STATE_SERVER_CONNECT_WAIT;
     s32_t hold_off_time = (m_server_settings[m_server_instance].hold_off_timer * 1000) - milliseconds_spent;
-    printk("ClientHoldOffTimer: sleeping %d milliseconds...\n", hold_off_time);
-    k_sleep(hold_off_time);
-
-    m_app_state = APP_STATE_SERVER_CONNECT;
+    printk(" -> client holdoff timer: sleeping %d milliseconds...\n", hold_off_time);
+    k_delayed_work_submit(&state_update_work, hold_off_time);
 
     return 0;
 }
@@ -2068,8 +2138,13 @@ static void app_bootstrap_connect(void)
 
             if (err_code == 0)
             {
-                mp_lwm2m_bs_transport = local_port.p_transport;
                 m_app_state = APP_STATE_BS_CONNECTED;
+                mp_lwm2m_bs_transport = local_port.p_transport;
+            }
+            else
+            {
+                m_app_state = APP_STATE_BS_CONNECT_WAIT;
+                app_start_retry_delay(0);
             }
     }
     else
@@ -2084,7 +2159,7 @@ static void app_bootstrap(void)
     uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)mp_bs_remote_server, &m_client_id, mp_lwm2m_bs_transport);
     if (err_code == 0)
     {
-        m_app_state = APP_STATE_BOOTRAP_REQUESTED;
+        m_app_state = APP_STATE_BOOTSTRAP_REQUESTED;
     }
 }
 
@@ -2151,9 +2226,14 @@ static void app_server_connect(void)
 
         if (err_code == 0)
         {
-            mp_lwm2m_transport = local_port.p_transport;
-
             m_app_state = APP_STATE_SERVER_CONNECTED;
+            mp_lwm2m_transport = local_port.p_transport;
+            m_server_settings[m_server_instance].retry_count = 0;
+        }
+        else
+        {
+            m_app_state = APP_STATE_SERVER_CONNECT_WAIT;
+            app_start_retry_delay(m_server_instance);
         }
     }
     else
@@ -2186,11 +2266,9 @@ static void app_server_register(void)
                                   mp_lwm2m_transport,
                                   mp_link_format_string,
                                   (uint16_t)m_link_format_string_len);
+        APP_ERROR_CHECK(err_code);
 
-        if (err_code == 0)
-        {
-            m_app_state = APP_STATE_SERVER_REGISTERED;
-        }
+        m_app_state = APP_STATE_SERVER_REGISTER_WAIT;
     }
 }
 
@@ -2249,6 +2327,45 @@ static void app_disconnect(void)
 }
 
 
+static void app_wait_state_update(struct k_work *work)
+{
+    ARG_UNUSED(work);
+
+    switch(m_app_state)
+    {
+        case APP_STATE_BS_CONNECT_WAIT:
+            // Timeout waiting for DTLS connection to bootstrap server
+            m_app_state = APP_STATE_BS_CONNECT;
+            break;
+
+        case APP_STATE_BOOTSTRAP_WAIT:
+            // Timeout waiting for bootstrap ACK (CoAP)
+            m_app_state = APP_STATE_BS_CONNECTED;
+            break;
+
+        case APP_STATE_BOOTSTRAPPING:
+            // Timeout waiting for bootstrap to finish
+            m_app_state = APP_STATE_BS_CONNECT_WAIT;
+            app_start_retry_delay(0);
+            break;
+
+        case APP_STATE_SERVER_CONNECT_WAIT:
+            // Timeout waiting for DTLS connection to registration server
+            m_app_state = APP_STATE_SERVER_CONNECT;
+            break;
+
+        case APP_STATE_SERVER_REGISTER_WAIT:
+            // Timeout waiting for registration ACK (CoAP)
+            m_app_state = APP_STATE_SERVER_CONNECTED;
+            break;
+
+        default:
+            // Unknown timeout state
+            break;
+    }
+}
+
+
 static void app_lwm2m_process(void)
 {
     coap_input();
@@ -2258,6 +2375,11 @@ static void app_lwm2m_process(void)
         case APP_STATE_BS_CONNECT:
         {
             printk("app_bootstrap_connect()\n");
+            if (mp_lwm2m_bs_transport)
+            {
+                // Already connected. Disconnect first.
+                app_disconnect();
+            }
             app_bootstrap_connect();
             break;
         }
@@ -2293,10 +2415,17 @@ static void app_lwm2m_process(void)
         }
         default:
         {
+            if (m_update_server)
+            {
+                printk("app_server_update()\n");
+                app_server_update(m_server_instance);
+                m_update_server = false;
+            }
             break;
         }
     }
 }
+
 
 static void app_coap_init(void)
 {
@@ -2463,6 +2592,8 @@ int main(void)
     // Initialize Timers.
     //timers_init();
     //iot_timer_init();
+
+    k_delayed_work_init(&state_update_work, app_wait_state_update);
 
     if (m_server_settings[0].is.bootstrapped)
     {

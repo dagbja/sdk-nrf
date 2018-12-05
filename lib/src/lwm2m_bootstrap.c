@@ -50,13 +50,22 @@ static uint32_t internal_message_new(coap_message_t         ** pp_msg,
 /**@brief Function to be used as callback function upon a bootstrap request. */
 static void lwm2m_bootstrap_cb(uint32_t status, void * p_arg, coap_message_t * p_message)
 {
+    struct sockaddr *p_remote = NULL;
+    uint8_t coap_code = 0;
+
+    if (p_message)
+    {
+        p_remote = p_message->p_remote;
+        coap_code = p_message->header.code;
+    }
+
     LWM2M_TRC("[Bootstrap]: lwm2m_bootstrap_cb, status: %lu, CoAP code: %u",
               status,
-              p_message->header.code);
+              coap_code);
 
     lwm2m_notification(LWM2M_NOTIFCATION_TYPE_BOOTSTRAP,
-                       p_message->p_remote,
-                       p_message->header.code,
+                       p_remote,
+                       coap_code,
                        0);
 }
 

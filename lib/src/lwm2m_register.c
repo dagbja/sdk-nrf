@@ -144,43 +144,51 @@ uint32_t internal_lwm2m_register_init(void)
 
 static void lwm2m_register_cb(uint32_t status, void * p_arg, coap_message_t * p_message)
 {
+    struct sockaddr *p_remote = NULL;
+    uint8_t coap_code = 0;
+    uint32_t err_code = 0;
+
+    if (p_message)
+    {
+        p_remote = p_message->p_remote;
+        coap_code = p_message->header.code;
+    }
+
     LWM2M_TRC("[Register]: lwm2m_register_cb, status: %lu, CoAP code: %u",
               status,
-              p_message->header.code);
+              coap_code);
 
-    LWM2M_MUTEX_LOCK();
-
-    // Get the short server id.
-    uint16_t short_server_id = (uint32_t)p_arg;
-
-    // Save the remote to lwm2m_remote. Pass the error to lwm2m_notification if we failed.
-    uint32_t err_code = lwm2m_remote_register(short_server_id, p_message->p_remote);
-    if (err_code != 0)
+    if (p_message)
     {
-        lwm2m_notification(LWM2M_NOTIFCATION_TYPE_REGISTER,
-                           p_message->p_remote,
-                           p_message->header.code,
-                           err_code);
-        return;
-    }
+        LWM2M_MUTEX_LOCK();
 
-    for (uint16_t i = 0; i < p_message->options_count; ++i)
-    {
-        coap_option_t option = p_message->options[i];
+        // Get the short server id.
+        uint16_t short_server_id = (uint32_t)p_arg;
 
-        if (option.number == COAP_OPT_LOCATION_PATH)
+        // Save the remote to lwm2m_remote. Pass the error to lwm2m_notification if we failed.
+        err_code = lwm2m_remote_register(short_server_id, p_remote);
+
+        if (err_code == 0)
         {
-            err_code = lwm2m_remote_location_save((char *)option.p_data,
-                                                  option.length,
-                                                  short_server_id);
-        }
-    }
+            for (uint16_t i = 0; i < p_message->options_count; ++i)
+            {
+                coap_option_t option = p_message->options[i];
 
-    LWM2M_MUTEX_UNLOCK();
+                if (option.number == COAP_OPT_LOCATION_PATH)
+                {
+                    err_code = lwm2m_remote_location_save((char *)option.p_data,
+                                                          option.length,
+                                                          short_server_id);
+                }
+            }
+        }
+
+        LWM2M_MUTEX_UNLOCK();
+    }
 
     lwm2m_notification(LWM2M_NOTIFCATION_TYPE_REGISTER,
-                       p_message->p_remote,
-                       p_message->header.code,
+                       p_remote,
+                       coap_code,
                        err_code);
 }
 
@@ -292,13 +300,22 @@ uint32_t lwm2m_register(struct sockaddr         * p_remote,
 
 void lwm2m_update_cb(uint32_t status, void * p_arg, coap_message_t * p_message)
 {
+    struct sockaddr *p_remote = NULL;
+    uint8_t coap_code = 0;
+
+    if (p_message)
+    {
+        p_remote = p_message->p_remote;
+        coap_code = p_message->header.code;
+    }
+
     LWM2M_TRC("[Update]: lwm2m_update_cb, status: %lu, coap code: %u",
               status,
-              p_message->header.code);
+              coap_code);
 
     lwm2m_notification(LWM2M_NOTIFCATION_TYPE_UPDATE,
-                       p_message->p_remote,
-                       p_message->header.code,
+                       p_remote,
+                       coap_code,
                        0);
 }
 
@@ -395,31 +412,39 @@ uint32_t lwm2m_update(struct sockaddr         * p_remote,
 
 void lwm2m_deregister_cb(uint32_t status, void * p_arg, coap_message_t * p_message)
 {
-    LWM2M_TRC("[DeRegister]: lwm2m_deregister_cb, status: %lu, coap code: %u",
-              status,
-              p_message->header.code);
+    struct sockaddr *p_remote = NULL;
+    uint8_t coap_code = 0;
+    uint32_t err_code = 0;
 
-    LWM2M_MUTEX_LOCK();
-
-    // Find short_server_id of the remote.
-    uint16_t ssid;
-    uint32_t err_code = lwm2m_remote_short_server_id_find(&ssid, p_message->p_remote);
-
-    if (err_code != 0)
+    if (p_message)
     {
-        lwm2m_notification(LWM2M_NOTIFCATION_TYPE_DEREGISTER,
-                           p_message->p_remote,
-                           p_message->header.code,
-                           err_code);
+        p_remote = p_message->p_remote;
+        coap_code = p_message->header.code;
     }
 
-    err_code = lwm2m_remote_deregister(ssid);
+    LWM2M_TRC("[DeRegister]: lwm2m_deregister_cb, status: %lu, coap code: %u",
+              status,
+              coap_code);
 
-    LWM2M_MUTEX_UNLOCK();
+    if (p_message)
+    {
+        LWM2M_MUTEX_LOCK();
+
+        // Find short_server_id of the remote.
+        uint16_t ssid;
+        err_code = lwm2m_remote_short_server_id_find(&ssid, p_remote);
+
+        if (err_code == 0)
+        {
+            err_code = lwm2m_remote_deregister(ssid);
+        }
+
+        LWM2M_MUTEX_UNLOCK();
+    }
 
     lwm2m_notification(LWM2M_NOTIFCATION_TYPE_DEREGISTER,
-                       p_message->p_remote,
-                       p_message->header.code,
+                       p_remote,
+                       coap_code,
                        err_code);
 }
 
