@@ -86,9 +86,9 @@ static uint16_t           m_num_objects;
 static uint16_t           m_num_instances;
 
 
-static void coap_error_handler(uint32_t error_code, coap_message_t * p_message)
+static void coap_error_handler(u32_t error_code, coap_message_t * p_message)
 {
-    LWM2M_ERR("[CoAP]: Unhandled CoAP message received. Error code: %lu", error_code);
+    LWM2M_ERR("[CoAP]: Unhandled CoAP message received. Error code: %u", error_code);
 }
 
 
@@ -427,7 +427,6 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                 err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LINK_FORMAT, p_request);
                 break;
             }
-            case LWM2M_OPERATION_CODE_OBSERVE:
             default:
                 break;
         }
@@ -545,6 +544,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
             case LWM2M_OPERATION_CODE_DELETE:
             case LWM2M_OPERATION_CODE_CREATE:
             case LWM2M_OPERATION_CODE_DISCOVER:
+            case LWM2M_OPERATION_CODE_OBSERVE:
             {
                 for(int i = 0; i < m_num_instances; ++i)
                 {
@@ -567,8 +567,6 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                 err_code = ENOENT;
                 break;
             }
-            case LWM2M_OPERATION_CODE_OBSERVE:
-            // Fall-through
             default:
                 break;
         }
@@ -744,6 +742,10 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
             if (content_type == COAP_CT_APP_LINK_FORMAT) // Discover
             {
                 operation = LWM2M_OPERATION_CODE_DISCOVER;
+            }
+            else if (coap_message_opt_present(p_request, COAP_OPT_OBSERVE) == 0) // Observe
+            {
+                operation = LWM2M_OPERATION_CODE_OBSERVE;
             }
             else // Read
             {
@@ -1157,7 +1159,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 }
 
 
-static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
+static u32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
 {
     LWM2M_ENTRY();
 

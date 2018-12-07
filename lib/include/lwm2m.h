@@ -25,6 +25,7 @@ LOG_MODULE_REGISTER(LWM2M_LOG_MODULE_NAME);
 #include <stdbool.h>
 #include <net/coap_message.h>
 #include <net/coap_codes.h>
+#include <net/coap_observe_api.h>
 
 #ifdef __cplusplus
 extern "C" {

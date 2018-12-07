@@ -148,7 +148,7 @@ typedef struct
 #define LWM2M_PERMISSION_EXECUTE      0x04  /**< Bit mask for LWM2M execute permission. */
 #define LWM2M_PERMISSION_DELETE       0x08  /**< Bit mask for LWM2M delete permission. */
 #define LWM2M_PERMISSION_CREATE       0x10  /**< Bit mask for LWM2M create permission. */
-
+#define LWM2M_PERMISSION_OBSERVE      0x40 
 
 #define LWM2M_OPERATION_CODE_NONE     0x00                     /**< Bit mask for LWM2M no operation. */
 #define LWM2M_OPERATION_CODE_READ     LWM2M_PERMISSION_READ    /**< Bit mask for LWM2M read operation. */
@@ -157,7 +157,7 @@ typedef struct
 #define LWM2M_OPERATION_CODE_DELETE   LWM2M_PERMISSION_DELETE  /**< Bit mask for LWM2M delete operation. */
 #define LWM2M_OPERATION_CODE_CREATE   LWM2M_PERMISSION_CREATE  /**< Bit mask for LWM2M create operation. */
 #define LWM2M_OPERATION_CODE_DISCOVER 0x20                     /**< Bit mask for LWM2M discover operation. */
-#define LWM2M_OPERATION_CODE_OBSERVE  0x40                     /**< Bit mask for LWM2M observe operation. */
+#define LWM2M_OPERATION_CODE_OBSERVE  LWM2M_PERMISSION_OBSERVE /**< Bit mask for LWM2M observe operation. */
 /**@} */
 
 /**@cond */
@@ -269,6 +269,7 @@ struct lwm2m_instance_t
     uint16_t                  num_resources;       /**< Number of resources MUST equal number of members in the lwm2m instance, sizeof resource_access and sizeof resource_ids. */
     uint8_t                   operations_offset;   /**< Internal use. */
     uint8_t                   resource_ids_offset; /**< Internal use. */
+    uint16_t                  expire_time;         /**< Timeout value on instance level to track when to send observable notifications. */
     lwm2m_instance_callback_t callback;            /**< Called when an operation is done on this instance. */
     lwm2m_instance_acl_t      acl;                 /**< ACL entry. */
 };
@@ -491,6 +492,19 @@ uint32_t lwm2m_respond_with_payload(uint8_t             * p_payload,
  * @retval NRF_SUCCESS If the response was sent out successfully.
  */
 uint32_t lwm2m_respond_with_code(coap_msg_code_t code, coap_message_t * p_request);
+
+
+uint32_t lwm2m_observe_register(uint8_t             * p_payload,
+                                uint16_t              payload_len,
+                                uint16_t              max_age,
+                                coap_message_t       * p_request,
+                                coap_content_type_t   content_type,
+                                lwm2m_instance_t     * p_instance_proto);
+
+uint32_t lwm2m_notify(uint8_t         * p_payload,
+                      uint16_t          payload_len,
+                      coap_observer_t * p_observer,
+                      coap_msg_type_t   type);
 
 #ifdef __cplusplus
 }

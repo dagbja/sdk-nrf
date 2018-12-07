@@ -58,7 +58,7 @@ static void lwm2m_bootstrap_cb(u32_t status, void * p_arg, coap_message_t * p_me
         coap_code = p_message->header.code;
     }
 
-    LWM2M_TRC("status: %lu, CoAP code: %u", status, coap_code);
+    LWM2M_TRC("status: %u, CoAP code: %u", status, coap_code);
 
     lwm2m_notification(LWM2M_NOTIFCATION_TYPE_BOOTSTRAP,
                        p_remote,

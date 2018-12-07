@@ -6,6 +6,9 @@
 
 #define LOG_MODULE_NAME lwm2m_client
 
+#include <logging/log.h>
+LOG_MODULE_REGISTER(LOG_MODULE_NAME);
+
 #include <zephyr.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -32,6 +35,7 @@
 #include <net/coap_api.h>
 #include <net/coap_option.h>
 #include <net/coap_message.h>
+#include <net/coap_observe_api.h>
 #include <lwm2m_api.h>
 #include <lwm2m_remote.h>
 #include <lwm2m_acl.h>
@@ -46,17 +50,27 @@
 
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_NVS                     0
+#define APP_USE_CONTABO                 0
 
 #define APP_LEDS_UPDATE_INTERVAL        500                                                   /**< Interval in milliseconds between each time status LEDs are updated. */
-#define APP_COAP_UPDATE_INTERVAL        1000                                                  /**< Interval between periodic callbacks to CoAP module. */
 
 #define COAP_LOCAL_LISTENER_PORT              5683                                            /**< Local port to listen on any traffic, client or server. Not bound to any specific LWM2M functionality.*/
+#if APP_USE_CONTABO
+#define LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT     5784                                            /**< Local port to connect to the LWM2M bootstrap server. */
+#define LWM2M_BOOTSTRAP_SERVER_REMOTE_PORT    5784                                            /**< Remote port of the LWM2M bootstrap server. */
+#else
 #define LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT     9998                                            /**< Local port to connect to the LWM2M bootstrap server. */
-#define LWM2M_LOCAL_CLIENT_PORT               9999                                            /**< Local port to connect to the LWM2M server. */
 #define LWM2M_BOOTSTRAP_SERVER_REMOTE_PORT    5684                                            /**< Remote port of the LWM2M bootstrap server. */
+#endif
+#define LWM2M_LOCAL_CLIENT_PORT               9999                                            /**< Local port to connect to the LWM2M server. */
 #define LWM2M_SERVER_REMORT_PORT              5684                                            /**< Remote port of the LWM2M server. */
 
+#if APP_USE_CONTABO
+#define BOOTSTRAP_URI                   "coaps://vmi36865.contabo.host:5784"                  /**< Server URI to the bootstrap server when using security (DTLS). */
+#else
 #define BOOTSTRAP_URI                   "coaps://ddocdpboot.do.motive.com:5684"               /**< Server URI to the bootstrap server when using security (DTLS). */
+#endif
+
 #define CLIENT_IMEI_MSISDN              "urn:imei-msisdn:" IMEI "-" MSISDN                    /**< IMEI-MSISDN of the device. */
 
 #define SECURITY_SERVER_URI_SIZE_MAX    64                                                    /**< Max size of server URIs. */
@@ -66,7 +80,11 @@
 #define APP_SEC_TAG_OFFSET              25
 
 #define APP_BOOTSTRAP_SEC_TAG           APP_SEC_TAG_OFFSET                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
+#if APP_USE_CONTABO
+#define APP_BOOTSTRAP_SEC_PSK           "676c656e6e73736563726574"                            /**< Pre-shared key used for bootstrap server in hex format. */
+#else
 #define APP_BOOTSTRAP_SEC_PSK           "d6160c2e7c90399ee7d207a22611e3d3a87241b0462976b935341d000a91e747" /**< Pre-shared key used for bootstrap server in hex format. */
+#endif
 #define APP_BOOTSTRAP_SEC_IDENTITY      CLIENT_IMEI_MSISDN                                    /**< Client identity used for bootstrap server. */
 
 #define APP_MAX_AT_READ_LENGTH          100
@@ -186,20 +204,32 @@ static char *               m_public_key[1+LWM2M_MAX_SERVERS];
 static char *               m_secret_key[1+LWM2M_MAX_SERVERS];
 
 // TODO: different retries for different vendors?
+#if APP_USE_CONTABO
+static s32_t app_retry_delay[] = { 2, 4, 6, 8, 24*60 };
+#else
 static s32_t app_retry_delay[] = { 2*60, 4*60, 6*60, 8*60, 24*60*60 };
+#endif
 
 /* Structures for delayed work */
 static struct k_delayed_work state_update_work;
 #if CONFIG_DK_LIBRARY
 static struct k_delayed_work leds_update_work;
 #endif
+
 static struct k_delayed_work connection_update_work[1+LWM2M_MAX_SERVERS];
-static struct k_delayed_work coap_update_work;
+
 
 /* Resolved server addresses */
+#if APP_USE_CONTABO
+static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET, AF_INET, 0, AF_INET };  /**< Current IP versions, start using IPv6. */
+#else
 static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET6, AF_INET6, 0, AF_INET6 };  /**< Current IP versions, start using IPv6. */
+#endif
 static struct sockaddr m_bs_remote_server;                                                    /**< Remote bootstrap server address to connect to. */
+
 static struct sockaddr m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
+static volatile uint32_t tick_count = 0;
+
 
 /**@brief Bootstrap values to store in app persistent storage. */
 typedef struct
@@ -261,6 +291,7 @@ static void app_provision_secret_keys(void);
 static void app_disconnect(void);
 static void app_factory_reset(void);
 static void app_wait_state_update(struct k_work *work);
+static const char * app_uri_get(char * server_uri, uint16_t * p_port, bool * p_secure);
 
 /**@brief Recoverable BSD library error. */
 void bsd_recoverable_error_handler(uint32_t error)
@@ -465,19 +496,6 @@ static void app_buttons_leds_init(void)
 #endif
 
 
-/**@brief Function for handling CoAP periodically time ticks.
-*/
-static void app_coap_time_tick(struct k_work *work)
-{
-    ARG_UNUSED(work);
-
-    // Pass a tick to CoAP in order to re-transmit any pending messages.
-    ARG_UNUSED(coap_time_tick());
-
-    k_delayed_work_submit(&coap_update_work, APP_COAP_UPDATE_INTERVAL);
-}
-
-
 /**@brief Application implementation of the root handler interface.
  *
  * @details This function is not bound to any object or instance. It will be called from
@@ -514,6 +532,30 @@ static void app_init_sockaddr_in(struct sockaddr *addr, sa_family_t ai_family, u
     }
 }
 
+static const char * app_uri_get(char * server_uri, uint16_t * p_port, bool * p_secure) {
+    const char *hostname;
+
+    if (strncmp(server_uri, "coaps://", 8) == 0) {
+        hostname = &server_uri[8];
+        *p_port = 5684;
+        *p_secure = true;
+    } else if (strncmp(server_uri, "coap://", 7) == 0) {
+        hostname = &server_uri[7];
+        *p_port = 5683;
+        *p_secure = false;
+    } else {
+        APPL_LOG("Invalid server URI: %s", server_uri);
+        return NULL;
+    }
+
+    char *sep = strchr(hostname, ':');
+    if (sep) {
+        *sep = '\0';
+        *p_port = atoi(sep + 1);
+    }
+
+    return hostname;
+}
 
 static uint32_t app_resolve_server_uri(char            * server_uri,
                                        struct sockaddr * addr,
@@ -524,26 +566,11 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     char server_uri_val[SECURITY_SERVER_URI_SIZE_MAX];
     strcpy(server_uri_val, server_uri);
 
-    const char *hostname;
     uint16_t port;
-
-    if (strncmp(server_uri_val, "coaps://", 8) == 0) {
-        hostname = &server_uri_val[8];
-        port = 5684;
-        *secure = true;
-    } else if (strncmp(server_uri_val, "coap://", 7) == 0) {
-        hostname = &server_uri_val[7];
-        port = 5683;
-        *secure = false;
-    } else {
-        APPL_LOG("Invalid server URI: %s", server_uri_val);
+    const char *hostname = app_uri_get(server_uri_val, &port, secure);
+    
+    if (hostname == NULL) {
         return EINVAL;
-    }
-
-    char *sep = strchr(hostname, ':');
-    if (sep) {
-        *sep = '\0';
-        port = atoi(sep + 1);
     }
 
     APPL_LOG("Doing DNS lookup using %s", (m_family_type[instance_id] == AF_INET6) ? "IPv6" : "IPv4");
@@ -627,7 +654,7 @@ static uint32_t app_lwm2m_access_remote_get(uint16_t         * p_access,
 /**@brief Helper function to handle a connect retry. */
 void app_handle_connect_retry(int instance_id, bool no_reply)
 {
-    if (instance_id == 0 && m_server_settings[instance_id].retry_count == sizeof app_retry_delay - 1)
+    if (instance_id == 0 && m_server_settings[instance_id].retry_count == sizeof(app_retry_delay) - 1)
     {
         // Bootstrap retry does not use the last retry value and does not continue before next power up.
         m_app_state = APP_STATE_IP_INTERFACE_UP;
@@ -845,7 +872,7 @@ static uint32_t tlv_security_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * 
 
 static uint32_t tlv_security_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
 {
-    uint32_t err_code;
+    uint32_t err_code = 0;
 
     switch (p_tlv->id)
     {
@@ -854,7 +881,11 @@ static uint32_t tlv_security_resource_decode(uint16_t instance_id, lwm2m_tlv_t *
             break;
 
         default:
+#if 0
             err_code = ENOENT;
+#else
+            printk("Unhandled security resource: %i", p_tlv->id);
+#endif
             break;
     }
 
@@ -933,7 +964,11 @@ static uint32_t tlv_server_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p
             break;
 
         default:
+#if 0
             err_code = ENOENT;
+#else
+            printk("Unhandled server resource: %i", p_tlv->id);
+#endif
             break;
     }
 
@@ -1022,7 +1057,7 @@ static uint32_t tlv_conn_mon_resource_decode(uint16_t instance_id, lwm2m_tlv_t *
 
 uint32_t resource_tlv_callback(lwm2m_instance_t * p_instance, lwm2m_tlv_t * p_tlv)
 {
-    uint32_t err_code;
+    uint32_t err_code = 0;
 
     switch (p_instance->object_id)
     {
@@ -1440,6 +1475,47 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
             (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
         }
     }
+    else if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
+    {
+        APPL_LOG("CoAP observe requested on object 4/%i/%i", p_instance->instance_id, resource_id);
+
+        u32_t observe_option = 0;
+        for (uint8_t index = 0; index < p_request->options_count; index++)
+        {
+            if (p_request->options[index].number == COAP_OPT_OBSERVE)
+            {
+                err_code = coap_opt_uint_decode(&observe_option,
+                                                p_request->options[index].length,
+                                                p_request->options[index].data);
+                break;
+            }
+        }
+
+        if (err_code == 0)
+        {
+            if (observe_option == 0) // Observe start
+            {
+                APPL_LOG("CoAP observe requested on object 4/%i/%i - START", p_instance->instance_id, resource_id);
+                uint8_t  buffer[200];
+                uint32_t buffer_size = sizeof(buffer);
+                err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
+                                                                    &buffer_size,
+                                                                    resource_id,
+                                                                    &m_instance_conn_mon);
+
+                err_code = lwm2m_observe_register(buffer,
+                                                  buffer_size,
+                                                  m_instance_conn_mon.proto.expire_time,
+                                                  p_request,
+                                                  COAP_CT_APP_LWM2M_TLV,
+                                                  (lwm2m_instance_t *)&m_instance_conn_mon);
+            }
+            else // Observe stop
+            {
+                APPL_LOG("CoAP observe requested on object 4/%i/%i - STOP", p_instance->instance_id, resource_id);
+            }
+        }
+    }
     else
     {
         (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
@@ -1841,7 +1917,11 @@ static void app_read_flash_storage(void)
 
     // DM server
     m_server_settings[1].short_server_id = 102;
+#if APP_USE_CONTABO
+    strcpy(m_server_settings[1].server_uri, "coap://vmi36865.contabo.host:5683");
+#else
     strcpy(m_server_settings[1].server_uri, "coaps://ddocdp.do.motive.com:5684");
+#endif
     m_server_settings[1].lifetime = 2592000;
     m_server_settings[1].default_minimum_period = 1;
     m_server_settings[1].default_maximum_period = 60;
@@ -1997,6 +2077,7 @@ static void app_lwm2m_create_objects(void)
     //
     lwm2m_instance_connectivity_monitoring_init(&m_instance_conn_mon);
 
+    m_instance_conn_mon.proto.expire_time = 60; // Default to 60 second notifications.
     m_instance_conn_mon.network_bearer = 6;
     m_instance_conn_mon.available_network_bearer.len = 2;
     m_instance_conn_mon.available_network_bearer.val.p_int32[0] = 5;
@@ -2036,7 +2117,8 @@ static void app_lwm2m_create_objects(void)
 
     (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_conn_mon,
                                     (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE),
+                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE |
+                                     LWM2M_PERMISSION_OBSERVE),
                                     102);
 
     (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_conn_mon);
@@ -2236,6 +2318,7 @@ static void app_server_connect(void)
     else
     {
         APPL_LOG("NON-SECURE session (register)");
+        m_app_state = APP_STATE_SERVER_CONNECTED;
     }
 }
 
@@ -2425,13 +2508,14 @@ static void app_lwm2m_process(void)
     }
 }
 
-
 static void app_coap_init(void)
 {
     uint32_t err_code;
 
     struct sockaddr local_addr;
-    app_init_sockaddr_in(&local_addr, AF_INET6, COAP_LOCAL_LISTENER_PORT);
+    struct sockaddr non_sec_local_addr;
+    app_init_sockaddr_in(&local_addr, AF_INET, COAP_LOCAL_LISTENER_PORT);
+    app_init_sockaddr_in(&non_sec_local_addr, AF_INET, LWM2M_LOCAL_CLIENT_PORT);
 
     // If bootstrap server and server is using different port we can
     // register the ports individually.
@@ -2439,6 +2523,11 @@ static void app_coap_init(void)
     {
         {
             .addr = &local_addr
+        },
+        {
+            .addr = &non_sec_local_addr,
+            .protocol = IPPROTO_UDP,
+            .setting = NULL,
         }
     };
 
@@ -2452,10 +2541,9 @@ static void app_coap_init(void)
     APP_ERROR_CHECK(err_code);
 
     mp_coap_transport = local_port_list[0].transport;
+    mp_lwm2m_transport[1] = local_port_list[1].transport;
     ARG_UNUSED(mp_coap_transport);
-
-    k_delayed_work_init(&coap_update_work, app_coap_time_tick);
-    k_delayed_work_submit(&coap_update_work, APP_COAP_UPDATE_INTERVAL);
+    ARG_UNUSED(mp_lwm2m_transport);
 }
 
 
@@ -2486,8 +2574,18 @@ static void app_provision_secret_keys(void)
     {
         if (m_public_key[i] && m_secret_key[i])
         {
-            app_provision_psk(APP_SEC_TAG_OFFSET + i, m_public_key[i], m_secret_key[i]);
+            static char server_uri_val[SECURITY_SERVER_URI_SIZE_MAX];
+            strcpy(server_uri_val, (char *)&m_server_settings[i].server_uri);
+            
+            bool secure = false;
+            uint16_t port = 0;
+            const char * hostname = app_uri_get(server_uri_val, &port, &secure);
+            (void)hostname;
 
+            if (secure) {
+                APPL_LOG("Provisioning key for %s, short-id: %u", server_uri_val, m_server_settings[i].short_server_id);
+                app_provision_psk(APP_SEC_TAG_OFFSET + i, m_public_key[i], m_secret_key[i]);
+            }
             k_free(m_public_key[i]);
             m_public_key[i] = NULL;
             k_free(m_secret_key[i]);
@@ -2497,6 +2595,11 @@ static void app_provision_secret_keys(void)
     APPL_LOG("Wrote secret keys");
 
     lte_lc_normal();
+
+    // THIS IS A HACK. Temporary solution to give a delay to recover Non-DTLS sockets from CFUN=4.
+    // The delay will make TX available after CID again set.
+    k_sleep(K_MSEC(2000));
+
     APPL_LOG("Normal mode");
 }
 
@@ -2973,6 +3076,35 @@ static void work_init(void)
     k_delayed_work_init(&state_update_work, app_wait_state_update);
 }
 
+static void app_lwm2m_observer_process(void)
+{
+    coap_observer_t * p_observer = NULL;
+    while (coap_observe_server_next_get(&p_observer, p_observer, (coap_resource_t *)&m_instance_conn_mon) == 0)
+    {
+        APPL_LOG("Observer found");
+        uint8_t  buffer[200];
+        uint32_t buffer_size = sizeof(buffer);
+        uint32_t err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
+                                                                    &buffer_size,
+                                                                    LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH,
+                                                                    &m_instance_conn_mon);
+        if (err_code)
+        {
+            LOG_ERR("Could not encode LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH, error code: %lu", err_code);
+        }
+
+        m_instance_conn_mon.radio_signal_strength += 1;
+
+        err_code =  lwm2m_notify(buffer,
+                                buffer_size,
+                                p_observer,
+                                COAP_TYPE_CON);
+        if (err_code)
+        {
+            LOG_ERR("Could notify observer, error code: %lu", err_code);
+        }
+    }
+}
 
 /**@brief Function for application main entry.
  */
@@ -3046,7 +3178,17 @@ int main(void)
             k_cpu_idle();
         }
 
+        if (tick_count++ % 100 == 0) {
+            // Pass a tick to CoAP in order to re-transmit any pending messages.
+            ARG_UNUSED(coap_time_tick());
+        }
+
         app_lwm2m_process();
+
+        if (tick_count % 1000 == 0)
+        {
+            app_lwm2m_observer_process();
+        }
 
 #if CONFIG_AT_HOST_LIBRARY
         if (at_host_err == 0) {
