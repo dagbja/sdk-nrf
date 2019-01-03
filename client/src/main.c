@@ -33,7 +33,8 @@
 #define APP_USE_BUTTONS_AND_LEDS        1
 #define APP_USE_AF_INET6                0
 #define APP_USE_NVS                     0
-#define APP_MODEM_TRACE                 0
+#define APP_FIDO_TRACE                  0
+#define APP_FIDOLESS_TRACE              0
 
 #if APP_USE_BUTTONS_AND_LEDS
 #include <dk_buttons_and_leds.h>
@@ -2520,7 +2521,43 @@ static void app_flash_init(void)
 }
 
 
-#if APP_MODEM_TRACE
+#if APP_FIDOLESS_TRACE
+static void send_at_command(const char *at_command)
+{
+#define APP_MAX_AT_READ_LENGTH          100
+#define APP_MAX_AT_WRITE_LENGTH         256
+
+    char write_buffer[APP_MAX_AT_WRITE_LENGTH];
+    char read_buffer[APP_MAX_AT_READ_LENGTH];
+
+    int at_socket_fd;
+    int length;
+
+    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
+    if (at_socket_fd < 0) {
+        APPL_LOG("socket() failed");
+        return;
+    }
+
+    snprintf(write_buffer, APP_MAX_AT_WRITE_LENGTH, "%s", at_command);
+    length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
+
+    if (length == strlen(write_buffer)) {
+         length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
+
+         if ((length < 2) || (strncmp("OK", read_buffer, 2) != 0)) {
+             APPL_LOG("recv(\"%s\") failed: %s", at_command, read_buffer);
+         }
+    } else {
+        APPL_LOG("send(\"%s\") failed", at_command);
+    }
+
+    close(at_socket_fd);
+}
+#endif
+
+
+#if APP_FIDO_TRACE
 static void modem_trace_enable(void)
 {
     /* GPIO configurations for trace and debug */
@@ -2562,7 +2599,7 @@ int main(void)
 {
     APPL_LOG("Application started");
 
-#if APP_MODEM_TRACE
+#if APP_FIDO_TRACE
     modem_trace_enable();
 #endif
 
@@ -2583,6 +2620,11 @@ int main(void)
 
     // Establish LTE link.
     lte_lc_init_and_connect();
+
+#if APP_FIDOLESS_TRACE
+    send_at_command("AT%XMODEMTRACE=1,2");
+    send_at_command("AT%XMODEMTRACE=1,3");
+#endif
 
     // Initialize Timers.
     //timers_init();
