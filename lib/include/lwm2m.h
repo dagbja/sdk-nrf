@@ -32,9 +32,8 @@ extern "C" {
 #define LWM2M_TRC(...) LOG_DBG(__VA_ARGS__) /**< Used for getting trace of execution in the module. */
 #define LWM2M_ERR(...) LOG_ERR(__VA_ARGS__) /**< Used for logging errors in the module. */
 
-#define LWM2M_ENTRY() LWM2M_TRC(">>")
-#define LWM2M_EXIT() LWM2M_TRC("<<")
-#define LWM2M_EXIT_WITH_RESULT(result) LWM2M_TRC("<< result: %d", result)
+#define LWM2M_ENTRY() LWM2M_TRC(">> %s", __func__)
+#define LWM2M_EXIT() LWM2M_TRC("<< %s", __func__)
 
 /**
  * @defgroup iot_coap_mutex_lock_unlock Module's Mutex Lock/Unlock Macros.

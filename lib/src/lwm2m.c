@@ -382,7 +382,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
 
     if (path_len == 1)
     {
-        LWM2M_TRC("[LWM2M-ACL][CoAP  ]:   >> %s object /%u/ SSID: %u\r\n",
+        LWM2M_TRC(">> %s object /%u/ SSID: %u",
                   m_operation_desc[op_desc_idx_lookup(operation)],
                   p_path[0],
                   short_server_id);
@@ -432,14 +432,14 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                 break;
         }
 
-        LWM2M_TRC("[LWM2M-ACL][CoAP  ]:   << %s object /%u/\r\n",
+        LWM2M_TRC("<< %s object /%u/",
                   m_operation_desc[op_desc_idx_lookup(operation)],
                   p_path[0]);
     }
 
     if (path_len == 2)
     {
-        LWM2M_TRC("[LWM2M-ACL][CoAP  ]:   >> %s instance /%u/%u/ SSID: %u \r\n",
+        LWM2M_TRC(">> %s instance /%u/%u/ SSID: %u",
                   m_operation_desc[op_desc_idx_lookup(operation)],
                   p_path[0],
                   p_path[1],
@@ -573,7 +573,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                 break;
         }
 
-        LWM2M_TRC("[LWM2M-ACL][CoAP  ]:   << %s instance /%u/%u/\r\n",
+        LWM2M_TRC("<< %s instance /%u/%u/",
                   m_operation_desc[op_desc_idx_lookup(operation)],
                   p_path[0],
                   p_path[1]);
@@ -581,7 +581,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
 
     if (path_len == 3)
     {
-        LWM2M_TRC("[LWM2M-ACL][CoAP  ]:   >> %s instance /%u/%u/%u/ SSID: %u.\r\n",
+        LWM2M_TRC(">> %s instance /%u/%u/%u/ SSID: %u",
                   m_operation_desc[op_desc_idx_lookup(operation)],
                   p_path[0],
                   p_path[1],
@@ -708,7 +708,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
 
         }
 
-        LWM2M_TRC("[LWM2M-ACL][CoAP  ]:   << %s instance /%u/%u/%u/\r\n",
+        LWM2M_TRC("<< %s instance /%u/%u/%u/",
                   m_operation_desc[op_desc_idx_lookup(operation)],
                   p_path[0],
                   p_path[1],
@@ -740,7 +740,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
     {
         case COAP_CODE_GET:
         {
-            LWM2M_TRC("[CoAP]: CoAP GET request");
+            LWM2M_TRC("CoAP GET request");
             if (content_type == COAP_CT_APP_LINK_FORMAT) // Discover
             {
                 operation = LWM2M_OPERATION_CODE_DISCOVER;
@@ -813,7 +813,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
             if (operation == LWM2M_OPERATION_CODE_DELETE)
             {
-                LWM2M_TRC("[CoAP      ]:   >> %s root /\r\n",
+                LWM2M_TRC(">> %s root /",
                           m_operation_desc[op_desc_idx_lookup(operation)]);
 
                 LWM2M_MUTEX_UNLOCK();
@@ -822,7 +822,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
                 LWM2M_MUTEX_LOCK();
 
-                LWM2M_TRC("[CoAP      ]:   << %s root /\r\n",
+                LWM2M_TRC("<< %s root /",
                           m_operation_desc[op_desc_idx_lookup(operation)]);
             }
             else
@@ -847,7 +847,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
         case 1:
         {
-            LWM2M_TRC("[CoAP      ]:   >> %s object /%u/\r\n",
+            LWM2M_TRC(">> %s object /%u/",
                       m_operation_desc[op_desc_idx_lookup(operation)],
                       p_path[0]);
 
@@ -879,7 +879,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
             LWM2M_MUTEX_LOCK();
 
-            LWM2M_TRC("[CoAP      ]:   << %s object /%u/, result: %s\r\n",
+            LWM2M_TRC("<< %s object /%u/, result: %s",
                       m_operation_desc[op_desc_idx_lookup(operation)],
                       p_path[0],
                       (err_code == 0) ? "SUCCESS" : "NOT_FOUND");
@@ -889,7 +889,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
         case 2:
         {
-            LWM2M_TRC("[CoAP]: >> %s instance /%u/%u/",
+            LWM2M_TRC(">> %s instance /%u/%u/",
                       m_operation_desc[op_desc_idx_lookup(operation)],
                       p_path[0],
                       p_path[1]);
@@ -934,7 +934,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
                 LWM2M_MUTEX_LOCK();
 
-                LWM2M_TRC("[CoAP      ]:   << %s instance /%u/%u/, result: %s\r\n",
+                LWM2M_TRC("<< %s instance /%u/%u/, result: %s",
                           m_operation_desc[op_desc_idx_lookup(operation)],
                           p_path[0],
                           p_path[1],
@@ -947,7 +947,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
                 operation == LWM2M_OPERATION_CODE_WRITE &&
                 p_request->header.code == COAP_CODE_PUT)
             {
-                LWM2M_TRC("[CoAP]: >> %s object /%u/%u/",
+                LWM2M_TRC(">> %s object /%u/%u/",
                           m_operation_desc[op_desc_idx_lookup(operation)],
                           p_path[0],
                           p_path[1]);
@@ -980,7 +980,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
                 LWM2M_MUTEX_LOCK();
 
-                LWM2M_TRC("[CoAP      ]:   << %s object /%u/%u/, result: %s\r\n",
+                LWM2M_TRC("<< %s object /%u/%u/, result: %s",
                           m_operation_desc[op_desc_idx_lookup(operation)],
                           p_path[0],
                           p_path[1],
@@ -991,7 +991,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
                 operation == LWM2M_OPERATION_CODE_WRITE &&
                 p_request->header.code == COAP_CODE_POST)
             {
-                LWM2M_TRC("[CoAP      ]:   >> CREATE object /%u/%u/\r\n",
+                LWM2M_TRC(">> CREATE object /%u/%u/",
                           p_path[0],
                           p_path[1]);
 
@@ -1026,7 +1026,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
                 LWM2M_MUTEX_LOCK();
 
-                LWM2M_TRC("[CoAP      ]:   << CREATE object /%u/%u/, result: %s\r\n",
+                LWM2M_TRC("<< CREATE object /%u/%u/, result: %s",
                           p_path[0],
                           p_path[1],
                           (err_code == 0) ? "SUCCESS" : "NOT_FOUND");
@@ -1120,7 +1120,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
                 }
             }
 
-            LWM2M_TRC("[CoAP      ]:   >> %s instance /%u/%u/%u/\r\n",
+            LWM2M_TRC(">> %s instance /%u/%u/%u/",
                         m_operation_desc[op_desc_idx_lookup(operation)],
                         p_path[0],
                         p_path[1],
@@ -1139,7 +1139,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
             LWM2M_MUTEX_LOCK();
 
-            LWM2M_TRC("[CoAP      ]:   << %s instance /%u/%u/%u/, result: %s\r\n",
+            LWM2M_TRC("<< %s instance /%u/%u/%u/, result: %s",
                         m_operation_desc[op_desc_idx_lookup(operation)],
                         p_path[0],
                         p_path[1],
@@ -1159,7 +1159,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
 static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
 {
-    LWM2M_TRC("[CoAP      ]: >> lwm2m_coap_handler_handle_request\r\n");
+    LWM2M_ENTRY();
 
     uint16_t index;
     uint16_t path[3];
@@ -1312,7 +1312,7 @@ static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
     }
 
 
-    LWM2M_TRC("[CoAP      ]: << lwm2m_coap_handler_handle_request\r\n");
+    LWM2M_EXIT();
 
     return err_code;
 }
@@ -1344,7 +1344,7 @@ uint32_t lwm2m_coap_handler_instance_add(lwm2m_instance_t * p_instance)
 
 uint32_t lwm2m_coap_handler_instance_delete(lwm2m_instance_t * p_instance)
 {
-    LWM2M_TRC("[CoAP      ]: lwm2m_coap_handler_instance_delete\r\n");
+    LWM2M_ENTRY();
 
     NULL_PARAM_CHECK(p_instance);
 

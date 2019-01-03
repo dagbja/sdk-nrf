@@ -58,9 +58,7 @@ static void lwm2m_bootstrap_cb(uint32_t status, void * p_arg, coap_message_t * p
         coap_code = p_message->header.code;
     }
 
-    LWM2M_TRC("[Bootstrap]: lwm2m_bootstrap_cb, status: %lu, CoAP code: %u",
-              status,
-              coap_code);
+    LWM2M_TRC("status: %lu, CoAP code: %u", status, coap_code);
 
     lwm2m_notification(LWM2M_NOTIFCATION_TYPE_BOOTSTRAP,
                        p_remote,
@@ -147,9 +145,9 @@ uint32_t lwm2m_bootstrap(struct sockaddr         * p_remote,
         (void)coap_message_delete(p_msg);
     }
 
-    LWM2M_TRC("[Bootstrap ]: << lwm2m_bootstrap\r\n");
-
     LWM2M_MUTEX_UNLOCK();
+
+    LWM2M_EXIT();
 
     return err_code;
 }

@@ -83,7 +83,7 @@ uint32_t lwm2m_acl_permissions_check(uint16_t         * p_access,
                                      lwm2m_instance_t * p_instance,
                                      uint16_t           short_server_id)
 {
-    LWM2M_TRC("[ACL  ]: >> lwm2m_acl_permissions_check. SSID: %u.\r\n", short_server_id);
+    LWM2M_TRC("SSID: %u", short_server_id);
 
     NULL_PARAM_CHECK(p_instance);
 
@@ -92,7 +92,7 @@ uint32_t lwm2m_acl_permissions_check(uint16_t         * p_access,
     {
         *p_access = LWM2M_ACL_FULL_PERM;
 
-        LWM2M_TRC("[ACL  ]: << lwm2m_acl_permissions_check. %u is owner.\r\n", short_server_id);
+        LWM2M_TRC("%u is owner", short_server_id);
 
         return 0;
     }
@@ -112,7 +112,7 @@ uint32_t lwm2m_acl_permissions_check(uint16_t         * p_access,
             // Set access to LWM2M_ACL_NO_PERM in case of no error checking.
             *p_access = LWM2M_ACL_NO_PERM;
 
-            LWM2M_TRC("[ACL  ]: << lwm2m_acl_permissions_check. %u was not found.\r\n", short_server_id);
+            LWM2M_TRC("%u was not found", short_server_id);
 
             return ENOENT;
         }
@@ -120,7 +120,7 @@ uint32_t lwm2m_acl_permissions_check(uint16_t         * p_access,
 
     *p_access = p_instance->acl.access[index];
 
-    LWM2M_TRC("[ACL  ]: << lwm2m_acl_permissions_check. Success.\r\n");
+    LWM2M_TRC("Success");
 
     return 0;
 }

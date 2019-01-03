@@ -153,9 +153,7 @@ static void lwm2m_register_cb(uint32_t status, void * p_arg, coap_message_t * p_
         coap_code = p_message->header.code;
     }
 
-    LWM2M_TRC("[Register]: lwm2m_register_cb, status: %lu, CoAP code: %u",
-              status,
-              coap_code);
+    LWM2M_TRC("status: %lu, CoAP code: %u", status, coap_code);
 
     if (p_message)
     {
@@ -199,7 +197,7 @@ uint32_t lwm2m_register(struct sockaddr         * p_remote,
                         uint8_t                 * p_link_format_string,
                         uint16_t                  link_format_len)
 {
-    LWM2M_TRC("[Register  ]: >> lwm2m_register\r\n");
+    LWM2M_ENTRY();
 
     NULL_PARAM_CHECK(p_remote);
     NULL_PARAM_CHECK(p_id);
@@ -308,9 +306,7 @@ void lwm2m_update_cb(uint32_t status, void * p_arg, coap_message_t * p_message)
         coap_code = p_message->header.code;
     }
 
-    LWM2M_TRC("[Update]: lwm2m_update_cb, status: %lu, coap code: %u",
-              status,
-              coap_code);
+    LWM2M_TRC("status: %lu, CoAP code: %u", status, coap_code);
 
     lwm2m_notification(LWM2M_NOTIFCATION_TYPE_UPDATE,
                        p_remote,
@@ -421,9 +417,7 @@ void lwm2m_deregister_cb(uint32_t status, void * p_arg, coap_message_t * p_messa
         coap_code = p_message->header.code;
     }
 
-    LWM2M_TRC("[DeRegister]: lwm2m_deregister_cb, status: %lu, coap code: %u",
-              status,
-              coap_code);
+    LWM2M_TRC("status: %lu, CoAP code: %u", status, coap_code);
 
     if (p_message)
     {
@@ -524,9 +518,9 @@ uint32_t lwm2m_deregister(struct sockaddr * p_remote, coap_transport_handle_t * 
         (void)coap_message_delete(p_msg);
     }
 
-    LWM2M_TRC("[DeRegister]: << lwm2m_deregister\r\n");
-
     LWM2M_MUTEX_UNLOCK();
+
+    LWM2M_EXIT();
 
     return err_code;
 }
