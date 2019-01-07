@@ -11,3 +11,12 @@ source "Kconfig.zephyr"
 endmenu
 
 rsource "../Kconfig"
+
+menu "Nordic LwM2M Client"
+
+config NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
+	bool "Use buttons and leds"
+	help
+	  "Enable use of buttons and leds"
+
+endmenu

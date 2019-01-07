@@ -17,6 +17,10 @@
 #include <nrf_inbuilt_key.h>
 #include <nrf.h>
 
+#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
+#include <dk_buttons_and_leds.h>
+#endif
+
 #include <coap_api.h>
 #include <coap_option.h>
 #include <coap_message.h>
@@ -30,25 +34,14 @@
 #define IMEI            "004402990020434"
 
 #define APP_ACL_DM_SERVER_HACK          1
-#define APP_USE_BUTTONS_AND_LEDS        1
 #define APP_USE_NVS                     0
 #define APP_FIDO_TRACE                  0
 #define APP_FIDOLESS_TRACE              0
 #define APP_AT_HOST                     0
 
-#if APP_USE_BUTTONS_AND_LEDS
-#include <dk_buttons_and_leds.h>
-#endif
-
 #if APP_AT_HOST
 #include <at_host.h>
 #endif
-
-#define LED_ON(x)                       (x)
-#define LED_BLINK(x)                    ((x) << 8)
-#define LED_INDEX(x)                    ((x) << 16)
-#define LED_GET_ON(x)                   ((x) & 0xFF)
-#define LED_GET_BLINK(x)                (((x) >> 8) & 0xFF)
 
 #define APP_LEDS_UPDATE_INTERVAL        500                                                   /**< Interval in milliseconds between each time status LEDs are updated. */
 #define APP_COAP_UPDATE_INTERVAL        1000                                                  /**< Interval between periodic callbacks to CoAP module. */
@@ -83,7 +76,7 @@
 #define APPL_LOG(...)
 #endif // APP_ENABLE_LOGS
 
-#if APP_USE_BUTTONS_AND_LEDS
+#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
 #define APP_ERROR_CHECK(error_code) \
     do { \
         if (error_code != 0) { \
@@ -137,23 +130,23 @@
 
 typedef enum
 {
-    APP_STATE_IDLE                    = LED_BLINK(DK_LED1_MSK),
-    APP_STATE_IP_INTERFACE_UP         = LED_ON(DK_LED1_MSK),
-    APP_STATE_BS_CONNECT              = LED_BLINK(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK),
-    APP_STATE_BS_CONNECT_WAIT         = LED_BLINK(DK_LED2_MSK) | LED_BLINK(DK_LED4_MSK),
-    APP_STATE_BS_CONNECTED            = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK) | LED_INDEX(0),
-    APP_STATE_BOOTSTRAP_REQUESTED     = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK) | LED_INDEX(1),
-    APP_STATE_BOOTSTRAP_WAIT          = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED2_MSK) | LED_BLINK(DK_LED4_MSK) | LED_INDEX(0),
-    APP_STATE_BOOTSTRAPPING           = LED_ON(DK_LED1_MSK) | LED_ON(DK_LED2_MSK) | LED_BLINK(DK_LED4_MSK) | LED_INDEX(1),
-    APP_STATE_BOOTSTRAPPED            = LED_ON(DK_LED1_MSK) | LED_ON(DK_LED2_MSK),
-    APP_STATE_SERVER_CONNECT          = LED_BLINK(DK_LED1_MSK) | LED_BLINK(DK_LED3_MSK),
-    APP_STATE_SERVER_CONNECT_WAIT     = LED_BLINK(DK_LED3_MSK) | LED_BLINK(DK_LED4_MSK),
-    APP_STATE_SERVER_CONNECTED        = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED3_MSK),
-    APP_STATE_SERVER_REGISTER_WAIT    = LED_ON(DK_LED1_MSK) | LED_BLINK(DK_LED3_MSK) | LED_BLINK(DK_LED4_MSK),
-    APP_STATE_SERVER_REGISTERED       = LED_ON(DK_LED1_MSK) | LED_ON(DK_LED3_MSK),
-    APP_STATE_SERVER_DEREGISTER       = LED_BLINK(DK_LED1_MSK) | LED_ON(DK_LED3_MSK) | LED_INDEX(0),
-    APP_STATE_SERVER_DEREGISTERING    = LED_BLINK(DK_LED1_MSK) | LED_ON(DK_LED3_MSK) | LED_INDEX(1),
-    APP_STATE_DISCONNECT              = LED_BLINK(DK_LED1_MSK) | LED_ON(DK_LED3_MSK) | LED_INDEX(2)
+    APP_STATE_IDLE,
+    APP_STATE_IP_INTERFACE_UP,
+    APP_STATE_BS_CONNECT,
+    APP_STATE_BS_CONNECT_WAIT,
+    APP_STATE_BS_CONNECTED,
+    APP_STATE_BOOTSTRAP_REQUESTED,
+    APP_STATE_BOOTSTRAP_WAIT,
+    APP_STATE_BOOTSTRAPPING,
+    APP_STATE_BOOTSTRAPPED,
+    APP_STATE_SERVER_CONNECT,
+    APP_STATE_SERVER_CONNECT_WAIT,
+    APP_STATE_SERVER_CONNECTED,
+    APP_STATE_SERVER_REGISTER_WAIT,
+    APP_STATE_SERVER_REGISTERED,
+    APP_STATE_SERVER_DEREGISTER,
+    APP_STATE_SERVER_DEREGISTERING,
+    APP_STATE_DISCONNECT
 } app_state_t;
 
 //APP_TIMER_DEF(m_iot_timer_tick_src_id);                                                       /**< App timer instance used to update the IoT timer wall clock. */
@@ -196,7 +189,7 @@ static char *               m_secret_key[1+LWM2M_MAX_SERVERS];
 
 /* Structures for delayed work */
 static struct k_delayed_work state_update_work;
-#if APP_USE_BUTTONS_AND_LEDS
+#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
 static struct k_delayed_work leds_update_work;
 #endif
 static struct k_delayed_work coap_update_work;
@@ -269,19 +262,21 @@ void bsd_recoverable_error_handler(uint32_t error)
 {
     ARG_UNUSED(error);
 
+#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
     k_delayed_work_cancel(&leds_update_work);
 
     /* Blinking all LEDs ON/OFF in pairs (1 and 3, 2 and 4)
      * if there is an recoverable error.
      */
     while (true) {
-#if APP_USE_BUTTONS_AND_LEDS
         dk_set_leds_state(DK_LED1_MSK | DK_LED3_MSK, DK_LED2_MSK | DK_LED4_MSK);
         k_sleep(250);
         dk_set_leds_state(DK_LED2_MSK | DK_LED4_MSK, DK_LED1_MSK | DK_LED3_MSK);
         k_sleep(250);
-#endif
     }
+#else
+    while (true);
+#endif
 }
 
 
@@ -290,21 +285,23 @@ void bsd_irrecoverable_error_handler(uint32_t error)
 {
     ARG_UNUSED(error);
 
+#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
     k_delayed_work_cancel(&leds_update_work);
 
     /* Blinking all LEDs ON/OFF if there is an irrecoverable error. */
     while (true) {
-#if APP_USE_BUTTONS_AND_LEDS
         dk_set_leds_state(DK_ALL_LEDS_MSK, 0x00);
         k_sleep(250);
         dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
         k_sleep(250);
-#endif
     }
+#else
+    while (true);
+#endif
 }
 
 
-#if APP_USE_BUTTONS_AND_LEDS
+#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
 /**@brief Callback for button events from the DK buttons and LEDs library. */
 static void app_button_handler(u32_t buttons, u32_t has_changed)
 {
@@ -336,33 +333,108 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
 }
 
 
+static void app_leds_get_state(u8_t *on, u8_t *blink)
+{
+    *on = 0;
+    *blink = 0;
+
+    switch (m_app_state)
+    {
+        case APP_STATE_IDLE:
+            *blink = DK_LED1_MSK;
+            break;
+
+        case APP_STATE_IP_INTERFACE_UP:
+            *on = DK_LED1_MSK;
+            break;
+
+        case APP_STATE_BS_CONNECT:
+            *blink = (DK_LED1_MSK | DK_LED2_MSK);
+            break;
+
+        case APP_STATE_BS_CONNECT_WAIT:
+            *blink = (DK_LED2_MSK | DK_LED4_MSK);
+            break;
+
+        case APP_STATE_BS_CONNECTED:
+        case APP_STATE_BOOTSTRAP_REQUESTED:
+            *on = DK_LED1_MSK;
+            *blink = DK_LED2_MSK;
+            break;
+
+        case APP_STATE_BOOTSTRAP_WAIT:
+            *on = DK_LED1_MSK;
+            *blink = (DK_LED2_MSK | DK_LED4_MSK);
+            break;
+
+        case APP_STATE_BOOTSTRAPPING:
+            *on = (DK_LED1_MSK | DK_LED2_MSK);
+            *blink = DK_LED4_MSK;
+            break;
+
+        case APP_STATE_BOOTSTRAPPED:
+            *on = (DK_LED1_MSK | DK_LED2_MSK);
+            break;
+
+        case APP_STATE_SERVER_CONNECT:
+            *blink = (DK_LED1_MSK | DK_LED3_MSK);
+            break;
+
+        case APP_STATE_SERVER_CONNECT_WAIT:
+            *blink = (DK_LED3_MSK | DK_LED4_MSK);
+            break;
+
+        case APP_STATE_SERVER_CONNECTED:
+            *on = DK_LED1_MSK;
+            *blink = DK_LED3_MSK;
+            break;
+
+        case APP_STATE_SERVER_REGISTER_WAIT:
+            *on = DK_LED1_MSK;
+            *blink = (DK_LED3_MSK | DK_LED4_MSK);
+            break;
+
+        case APP_STATE_SERVER_REGISTERED:
+            *on = (DK_LED1_MSK | DK_LED3_MSK);
+            break;
+
+        case APP_STATE_SERVER_DEREGISTER:
+        case APP_STATE_SERVER_DEREGISTERING:
+        case APP_STATE_DISCONNECT:
+            *on = DK_LED3_MSK;
+            *blink = DK_LED1_MSK;
+            break;
+    }
+}
+
+
 /**@brief Update LEDs state. */
 static void app_leds_update(struct k_work *work)
 {
         static bool led_on;
         static u8_t current_led_on_mask;
-        u8_t led_on_mask;
+        u8_t led_on_mask, led_blink_mask;
 
         ARG_UNUSED(work);
 
         /* Set led_on_mask to match current state. */
-        led_on_mask = LED_GET_ON(m_app_state);
+        app_leds_get_state(&led_on_mask, &led_blink_mask);
 
         if (m_did_bootstrap)
         {
             /* Only turn on LED2 if bootstrap was done. */
-            led_on_mask |= LED_ON(DK_LED2_MSK);
+            led_on_mask |= DK_LED2_MSK;
         }
 
         led_on = !led_on;
         if (led_on) {
-                led_on_mask |= LED_GET_BLINK(m_app_state);
-                if (!LED_GET_BLINK(m_app_state)) {
+                led_on_mask |= led_blink_mask;
+                if (led_blink_mask == 0) {
                     // Only blink LED4 if no other led is blinking
                     led_on_mask |= DK_LED4_MSK;
                 }
         } else {
-                led_on_mask &= ~LED_GET_BLINK(m_app_state);
+                led_on_mask &= ~led_blink_mask;
                 led_on_mask &= ~DK_LED4_MSK;
         }
 
@@ -373,21 +445,19 @@ static void app_leds_update(struct k_work *work)
 
         k_delayed_work_submit(&leds_update_work, APP_LEDS_UPDATE_INTERVAL);
 }
-#endif
 
 
 /**@brief Initializes buttons and LEDs, using the DK buttons and LEDs library. */
 static void app_buttons_leds_init(void)
 {
-#if APP_USE_BUTTONS_AND_LEDS
     dk_buttons_init(app_button_handler);
     dk_leds_init();
     dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
 
     k_delayed_work_init(&leds_update_work, app_leds_update);
     k_delayed_work_submit(&leds_update_work, APP_LEDS_UPDATE_INTERVAL);
-#endif
 }
+#endif
 
 
 /**@brief Function for handling CoAP periodically time ticks.
@@ -410,7 +480,7 @@ static void app_coap_time_tick(struct k_work *work)
 static void blink_timeout_handler(iot_timer_time_in_ms_t wall_clock_value)
 {
     ARG_UNUSED(wall_clock_value);
-#if APP_USE_BUTTONS_AND_LEDS
+#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
     switch (m_app_state)
     {
         case APP_STATE_IDLE:
@@ -1795,6 +1865,7 @@ static void app_read_flash_storage(void)
         app_factory_bootstrap_server_object(i);
     }
 
+#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
     // Workaround for not storing is.bootstrapped:
     // - Switch 1 will determine if doing bootstrap
     // - Switch 2 will determine if connecting to DM or Repository server
@@ -1821,6 +1892,7 @@ static void app_read_flash_storage(void)
     {
         m_family_type = AF_INET6;
     }
+#endif
 
     // Bootstrap values (will be fetched from NVS after bootstrap)
     uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
@@ -2579,8 +2651,10 @@ int main(void)
     modem_trace_enable();
 #endif
 
+#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
     // Initialize LEDs and Buttons.
     app_buttons_leds_init();
+#endif
 
     // Initialize Non-volatile Storage.
     app_flash_init();
