@@ -31,7 +31,6 @@
 
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_BUTTONS_AND_LEDS        1
-#define APP_USE_AF_INET6                0
 #define APP_USE_NVS                     0
 #define APP_FIDO_TRACE                  0
 #define APP_FIDOLESS_TRACE              0
@@ -202,16 +201,9 @@ static struct k_delayed_work leds_update_work;
 #endif
 static struct k_delayed_work coap_update_work;
 
-#if (APP_USE_AF_INET6 == 1)
-static struct sockaddr_in6 m_bs_server;
-static struct sockaddr_in6 m_server;
-#else // APP_USE_AF_INET6
-static struct sockaddr_in m_bs_server;
-static struct sockaddr_in m_server;
-#endif // APP_USE_AF_INET6
-
-static struct sockaddr * mp_bs_remote_server = (struct sockaddr *)&m_bs_server;               /**< Pointer to remote bootstrap server address to connect to. */
-static struct sockaddr * mp_remote_server = (struct sockaddr *)&m_server;                     /**< Pointer to remote secure server address to connect to. */
+static struct sockaddr m_bs_remote_server;                                                    /**< Remote bootstrap server address to connect to. */
+static struct sockaddr m_remote_server;                                                       /**< Remote secure server address to connect to. */
+static sa_family_t  m_family_type = AF_INET6;
 
 /**@brief Bootstrap values to store in app persistent storage. */
 typedef struct
@@ -526,6 +518,27 @@ uint32_t lwm2m_coap_handler_root(uint8_t op_code, coap_message_t * p_request)
 }
 
 
+static void app_init_sockaddr_in(struct sockaddr *addr, sa_family_t ai_family, u16_t port)
+{
+    memset(addr, 0, sizeof(struct sockaddr));
+
+    if (ai_family == AF_INET)
+    {
+        struct sockaddr_in *addr_in = (struct sockaddr_in *)addr;
+
+        addr_in->sin_family = ai_family;
+        addr_in->sin_port = htons(port);
+    }
+    else
+    {
+        struct sockaddr_in6 *addr_in6 = (struct sockaddr_in6 *)addr;
+
+        addr_in6->sin6_family = ai_family;
+        addr_in6->sin6_port = htons(port);
+    }
+}
+
+
 static uint32_t app_resolve_server_uri(char            * server_uri,
                                        struct sockaddr * addr,
                                        bool            * secure)
@@ -555,13 +568,9 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
         port = atoi(sep + 1);
     }
 
-    APPL_LOG("Doing DNS lookup");
+    APPL_LOG("Doing DNS lookup using %s", (m_family_type == AF_INET6) ? "IPv6" : "IPv4");
     struct addrinfo hints = {
-#if (APP_USE_AF_INET6 == 1)
-        .ai_family = AF_INET6,
-#else // APP_USE_AF_INET6
-        .ai_family = AF_INET,
-#endif // APP_USE_AF_INET6
+        .ai_family = m_family_type,
         .ai_socktype = SOCK_DGRAM
     };
     struct addrinfo *result;
@@ -573,13 +582,11 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
         return errno;
     }
 
+    app_init_sockaddr_in(addr, result->ai_family, port);
+
     if (result->ai_family == AF_INET) {
-        ((struct sockaddr_in *)addr)->sin_family = result->ai_family;
-        ((struct sockaddr_in *)addr)->sin_port = htons(port);
         ((struct sockaddr_in *)addr)->sin_addr.s_addr = ((struct sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
     } else {
-        ((struct sockaddr_in6 *)addr)->sin6_family = result->ai_family;
-        ((struct sockaddr_in6 *)addr)->sin6_port = htons(port);
         memcpy(((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr, ((struct sockaddr_in6 *)result->ai_addr)->sin6_addr.s6_addr, 16);
     }
 
@@ -1804,13 +1811,15 @@ static void app_read_flash_storage(void)
         m_server_settings[0].is.bootstrapped = true;
     }
 
+    m_server_instance = 1;  // Connect to DM server
+
     if (button_state & 0x08) // Switch 2 in left position
     {
-        m_server_instance = 1; // Connect to DM server
+        m_family_type = AF_INET;
     }
     else
     {
-        m_server_instance = 3; // Connect to Repository server
+        m_family_type = AF_INET6;
     }
 
     // Bootstrap values (will be fetched from NVS after bootstrap)
@@ -2093,60 +2102,46 @@ static void app_bootstrap_connect(void)
     (void)app_lwm2m_parse_uri_and_save_remote(LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
                                               (char *)&m_server_settings[0].server_uri,
                                               &secure,
-                                              mp_bs_remote_server);
+                                              &m_bs_remote_server);
 
     if (secure == true)
     {
         APPL_LOG("SECURE session (bootstrap)");
 
-#if (APP_USE_AF_INET6 == 1)
-            const struct sockaddr_in6 client_addr =
-            {
-                .sin6_port   = htons(LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT),
-                .sin6_family = AF_INET6,
-            };
-#else // APP_USE_AF_INET6
-            const struct sockaddr_in client_addr =
-            {
-                .sin_port   = htons(LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT),
-                .sin_family = AF_INET,
-            };
-#endif // APP_USE_AF_INET6
+        struct sockaddr local_addr;
+        app_init_sockaddr_in(&local_addr, m_bs_remote_server.sa_family, LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT);
 
-            #define SEC_TAG_COUNT 1
+        #define SEC_TAG_COUNT 1
 
-            struct sockaddr * p_localaddr = (struct sockaddr *)&client_addr;
+        sec_tag_t sec_tag_list[SEC_TAG_COUNT] = {APP_BOOTSTRAP_SEC_TAG};
 
-            sec_tag_t sec_tag_list[SEC_TAG_COUNT] = {APP_BOOTSTRAP_SEC_TAG};
+        coap_sec_config_t setting =
+        {
+            .role           = 0,    // 0 -> Client role
+            .sec_tag_count  = SEC_TAG_COUNT,
+            .p_sec_tag_list = sec_tag_list
+        };
 
-            coap_sec_config_t setting =
-            {
-                .role           = 0,    // 0 -> Client role
-                .sec_tag_count  = SEC_TAG_COUNT,
-                .p_sec_tag_list = sec_tag_list
-            };
+        coap_local_t local_port =
+        {
+            .p_addr    = &local_addr,
+            .p_setting = &setting,
+            .protocol  = IPPROTO_DTLS_1_2
+        };
 
+        // NOTE: This method initiates a DTLS handshake and may block for a some seconds.
+        err_code = coap_security_setup(&local_port, &m_bs_remote_server);
 
-            coap_local_t local_port =
-            {
-                .p_addr    = p_localaddr,
-                .p_setting = &setting,
-                .protocol  = IPPROTO_DTLS_1_2
-            };
-
-            // NOTE: This method initiates a DTLS handshake and may block for a some seconds.
-            err_code = coap_security_setup(&local_port, mp_bs_remote_server);
-
-            if (err_code == 0)
-            {
-                m_app_state = APP_STATE_BS_CONNECTED;
-                mp_lwm2m_bs_transport = local_port.p_transport;
-            }
-            else
-            {
-                m_app_state = APP_STATE_BS_CONNECT_WAIT;
-                app_start_retry_delay(0);
-            }
+        if (err_code == 0)
+        {
+            m_app_state = APP_STATE_BS_CONNECTED;
+            mp_lwm2m_bs_transport = local_port.p_transport;
+        }
+        else
+        {
+            m_app_state = APP_STATE_BS_CONNECT_WAIT;
+            app_start_retry_delay(0);
+        }
     }
     else
     {
@@ -2157,7 +2152,7 @@ static void app_bootstrap_connect(void)
 
 static void app_bootstrap(void)
 {
-    uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)mp_bs_remote_server, &m_client_id, mp_lwm2m_bs_transport);
+    uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)&m_bs_remote_server, &m_client_id, mp_lwm2m_bs_transport);
     if (err_code == 0)
     {
         m_app_state = APP_STATE_BOOTSTRAP_REQUESTED;
@@ -2178,7 +2173,7 @@ static void app_server_connect(void)
     m_server_conf.short_server_id = m_server_settings[m_server_instance].short_server_id;
 
     err_code = app_resolve_server_uri((char *)&m_server_settings[m_server_instance].server_uri,
-                                      mp_remote_server, &secure);
+                                      &m_remote_server, &secure);
     if (err_code != 0)
     {
         return;
@@ -2187,23 +2182,11 @@ static void app_server_connect(void)
     if (secure == true)
     {
         APPL_LOG("SECURE session (register)");
-#if (APP_USE_AF_INET6 == 1)
-        const struct sockaddr_in6 client_addr =
-        {
-            .sin6_port   = htons(LWM2M_LOCAL_CLIENT_PORT),
-            .sin6_family = AF_INET6,
-        };
-#else // APP_USE_AF_INET6
-        const struct sockaddr_in client_addr =
-        {
-            .sin_port   = htons(LWM2M_LOCAL_CLIENT_PORT),
-            .sin_family = AF_INET,
-        };
-#endif // APP_USE_AF_INET6
+
+        struct sockaddr local_addr;
+        app_init_sockaddr_in(&local_addr, m_remote_server.sa_family, LWM2M_LOCAL_CLIENT_PORT);
 
         #define SEC_TAG_COUNT 1
-
-        struct sockaddr * p_localaddr = (struct sockaddr *)&client_addr;
 
         sec_tag_t sec_tag_list[SEC_TAG_COUNT] = { APP_SEC_TAG_OFFSET + m_server_instance };
 
@@ -2214,16 +2197,15 @@ static void app_server_connect(void)
             .p_sec_tag_list = sec_tag_list
         };
 
-
         coap_local_t local_port =
         {
-            .p_addr    = p_localaddr,
+            .p_addr    = &local_addr,
             .p_setting = &setting,
             .protocol  = IPPROTO_DTLS_1_2
         };
 
         // NOTE: This method initiates a DTLS handshake and may block for some seconds.
-        err_code = coap_security_setup(&local_port, mp_remote_server);
+        err_code = coap_security_setup(&local_port, &m_remote_server);
 
         if (err_code == 0)
         {
@@ -2261,7 +2243,7 @@ static void app_server_register(void)
         err_code = lwm2m_coap_handler_gen_link_format(mp_link_format_string, (uint16_t *)&m_link_format_string_len);
         APP_ERROR_CHECK(err_code);
 
-        err_code = lwm2m_register((struct sockaddr *)mp_remote_server,
+        err_code = lwm2m_register((struct sockaddr *)&m_remote_server,
                                   &m_client_id,
                                   &m_server_conf,
                                   mp_lwm2m_transport,
@@ -2281,7 +2263,7 @@ static void app_server_update(uint16_t instance_id)
     // TODO: check instance_id
     ARG_UNUSED(instance_id);
 
-    err_code = lwm2m_update((struct sockaddr *)mp_remote_server,
+    err_code = lwm2m_update((struct sockaddr *)&m_remote_server,
                             &m_server_conf,
                             mp_lwm2m_transport);
     APP_ERROR_CHECK(err_code);
@@ -2295,7 +2277,7 @@ static void app_server_deregister(uint16_t instance_id)
     // TODO: check instance_id
     ARG_UNUSED(instance_id);
 
-    err_code = lwm2m_deregister((struct sockaddr *)mp_remote_server,
+    err_code = lwm2m_deregister((struct sockaddr *)&m_remote_server,
                                 mp_lwm2m_transport);
     APP_ERROR_CHECK(err_code);
 
@@ -2432,26 +2414,15 @@ static void app_coap_init(void)
 {
     uint32_t err_code;
 
-#if (APP_USE_AF_INET6 == 1)
-    struct sockaddr_in6 local_client_addr =
-    {
-        .sin6_port   = htons(COAP_LOCAL_LISTENER_PORT),
-        .sin6_family = AF_INET6,
-    };
-#else // APP_USE_AF_INET6
-    struct sockaddr_in local_client_addr =
-    {
-        .sin_port   = htons(COAP_LOCAL_LISTENER_PORT),
-        .sin_family = AF_INET,
-    };
-#endif // APP_USE_AF_INET6
+    struct sockaddr local_addr;
+    app_init_sockaddr_in(&local_addr, m_family_type, COAP_LOCAL_LISTENER_PORT);
 
     // If bootstrap server and server is using different port we can
     // register the ports individually.
     coap_local_t local_port_list[COAP_PORT_COUNT] =
     {
         {
-            .p_addr = (struct sockaddr *)&local_client_addr
+            .p_addr = &local_addr
         }
     };
 
