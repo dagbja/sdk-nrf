@@ -39,8 +39,6 @@
 
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_NVS                     0
-#define APP_FIDO_TRACE                  0
-#define APP_FIDOLESS_TRACE              0
 
 #define APP_LEDS_UPDATE_INTERVAL        500                                                   /**< Interval in milliseconds between each time status LEDs are updated. */
 #define APP_COAP_UPDATE_INTERVAL        1000                                                  /**< Interval between periodic callbacks to CoAP module. */
@@ -2562,7 +2560,7 @@ static void app_flash_init(void)
 }
 
 
-#if APP_FIDOLESS_TRACE
+#if (CONFIG_NRF_LWM2M_CLIENT_MODEM_LOGGING == 1)
 static void send_at_command(const char *at_command)
 {
 #define APP_MAX_AT_READ_LENGTH          100
@@ -2598,7 +2596,7 @@ static void send_at_command(const char *at_command)
 #endif
 
 
-#if APP_FIDO_TRACE
+#if (CONFIG_NRF_LWM2M_CLIENT_MODEM_LOGGING == 2)
 static void modem_trace_enable(void)
 {
     /* GPIO configurations for trace and debug */
@@ -2640,7 +2638,7 @@ int main(void)
 {
     APPL_LOG("Application started");
 
-#if APP_FIDO_TRACE
+#if (CONFIG_NRF_LWM2M_CLIENT_MODEM_LOGGING == 2)
     modem_trace_enable();
 #endif
 
@@ -2664,9 +2662,15 @@ int main(void)
     // Establish LTE link.
     lte_lc_init_and_connect();
 
-#if APP_FIDOLESS_TRACE
+#if (CONFIG_NRF_LWM2M_CLIENT_MODEM_LOGGING == 1)
+    // 1,0 = disable
+    // 1,1 = coredump only
+    // 1,2 = generic (and coredump)
+    // 1,3 = lwm2m   (and coredump)
+    // 1,4 = ip only (and coredump)
     send_at_command("AT%XMODEMTRACE=1,2");
     send_at_command("AT%XMODEMTRACE=1,3");
+    send_at_command("AT%XMODEMTRACE=1,4");
 #endif
 
     // Initialize Timers.

@@ -25,4 +25,11 @@ config NRF_LWM2M_CLIENT_ENABLE_AT_HOST
 	help
 	  "Enable AT host"
 
+config NRF_LWM2M_CLIENT_MODEM_LOGGING
+	int "Modem logging"
+	default 0
+	range 0 2
+	help
+	  "Enable modem logging. 0 = disabled, 1 = fidoless, 2 = fido"
+
 endmenu
