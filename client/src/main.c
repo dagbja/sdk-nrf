@@ -59,8 +59,6 @@
 #define SECURITY_SMS_NUMBER_SIZE_MAX    20                                                    /**< Max size of server SMS number. */
 #define SERVER_BINDING_SIZE_MAX         4                                                     /**< Max size of server binding. */
 
-#define APP_ENABLE_LOGS                 0                                                     /**< Enable logs in the application. */
-
 #define APP_SEC_TAG_OFFSET              25
 
 #define APP_BOOTSTRAP_SEC_TAG           APP_SEC_TAG_OFFSET                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
@@ -70,11 +68,7 @@
 #define APP_MAX_AT_READ_LENGTH          100
 #define APP_MAX_AT_WRITE_LENGTH         256
 
-#if (APP_ENABLE_LOGS == 1)
 #define APPL_LOG  LOG_DBG
-#else // APP_ENABLE_LOGS
-#define APPL_LOG(...)
-#endif // APP_ENABLE_LOGS
 
 #if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
 #define APP_ERROR_CHECK(error_code) \
