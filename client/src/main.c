@@ -21,6 +21,10 @@
 #include <dk_buttons_and_leds.h>
 #endif
 
+#if CONFIG_NRF_LWM2M_CLIENT_ENABLE_AT_HOST
+#include <at_host.h>
+#endif
+
 #include <coap_api.h>
 #include <coap_option.h>
 #include <coap_message.h>
@@ -37,11 +41,6 @@
 #define APP_USE_NVS                     0
 #define APP_FIDO_TRACE                  0
 #define APP_FIDOLESS_TRACE              0
-#define APP_AT_HOST                     0
-
-#if APP_AT_HOST
-#include <at_host.h>
-#endif
 
 #define APP_LEDS_UPDATE_INTERVAL        500                                                   /**< Interval in milliseconds between each time status LEDs are updated. */
 #define APP_COAP_UPDATE_INTERVAL        1000                                                  /**< Interval between periodic callbacks to CoAP module. */
@@ -2674,10 +2673,10 @@ int main(void)
     //timers_init();
     //iot_timer_init();
 
-#if APP_AT_HOST
+#if CONFIG_NRF_LWM2M_CLIENT_ENABLE_AT_HOST
     int at_host_err = at_host_init(CONFIG_AT_HOST_UART, CONFIG_AT_HOST_TERMINATION);
     if (at_host_err != 0) {
-            LOG_ERR("AT Host not initialized");
+        LOG_ERR("AT Host not initialized");
     }
 #endif
 
@@ -2698,7 +2697,7 @@ int main(void)
         app_lwm2m_process();
         k_sleep(10);
 
-#if APP_AT_HOST
+#if CONFIG_NRF_LWM2M_CLIENT_ENABLE_AT_HOST
         if (at_host_err == 0) {
             at_host_process();
         }
