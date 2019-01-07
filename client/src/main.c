@@ -140,8 +140,6 @@ typedef enum
     APP_STATE_DISCONNECT
 } app_state_t;
 
-//APP_TIMER_DEF(m_iot_timer_tick_src_id);                                                       /**< App timer instance used to update the IoT timer wall clock. */
-
 static lwm2m_server_config_t               m_server_conf;                                     /**< Server configuration structure. */
 static lwm2m_client_identity_t             m_client_id;                                       /**< Client ID structure to hold the client's UUID. */
 static uint8_t *                           mp_link_format_string    = NULL;                   /**< Pointer to hold a link format string across a button press initiated registration and retry. */
@@ -463,105 +461,6 @@ static void app_coap_time_tick(struct k_work *work)
     k_delayed_work_submit(&coap_update_work, APP_COAP_UPDATE_INTERVAL);
 }
 
-
-/**@brief Timer callback used for controlling board LEDs to represent application state.
- *
- */
-#if 0
-static void blink_timeout_handler(iot_timer_time_in_ms_t wall_clock_value)
-{
-    ARG_UNUSED(wall_clock_value);
-#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
-    switch (m_app_state)
-    {
-        case APP_STATE_IDLE:
-        {
-            LEDS_ON((LED_ONE | LED_TWO | LED_THREE | LED_FOUR));
-            break;
-        }
-        case APP_STATE_IP_INTERFACE_UP:
-        {
-            LEDS_OFF((LED_ONE | LED_TWO | LED_THREE | LED_FOUR));
-            LEDS_ON(LED_ONE);
-            break;
-        }
-        case APP_STATE_BS_CONNECT:
-        {
-            LEDS_INVERT(LED_TWO);
-            break;
-        }
-        case APP_STATE_BOOTSTRAPPED:
-        {
-            LEDS_ON(LED_TWO);
-            break;
-        }
-        default:
-        {
-            break;
-        }
-    }
-#endif
-}
-
-
-/**@brief Function for updating the wall clock of the IoT Timer module.
- */
-static void iot_timer_tick_callback(void * p_context)
-{
-    ARG_UNUSED(p_context);
-    uint32_t err_code = iot_timer_update();
-    APP_ERROR_CHECK(err_code);
-}
-
-
-/**@brief Function for the Timer initialization.
- *
- * @details Initializes the timer module.
- */
-static void timers_init(void)
-{
-    uint32_t err_code;
-
-    // Initialize timer module.
-    APP_ERROR_CHECK(app_timer_init());
-
-    // Create a sys timer.
-    err_code = app_timer_create(&m_iot_timer_tick_src_id,
-                                APP_TIMER_MODE_REPEATED,
-                                iot_timer_tick_callback);
-    APP_ERROR_CHECK(err_code);
-}
-
-
-/**@brief Function for initializing the IoT Timer. */
-static void iot_timer_init(void)
-{
-    uint32_t err_code;
-
-    static const iot_timer_client_t list_of_clients[] =
-    {
-        {blink_timeout_handler,   LED_BLINK_INTERVAL_MS},
-        {app_coap_time_tick,      COAP_TICK_INTERVAL_MS}
-    };
-
-    // The list of IoT Timer clients is declared as a constant.
-    static const iot_timer_clients_list_t iot_timer_clients =
-    {
-        (sizeof(list_of_clients) / sizeof(iot_timer_client_t)),
-        &(list_of_clients[0]),
-    };
-
-    // Passing the list of clients to the IoT Timer module.
-    err_code = iot_timer_client_list_set(&iot_timer_clients);
-    APP_ERROR_CHECK(err_code);
-
-    // Starting the app timer instance that is the tick source for the IoT Timer.
-    err_code = app_timer_start(m_iot_timer_tick_src_id,
-                               APP_TIMER_TICKS(IOT_TIMER_RESOLUTION_IN_MS),
-                               NULL);
-    APP_ERROR_CHECK(err_code);
-}
-#endif
 
 /**@brief Application implementation of the root handler interface.
  *
@@ -1620,35 +1519,6 @@ uint32_t server_object_callback(lwm2m_object_t * p_object,
     return err_code;
 }
 
-#if 0
-uint32_t security_resource_callback(lwm2m_instance_t * p_instance,
-                                    uint16_t           resource_id,
-                                    uint8_t            op_code,
-                                    coap_message_t   * p_request)
-{
-    uint16_t instance_id = p_instance->instance_id;
-    uint32_t err_code = 0;
-
-    if (op_code == LWM2M_OPERATION_CODE_READ)
-    {
-        // Write to p_request->p_payload, update p_request->payload_len
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_WRITE)
-    {
-        // uint32_t mask = 0;
-        // err_code = coap_message_ct_mask_get(p_request, &mask);
-
-        // Read from p_request->payload, from offset XXX
-    }
-    else
-    {
-        err_code = ENOENT;
-    }
-
-    return err_code;
-}
-#endif
-
 
 /**@brief Callback function for LWM2M security instances. */
 uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
@@ -2672,10 +2542,6 @@ int main(void)
     send_at_command("AT%XMODEMTRACE=1,3");
     send_at_command("AT%XMODEMTRACE=1,4");
 #endif
-
-    // Initialize Timers.
-    //timers_init();
-    //iot_timer_init();
 
 #if CONFIG_NRF_LWM2M_CLIENT_ENABLE_AT_HOST
     int at_host_err = at_host_init(CONFIG_AT_HOST_UART, CONFIG_AT_HOST_TERMINATION);
