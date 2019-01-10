@@ -183,9 +183,10 @@ static struct k_delayed_work leds_update_work;
 #endif
 static struct k_delayed_work coap_update_work;
 
+/* Resolved server addresses */
+static sa_family_t m_family_type = AF_INET6;                                                  /**< Current IP version, start using IPv6. */
 static struct sockaddr m_bs_remote_server;                                                    /**< Remote bootstrap server address to connect to. */
 static struct sockaddr m_remote_server;                                                       /**< Remote secure server address to connect to. */
-static sa_family_t  m_family_type = AF_INET6;
 
 /**@brief Bootstrap values to store in app persistent storage. */
 typedef struct
@@ -570,6 +571,9 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_serv
 
     if (err_code == 0)
     {
+        // Deregister the short_server_id in case it has been registered with a different address
+        (void) lwm2m_remote_deregister(short_server_id);
+
         // Register the short_server_id
         err_code = lwm2m_remote_register(short_server_id, (struct sockaddr *)p_remote);
     }
@@ -604,7 +608,7 @@ static uint32_t app_lwm2m_access_remote_get(uint16_t         * p_access,
 
 
 /**@brief Helper function to start a retry delay. */
-void app_start_retry_delay(int instance_id)
+void app_start_retry_delay(int instance_id, bool connect_issue)
 {
     // TODO: different retries for different vendors?
     static s32_t app_retry_delay[] = { 2*60, 4*60, 6*60, 8*60, 24*60*60 };
@@ -626,10 +630,29 @@ void app_start_retry_delay(int instance_id)
 
     s32_t retry_delay = app_retry_delay[m_server_settings[instance_id].retry_count];
 
-    APPL_LOG("Retry delay for %d minutes...", retry_delay / 60);
-    k_delayed_work_submit(&state_update_work, retry_delay * 1000);
+    bool start_retry_delay = true;
 
-    m_server_settings[instance_id].retry_count++;
+    if (connect_issue)
+    {
+        // Fallback to the other IP version
+        m_family_type = (m_family_type == AF_INET6) ? AF_INET : AF_INET6;
+
+        if (m_family_type == AF_INET)
+        {
+            // No retry delay when IPv6 to IPv4 fallback
+            APPL_LOG("IPv6 to IPv4 fallback");
+            start_retry_delay = false;
+            app_wait_state_update(NULL);
+        }
+    }
+
+    if (start_retry_delay)
+    {
+        APPL_LOG("Retry delay for %d minutes...", retry_delay / 60);
+        k_delayed_work_submit(&state_update_work, retry_delay * 1000);
+
+        m_server_settings[instance_id].retry_count++;
+    }
 }
 
 
@@ -656,7 +679,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
         {
             // No response or received a 4.03 error.
             m_app_state = APP_STATE_BOOTSTRAP_WAIT;
-            app_start_retry_delay(0);
+            app_start_retry_delay(0, false);
         }
         else
         {
@@ -673,7 +696,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
         else
         {
             m_app_state = APP_STATE_SERVER_REGISTER_WAIT;
-            app_start_retry_delay(m_server_instance);
+            app_start_retry_delay(m_server_instance, false);
         }
     }
     else if (type == LWM2M_NOTIFCATION_TYPE_UPDATE)
@@ -1743,15 +1766,13 @@ static void app_read_flash_storage(void)
         m_server_settings[0].is.bootstrapped = true;
     }
 
-    m_server_instance = 1;  // Connect to DM server
-
     if (button_state & 0x08) // Switch 2 in left position
     {
-        m_family_type = AF_INET;
+        m_server_instance = 1;  // Connect to DM server
     }
     else
     {
-        m_family_type = AF_INET6;
+        m_server_instance = 3; // Connect to Repository server
     }
 #endif
 
@@ -2072,8 +2093,9 @@ static void app_bootstrap_connect(void)
         }
         else
         {
+            // TODO: check err_code for NRF_ENETUNREACH
             m_app_state = APP_STATE_BS_CONNECT_WAIT;
-            app_start_retry_delay(0);
+            app_start_retry_delay(0, true);
         }
     }
     else
@@ -2148,8 +2170,9 @@ static void app_server_connect(void)
         }
         else
         {
+            // TODO: check err_code for NRF_ENETUNREACH
             m_app_state = APP_STATE_SERVER_CONNECT_WAIT;
-            app_start_retry_delay(m_server_instance);
+            app_start_retry_delay(m_server_instance, true);
         }
     }
     else
@@ -2262,7 +2285,7 @@ static void app_wait_state_update(struct k_work *work)
         case APP_STATE_BOOTSTRAPPING:
             // Timeout waiting for bootstrap to finish
             m_app_state = APP_STATE_BS_CONNECT_WAIT;
-            app_start_retry_delay(0);
+            app_start_retry_delay(0, false);
             break;
 
         case APP_STATE_SERVER_CONNECT_WAIT:
