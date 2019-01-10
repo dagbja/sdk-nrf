@@ -2699,6 +2699,74 @@ static int cmd_lwm2m_deregister(const struct shell *shell, size_t argc, char **a
 }
 
 
+static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
+{
+    if (m_did_bootstrap) {
+        shell_print(shell, "Bootstrap completed");
+    }
+
+    switch(m_app_state)
+    {
+        case APP_STATE_IDLE:
+            shell_print(shell, "Idle");
+            break;
+        case APP_STATE_IP_INTERFACE_UP:
+            shell_print(shell, "IP interface up");
+            break;
+        case APP_STATE_BS_CONNECT:
+            shell_print(shell, "Bootstrap connect");
+            break;
+        case APP_STATE_BS_CONNECT_WAIT:
+            shell_print(shell, "Bootstrap connect wait");
+            break;
+        case APP_STATE_BS_CONNECTED:
+            shell_print(shell, "Bootstrap connected");
+            break;
+        case APP_STATE_BOOTSTRAP_REQUESTED:
+            shell_print(shell, "Bootstrap requested");
+            break;
+        case APP_STATE_BOOTSTRAP_WAIT:
+            shell_print(shell, "Bootstrap wait");
+            break;
+        case APP_STATE_BOOTSTRAPPING:
+            shell_print(shell, "Bootstrapping");
+            break;
+        case APP_STATE_BOOTSTRAPPED:
+            shell_print(shell, "Bootstrapped");
+            break;
+        case APP_STATE_SERVER_CONNECT:
+            shell_print(shell, "Server connect");
+            break;
+        case APP_STATE_SERVER_CONNECT_WAIT:
+            shell_print(shell, "Server connect wait");
+            break;
+        case APP_STATE_SERVER_CONNECTED:
+            shell_print(shell, "Server connected");
+            break;
+        case APP_STATE_SERVER_REGISTER_WAIT:
+            shell_print(shell, "Server register wait");
+            break;
+        case APP_STATE_SERVER_REGISTERED:
+            shell_print(shell, "Server registered");
+            break;
+        case APP_STATE_SERVER_DEREGISTER:
+            shell_print(shell, "Server deregister");
+            break;
+        case APP_STATE_SERVER_DEREGISTERING:
+            shell_print(shell, "Server deregistering");
+            break;
+        case APP_STATE_DISCONNECT:
+            shell_print(shell, "Disconnect");
+            break;
+        default:
+            shell_print(shell, "Unknown: %d", m_app_state);
+            break;
+    };
+
+    return 0;
+}
+
+
 static int cmd_factory_reset(const struct shell *shell, size_t argc, char **argv)
 {
     app_factory_reset();
@@ -2740,6 +2808,7 @@ SHELL_CREATE_STATIC_SUBCMD_SET(sub_lwm2m)
     SHELL_CMD(register, NULL, "Register server", cmd_lwm2m_register),
     SHELL_CMD(update, NULL, "Update server", cmd_lwm2m_update),
     SHELL_CMD(deregister, NULL, "Deregister server", cmd_lwm2m_deregister),
+    SHELL_CMD(status, NULL, "Application status", cmd_lwm2m_status),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 };
 
