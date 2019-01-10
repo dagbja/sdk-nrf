@@ -229,7 +229,7 @@ static server_settings_t     m_server_settings[1+LWM2M_MAX_SERVERS];
 #if APP_USE_NVS
 /* NVS-related defines */
 #define NVS_SECTOR_SIZE    FLASH_ERASE_BLOCK_SIZE    /* Multiple of FLASH_PAGE_SIZE */
-#define NVS_SECTOR_COUNT   3                         /* At least 2 sectors */
+#define NVS_SECTOR_COUNT   2                         /* At least 2 sectors */
 #define NVS_STORAGE_OFFSET FLASH_AREA_STORAGE_OFFSET /* Start address of the filesystem in flash */
 
 static struct nvs_fs fs = {
@@ -245,7 +245,9 @@ static void app_server_update(uint16_t instance_id);
 static void app_server_deregister(uint16_t instance_id);
 static void app_provision_psk(int sec_tag, char * identity, char * psk);
 static void app_provision_secret_keys(void);
-
+static void app_disconnect(void);
+static void app_factory_reset(void);
+static void app_wait_state_update(struct k_work *work);
 
 /**@brief Recoverable BSD library error. */
 void bsd_recoverable_error_handler(uint32_t error)
@@ -758,6 +760,11 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     m_server_settings[0].is.bootstrapped = true;  // TODO: this should be set by bootstrap server when bootstrapped
     m_did_bootstrap = true;
 
+#if APP_USE_NVS
+    APPL_LOG("Store bootstrap settings");
+    nvs_write(&fs, 0, &m_server_settings[0], sizeof(m_server_settings[0]));
+#endif
+
     milliseconds_spent = k_uptime_delta(&time_stamp);
 
     m_app_state = APP_STATE_SERVER_CONNECT_WAIT;
@@ -1269,12 +1276,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
 
             case LWM2M_DEVICE_FACTORY_RESET:
             {
-#if APP_USE_NVS
-                for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
-                {
-                    nvs_delete(&fs, i);
-                }
-#endif
+                app_factory_reset();
 
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
 
@@ -1448,6 +1450,7 @@ static uint32_t app_store_bootstrap_security_values(uint16_t instance_id)
     m_instance_security[instance_id].sms_number.p_val = m_server_settings[instance_id].sms_number;
 
 #if APP_USE_NVS
+    APPL_LOG("Store bootstrap security values");
     nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[instance_id]));
 #endif
 
@@ -1487,6 +1490,7 @@ static uint32_t app_store_bootstrap_server_values(uint16_t instance_id)
     m_server_settings[instance_id].owner = p_instance->acl.owner;
 
 #if APP_USE_NVS
+    APPL_LOG("Store bootstrap server values");
     nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[instance_id]));
 #endif
 
@@ -1691,6 +1695,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
         case 1: // DM server
         {
             memset(&m_server_settings[1], 0, sizeof(m_server_settings[1]));
+            m_server_settings[1].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
             break;
         }
 
@@ -1714,12 +1719,24 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
         case 3: // Repository server
         {
             memset(&m_server_settings[3], 0, sizeof(m_server_settings[3]));
+            m_server_settings[3].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
             break;
         }
 
         default:
             break;
     }
+}
+
+
+static void app_factory_reset(void)
+{
+#if APP_USE_NVS
+        for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+        {
+            nvs_delete(&fs, i);
+        }
+#endif
 }
 
 
@@ -1731,7 +1748,7 @@ static void app_read_flash_storage(void)
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
         rc = nvs_read(&fs, i, &m_server_settings[i], sizeof(m_server_settings[i]));
-        if (rc <= 0)
+        if (rc <= 0) // TODO: check if written size is correct?
         {
             // Not found, create new factory bootstrapped object.
             app_factory_bootstrap_server_object(i);
@@ -1739,10 +1756,29 @@ static void app_read_flash_storage(void)
             if (m_server_settings[i].short_server_id)
             {
                 // Write settings for initialized server objects.
-                nvs_write(&fs, i, &m_server_settings[i], sizeof(m_server_settings[i]));
+                rc = nvs_write(&fs, i, &m_server_settings[i], sizeof(m_server_settings[i]));
+                if (rc <= 0)
+                {
+                    APPL_LOG("Storing server settings failed");
+                }
             }
         }
     }
+
+#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
+    u32_t button_state = 0;
+    dk_read_buttons(&button_state, NULL);
+
+    if (button_state & 0x08) // Switch 2 in left position
+    {
+        m_server_instance = 1;  // Connect to DM server
+    }
+    else
+    {
+        m_server_instance = 3; // Connect to Repository server
+    }
+#endif
+
 #else
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
@@ -2525,6 +2561,30 @@ static void modem_trace_enable(void)
 #endif
 
 
+#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
+/**@brief Check buttons pressed at startup. */
+void app_check_buttons_pressed(void)
+{
+    u32_t button_state = 0;
+    dk_read_buttons(&button_state, NULL);
+
+    // Check if button 1 pressed during startup
+    if (button_state & 0x01) {
+        app_factory_reset();
+
+        printk("Factory reset!\n");
+        k_delayed_work_cancel(&leds_update_work);
+        while (true) { // Blink all LEDs
+            dk_set_leds_state(DK_LED1_MSK | DK_LED2_MSK | DK_LED3_MSK | DK_LED4_MSK, 0);
+            k_sleep(250);
+            dk_set_leds_state(0, DK_LED1_MSK | DK_LED2_MSK | DK_LED3_MSK | DK_LED4_MSK);
+            k_sleep(250);
+        }
+    }
+}
+#endif
+
+
 /**@brief Function for application main entry.
  */
 int main(void)
@@ -2535,13 +2595,14 @@ int main(void)
     modem_trace_enable();
 #endif
 
+    // Initialize Non-volatile Storage.
+    app_flash_init();
+
 #if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
     // Initialize LEDs and Buttons.
     app_buttons_leds_init();
+    app_check_buttons_pressed();
 #endif
-
-    // Initialize Non-volatile Storage.
-    app_flash_init();
 
     // Initialize CoAP.
     app_coap_init();
