@@ -14,17 +14,6 @@ rsource "../Kconfig"
 
 menu "Nordic LwM2M Client"
 
-config NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
-	bool "Use buttons and leds"
-	help
-	  "Enable use of buttons and leds"
-
-config NRF_LWM2M_CLIENT_ENABLE_AT_HOST
-	bool "Enable AT host"
-	select AT_HOST_LIBRARY
-	help
-	  "Enable AT host"
-
 config NRF_LWM2M_CLIENT_MODEM_LOGGING
 	int "Modem logging"
 	default 0

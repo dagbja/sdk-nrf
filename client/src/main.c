@@ -21,11 +21,11 @@
 #include <shell/shell.h>
 #endif
 
-#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
+#if CONFIG_DK_LIBRARY
 #include <dk_buttons_and_leds.h>
 #endif
 
-#if CONFIG_NRF_LWM2M_CLIENT_ENABLE_AT_HOST
+#if CONFIG_AT_HOST_LIBRARY
 #include <at_host.h>
 #endif
 
@@ -69,9 +69,13 @@
 #define APP_MAX_AT_READ_LENGTH          100
 #define APP_MAX_AT_WRITE_LENGTH         256
 
+#if CONFIG_LOG
 #define APPL_LOG  LOG_DBG
+#else
+#define APPL_LOG
+#endif
 
-#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
+#if CONFIG_DK_LIBRARY
 #define APP_ERROR_CHECK(error_code) \
     do { \
         if (error_code != 0) { \
@@ -182,7 +186,7 @@ static char *               m_secret_key[1+LWM2M_MAX_SERVERS];
 
 /* Structures for delayed work */
 static struct k_delayed_work state_update_work;
-#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
+#if CONFIG_DK_LIBRARY
 static struct k_delayed_work leds_update_work;
 #endif
 static struct k_delayed_work coap_update_work;
@@ -258,7 +262,7 @@ void bsd_recoverable_error_handler(uint32_t error)
 {
     ARG_UNUSED(error);
 
-#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
+#if CONFIG_DK_LIBRARY
     k_delayed_work_cancel(&leds_update_work);
 
     /* Blinking all LEDs ON/OFF in pairs (1 and 3, 2 and 4)
@@ -281,7 +285,7 @@ void bsd_irrecoverable_error_handler(uint32_t error)
 {
     ARG_UNUSED(error);
 
-#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
+#if CONFIG_DK_LIBRARY
     k_delayed_work_cancel(&leds_update_work);
 
     /* Blinking all LEDs ON/OFF if there is an irrecoverable error. */
@@ -297,7 +301,7 @@ void bsd_irrecoverable_error_handler(uint32_t error)
 }
 
 
-#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
+#if CONFIG_DK_LIBRARY
 /**@brief Callback for button events from the DK buttons and LEDs library. */
 static void app_button_handler(u32_t buttons, u32_t has_changed)
 {
@@ -696,6 +700,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
     {
         if (coap_code == COAP_CODE_201_CREATED)
         {
+            printk("Registered\n");
             m_app_state = APP_STATE_SERVER_REGISTERED;
             m_server_settings[m_server_instance].retry_count = 0;
         }
@@ -1769,7 +1774,7 @@ static void app_read_flash_storage(void)
         }
     }
 
-#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
+#if CONFIG_DK_LIBRARY
     u32_t button_state = 0;
     dk_read_buttons(&button_state, NULL);
 
@@ -1789,7 +1794,7 @@ static void app_read_flash_storage(void)
         app_factory_bootstrap_server_object(i);
     }
 
-#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
+#if CONFIG_DK_LIBRARY
     // Workaround for not storing is.bootstrapped:
     // - Switch 1 will determine if doing bootstrap
     // - Switch 2 will determine if connecting to DM or Repository server
@@ -2567,7 +2572,7 @@ static void modem_trace_enable(void)
 #endif
 
 
-#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
+#if CONFIG_DK_LIBRARY
 /**@brief Check buttons pressed at startup. */
 void app_check_buttons_pressed(void)
 {
@@ -2753,7 +2758,7 @@ SHELL_CMD_REGISTER(reboot, NULL, "Reboot", cmd_reboot);
  */
 int main(void)
 {
-    printk("Application starting, please wait...\n");
+    printk("\n\nInitializing LTE link, please wait...\n");
 
 #if (CONFIG_NRF_LWM2M_CLIENT_MODEM_LOGGING == 2)
     modem_trace_enable();
@@ -2762,7 +2767,7 @@ int main(void)
     // Initialize Non-volatile Storage.
     app_flash_init();
 
-#if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
+#if CONFIG_DK_LIBRARY
     // Initialize LEDs and Buttons.
     app_buttons_leds_init();
     app_check_buttons_pressed();
@@ -2791,7 +2796,7 @@ int main(void)
     send_at_command("AT%XMODEMTRACE=1,4");
 #endif
 
-#if CONFIG_NRF_LWM2M_CLIENT_ENABLE_AT_HOST
+#if CONFIG_AT_HOST_LIBRARY
     int at_host_err = at_host_init(CONFIG_AT_HOST_UART, CONFIG_AT_HOST_TERMINATION);
     if (at_host_err != 0) {
         LOG_ERR("AT Host not initialized");
@@ -2815,7 +2820,7 @@ int main(void)
         app_lwm2m_process();
         k_sleep(10);
 
-#if CONFIG_NRF_LWM2M_CLIENT_ENABLE_AT_HOST
+#if CONFIG_AT_HOST_LIBRARY
         if (at_host_err == 0) {
             at_host_process();
         }
