@@ -17,6 +17,10 @@
 #include <nrf_inbuilt_key.h>
 #include <nrf.h>
 
+#if CONFIG_SHELL
+#include <shell/shell.h>
+#endif
+
 #if CONFIG_NRF_LWM2M_CLIENT_USE_BUTTONS_AND_LEDS
 #include <dk_buttons_and_leds.h>
 #endif
@@ -2489,7 +2493,7 @@ static void app_flash_init(void)
 }
 
 
-#if (CONFIG_NRF_LWM2M_CLIENT_MODEM_LOGGING == 1)
+#if (CONFIG_NRF_LWM2M_CLIENT_MODEM_LOGGING == 1) || (CONFIG_SHELL)
 static void send_at_command(const char *at_command)
 {
 #define APP_MAX_AT_READ_LENGTH          100
@@ -2503,21 +2507,23 @@ static void send_at_command(const char *at_command)
 
     at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
     if (at_socket_fd < 0) {
-        APPL_LOG("socket() failed");
+        printk("socket() failed\n");
         return;
     }
 
+    printk("send: %s\n", at_command);
     snprintf(write_buffer, APP_MAX_AT_WRITE_LENGTH, "%s", at_command);
     length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
 
     if (length == strlen(write_buffer)) {
-         length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-
-         if ((length < 2) || (strncmp("OK", read_buffer, 2) != 0)) {
-             APPL_LOG("recv(\"%s\") failed: %s", at_command, read_buffer);
-         }
+        length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
+        if (length > 0) {
+            printk("recv: %s\n", read_buffer);
+        } else {
+            printk("recv() failed\n");
+        }
     } else {
-        APPL_LOG("send(\"%s\") failed", at_command);
+        printk("send() failed\n");
     }
 
     close(at_socket_fd);
@@ -2585,11 +2591,169 @@ void app_check_buttons_pressed(void)
 #endif
 
 
+#ifdef CONFIG_SHELL
+static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s \"AT command\"", argv[0]);
+        return 0;
+    }
+
+    send_at_command(argv[1]);
+
+    return 0;
+}
+
+#if APP_USE_NVS
+static int cmd_uri_print(const struct shell *shell, size_t argc, char **argv)
+{
+    shell_print(shell, "Server URIs:");
+
+    for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++)
+    {
+        shell_print(shell, " URI %d: %s", i, m_server_settings[i].server_uri);
+    }
+
+    return 0;
+}
+
+
+static int cmd_uri_set(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 3) {
+        shell_print(shell, "%s <instance> <URI>", argv[0]);
+        return 0;
+    }
+
+    int instance_id = atoi(argv[1]);
+    char *uri = argv[2];
+    size_t uri_len = strlen(uri);
+
+    if (instance_id < 0 || instance_id >= (1+LWM2M_MAX_SERVERS))
+    {
+        shell_print(shell, "instance must be between 0 and %d", LWM2M_MAX_SERVERS);
+        return 0;
+    }
+
+    if (uri_len > SECURITY_SERVER_URI_SIZE_MAX)
+    {
+        shell_print(shell, "maximum URI length is %d", SECURITY_SERVER_URI_SIZE_MAX);
+        return 0;
+    }
+
+    memset(m_server_settings[instance_id].server_uri, 0, SECURITY_SERVER_URI_SIZE_MAX);
+    strcpy(m_server_settings[instance_id].server_uri, uri);
+    nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[0]));
+
+    shell_print(shell, "Set URI %d: %s", instance_id, uri);
+
+    return 0;
+}
+#endif
+
+
+static int cmd_lwm2m_register(const struct shell *shell, size_t argc, char **argv)
+{
+    if (m_app_state == APP_STATE_IP_INTERFACE_UP) {
+        if (m_server_settings[0].is.bootstrapped) {
+            m_app_state = APP_STATE_SERVER_CONNECT;
+        } else {
+            m_app_state = APP_STATE_BS_CONNECT;
+        }
+    } else if (m_app_state == APP_STATE_SERVER_REGISTERED) {
+        shell_print(shell, "Already registered");
+    } else {
+        shell_print(shell, "Wrong state for registration");
+    }
+
+    return 0;
+}
+
+
+static int cmd_lwm2m_update(const struct shell *shell, size_t argc, char **argv)
+{
+    if (m_app_state == APP_STATE_SERVER_REGISTERED) {
+        m_update_server = true;
+    } else {
+        shell_print(shell, "Not registered");
+    }
+
+    return 0;
+}
+
+
+static int cmd_lwm2m_deregister(const struct shell *shell, size_t argc, char **argv)
+{
+    if (m_app_state == APP_STATE_SERVER_REGISTERED) {
+        m_app_state = APP_STATE_SERVER_DEREGISTER;
+    } else {
+        shell_print(shell, "Not registered");
+    }
+
+    return 0;
+}
+
+
+static int cmd_factory_reset(const struct shell *shell, size_t argc, char **argv)
+{
+    app_factory_reset();
+    NVIC_SystemReset();
+
+    return 0;
+}
+
+
+static int cmd_reboot(const struct shell *shell, size_t argc, char **argv)
+{
+    NVIC_SystemReset();
+
+    return 0;
+}
+
+
+#if APP_USE_NVS
+SHELL_CREATE_STATIC_SUBCMD_SET(sub_uri)
+{
+    /* Alphabetically sorted. */
+    SHELL_CMD(print, NULL, "Print URIs.", cmd_uri_print),
+    SHELL_CMD(set, NULL, "Set URI", cmd_uri_set),
+    SHELL_SUBCMD_SET_END /* Array terminated. */
+};
+
+SHELL_CREATE_STATIC_SUBCMD_SET(sub_config)
+{
+    /* Alphabetically sorted. */
+    SHELL_CMD(uri, &sub_uri, "URI settings", NULL),
+    SHELL_SUBCMD_SET_END /* Array terminated. */
+};
+#endif
+
+
+SHELL_CREATE_STATIC_SUBCMD_SET(sub_lwm2m)
+{
+    /* Alphabetically sorted. */
+    SHELL_CMD(register, NULL, "Register server", cmd_lwm2m_register),
+    SHELL_CMD(update, NULL, "Update server", cmd_lwm2m_update),
+    SHELL_CMD(deregister, NULL, "Deregister server", cmd_lwm2m_deregister),
+    SHELL_SUBCMD_SET_END /* Array terminated. */
+};
+
+
+SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
+#if APP_USE_NVS
+SHELL_CMD_REGISTER(config, &sub_config, "Configuration", NULL);
+#endif
+SHELL_CMD_REGISTER(lwm2m, &sub_lwm2m, "LwM2M operations", NULL);
+SHELL_CMD_REGISTER(factory_reset, NULL, "Factory Reset", cmd_factory_reset);
+SHELL_CMD_REGISTER(reboot, NULL, "Reboot", cmd_reboot);
+#endif
+
+
 /**@brief Function for application main entry.
  */
 int main(void)
 {
-    APPL_LOG("Application started");
+    printk("Application starting, please wait...\n");
 
 #if (CONFIG_NRF_LWM2M_CLIENT_MODEM_LOGGING == 2)
     modem_trace_enable();
