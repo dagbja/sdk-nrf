@@ -620,8 +620,8 @@ static uint32_t app_lwm2m_access_remote_get(uint16_t         * p_access,
 }
 
 
-/**@brief Helper function to start a retry delay. */
-void app_start_retry_delay(int instance_id, bool connect_issue)
+/**@brief Helper function to handle a connect retry. */
+void app_handle_connect_retry(int instance_id, bool no_reply)
 {
     if (instance_id == 0 && m_server_settings[instance_id].retry_count == sizeof app_retry_delay - 1)
     {
@@ -638,11 +638,9 @@ void app_start_retry_delay(int instance_id, bool connect_issue)
         m_server_settings[instance_id].retry_count = 0;
     }
 
-    s32_t retry_delay = app_retry_delay[m_server_settings[instance_id].retry_count];
-
     bool start_retry_delay = true;
 
-    if (connect_issue)
+    if (no_reply)
     {
         // Fallback to the other IP version
         m_family_type = (m_family_type == AF_INET6) ? AF_INET : AF_INET6;
@@ -652,16 +650,19 @@ void app_start_retry_delay(int instance_id, bool connect_issue)
             // No retry delay when IPv6 to IPv4 fallback
             APPL_LOG("IPv6 to IPv4 fallback");
             start_retry_delay = false;
-            app_wait_state_update(NULL);
         }
     }
 
     if (start_retry_delay)
     {
+        s32_t retry_delay = app_retry_delay[m_server_settings[instance_id].retry_count];
+
         APPL_LOG("Retry delay for %d minutes...", retry_delay / 60);
         k_delayed_work_submit(&state_update_work, retry_delay * 1000);
 
         m_server_settings[instance_id].retry_count++;
+    } else {
+        k_delayed_work_submit(&state_update_work, 0);
     }
 }
 
@@ -689,7 +690,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
         {
             // No response or received a 4.03 error.
             m_app_state = APP_STATE_BOOTSTRAP_WAIT;
-            app_start_retry_delay(0, false);
+            app_handle_connect_retry(0, false);
         }
         else
         {
@@ -698,7 +699,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
     }
     else if (type == LWM2M_NOTIFCATION_TYPE_REGISTER)
     {
-        if (coap_code == COAP_CODE_201_CREATED)
+        if (coap_code == COAP_CODE_201_CREATED || coap_code == COAP_CODE_204_CHANGED)
         {
             printk("Registered\n");
             m_app_state = APP_STATE_SERVER_REGISTERED;
@@ -707,7 +708,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
         else
         {
             m_app_state = APP_STATE_SERVER_REGISTER_WAIT;
-            app_start_retry_delay(m_server_instance, false);
+            app_handle_connect_retry(m_server_instance, false);
         }
     }
     else if (type == LWM2M_NOTIFCATION_TYPE_UPDATE)
@@ -2138,9 +2139,13 @@ static void app_bootstrap_connect(void)
         }
         else
         {
-            // TODO: check err_code for NRF_ENETUNREACH
             m_app_state = APP_STATE_BS_CONNECT_WAIT;
-            app_start_retry_delay(0, true);
+            // Check for no IPv6 support (EINVAL) and no response (ETIMEDOUT)
+            if (err_code == EIO && (errno == EINVAL || errno == ETIMEDOUT)) {
+                app_handle_connect_retry(0, true);
+            } else {
+                app_handle_connect_retry(0, false);
+            }
         }
     }
     else
@@ -2215,9 +2220,13 @@ static void app_server_connect(void)
         }
         else
         {
-            // TODO: check err_code for NRF_ENETUNREACH
             m_app_state = APP_STATE_SERVER_CONNECT_WAIT;
-            app_start_retry_delay(m_server_instance, true);
+            // Check for no IPv6 support (EINVAL) and no response (ETIMEDOUT)
+            if (err_code == EIO && (errno == EINVAL || errno == ETIMEDOUT)) {
+                app_handle_connect_retry(m_server_instance, true);
+            } else {
+                app_handle_connect_retry(m_server_instance, false);
+            }
         }
     }
     else
@@ -2330,7 +2339,7 @@ static void app_wait_state_update(struct k_work *work)
         case APP_STATE_BOOTSTRAPPING:
             // Timeout waiting for bootstrap to finish
             m_app_state = APP_STATE_BS_CONNECT_WAIT;
-            app_start_retry_delay(0, false);
+            app_handle_connect_retry(0, false);
             break;
 
         case APP_STATE_SERVER_CONNECT_WAIT:
@@ -2742,6 +2751,8 @@ static int cmd_lwm2m_deregister(const struct shell *shell, size_t argc, char **a
 
 static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
 {
+    shell_print(shell, "IP version %s", (m_family_type == AF_INET6) ? "6" : "4");
+
     if (m_did_bootstrap) {
         shell_print(shell, "Bootstrap completed");
     }
@@ -2771,7 +2782,11 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Bootstrap requested");
             break;
         case APP_STATE_BOOTSTRAP_WAIT:
-            shell_print(shell, "Bootstrap wait for ACK");
+            if (m_server_settings[0].retry_count > 0) {
+                shell_print(shell, "Bootstrap delay (%d minutes)", app_retry_delay[m_server_settings[0].retry_count - 1] / 60);
+            } else {
+                shell_print(shell, "Bootstrap wait...");
+            }
             break;
         case APP_STATE_BOOTSTRAPPING:
             shell_print(shell, "Bootstrapping...");
@@ -2793,7 +2808,11 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Server connected");
             break;
         case APP_STATE_SERVER_REGISTER_WAIT:
-            shell_print(shell, "Server register wait for ACK");
+            if (m_server_settings[m_server_instance].retry_count > 0) {
+                shell_print(shell, "Server register delay (%d minutes)", app_retry_delay[m_server_settings[m_server_instance].retry_count - 1] / 60);
+            } else {
+                shell_print(shell, "Server register wait...");
+            }
             break;
         case APP_STATE_SERVER_REGISTERED:
             shell_print(shell, "Server registered");
@@ -2836,9 +2855,8 @@ static int cmd_reboot(const struct shell *shell, size_t argc, char **argv)
 #if APP_USE_NVS
 SHELL_CREATE_STATIC_SUBCMD_SET(sub_config)
 {
-    /* Alphabetically sorted. */
-    SHELL_CMD(clear, NULL, "Clear bootstrapped values", cmd_config_clear),
     SHELL_CMD(print, NULL, "Print configuration", cmd_config_print),
+    SHELL_CMD(clear, NULL, "Clear bootstrapped values", cmd_config_clear),
     SHELL_CMD(uri, NULL, "Set URI", cmd_config_uri),
     SHELL_CMD(lifetime, NULL, "Set lifetime", cmd_config_lifetime),
     SHELL_SUBCMD_SET_END /* Array terminated. */
@@ -2848,11 +2866,10 @@ SHELL_CREATE_STATIC_SUBCMD_SET(sub_config)
 
 SHELL_CREATE_STATIC_SUBCMD_SET(sub_lwm2m)
 {
-    /* Alphabetically sorted. */
+    SHELL_CMD(status, NULL, "Application status", cmd_lwm2m_status),
     SHELL_CMD(register, NULL, "Register server", cmd_lwm2m_register),
     SHELL_CMD(update, NULL, "Update server", cmd_lwm2m_update),
     SHELL_CMD(deregister, NULL, "Deregister server", cmd_lwm2m_deregister),
-    SHELL_CMD(status, NULL, "Application status", cmd_lwm2m_status),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 };
 
