@@ -184,6 +184,9 @@ static volatile bool        m_update_server;
 static char *               m_public_key[1+LWM2M_MAX_SERVERS];
 static char *               m_secret_key[1+LWM2M_MAX_SERVERS];
 
+// TODO: different retries for different vendors?
+static s32_t app_retry_delay[] = { 2*60, 4*60, 6*60, 8*60, 24*60*60 };
+
 /* Structures for delayed work */
 static struct k_delayed_work state_update_work;
 #if CONFIG_DK_LIBRARY
@@ -620,9 +623,6 @@ static uint32_t app_lwm2m_access_remote_get(uint16_t         * p_access,
 /**@brief Helper function to start a retry delay. */
 void app_start_retry_delay(int instance_id, bool connect_issue)
 {
-    // TODO: different retries for different vendors?
-    static s32_t app_retry_delay[] = { 2*60, 4*60, 6*60, 8*60, 24*60*60 };
-
     if (instance_id == 0 && m_server_settings[instance_id].retry_count == sizeof app_retry_delay - 1)
     {
         // Bootstrap retry does not use the last retry value and does not continue before next power up.
@@ -2610,20 +2610,36 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
 }
 
 #if APP_USE_NVS
-static int cmd_uri_print(const struct shell *shell, size_t argc, char **argv)
+static int cmd_config_clear(const struct shell *shell, size_t argc, char **argv)
 {
-    shell_print(shell, "Server URIs:");
+    m_server_settings[0].is.bootstrapped = false;
+    nvs_write(&fs, 0, &m_server_settings[0], sizeof(m_server_settings[0]));
 
+    app_factory_bootstrap_server_object(1);
+    nvs_delete(&fs, 1);
+
+    app_factory_bootstrap_server_object(3);
+    nvs_delete(&fs, 3);
+
+    shell_print(shell, "Deleted all bootstrapped values");
+    return 0;
+}
+
+
+static int cmd_config_print(const struct shell *shell, size_t argc, char **argv)
+{
     for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++)
     {
-        shell_print(shell, " URI %d: %s", i, m_server_settings[i].server_uri);
+        shell_print(shell, "Instance %d", i);
+        shell_print(shell, " Short Server ID  %d", m_server_settings[i].short_server_id);
+        shell_print(shell, " Server URI       %s", m_server_settings[i].server_uri);
     }
 
     return 0;
 }
 
 
-static int cmd_uri_set(const struct shell *shell, size_t argc, char **argv)
+static int cmd_config_uri(const struct shell *shell, size_t argc, char **argv)
 {
     if (argc != 3) {
         shell_print(shell, "%s <instance> <URI>", argv[0]);
@@ -2651,6 +2667,31 @@ static int cmd_uri_set(const struct shell *shell, size_t argc, char **argv)
     nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[0]));
 
     shell_print(shell, "Set URI %d: %s", instance_id, uri);
+
+    return 0;
+}
+
+
+static int cmd_config_lifetime(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 3) {
+        shell_print(shell, "%s <instance> <seconds>", argv[0]);
+        return 0;
+    }
+
+    int instance_id = atoi(argv[1]);
+    time_t lifetime = (time_t) atoi(argv[2]);
+
+    if (instance_id < 0 || instance_id >= (1+LWM2M_MAX_SERVERS))
+    {
+        shell_print(shell, "instance must be between 0 and %d", LWM2M_MAX_SERVERS);
+        return 0;
+    }
+
+    m_server_settings[instance_id].lifetime = lifetime;
+    nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[0]));
+
+    shell_print(shell, "Set lifetime %d: %d", instance_id, lifetime);
 
     return 0;
 }
@@ -2711,13 +2752,17 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Idle");
             break;
         case APP_STATE_IP_INTERFACE_UP:
-            shell_print(shell, "IP interface up");
+            shell_print(shell, "Disconnected");
             break;
         case APP_STATE_BS_CONNECT:
             shell_print(shell, "Bootstrap connect");
             break;
         case APP_STATE_BS_CONNECT_WAIT:
-            shell_print(shell, "Bootstrap connect wait");
+            if (m_server_settings[0].retry_count > 0) {
+                shell_print(shell, "Bootstrap connect delay (%d minutes)", app_retry_delay[m_server_settings[0].retry_count - 1] / 60);
+            } else {
+                shell_print(shell, "Bootstrap connect wait...");
+            }
             break;
         case APP_STATE_BS_CONNECTED:
             shell_print(shell, "Bootstrap connected");
@@ -2726,10 +2771,10 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Bootstrap requested");
             break;
         case APP_STATE_BOOTSTRAP_WAIT:
-            shell_print(shell, "Bootstrap wait");
+            shell_print(shell, "Bootstrap wait for ACK");
             break;
         case APP_STATE_BOOTSTRAPPING:
-            shell_print(shell, "Bootstrapping");
+            shell_print(shell, "Bootstrapping...");
             break;
         case APP_STATE_BOOTSTRAPPED:
             shell_print(shell, "Bootstrapped");
@@ -2738,13 +2783,17 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Server connect");
             break;
         case APP_STATE_SERVER_CONNECT_WAIT:
-            shell_print(shell, "Server connect wait");
+            if (m_server_settings[m_server_instance].retry_count > 0) {
+                shell_print(shell, "Server connect delay (%d minutes)", app_retry_delay[m_server_settings[m_server_instance].retry_count - 1] / 60);
+            } else {
+                shell_print(shell, "Server connect wait...");
+            }
             break;
         case APP_STATE_SERVER_CONNECTED:
             shell_print(shell, "Server connected");
             break;
         case APP_STATE_SERVER_REGISTER_WAIT:
-            shell_print(shell, "Server register wait");
+            shell_print(shell, "Server register wait for ACK");
             break;
         case APP_STATE_SERVER_REGISTERED:
             shell_print(shell, "Server registered");
@@ -2759,7 +2808,7 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Disconnect");
             break;
         default:
-            shell_print(shell, "Unknown: %d", m_app_state);
+            shell_print(shell, "Unknown state: %d", m_app_state);
             break;
     };
 
@@ -2785,18 +2834,13 @@ static int cmd_reboot(const struct shell *shell, size_t argc, char **argv)
 
 
 #if APP_USE_NVS
-SHELL_CREATE_STATIC_SUBCMD_SET(sub_uri)
-{
-    /* Alphabetically sorted. */
-    SHELL_CMD(print, NULL, "Print URIs.", cmd_uri_print),
-    SHELL_CMD(set, NULL, "Set URI", cmd_uri_set),
-    SHELL_SUBCMD_SET_END /* Array terminated. */
-};
-
 SHELL_CREATE_STATIC_SUBCMD_SET(sub_config)
 {
     /* Alphabetically sorted. */
-    SHELL_CMD(uri, &sub_uri, "URI settings", NULL),
+    SHELL_CMD(clear, NULL, "Clear bootstrapped values", cmd_config_clear),
+    SHELL_CMD(print, NULL, "Print configuration", cmd_config_print),
+    SHELL_CMD(uri, NULL, "Set URI", cmd_config_uri),
+    SHELL_CMD(lifetime, NULL, "Set lifetime", cmd_config_lifetime),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 };
 #endif
@@ -2815,7 +2859,7 @@ SHELL_CREATE_STATIC_SUBCMD_SET(sub_lwm2m)
 
 SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
 #if APP_USE_NVS
-SHELL_CMD_REGISTER(config, &sub_config, "Configuration", NULL);
+SHELL_CMD_REGISTER(config, &sub_config, "Instance configuration", NULL);
 #endif
 SHELL_CMD_REGISTER(lwm2m, &sub_lwm2m, "LwM2M operations", NULL);
 SHELL_CMD_REGISTER(factory_reset, NULL, "Factory Reset", cmd_factory_reset);
