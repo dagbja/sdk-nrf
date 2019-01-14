@@ -532,6 +532,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
         port = 5683;
         *secure = false;
     } else {
+        APPL_LOG("Invalid server URI: %s", server_uri_val);
         return EINVAL;
     }
 
@@ -551,7 +552,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     int ret_val = getaddrinfo(hostname, NULL, &hints, &result);
 
     if (ret_val != 0) {
-        APPL_LOG("Failed to lookup \"%s\": %d", hostname, ret_val);
+        APPL_LOG("Failed to lookup \"%s\": %d (%d)", hostname, ret_val, errno);
         return errno;
     }
 
@@ -672,10 +673,10 @@ void lwm2m_notification(lwm2m_notification_type_t type,
                         uint8_t                   coap_code,
                         uint32_t                  err_code)
 {
-#if (APP_ENABLE_LOGS == 1)
-    static char *str_type[] = { "Bootstrap", "Register", "Update", "Deregister" };
-    APPL_LOG("Got LWM2M notifcation %s  CoAP %d.%02d  err:%lu", str_type[type], coap_code >> 5, coap_code & 0x1f, err_code);
-#endif
+    if (IS_ENABLED(CONFIG_LOG)) {
+        static char *str_type[] = { "Bootstrap", "Register", "Update", "Deregister" };
+        APPL_LOG("Got LWM2M notifcation %s  CoAP %d.%02d  err:%lu", str_type[type], coap_code >> 5, coap_code & 0x1f, err_code);
+    }
 
     if (type == LWM2M_NOTIFCATION_TYPE_BOOTSTRAP)
     {
@@ -2744,10 +2745,15 @@ static int cmd_lwm2m_deregister(const struct shell *shell, size_t argc, char **a
 
 static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
 {
-    shell_print(shell, "IP version %s", (m_family_type == AF_INET6) ? "6" : "4");
+    char ip_version[] = "IPvX";
+    ip_version[3] = (m_family_type[m_server_instance] == AF_INET6) ? '6' : '4';
 
     if (m_did_bootstrap) {
-        shell_print(shell, "Bootstrap completed");
+        shell_print(shell, "Bootstrap completed [%s]", (m_family_type[0] == AF_INET6) ? "IPv6" : "IPv4");
+    }
+
+    if (m_server_instance == 3) {
+        shell_print(shell, "Server 1 registered [%s]", (m_family_type[1] == AF_INET6) ? "IPv6" : "IPv4");
     }
 
     switch(m_app_state)
@@ -2759,56 +2765,56 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Disconnected");
             break;
         case APP_STATE_BS_CONNECT:
-            shell_print(shell, "Bootstrap connect");
+            shell_print(shell, "Bootstrap connect [%s]", ip_version);
             break;
         case APP_STATE_BS_CONNECT_WAIT:
             if (m_server_settings[0].retry_count > 0) {
-                shell_print(shell, "Bootstrap connect delay (%d minutes)", app_retry_delay[m_server_settings[0].retry_count - 1] / 60);
+                shell_print(shell, "Bootstrap retry delay (%d minutes) [%s]", app_retry_delay[m_server_settings[0].retry_count - 1] / 60, ip_version);
             } else {
-                shell_print(shell, "Bootstrap connect wait...");
+                shell_print(shell, "Bootstrap connect wait [%s]", ip_version);
             }
             break;
         case APP_STATE_BS_CONNECTED:
-            shell_print(shell, "Bootstrap connected");
+            shell_print(shell, "Bootstrap connected [%s]", ip_version);
             break;
         case APP_STATE_BOOTSTRAP_REQUESTED:
-            shell_print(shell, "Bootstrap requested");
+            shell_print(shell, "Bootstrap requested [%s]", ip_version);
             break;
         case APP_STATE_BOOTSTRAP_WAIT:
             if (m_server_settings[0].retry_count > 0) {
-                shell_print(shell, "Bootstrap delay (%d minutes)", app_retry_delay[m_server_settings[0].retry_count - 1] / 60);
+                shell_print(shell, "Bootstrap delay (%d minutes) [%s]", app_retry_delay[m_server_settings[0].retry_count - 1] / 60, ip_version);
             } else {
-                shell_print(shell, "Bootstrap wait...");
+                shell_print(shell, "Bootstrap wait [%s]", ip_version);
             }
             break;
         case APP_STATE_BOOTSTRAPPING:
-            shell_print(shell, "Bootstrapping...");
+            shell_print(shell, "Bootstrapping [%s]", ip_version);
             break;
         case APP_STATE_BOOTSTRAPPED:
-            shell_print(shell, "Bootstrapped");
+            shell_print(shell, "Bootstrapped [%s]", ip_version);
             break;
         case APP_STATE_SERVER_CONNECT:
-            shell_print(shell, "Server connect");
+            shell_print(shell, "Server %d connect [%s]", m_server_instance, ip_version);
             break;
         case APP_STATE_SERVER_CONNECT_WAIT:
             if (m_server_settings[m_server_instance].retry_count > 0) {
-                shell_print(shell, "Server connect delay (%d minutes)", app_retry_delay[m_server_settings[m_server_instance].retry_count - 1] / 60);
+                shell_print(shell, "Server %d retry delay (%d minutes) [%s]", m_server_instance, app_retry_delay[m_server_settings[m_server_instance].retry_count - 1] / 60, ip_version);
             } else {
-                shell_print(shell, "Server connect wait...");
+                shell_print(shell, "Server %d connect wait [%s]", m_server_instance, ip_version);
             }
             break;
         case APP_STATE_SERVER_CONNECTED:
-            shell_print(shell, "Server connected");
+            shell_print(shell, "Server %d connected [%s]", m_server_instance, ip_version);
             break;
         case APP_STATE_SERVER_REGISTER_WAIT:
             if (m_server_settings[m_server_instance].retry_count > 0) {
-                shell_print(shell, "Server register delay (%d minutes)", app_retry_delay[m_server_settings[m_server_instance].retry_count - 1] / 60);
+                shell_print(shell, "Server %d register delay (%d minutes) [%s]", m_server_instance, app_retry_delay[m_server_settings[m_server_instance].retry_count - 1] / 60, ip_version);
             } else {
-                shell_print(shell, "Server register wait...");
+                shell_print(shell, "Server %d register wait [%s]", m_server_instance, ip_version);
             }
             break;
         case APP_STATE_SERVER_REGISTERED:
-            shell_print(shell, "Server registered");
+            shell_print(shell, "Server %d registered [%s]", m_server_instance, ip_version);
             break;
         case APP_STATE_SERVER_DEREGISTER:
             shell_print(shell, "Server deregister");
@@ -2941,8 +2947,15 @@ int main(void)
     // Enter main loop
     for (;;)
     {
+        if (IS_ENABLED(CONFIG_LOG)) {
+            /* if logging is enabled, sleep */
+            k_sleep(K_MSEC(10));
+        } else {
+            /* other, put CPU to idle to save power */
+            k_cpu_idle();
+        }
+
         app_lwm2m_process();
-        k_sleep(10);
 
 #if CONFIG_AT_HOST_LIBRARY
         if (at_host_err == 0) {
