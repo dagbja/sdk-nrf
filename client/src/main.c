@@ -148,10 +148,8 @@ typedef enum
     APP_STATE_DISCONNECT
 } app_state_t;
 
-static lwm2m_server_config_t               m_server_conf;                                     /**< Server configuration structure. */
+static lwm2m_server_config_t               m_server_conf[1+LWM2M_MAX_SERVERS];                /**< Server configuration structure. */
 static lwm2m_client_identity_t             m_client_id;                                       /**< Client ID structure to hold the client's UUID. */
-static uint8_t *                           mp_link_format_string    = NULL;                   /**< Pointer to hold a link format string across a button press initiated registration and retry. */
-static uint32_t                            m_link_format_string_len = 0;                      /**< Length of the link format string that is used in registration attempts. */
 
 // Objects
 static lwm2m_object_t                      m_object_security;                                 /**< LWM2M security base object. */
@@ -172,14 +170,14 @@ static lwm2m_connectivity_monitoring_t     m_instance_conn_mon;                 
 
 static lwm2m_string_t                      m_apn[4];                                          /**< Verizon specific APN names. */
 
-static coap_transport_handle_t *           mp_coap_transport     = NULL;                      /**< CoAP transport handle for the non bootstrap server. */
-static coap_transport_handle_t *           mp_lwm2m_bs_transport = NULL;                      /**< CoAP transport handle for the secure bootstrap server. Obtained on @coap_security_setup. */
-static coap_transport_handle_t *           mp_lwm2m_transport    = NULL;                      /**< CoAP transport handle for the secure server. Obtained on @coap_security_setup. */
+static coap_transport_handle_t *           mp_coap_transport;                                 /**< CoAP transport handle for the non bootstrap server. */
+static coap_transport_handle_t *           mp_lwm2m_bs_transport;                             /**< CoAP transport handle for the secure bootstrap server. Obtained on @coap_security_setup. */
+static coap_transport_handle_t *           mp_lwm2m_transport[1+LWM2M_MAX_SERVERS];           /**< CoAP transport handle for the secure server. Obtained on @coap_security_setup. */
 
 static volatile app_state_t m_app_state = APP_STATE_IDLE;                                     /**< Application state. Should be one of @ref app_state_t. */
-static volatile uint16_t    m_server_instance;
+static volatile uint16_t    m_server_instance;                                                /**< Server instance handled. */
 static volatile bool        m_did_bootstrap;
-static volatile bool        m_update_server;
+static volatile uint16_t    m_update_server;
 
 static char *               m_public_key[1+LWM2M_MAX_SERVERS];
 static char *               m_secret_key[1+LWM2M_MAX_SERVERS];
@@ -195,9 +193,9 @@ static struct k_delayed_work leds_update_work;
 static struct k_delayed_work coap_update_work;
 
 /* Resolved server addresses */
-static sa_family_t m_family_type = AF_INET6;                                                  /**< Current IP version, start using IPv6. */
+static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET6, AF_INET6, 0, AF_INET6 };  /**< Current IP versions, start using IPv6. */
 static struct sockaddr m_bs_remote_server;                                                    /**< Remote bootstrap server address to connect to. */
-static struct sockaddr m_remote_server;                                                       /**< Remote secure server address to connect to. */
+static struct sockaddr m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
 
 /**@brief Bootstrap values to store in app persistent storage. */
 typedef struct
@@ -323,7 +321,7 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
         }
         else if (m_app_state == APP_STATE_SERVER_REGISTERED)
         {
-            m_update_server = true;
+            m_update_server = 1;
         }
     }
     else if (buttons & 0x02) // Button 2 has changed
@@ -515,7 +513,8 @@ static void app_init_sockaddr_in(struct sockaddr *addr, sa_family_t ai_family, u
 
 static uint32_t app_resolve_server_uri(char            * server_uri,
                                        struct sockaddr * addr,
-                                       bool            * secure)
+                                       bool            * secure,
+                                       uint16_t          instance_id)
 {
     // Create a string copy to null-terminate hostname within the server_uri.
     char server_uri_val[SECURITY_SERVER_URI_SIZE_MAX];
@@ -542,9 +541,9 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
         port = atoi(sep + 1);
     }
 
-    APPL_LOG("Doing DNS lookup using %s", (m_family_type == AF_INET6) ? "IPv6" : "IPv4");
+    APPL_LOG("Doing DNS lookup using %s", (m_family_type[instance_id] == AF_INET6) ? "IPv6" : "IPv4");
     struct addrinfo hints = {
-        .ai_family = m_family_type,
+        .ai_family = m_family_type[instance_id],
         .ai_socktype = SOCK_DGRAM
     };
     struct addrinfo *result;
@@ -580,7 +579,7 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_serv
     uint32_t err_code;
 
     // Use DNS to lookup the IP
-    err_code = app_resolve_server_uri(server_uri, p_remote, secure);
+    err_code = app_resolve_server_uri(server_uri, p_remote, secure, 0);
 
     if (err_code == 0)
     {
@@ -643,9 +642,9 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
     if (no_reply)
     {
         // Fallback to the other IP version
-        m_family_type = (m_family_type == AF_INET6) ? AF_INET : AF_INET6;
+        m_family_type[instance_id] = (m_family_type[instance_id] == AF_INET6) ? AF_INET : AF_INET6;
 
-        if (m_family_type == AF_INET)
+        if (m_family_type[instance_id] == AF_INET)
         {
             // No retry delay when IPv6 to IPv4 fallback
             APPL_LOG("IPv6 to IPv4 fallback");
@@ -701,9 +700,16 @@ void lwm2m_notification(lwm2m_notification_type_t type,
     {
         if (coap_code == COAP_CODE_201_CREATED || coap_code == COAP_CODE_204_CHANGED)
         {
-            printk("Registered\n");
-            m_app_state = APP_STATE_SERVER_REGISTERED;
+            printk("Registered %d\n", m_server_instance);
             m_server_settings[m_server_instance].retry_count = 0;
+            m_server_settings[m_server_instance].is.registered = true;
+
+            if (m_server_instance == 1 && m_server_settings[3].server_uri[0]) {
+                m_app_state = APP_STATE_SERVER_CONNECT;
+                m_server_instance = 3;
+            } else {
+                m_app_state = APP_STATE_SERVER_REGISTERED;
+            }
         }
         else
         {
@@ -716,15 +722,15 @@ void lwm2m_notification(lwm2m_notification_type_t type,
     }
     else if (type == LWM2M_NOTIFCATION_TYPE_DEREGISTER)
     {
-        // We have successfully deregistered, free up the allocated link format string.
-        if (mp_link_format_string != NULL)
-        {
-            // No more attempts, clean up.
-            k_free(mp_link_format_string);
-            mp_link_format_string = NULL;
-        }
+        // We have successfully deregistered current server instance.
+        m_server_settings[m_server_instance].is.registered = false;
 
-        m_app_state = APP_STATE_DISCONNECT;
+        if (m_server_instance == 3) {
+            m_app_state = APP_STATE_SERVER_DEREGISTER;
+            m_server_instance = 1;
+        } else {
+            m_app_state = APP_STATE_DISCONNECT;
+        }
     }
 }
 
@@ -1155,7 +1161,8 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
             case LWM2M_SERVER_REGISTRATION_UPDATE_TRIGGER:
             {
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-                app_server_update(instance_id);
+                // TODO: use instance_id when /1/0/8 in Motive is fixed
+                app_server_update(1);
                 break;
             }
 
@@ -1774,21 +1781,6 @@ static void app_read_flash_storage(void)
             }
         }
     }
-
-#if CONFIG_DK_LIBRARY
-    u32_t button_state = 0;
-    dk_read_buttons(&button_state, NULL);
-
-    if (button_state & 0x08) // Switch 2 in left position
-    {
-        m_server_instance = 1;  // Connect to DM server
-    }
-    else
-    {
-        m_server_instance = 3; // Connect to Repository server
-    }
-#endif
-
 #else
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
@@ -1798,7 +1790,6 @@ static void app_read_flash_storage(void)
 #if CONFIG_DK_LIBRARY
     // Workaround for not storing is.bootstrapped:
     // - Switch 1 will determine if doing bootstrap
-    // - Switch 2 will determine if connecting to DM or Repository server
 
     u32_t button_state = 0;
     dk_read_buttons(&button_state, NULL);
@@ -1810,15 +1801,6 @@ static void app_read_flash_storage(void)
     else
     {
         m_server_settings[0].is.bootstrapped = true;
-    }
-
-    if (button_state & 0x08) // Switch 2 in left position
-    {
-        m_server_instance = 1;  // Connect to DM server
-    }
-    else
-    {
-        m_server_instance = 3; // Connect to Repository server
     }
 #endif
 
@@ -2171,16 +2153,17 @@ static void app_server_connect(void)
     bool secure;
 
     // Initialize server configuration structure.
-    memset(&m_server_conf, 0, sizeof(lwm2m_server_config_t));
-    m_server_conf.lifetime = 1000;
+    memset(&m_server_conf[m_server_instance], 0, sizeof(lwm2m_server_config_t));
+    m_server_conf[m_server_instance].lifetime = 1000;
 
     // Set the short server id of the server in the config.
-    m_server_conf.short_server_id = m_server_settings[m_server_instance].short_server_id;
+    m_server_conf[m_server_instance].short_server_id = m_server_settings[m_server_instance].short_server_id;
 
     err_code = app_resolve_server_uri((char *)&m_server_settings[m_server_instance].server_uri,
-                                      &m_remote_server, &secure);
+                                      &m_remote_server[m_server_instance], &secure, m_server_instance);
     if (err_code != 0)
     {
+        app_handle_connect_retry(m_server_instance, true);
         return;
     }
 
@@ -2189,7 +2172,7 @@ static void app_server_connect(void)
         APPL_LOG("SECURE session (register)");
 
         struct sockaddr local_addr;
-        app_init_sockaddr_in(&local_addr, m_remote_server.sa_family, LWM2M_LOCAL_CLIENT_PORT);
+        app_init_sockaddr_in(&local_addr, m_remote_server[m_server_instance].sa_family, LWM2M_LOCAL_CLIENT_PORT);
 
         #define SEC_TAG_COUNT 1
 
@@ -2210,12 +2193,12 @@ static void app_server_connect(void)
         };
 
         // NOTE: This method initiates a DTLS handshake and may block for some seconds.
-        err_code = coap_security_setup(&local_port, &m_remote_server);
+        err_code = coap_security_setup(&local_port, &m_remote_server[m_server_instance]);
 
         if (err_code == 0)
         {
             m_app_state = APP_STATE_SERVER_CONNECTED;
-            mp_lwm2m_transport = local_port.p_transport;
+            mp_lwm2m_transport[m_server_instance] = local_port.p_transport;
             m_server_settings[m_server_instance].retry_count = 0;
         }
         else
@@ -2239,29 +2222,31 @@ static void app_server_connect(void)
 static void app_server_register(void)
 {
     uint32_t err_code;
+    uint32_t link_format_string_len = 0;
 
     // Dry run the link format generation, to check how much memory that is needed.
-    err_code = lwm2m_coap_handler_gen_link_format(NULL, (uint16_t *)&m_link_format_string_len);
+    err_code = lwm2m_coap_handler_gen_link_format(NULL, (uint16_t *)&link_format_string_len);
     APP_ERROR_CHECK(err_code);
 
     // Allocate the needed amount of memory.
-    mp_link_format_string = k_malloc(m_link_format_string_len);
+    uint8_t * p_link_format_string = k_malloc(link_format_string_len);
 
-    if (mp_link_format_string != NULL)
+    if (p_link_format_string != NULL)
     {
         // Render the link format string.
-        err_code = lwm2m_coap_handler_gen_link_format(mp_link_format_string, (uint16_t *)&m_link_format_string_len);
+        err_code = lwm2m_coap_handler_gen_link_format(p_link_format_string, (uint16_t *)&link_format_string_len);
         APP_ERROR_CHECK(err_code);
 
-        err_code = lwm2m_register((struct sockaddr *)&m_remote_server,
+        err_code = lwm2m_register((struct sockaddr *)&m_remote_server[m_server_instance],
                                   &m_client_id,
-                                  &m_server_conf,
-                                  mp_lwm2m_transport,
-                                  mp_link_format_string,
-                                  (uint16_t)m_link_format_string_len);
+                                  &m_server_conf[m_server_instance],
+                                  mp_lwm2m_transport[m_server_instance],
+                                  p_link_format_string,
+                                  (uint16_t)link_format_string_len);
         APP_ERROR_CHECK(err_code);
 
         m_app_state = APP_STATE_SERVER_REGISTER_WAIT;
+        k_free(p_link_format_string);
     }
 }
 
@@ -2270,12 +2255,9 @@ static void app_server_update(uint16_t instance_id)
 {
     uint32_t err_code;
 
-    // TODO: check instance_id
-    ARG_UNUSED(instance_id);
-
-    err_code = lwm2m_update((struct sockaddr *)&m_remote_server,
-                            &m_server_conf,
-                            mp_lwm2m_transport);
+    err_code = lwm2m_update((struct sockaddr *)&m_remote_server[instance_id],
+                            &m_server_conf[instance_id],
+                            mp_lwm2m_transport[instance_id]);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -2284,11 +2266,8 @@ static void app_server_deregister(uint16_t instance_id)
 {
     uint32_t err_code;
 
-    // TODO: check instance_id
-    ARG_UNUSED(instance_id);
-
-    err_code = lwm2m_deregister((struct sockaddr *)&m_remote_server,
-                                mp_lwm2m_transport);
+    err_code = lwm2m_deregister((struct sockaddr *)&m_remote_server[instance_id],
+                                mp_lwm2m_transport[instance_id]);
     APP_ERROR_CHECK(err_code);
 
     m_app_state = APP_STATE_SERVER_DEREGISTERING;
@@ -2308,12 +2287,14 @@ static void app_disconnect(void)
         mp_lwm2m_bs_transport = NULL;
     }
 
-    if (mp_lwm2m_transport)
-    {
-        err_code = coap_security_destroy(mp_lwm2m_transport);
-        APP_ERROR_CHECK(err_code);
+    for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+        if (mp_lwm2m_transport[i])
+        {
+            err_code = coap_security_destroy(mp_lwm2m_transport[i]);
+            APP_ERROR_CHECK(err_code);
 
-        mp_lwm2m_transport = NULL;
+            mp_lwm2m_transport[i] = NULL;
+        }
     }
 
     m_app_state = APP_STATE_IP_INTERFACE_UP;
@@ -2408,11 +2389,11 @@ static void app_lwm2m_process(void)
         }
         default:
         {
-            if (m_update_server)
+            if (m_update_server > 0)
             {
                 APPL_LOG("app_server_update");
-                app_server_update(m_server_instance);
-                m_update_server = false;
+                app_server_update(m_update_server);
+                m_update_server = 0;
             }
             break;
         }
@@ -2425,7 +2406,7 @@ static void app_coap_init(void)
     uint32_t err_code;
 
     struct sockaddr local_addr;
-    app_init_sockaddr_in(&local_addr, m_family_type, COAP_LOCAL_LISTENER_PORT);
+    app_init_sockaddr_in(&local_addr, AF_INET6, COAP_LOCAL_LISTENER_PORT);
 
     // If bootstrap server and server is using different port we can
     // register the ports individually.
@@ -2727,8 +2708,20 @@ static int cmd_lwm2m_register(const struct shell *shell, size_t argc, char **arg
 
 static int cmd_lwm2m_update(const struct shell *shell, size_t argc, char **argv)
 {
+    uint16_t instance_id = 1;
+
+    if (argc == 2) {
+        instance_id = atoi(argv[1]);
+
+        if (instance_id != 1 && instance_id != 3)
+        {
+            shell_print(shell, "instance must be 1 or 3");
+            return 0;
+        }
+    }
+
     if (m_app_state == APP_STATE_SERVER_REGISTERED) {
-        m_update_server = true;
+        m_update_server = instance_id;
     } else {
         shell_print(shell, "Not registered");
     }
@@ -2943,6 +2936,7 @@ int main(void)
     {
         m_app_state = APP_STATE_BS_CONNECT;
     }
+    m_server_instance = 1;
 
     // Enter main loop
     for (;;)
