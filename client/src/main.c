@@ -1923,23 +1923,14 @@ static void app_lwm2m_create_objects(void)
     m_instance_device.serial_number.len = strlen(m_instance_device.serial_number.p_val);
     m_instance_device.firmware_version.p_val = "1.0";
     m_instance_device.firmware_version.len = strlen(m_instance_device.firmware_version.p_val);
-    m_instance_device.avail_power_sources.len = 3;
-    m_instance_device.avail_power_sources.val.p_uint8[0] = 0; // DC power
-    m_instance_device.avail_power_sources.val.p_uint8[1] = 2; // External Battery
-    m_instance_device.avail_power_sources.val.p_uint8[2] = 5; // USB
-    m_instance_device.power_source_voltage.len = 3;
-    m_instance_device.power_source_voltage.val.p_int32[0] = 5108;
-    m_instance_device.power_source_voltage.val.p_int32[1] = 5242;
-    m_instance_device.power_source_voltage.val.p_int32[2] = 5000;
-    m_instance_device.power_source_current.len = 3;
-    m_instance_device.power_source_current.val.p_int32[0] = 42;
-    m_instance_device.power_source_current.val.p_int32[1] = 0;
-    m_instance_device.power_source_current.val.p_int32[2] = 0;
-    m_instance_device.battery_level = 20;
-    m_instance_device.memory_free = 40;
+    m_instance_device.avail_power_sources.len = 0;
+    m_instance_device.power_source_voltage.len = 0;
+    m_instance_device.power_source_current.len = 0;
+    m_instance_device.battery_level = 0;
+    m_instance_device.memory_free = 64;
     m_instance_device.error_code.len = 1;
-    m_instance_device.error_code.val.p_int32[0] = 1; // Low battery power
-    m_instance_device.current_time = 1536738518; // Wed Sep 12 09:48:38 CEST 2018
+    m_instance_device.error_code.val.p_int32[0] = 0; // No error
+    m_instance_device.current_time = 1546300800; // Tue Jan 01 00:00:00 CEST 2019
     char * utc_offset = "+02:00";
     (void)lwm2m_bytebuffer_to_string(utc_offset, strlen(utc_offset), &m_instance_device.utc_offset);
     char * timezone = "Europe/Oslo";
@@ -1951,7 +1942,7 @@ static void app_lwm2m_create_objects(void)
     m_instance_device.hardware_version.len = strlen(m_instance_device.hardware_version.p_val);
     m_instance_device.software_version.p_val = "1.0";
     m_instance_device.software_version.len = strlen(m_instance_device.software_version.p_val);
-    m_instance_device.battery_status = 4;
+    m_instance_device.battery_status = 5;
     m_instance_device.memory_total = 128;
 
     m_instance_device.proto.callback = device_instance_callback;
