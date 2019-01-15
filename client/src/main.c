@@ -785,6 +785,8 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 #if APP_USE_NVS
     APPL_LOG("Store bootstrap settings");
     nvs_write(&fs, 0, &m_server_settings[0], sizeof(m_server_settings[0]));
+    nvs_write(&fs, 1, &m_server_settings[1], sizeof(m_server_settings[1]));
+    nvs_write(&fs, 3, &m_server_settings[3], sizeof(m_server_settings[3]));
 #endif
 
     milliseconds_spent = k_uptime_delta(&time_stamp);
@@ -1725,6 +1727,12 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
         case 1: // DM server
         {
             memset(&m_server_settings[1], 0, sizeof(m_server_settings[1]));
+            m_server_settings[1].access[0] = rwde_access;
+            m_server_settings[1].server[0] = 101;
+            m_server_settings[1].access[1] = rwde_access;
+            m_server_settings[1].server[1] = 102;
+            m_server_settings[1].access[2] = rwde_access;
+            m_server_settings[1].server[2] = 1000;
             m_server_settings[1].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
             break;
         }
@@ -1749,6 +1757,12 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
         case 3: // Repository server
         {
             memset(&m_server_settings[3], 0, sizeof(m_server_settings[3]));
+            m_server_settings[1].access[0] = rwde_access;
+            m_server_settings[1].server[0] = 101;
+            m_server_settings[1].access[1] = rwde_access;
+            m_server_settings[1].server[1] = 102;
+            m_server_settings[1].access[2] = rwde_access;
+            m_server_settings[1].server[2] = 1000;
             m_server_settings[3].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
             break;
         }
@@ -2632,6 +2646,7 @@ static int cmd_config_print(const struct shell *shell, size_t argc, char **argv)
         shell_print(shell, " Short Server ID  %d", m_server_settings[i].short_server_id);
         shell_print(shell, " Server URI       %s", m_server_settings[i].server_uri);
         shell_print(shell, " Lifetime         %lld", m_server_settings[i].lifetime);
+        shell_print(shell, " Owner            %d", m_server_settings[i].owner);
     }
 
     return 0;
@@ -2700,6 +2715,35 @@ static int cmd_config_lifetime(const struct shell *shell, size_t argc, char **ar
         nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[0]));
 
         shell_print(shell, "Set lifetime %d: %d", instance_id, lifetime);
+    }
+
+    return 0;
+}
+
+static int cmd_config_owner(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 3) {
+        shell_print(shell, "%s <instance> <owner>", argv[0]);
+        return 0;
+    }
+
+    int instance_id = atoi(argv[1]);
+    uint16_t owner = (uint16_t) atoi(argv[2]);
+
+    if (instance_id < 0 || instance_id >= (1+LWM2M_MAX_SERVERS))
+    {
+        shell_print(shell, "instance must be between 0 and %d", LWM2M_MAX_SERVERS);
+        return 0;
+    }
+
+    if (owner != m_server_settings[instance_id].owner) {
+
+        m_server_settings[instance_id].owner = owner;
+        m_instance_server[instance_id].proto.acl.owner = owner;
+
+        nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[0]));
+
+        shell_print(shell, "Set owner %d: %d", instance_id, owner);
     }
 
     return 0;
@@ -2876,6 +2920,7 @@ SHELL_CREATE_STATIC_SUBCMD_SET(sub_config)
     SHELL_CMD(clear, NULL, "Clear bootstrapped values", cmd_config_clear),
     SHELL_CMD(uri, NULL, "Set URI", cmd_config_uri),
     SHELL_CMD(lifetime, NULL, "Set lifetime", cmd_config_lifetime),
+    SHELL_CMD(owner, NULL, "Set access control owner", cmd_config_owner),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 };
 #endif
