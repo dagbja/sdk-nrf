@@ -41,6 +41,9 @@
 /* Hardcoded IMEI for now, will be fetched from modem using AT+CGSN=1 */
 #define IMEI            "004402990020434"
 
+/* Hardcoded MSISDN fro now, will be fetched from modem using AT+CNUM */
+#define MSISDN          "0123456789"
+
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_NVS                     0
 
@@ -54,7 +57,7 @@
 #define LWM2M_SERVER_REMORT_PORT              5684                                            /**< Remote port of the LWM2M server. */
 
 #define BOOTSTRAP_URI                   "coaps://ddocdpboot.do.motive.com:5684"               /**< Server URI to the bootstrap server when using security (DTLS). */
-#define CLIENT_IMEI_MSISDN              "urn:imei-msisdn:" IMEI "-0123456789"                 /**< IMEI-MSISDN of the device. */
+#define CLIENT_IMEI_MSISDN              "urn:imei-msisdn:" IMEI "-" MSISDN                    /**< IMEI-MSISDN of the device. */
 
 #define SECURITY_SERVER_URI_SIZE_MAX    64                                                    /**< Max size of server URIs. */
 #define SECURITY_SMS_NUMBER_SIZE_MAX    20                                                    /**< Max size of server SMS number. */
