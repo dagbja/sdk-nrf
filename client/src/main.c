@@ -2921,6 +2921,7 @@ SHELL_CREATE_STATIC_SUBCMD_SET(sub_config)
     SHELL_CMD(uri, NULL, "Set URI", cmd_config_uri),
     SHELL_CMD(lifetime, NULL, "Set lifetime", cmd_config_lifetime),
     SHELL_CMD(owner, NULL, "Set access control owner", cmd_config_owner),
+    SHELL_CMD(factory_reset, NULL, "Factory reset", cmd_factory_reset),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 };
 #endif
@@ -2941,7 +2942,6 @@ SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
 SHELL_CMD_REGISTER(config, &sub_config, "Instance configuration", NULL);
 #endif
 SHELL_CMD_REGISTER(lwm2m, &sub_lwm2m, "LwM2M operations", NULL);
-SHELL_CMD_REGISTER(factory_reset, NULL, "Factory Reset", cmd_factory_reset);
 SHELL_CMD_REGISTER(reboot, NULL, "Reboot", cmd_reboot);
 #endif
 
