@@ -190,6 +190,7 @@ static struct k_delayed_work state_update_work;
 #if CONFIG_DK_LIBRARY
 static struct k_delayed_work leds_update_work;
 #endif
+static struct k_delayed_work connection_update_work[1+LWM2M_MAX_SERVERS];
 static struct k_delayed_work coap_update_work;
 
 /* Resolved server addresses */
@@ -699,6 +700,10 @@ void lwm2m_notification(lwm2m_notification_type_t type,
     }
     else if (type == LWM2M_NOTIFCATION_TYPE_REGISTER)
     {
+        // Start lifetime timer
+        k_delayed_work_submit(&connection_update_work[m_server_instance],
+                              m_server_settings[m_server_instance].lifetime * 1000);
+
         if (coap_code == COAP_CODE_201_CREATED || coap_code == COAP_CODE_204_CHANGED)
         {
             printk("Registered %d\n", m_server_instance);
@@ -1483,6 +1488,13 @@ static uint32_t app_store_bootstrap_server_values(uint16_t instance_id)
         return EINVAL;
     }
 
+    if (m_server_settings[instance_id].lifetime != m_instance_server[instance_id].lifetime) {
+        if (instance_id == 1 || instance_id == 3) {
+            // Lifetime changed, send update server
+            m_update_server = instance_id;
+        }
+    }
+
     m_server_settings[instance_id].lifetime = m_instance_server[instance_id].lifetime;
     m_server_settings[instance_id].default_minimum_period = m_instance_server[instance_id].default_minimum_period;
     m_server_settings[instance_id].default_maximum_period = m_instance_server[instance_id].default_maximum_period;
@@ -2146,7 +2158,7 @@ static void app_server_connect(void)
 
     // Initialize server configuration structure.
     memset(&m_server_conf[m_server_instance], 0, sizeof(lwm2m_server_config_t));
-    m_server_conf[m_server_instance].lifetime = 1000;
+    m_server_conf[m_server_instance].lifetime = m_server_settings[m_server_instance].lifetime;
 
     // Set the short server id of the server in the config.
     m_server_conf[m_server_instance].short_server_id = m_server_settings[m_server_instance].short_server_id;
@@ -2250,7 +2262,11 @@ static void app_server_update(uint16_t instance_id)
     err_code = lwm2m_update((struct sockaddr *)&m_remote_server[instance_id],
                             &m_server_conf[instance_id],
                             mp_lwm2m_transport[instance_id]);
-    APP_ERROR_CHECK(err_code);
+    ARG_UNUSED(err_code);
+
+    // Restart lifetime timer
+    k_delayed_work_submit(&connection_update_work[instance_id],
+                          m_server_settings[instance_id].lifetime * 1000);
 }
 
 
@@ -2615,6 +2631,7 @@ static int cmd_config_print(const struct shell *shell, size_t argc, char **argv)
         shell_print(shell, "Instance %d", i);
         shell_print(shell, " Short Server ID  %d", m_server_settings[i].short_server_id);
         shell_print(shell, " Server URI       %s", m_server_settings[i].server_uri);
+        shell_print(shell, " Lifetime         %lld", m_server_settings[i].lifetime);
     }
 
     return 0;
@@ -2670,10 +2687,20 @@ static int cmd_config_lifetime(const struct shell *shell, size_t argc, char **ar
         return 0;
     }
 
-    m_server_settings[instance_id].lifetime = lifetime;
-    nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[0]));
+    if (lifetime != m_server_settings[instance_id].lifetime) {
+        if (instance_id == 1 || instance_id == 3) {
+            // Lifetime changed, send update server
+            m_update_server = instance_id;
+        }
 
-    shell_print(shell, "Set lifetime %d: %d", instance_id, lifetime);
+        m_server_settings[instance_id].lifetime = lifetime;
+        m_instance_server[instance_id].lifetime = lifetime;
+        m_server_conf[instance_id].lifetime = lifetime;
+
+        nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[0]));
+
+        shell_print(shell, "Set lifetime %d: %d", instance_id, lifetime);
+    }
 
     return 0;
 }
@@ -2874,6 +2901,31 @@ SHELL_CMD_REGISTER(reboot, NULL, "Reboot", cmd_reboot);
 #endif
 
 
+/**@brief Handle server lifetime.
+ */
+static void app_connection_update(struct k_work *work)
+{
+    if (m_app_state == APP_STATE_SERVER_REGISTERED) {
+        for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+            if (work == (struct k_work *)&connection_update_work[i]) {
+                app_server_update(i);
+                break;
+            }
+        }
+    }
+}
+
+
+/**@brief Initializes and submits delayed work. */
+static void work_init(void)
+{
+    k_delayed_work_init(&connection_update_work[1], app_connection_update);
+    k_delayed_work_init(&connection_update_work[3], app_connection_update);
+
+    k_delayed_work_init(&state_update_work, app_wait_state_update);
+}
+
+
 /**@brief Function for application main entry.
  */
 int main(void)
@@ -2923,7 +2975,7 @@ int main(void)
     }
 #endif
 
-    k_delayed_work_init(&state_update_work, app_wait_state_update);
+    work_init();
 
     if (m_server_settings[0].is.bootstrapped)
     {
