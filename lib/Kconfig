@@ -6,7 +6,7 @@
 
 config NRF_LWM2M
 	bool "Nordic LwM2M library support"
-	select NRFXLIB_COAP
+	select NRF_COAP_LIB
 	help
 	  "Enable LwM2M library"
 

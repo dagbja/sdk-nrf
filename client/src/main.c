@@ -29,9 +29,9 @@
 #include <at_host.h>
 #endif
 
-#include <coap_api.h>
-#include <coap_option.h>
-#include <coap_message.h>
+#include <net/coap_api.h>
+#include <net/coap_option.h>
+#include <net/coap_message.h>
 #include <lwm2m_api.h>
 #include <lwm2m_remote.h>
 #include <lwm2m_acl.h>
@@ -1058,7 +1058,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
     uint16_t access = 0;
     uint32_t err_code = app_lwm2m_access_remote_get(&access,
                                                     p_instance,
-                                                    p_request->p_remote);
+                                                    p_request->remote);
     APP_ERROR_CHECK(err_code);
 
     // Set op_code to 0 if access not allowed for that op_code.
@@ -1109,7 +1109,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
     }
     else if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
-        uint32_t mask = 0;
+        u32_t mask = 0;
         err_code = coap_message_ct_mask_get(p_request, &mask);
 
         if (err_code != 0)
@@ -1121,7 +1121,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
         if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
         {
             err_code = lwm2m_tlv_server_decode(&m_instance_server[instance_id],
-                                               p_request->p_payload,
+                                               p_request->payload,
                                                p_request->payload_len,
                                                resource_tlv_callback);
         }
@@ -1129,7 +1129,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
         {
             err_code = lwm2m_plain_text_server_decode(&m_instance_server[instance_id],
                                                       resource_id,
-                                                      p_request->p_payload,
+                                                      p_request->payload,
                                                       p_request->payload_len);
         }
         else
@@ -1204,7 +1204,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
     uint16_t access = 0;
     uint32_t err_code = app_lwm2m_access_remote_get(&access,
                                                     p_instance,
-                                                    p_request->p_remote);
+                                                    p_request->remote);
     APP_ERROR_CHECK(err_code);
 
     // Set op_code to 0 if access not allowed for that op_code.
@@ -1247,7 +1247,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
     }
     else if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
-        uint32_t mask = 0;
+        u32_t mask = 0;
         err_code = coap_message_ct_mask_get(p_request, &mask);
 
         if (err_code != 0)
@@ -1259,7 +1259,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
         if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
         {
             err_code = lwm2m_tlv_device_decode(&m_instance_device,
-                                               p_request->p_payload,
+                                               p_request->payload,
                                                p_request->payload_len,
                                                resource_tlv_callback);
         }
@@ -1267,7 +1267,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
         {
             err_code = lwm2m_plain_text_device_decode(&m_instance_device,
                                                       resource_id,
-                                                      p_request->p_payload,
+                                                      p_request->payload,
                                                       p_request->payload_len);
         }
         else
@@ -1349,7 +1349,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
     uint16_t access = 0;
     uint32_t err_code = app_lwm2m_access_remote_get(&access,
                                                     p_instance,
-                                                    p_request->p_remote);
+                                                    p_request->remote);
     APP_ERROR_CHECK(err_code);
 
     // Set op_code to 0 if access not allowed for that op_code.
@@ -1405,7 +1405,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
     }
     else if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
-        uint32_t mask = 0;
+        u32_t mask = 0;
         err_code = coap_message_ct_mask_get(p_request, &mask);
 
         if (err_code != 0)
@@ -1417,7 +1417,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
         if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
         {
             err_code = lwm2m_tlv_connectivity_monitoring_decode(&m_instance_conn_mon,
-                                                                p_request->p_payload,
+                                                                p_request->payload,
                                                                 p_request->payload_len,
                                                                 resource_tlv_callback);
         }
@@ -1546,7 +1546,7 @@ uint32_t server_object_callback(lwm2m_object_t * p_object,
     if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
         (void)lwm2m_tlv_server_decode(&m_instance_server[instance_id],
-                                      p_request->p_payload,
+                                      p_request->payload,
                                       p_request->payload_len,
                                       resource_tlv_callback);
 
@@ -1593,7 +1593,7 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
     uint16_t access = 0;
     uint32_t err_code = app_lwm2m_access_remote_get(&access,
                                                     p_instance,
-                                                    p_request->p_remote);
+                                                    p_request->remote);
     APP_ERROR_CHECK(err_code);
 
     // Set op_code to 0 if access not allowed for that op_code.
@@ -1611,7 +1611,7 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
         uint16_t instance_id = p_instance->instance_id;
 
         err_code = lwm2m_tlv_security_decode(&m_instance_security[instance_id],
-                                             p_request->p_payload,
+                                             p_request->payload,
                                              p_request->payload_len,
                                              resource_tlv_callback);
         APP_ERROR_CHECK(err_code);
@@ -1645,7 +1645,7 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
     if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
         uint32_t err_code = lwm2m_tlv_security_decode(&m_instance_security[instance_id],
-                                                      p_request->p_payload,
+                                                      p_request->payload,
                                                       p_request->payload_len,
                                                       resource_tlv_callback);
         APP_ERROR_CHECK(err_code);
@@ -2120,16 +2120,16 @@ static void app_bootstrap_connect(void)
 
         coap_sec_config_t setting =
         {
-            .role           = 0,    // 0 -> Client role
-            .sec_tag_count  = SEC_TAG_COUNT,
-            .p_sec_tag_list = sec_tag_list
+            .role          = 0,    // 0 -> Client role
+            .sec_tag_count = SEC_TAG_COUNT,
+            .sec_tag_list  = sec_tag_list
         };
 
         coap_local_t local_port =
         {
-            .p_addr    = &local_addr,
-            .p_setting = &setting,
-            .protocol  = IPPROTO_DTLS_1_2
+            .addr     = &local_addr,
+            .setting  = &setting,
+            .protocol = IPPROTO_DTLS_1_2
         };
 
         // NOTE: This method initiates a DTLS handshake and may block for a some seconds.
@@ -2138,7 +2138,7 @@ static void app_bootstrap_connect(void)
         if (err_code == 0)
         {
             m_app_state = APP_STATE_BS_CONNECTED;
-            mp_lwm2m_bs_transport = local_port.p_transport;
+            mp_lwm2m_bs_transport = local_port.transport;
         }
         else
         {
@@ -2203,13 +2203,13 @@ static void app_server_connect(void)
         {
             .role           = 0,    // 0 -> Client role
             .sec_tag_count  = SEC_TAG_COUNT,
-            .p_sec_tag_list = sec_tag_list
+            .sec_tag_list = sec_tag_list
         };
 
         coap_local_t local_port =
         {
-            .p_addr    = &local_addr,
-            .p_setting = &setting,
+            .addr    = &local_addr,
+            .setting = &setting,
             .protocol  = IPPROTO_DTLS_1_2
         };
 
@@ -2219,7 +2219,7 @@ static void app_server_connect(void)
         if (err_code == 0)
         {
             m_app_state = APP_STATE_SERVER_CONNECTED;
-            mp_lwm2m_transport[m_server_instance] = local_port.p_transport;
+            mp_lwm2m_transport[m_server_instance] = local_port.transport;
             m_server_settings[m_server_instance].retry_count = 0;
         }
         else
@@ -2438,7 +2438,7 @@ static void app_coap_init(void)
     coap_local_t local_port_list[COAP_PORT_COUNT] =
     {
         {
-            .p_addr = &local_addr
+            .addr = &local_addr
         }
     };
 
@@ -2446,12 +2446,12 @@ static void app_coap_init(void)
     APP_ERROR_CHECK_BOOL(((sizeof(local_port_list)) / (sizeof(coap_local_t))) == COAP_PORT_COUNT);
 
     coap_transport_init_t port_list;
-    port_list.p_port_table = &local_port_list[0];
+    port_list.port_table = &local_port_list[0];
 
     err_code = coap_init(17, &port_list, k_malloc, k_free);
     APP_ERROR_CHECK(err_code);
 
-    mp_coap_transport = local_port_list[0].p_transport;
+    mp_coap_transport = local_port_list[0].transport;
     ARG_UNUSED(mp_coap_transport);
 
     k_delayed_work_init(&coap_update_work, app_coap_time_tick);

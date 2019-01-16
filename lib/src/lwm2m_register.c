@@ -14,7 +14,7 @@
 #include <lwm2m_api.h>
 #include <lwm2m_register.h>
 #include <lwm2m_remote.h>
-#include <coap_api.h>
+#include <net/coap_api.h>
 
 #define LWM2M_REGISTER_URI_PATH "rd"
 #define TOKEN_START 0xAE1C
@@ -35,7 +35,7 @@ static uint32_t internal_message_new(coap_message_t **         pp_msg,
     conf.type              = COAP_TYPE_CON;
     conf.code              = code;
     conf.response_callback = callback;
-    conf.p_transport       = p_transport;
+    conf.transport         = p_transport;
     conf.token_len         = uint16_encode(m_token, conf.token);
     m_token++;
 
@@ -149,7 +149,7 @@ static void lwm2m_register_cb(uint32_t status, void * p_arg, coap_message_t * p_
 
     if (p_message)
     {
-        p_remote = p_message->p_remote;
+        p_remote = p_message->remote;
         coap_code = p_message->header.code;
     }
 
@@ -173,7 +173,7 @@ static void lwm2m_register_cb(uint32_t status, void * p_arg, coap_message_t * p_
 
                 if (option.number == COAP_OPT_LOCATION_PATH)
                 {
-                    err_code = lwm2m_remote_location_save((char *)option.p_data,
+                    err_code = lwm2m_remote_location_save((char *)option.data,
                                                           option.length,
                                                           short_server_id);
                 }
@@ -225,7 +225,7 @@ uint32_t lwm2m_register(struct sockaddr         * p_remote,
     if (err_code == 0)
     {
         uint32_t ssid = p_config->short_server_id;
-        p_msg->p_arg  = (void *)ssid;
+        p_msg->arg    = (void *)ssid;
         err_code      = coap_message_remote_addr_set(p_msg, p_remote);
     }
 
@@ -302,7 +302,7 @@ void lwm2m_update_cb(uint32_t status, void * p_arg, coap_message_t * p_message)
 
     if (p_message)
     {
-        p_remote = p_message->p_remote;
+        p_remote = p_message->remote;
         coap_code = p_message->header.code;
     }
 
@@ -413,7 +413,7 @@ void lwm2m_deregister_cb(uint32_t status, void * p_arg, coap_message_t * p_messa
 
     if (p_message)
     {
-        p_remote = p_message->p_remote;
+        p_remote = p_message->remote;
         coap_code = p_message->header.code;
     }
 

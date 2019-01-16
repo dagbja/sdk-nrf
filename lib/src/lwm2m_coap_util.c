@@ -9,7 +9,7 @@
 #include <string.h>
 
 #include <lwm2m.h>
-#include <coap_api.h>
+#include <net/coap_api.h>
 
 
 uint32_t lwm2m_respond_with_code(coap_msg_code_t code, coap_message_t * p_request)
@@ -32,7 +32,7 @@ uint32_t lwm2m_respond_with_code(coap_msg_code_t code, coap_message_t * p_reques
     // PIGGY BACKED RESPONSE
     response_config.code        = code;
     response_config.id          = p_request->header.id;
-    response_config.p_transport = p_request->p_transport;
+    response_config.transport = p_request->transport;
 
     // Copy token.
     memcpy(&response_config.token[0], &p_request->token[0], p_request->header.token_len);
@@ -46,14 +46,14 @@ uint32_t lwm2m_respond_with_code(coap_msg_code_t code, coap_message_t * p_reques
         return err_code;
     }
 
-    err_code = coap_message_remote_addr_set(p_response, p_request->p_remote);
+    err_code = coap_message_remote_addr_set(p_response, p_request->remote);
     if (err_code != 0)
     {
         (void)coap_message_delete(p_response);
         return err_code;
     }
 
-    uint32_t msg_handle;
+    u32_t msg_handle;
     err_code = coap_message_send(&msg_handle, p_response);
     if (err_code != 0)
     {
@@ -91,7 +91,7 @@ uint32_t lwm2m_respond_with_payload(uint8_t             * p_payload,
     // PIGGY BACKED RESPONSE
     response_config.code        = COAP_CODE_205_CONTENT;
     response_config.id          = p_request->header.id;
-    response_config.p_transport = p_request->p_transport;
+    response_config.transport   = p_request->transport;
 
     // Copy token.
     memcpy(&response_config.token[0], &p_request->token[0], p_request->header.token_len);
@@ -122,7 +122,7 @@ uint32_t lwm2m_respond_with_payload(uint8_t             * p_payload,
         return err_code;
     }
 
-    err_code = coap_message_remote_addr_set(p_response, p_request->p_remote);
+    err_code = coap_message_remote_addr_set(p_response, p_request->remote);
     if (err_code != 0)
     {
         (void)coap_message_delete(p_response);

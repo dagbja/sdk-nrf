@@ -515,7 +515,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                 }
 
 
-                err_code = internal_acl_save_from_tlv(p_request->p_payload, p_request->payload_len, current_instance);
+                err_code = internal_acl_save_from_tlv(p_request->payload, p_request->payload_len, current_instance);
                 if (err_code != 0)
                 {
                     LWM2M_MUTEX_UNLOCK();
@@ -728,7 +728,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 {
     uint32_t err_code;
     uint8_t  operation    = LWM2M_OPERATION_CODE_NONE;
-    uint32_t content_type = 0;
+    u32_t content_type = 0;
 
     err_code = coap_message_ct_mask_get(p_request, &content_type);
     if (err_code != 0)
@@ -1177,7 +1177,7 @@ static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
         if (p_request->options[index].number == COAP_OPT_URI_PATH)
         {
             uint16_t option_len = p_request->options[index].length;
-            bool     numbers    = numbers_only((char *)p_request->options[index].p_data,
+            bool     numbers    = numbers_only((char *)p_request->options[index].data,
                                                option_len);
             if (numbers)
             {
@@ -1187,7 +1187,7 @@ static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
                 // Set the temporary array to zero.
                 memset(option_data, 0, sizeof(option_data));
                 // Copy the option data string to the temporary array.
-                memcpy(option_data, p_request->options[index].p_data, option_len);
+                memcpy(option_data, p_request->options[index].data, option_len);
 
                 // Convert the zero-terminated string to a long int value.
                 path[path_index] = strtol((char *)option_data, &endptr, 10);
@@ -1216,7 +1216,7 @@ static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
 
     if (err_code == 0)
     {
-        err_code = lwm2m_remote_short_server_id_find(&short_server_id, p_request->p_remote);
+        err_code = lwm2m_remote_short_server_id_find(&short_server_id, p_request->remote);
         if (err_code == ENOENT)
         {
             // LWM2M remote not found. Setting it to be default short server id.
@@ -1242,7 +1242,7 @@ static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
             {
                 if (p_request->options[index].number == COAP_OPT_URI_PATH)
                 {
-                    requested_uri = (char *)p_request->options[index].p_data;
+                    requested_uri = (char *)p_request->options[index].data;
 
                     // Stop on first URI hit.
                     break;

@@ -20,10 +20,11 @@
 LOG_MODULE_REGISTER(LWM2M_LOG_MODULE_NAME);
 
 #include <zephyr.h>
+#include <zephyr/types.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <coap_message.h>
-#include <coap_codes.h>
+#include <net/coap_message.h>
+#include <net/coap_codes.h>
 
 #ifdef __cplusplus
 extern "C" {

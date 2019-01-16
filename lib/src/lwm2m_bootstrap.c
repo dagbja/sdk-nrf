@@ -13,7 +13,7 @@
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_bootstrap.h>
-#include <coap_api.h>
+#include <net/coap_api.h>
 
 #define LWM2M_BOOTSTRAP_URI_PATH "bs"
 #define TOKEN_START 0x012A
@@ -34,7 +34,7 @@ static uint32_t internal_message_new(coap_message_t         ** pp_msg,
     conf.type              = COAP_TYPE_CON;
     conf.code              = code;
     conf.response_callback = callback;
-    conf.p_transport       = p_transport;
+    conf.transport         = p_transport;
 
     conf.token_len = uint16_encode(m_token, conf.token);
 
@@ -47,14 +47,14 @@ static uint32_t internal_message_new(coap_message_t         ** pp_msg,
 
 
 /**@brief Function to be used as callback function upon a bootstrap request. */
-static void lwm2m_bootstrap_cb(uint32_t status, void * p_arg, coap_message_t * p_message)
+static void lwm2m_bootstrap_cb(u32_t status, void * p_arg, coap_message_t * p_message)
 {
     struct sockaddr *p_remote = NULL;
     uint8_t coap_code = 0;
 
     if (p_message)
     {
-        p_remote = p_message->p_remote;
+        p_remote  = p_message->remote;
         coap_code = p_message->header.code;
     }
 
@@ -130,7 +130,7 @@ uint32_t lwm2m_bootstrap(struct sockaddr         * p_remote,
 
     if (err_code == 0)
     {
-        uint32_t msg_handle;
+        u32_t msg_handle;
         err_code = coap_message_send(&msg_handle, p_msg);
     }
 
