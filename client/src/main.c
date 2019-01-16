@@ -49,7 +49,6 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define MSISDN          "0123456789"
 
 #define APP_ACL_DM_SERVER_HACK          1
-#define APP_USE_NVS                     0
 #define APP_USE_CONTABO                 0
 
 #define APP_LEDS_UPDATE_INTERVAL        500                                                   /**< Interval in milliseconds between each time status LEDs are updated. */
@@ -269,7 +268,7 @@ typedef struct
 
 static server_settings_t     m_server_settings[1+LWM2M_MAX_SERVERS];
 
-#if APP_USE_NVS
+#if CONFIG_FLASH
 /* NVS-related defines */
 #define NVS_SECTOR_SIZE    FLASH_ERASE_BLOCK_SIZE    /* Multiple of FLASH_PAGE_SIZE */
 #define NVS_SECTOR_COUNT   2                         /* At least 2 sectors */
@@ -812,7 +811,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     m_server_settings[0].is.bootstrapped = true;  // TODO: this should be set by bootstrap server when bootstrapped
     m_did_bootstrap = true;
 
-#if APP_USE_NVS
+#if CONFIG_FLASH
     APPL_LOG("Store bootstrap settings");
     nvs_write(&fs, 0, &m_server_settings[0], sizeof(m_server_settings[0]));
     nvs_write(&fs, 1, &m_server_settings[1], sizeof(m_server_settings[1]));
@@ -1553,7 +1552,7 @@ static uint32_t app_store_bootstrap_security_values(uint16_t instance_id)
            m_instance_security[instance_id].sms_number.len);
     m_instance_security[instance_id].sms_number.p_val = m_server_settings[instance_id].sms_number;
 
-#if APP_USE_NVS
+#if CONFIG_FLASH
     APPL_LOG("Store bootstrap security values");
     nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[instance_id]));
 #endif
@@ -1600,7 +1599,7 @@ static uint32_t app_store_bootstrap_server_values(uint16_t instance_id)
     }
     m_server_settings[instance_id].owner = p_instance->acl.owner;
 
-#if APP_USE_NVS
+#if CONFIG_FLASH
     APPL_LOG("Store bootstrap server values");
     nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[instance_id]));
 #endif
@@ -1854,7 +1853,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
 
 static void app_factory_reset(void)
 {
-#if APP_USE_NVS
+#if CONFIG_FLASH
         for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
         {
             nvs_delete(&fs, i);
@@ -1865,7 +1864,7 @@ static void app_factory_reset(void)
 
 static void app_read_flash_storage(void)
 {
-#if APP_USE_NVS
+#if CONFIG_FLASH
     int rc;
 
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
@@ -2607,7 +2606,7 @@ static void app_provision_secret_keys(void)
 /**@brief Initialize Non-volatile Storage. */
 static void app_flash_init(void)
 {
-#if APP_USE_NVS
+#if CONFIG_FLASH
     int rc = nvs_init(&fs, DT_FLASH_DEV_NAME);
     if (rc) {
         APPL_LOG("Flash init failed: %d", rc);
@@ -2727,7 +2726,7 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
     return 0;
 }
 
-#if APP_USE_NVS
+#if CONFIG_FLASH
 static int cmd_config_clear(const struct shell *shell, size_t argc, char **argv)
 {
     m_server_settings[0].is.bootstrapped = false;
@@ -3019,7 +3018,7 @@ static int cmd_reboot(const struct shell *shell, size_t argc, char **argv)
 }
 
 
-#if APP_USE_NVS
+#if CONFIG_FLASH
 SHELL_CREATE_STATIC_SUBCMD_SET(sub_config)
 {
     SHELL_CMD(print, NULL, "Print configuration", cmd_config_print),
@@ -3044,7 +3043,7 @@ SHELL_CREATE_STATIC_SUBCMD_SET(sub_lwm2m)
 
 
 SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
-#if APP_USE_NVS
+#if CONFIG_FLASH
 SHELL_CMD_REGISTER(config, &sub_config, "Instance configuration", NULL);
 #endif
 SHELL_CMD_REGISTER(lwm2m, &sub_lwm2m, "LwM2M operations", NULL);
