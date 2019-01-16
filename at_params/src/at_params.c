@@ -4,12 +4,11 @@
 #include <stdio.h>
 #include <limits.h>
 
-#include "at_params.h"
+#include <at_params.h>
 
-#include "sdk_macros.h"
-#include "nrf_error.h"
-// #include "mem_manager.h"
 #include <kernel.h>
+#include <sdk_macros.h>
+#include <nrf_error.h>
 
 #define AT_PARAMS_CALLOC    k_calloc
 #define AT_PARAMS_MALLOC    k_malloc

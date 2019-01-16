@@ -20,6 +20,9 @@ zephyr_include_directories(src)
 # Use the AT command parser
 target_link_libraries(app PRIVATE nrf_at_cmd_parser)
 
+# Modem interface using AT commands
+target_link_libraries(app PRIVATE nrf_mdm_interface_at)
+
 add_subdirectory(.. ${PROJECT_BINARY_DIR}/zephyr/nrf_lwm2m)
 target_link_libraries(app PRIVATE nrf_lwm2m)
 

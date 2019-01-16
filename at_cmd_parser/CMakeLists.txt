@@ -9,9 +9,10 @@ add_library(nrf_at_cmd_parser
     src/at_utils.c
 )
 
+# Zephyr Kernel
 add_dependencies(nrf_at_cmd_parser offsets_h)
 
-# Add nrf_at_params a dependency.
+# Add nrf_at_params as a dependency.
 target_link_libraries(nrf_at_cmd_parser PUBLIC nrf_at_params)
 
 target_include_directories(nrf_at_cmd_parser PUBLIC include)
