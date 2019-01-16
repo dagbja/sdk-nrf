@@ -1760,12 +1760,12 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
         case 3: // Repository server
         {
             memset(&m_server_settings[3], 0, sizeof(m_server_settings[3]));
-            m_server_settings[1].access[0] = rwde_access;
-            m_server_settings[1].server[0] = 101;
-            m_server_settings[1].access[1] = rwde_access;
-            m_server_settings[1].server[1] = 102;
-            m_server_settings[1].access[2] = rwde_access;
-            m_server_settings[1].server[2] = 1000;
+            m_server_settings[3].access[0] = rwde_access;
+            m_server_settings[3].server[0] = 101;
+            m_server_settings[3].access[1] = rwde_access;
+            m_server_settings[3].server[1] = 102;
+            m_server_settings[3].access[2] = rwde_access;
+            m_server_settings[3].server[2] = 1000;
             m_server_settings[3].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
             break;
         }
