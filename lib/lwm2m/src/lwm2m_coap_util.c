@@ -71,9 +71,9 @@ uint32_t lwm2m_respond_with_code(coap_msg_code_t code, coap_message_t * p_reques
 uint32_t lwm2m_observe_register(uint8_t             * p_payload,
                                 uint16_t              payload_len,
                                 uint16_t              max_age,
-                                coap_message_t       * p_request,
+                                coap_message_t      * p_request,
                                 coap_content_type_t   content_type,
-                                lwm2m_instance_t     * p_instance_proto)
+                                lwm2m_instance_t    * p_instance_proto)
 {
     NULL_PARAM_CHECK(p_request);
     NULL_PARAM_CHECK(p_payload);

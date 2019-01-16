@@ -17,6 +17,8 @@
 #include <stdint.h>
 
 #include <net/socket.h>
+#include <net/coap_api.h>
+#include <net/coap_observe_api.h>
 
 #ifdef __cplusplus
 extern "C" {

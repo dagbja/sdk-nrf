@@ -209,7 +209,7 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
             {
                 if (resource_callback)
                 {
-                    err_code = resource_callback((lwm2m_instance_t *)p_security, &tlv);
+                    err_code = resource_callback(((lwm2m_instance_t *)p_security)->instance_id, &tlv);
                 }
                 break;
             }
@@ -458,7 +458,7 @@ uint32_t lwm2m_tlv_server_decode(lwm2m_server_t     * p_server,
             {
                 if (resource_callback)
                 {
-                    err_code = resource_callback((lwm2m_instance_t *)p_server, &tlv);
+                    err_code = resource_callback(((lwm2m_instance_t *)p_server)->instance_id, &tlv);
                 }
                 break;
             }
@@ -682,7 +682,7 @@ uint32_t lwm2m_tlv_connectivity_monitoring_decode(lwm2m_connectivity_monitoring_
             {
                 if (resource_callback)
                 {
-                    err_code = resource_callback((lwm2m_instance_t *)p_conn_mon, &tlv);
+                    err_code = resource_callback(((lwm2m_instance_t *)p_conn_mon)->instance_id, &tlv);
                 }
                 break;
             }
@@ -881,7 +881,7 @@ uint32_t lwm2m_tlv_device_decode(lwm2m_device_t     * p_device,
             {
                 if (resource_callback)
                 {
-                    err_code = resource_callback((lwm2m_instance_t *)p_device, &tlv);
+                    err_code = resource_callback(((lwm2m_instance_t *)p_device)->instance_id, &tlv);
                 }
                 break;
             }
