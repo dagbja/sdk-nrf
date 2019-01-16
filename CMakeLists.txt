@@ -7,3 +7,4 @@
 add_subdirectory(lib)
 
 add_subdirectory(at_params)
+add_subdirectory(at_cmd_parser)
