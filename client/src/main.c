@@ -806,11 +806,14 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             printk("Registered %d\n", m_server_instance);
             m_server_settings[m_server_instance].retry_count = 0;
             m_server_settings[m_server_instance].is.registered = true;
-
+#if (APP_USE_CONTABO != 1)
             if (m_server_instance == 1 && m_server_settings[3].server_uri[0]) {
                 m_app_state = APP_STATE_SERVER_CONNECT;
                 m_server_instance = 3;
-            } else {
+            }
+            else
+#endif
+            {
                 m_app_state = APP_STATE_SERVER_REGISTERED;
             }
         }
