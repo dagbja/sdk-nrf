@@ -54,6 +54,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define APP_LEDS_UPDATE_INTERVAL        500                                                   /**< Interval in milliseconds between each time status LEDs are updated. */
 
 #define COAP_LOCAL_LISTENER_PORT              5683                                            /**< Local port to listen on any traffic, client or server. Not bound to any specific LWM2M functionality.*/
+#define LWM2M_LOCAL_LISTENER_PORT             9997                                            /**< Local port to listen on any traffic. Bound to specific LWM2M functionality. */
 #if APP_USE_CONTABO
 #define LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT     5784                                            /**< Local port to connect to the LWM2M bootstrap server. */
 #define LWM2M_BOOTSTRAP_SERVER_REMOTE_PORT    5784                                            /**< Remote port of the LWM2M bootstrap server. */
@@ -2514,7 +2515,7 @@ static void app_coap_init(void)
     struct sockaddr local_addr;
     struct sockaddr non_sec_local_addr;
     app_init_sockaddr_in(&local_addr, AF_INET, COAP_LOCAL_LISTENER_PORT);
-    app_init_sockaddr_in(&non_sec_local_addr, AF_INET, LWM2M_LOCAL_CLIENT_PORT);
+    app_init_sockaddr_in(&non_sec_local_addr, AF_INET, LWM2M_LOCAL_LISTENER_PORT);
 
     // If bootstrap server and server is using different port we can
     // register the ports individually.
