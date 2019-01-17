@@ -48,6 +48,10 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 /* Hardcoded MSISDN fro now, will be fetched from modem using AT+CNUM */
 #define MSISDN          "0123456789"
 
+#define APP_MOTIVE_FIX_UPDATE_TRIGGER   1 // To adjust for MotiveBridge posting /1/0/8 instead of /1/1/8
+#define APP_MOTIVE_NO_REBOOT            1 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
+#define APP_MOTIVE_FAKE_POWER_SOURCES   1 // To pass MotiveBridge power source tests (4.10, 4.11 and 4.12)
+
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_CONTABO                 0
 
@@ -1207,8 +1211,13 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
             case LWM2M_SERVER_REGISTRATION_UPDATE_TRIGGER:
             {
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-                // TODO: use instance_id when /1/0/8 in Motive is fixed
-                app_server_update(1);
+#if APP_MOTIVE_FIX_UPDATE_TRIGGER
+                // Use instance_id 1 when MotiveBridge say /1/0/8
+                if (instance_id == 0) {
+                    instance_id = 1;
+                }
+#endif
+                app_server_update(instance_id);
                 break;
             }
 
@@ -1333,7 +1342,13 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
 
                 // TODO: Shutdown and reboot
+                app_disconnect();
+#if APP_MOTIVE_NO_REBOOT
+                m_app_state = APP_STATE_SERVER_CONNECT;
+                m_server_instance = 1;
+#else
                 NVIC_SystemReset();
+#endif
                 break;
             }
 
@@ -1344,7 +1359,13 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
 
                 // TODO: Shutdown and reboot
+                app_disconnect();
+#if APP_MOTIVE_NO_REBOOT
+                m_app_state = APP_STATE_SERVER_CONNECT;
+                m_server_instance = 1;
+#else
                 NVIC_SystemReset();
+#endif
                 break;
             }
 
@@ -2032,9 +2053,23 @@ static void app_lwm2m_create_objects(void)
     m_instance_device.serial_number.len = strlen(m_instance_device.serial_number.p_val);
     m_instance_device.firmware_version.p_val = "1.0";
     m_instance_device.firmware_version.len = strlen(m_instance_device.firmware_version.p_val);
+
+#if APP_MOTIVE_FAKE_POWER_SOURCES
+    m_instance_device.avail_power_sources.len = 2;
+    m_instance_device.avail_power_sources.val.p_uint8[0] = 0; // DC power
+    m_instance_device.avail_power_sources.val.p_uint8[1] = 2; // External Battery
+    m_instance_device.power_source_voltage.len = 2;
+    m_instance_device.power_source_voltage.val.p_int32[0] = 5108;
+    m_instance_device.power_source_voltage.val.p_int32[1] = 5242;
+    m_instance_device.power_source_current.len = 2;
+    m_instance_device.power_source_current.val.p_int32[0] = 42;
+    m_instance_device.power_source_current.val.p_int32[1] = 0;
+#else
     m_instance_device.avail_power_sources.len = 0;
     m_instance_device.power_source_voltage.len = 0;
     m_instance_device.power_source_current.len = 0;
+#endif
+
     m_instance_device.battery_level = 0;
     m_instance_device.memory_free = 64;
     m_instance_device.error_code.len = 1;
