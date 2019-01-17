@@ -1,0 +1,75 @@
+#
+# Copyright (c) 2018 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+#
+
+config NRF_LWM2M
+	bool "Nordic LwM2M library support"
+	select NRF_COAP_LIB
+	help
+	  "Enable LwM2M library"
+
+config NRF_LWM2M_LOG_LEVEL
+	int "Log level for LwM2M"
+	depends on NRF_LWM2M
+	default 0
+	range 0 4
+	help
+	  "Enables LwM2M debug messages."
+
+config NRF_LWM2M_COAP_HANDLER_MAX_INSTANCES
+	int "Maximum number of object instance supported by the device."
+	depends on NRF_LWM2M
+	default 5
+	range 1 65535
+	help
+	  "Maximum number of object instances. Objects are not included as an instance as the handlers are kept in a seperate buffer."
+
+config NRF_LWM2M_COAP_HANDLER_MAX_OBJECTS
+	int "Maximum number of objects supported by the device."
+	depends on NRF_LWM2M
+	default 5
+	range 1 65535
+	help
+	  "As objects are default resource handler for the LWM2M instances when no instanceis registred, this has to be defined to set of memory for the objects that are going to be registered as handlers."
+
+config NRF_LWM2M_MAX_SERVERS
+	int "Maximum number of LWM2M servers to connect to."
+	depends on NRF_LWM2M
+	default 1
+	range 1 65535
+	help
+	  "As bootstrap server is not counted as a server in this sense, the number should reflect how many servers the device is suppose to register to."
+
+config NRF_LWM2M_REGISTER_MAX_LOCATION_LEN
+	int "Max number of bytes allocated for location string from remote server."
+	depends on NRF_LWM2M
+	default 20
+	range 1 255
+	help
+	  "Upon registration the device will get a location string to be used as identifierfor later communication with the server it is registered to. This setting defines the maximum length of the location string a server can return upon registration with a server."
+
+config NRF_LWM2M_CONNECTIVITY_MONITORING_MAX_NETWORK_BEARERS
+	int "Max number of network bearers."
+	depends on NRF_LWM2M
+	default 2
+	range 1 255
+	help
+	  "This setting defines the maximum number of available network bearers which this device can have in the Connectivity Monitoring object."
+
+config NRF_LWM2M_CONNECTIVITY_MONITORING_MAX_IP_ADDRESSES
+	int "Max number of IP addresses."
+	depends on NRF_LWM2M
+	default 2
+	range 1 255
+	help
+	  "This setting defines the maximum number of IP addresses which this device can have in the Connectivity Monitoring object."
+
+config NRF_LWM2M_CONNECTIVITY_MONITORING_MAX_APNS
+	int "Max number of APNs."
+	depends on NRF_LWM2M
+	default 4
+	range 1 255
+	help
+	  "This setting defines the maximum number of APNs which this device can have in the Connectivity Monitoring object."
