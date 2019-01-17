@@ -9,10 +9,14 @@ targeted for Zephyr on a nrf9160_pca10090 development kit.
 Switches and Buttons
 ********************
 
-The switches and buttons are used to control the behaviour of the client as follows:
+The switches are used to control the behaviour of the client when not having flash support:
 
-* Switch 1: In left position do bootstrap procedure. In right position skip bootstrap.
-* Switch 2: In left position connect to DM server. In right position connect to Repository server.
+* Switch 1: In left position do bootstrap procedure.
+            In right position skip bootstrap and use hardcoded values.
+* Switch 2: Currently unused.
+
+The buttons are used to control the behaviour of the client as follows:
+
 * Button 1: Update server if registered. Register server if not registered.
 * Button 2: Deregister server if registered.
 
