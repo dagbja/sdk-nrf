@@ -2747,11 +2747,13 @@ static int cmd_config_print(const struct shell *shell, size_t argc, char **argv)
 {
     for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++)
     {
-        shell_print(shell, "Instance %d", i);
-        shell_print(shell, " Short Server ID  %d", m_server_settings[i].short_server_id);
-        shell_print(shell, " Server URI       %s", m_server_settings[i].server_uri);
-        shell_print(shell, " Lifetime         %lld", m_server_settings[i].lifetime);
-        shell_print(shell, " Owner            %d", m_server_settings[i].owner);
+        if (m_server_settings[i].short_server_id) {
+            shell_print(shell, "Instance %d", i);
+            shell_print(shell, " Short Server ID  %d", m_server_settings[i].short_server_id);
+            shell_print(shell, " Server URI       %s", m_server_settings[i].server_uri);
+            shell_print(shell, " Lifetime         %lld", m_server_settings[i].lifetime);
+            shell_print(shell, " Owner            %d", m_server_settings[i].owner);
+        }
     }
 
     return 0;
