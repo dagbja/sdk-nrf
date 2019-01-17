@@ -2102,8 +2102,15 @@ static void app_lwm2m_create_objects(void)
 
     (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_device,
                                     (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE),
+                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE |
+                                     LWM2M_PERMISSION_OBSERVE),
                                     102);
+
+    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_device,
+                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
+                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE |
+                                     LWM2M_PERMISSION_OBSERVE),
+                                    1000);
 
     (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_device);
 
@@ -2155,6 +2162,12 @@ static void app_lwm2m_create_objects(void)
                                      LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE |
                                      LWM2M_PERMISSION_OBSERVE),
                                     102);
+
+    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_conn_mon,
+                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
+                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE |
+                                     LWM2M_PERMISSION_OBSERVE),
+                                    1000);
 
     (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_conn_mon);
 }
