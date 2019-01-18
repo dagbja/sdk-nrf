@@ -287,6 +287,7 @@ static struct nvs_fs fs = {
 #endif
 
 
+static uint32_t app_store_bootstrap_server_acl(uint16_t instance_id);
 static uint32_t app_store_bootstrap_server_values(uint16_t instance_id);
 static void app_server_update(uint16_t instance_id);
 static void app_server_deregister(uint16_t instance_id);
@@ -818,9 +819,10 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 
 #if CONFIG_FLASH
     APPL_LOG("Store bootstrap settings");
-    nvs_write(&fs, 0, &m_server_settings[0], sizeof(m_server_settings[0]));
-    nvs_write(&fs, 1, &m_server_settings[1], sizeof(m_server_settings[1]));
-    nvs_write(&fs, 3, &m_server_settings[3], sizeof(m_server_settings[3]));
+    for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+        app_store_bootstrap_server_acl(i);
+        nvs_write(&fs, i, &m_server_settings[i], sizeof(m_server_settings[i]));
+     }
 #endif
 
     milliseconds_spent = k_uptime_delta(&time_stamp);
@@ -1582,6 +1584,21 @@ static uint32_t app_store_bootstrap_security_values(uint16_t instance_id)
     return 0;
 }
 
+
+static uint32_t app_store_bootstrap_server_acl(uint16_t instance_id)
+{
+    lwm2m_instance_t * p_instance = (lwm2m_instance_t *) &m_instance_server[instance_id].proto;
+    for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++)
+    {
+        m_server_settings[instance_id].access[i] = p_instance->acl.access[i];
+        m_server_settings[instance_id].server[i] = p_instance->acl.server[i];
+    }
+    m_server_settings[instance_id].owner = p_instance->acl.owner;
+
+    return 0;
+}
+
+
 static uint32_t app_store_bootstrap_server_values(uint16_t instance_id)
 {
     if (m_instance_server[instance_id].binding.len >= SERVER_BINDING_SIZE_MAX)
@@ -1610,16 +1627,7 @@ static uint32_t app_store_bootstrap_server_values(uint16_t instance_id)
            m_instance_server[instance_id].binding.len);
 
     // Copy ACL.
-    lwm2m_instance_t * p_instance = (lwm2m_instance_t *) &m_instance_server[instance_id].proto;
-    for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++)
-    {
-        if (p_instance->acl.server[i])
-        {
-            m_server_settings[instance_id].access[i] = p_instance->acl.access[i];
-            m_server_settings[instance_id].server[i] = p_instance->acl.server[i];
-        }
-    }
-    m_server_settings[instance_id].owner = p_instance->acl.owner;
+    app_store_bootstrap_server_acl(instance_id);
 
 #if CONFIG_FLASH
     APPL_LOG("Store bootstrap server values");
