@@ -11,14 +11,3 @@ source "Kconfig.zephyr"
 endmenu
 
 rsource "../Kconfig"
-
-menu "Nordic LwM2M Client"
-
-config NRF_LWM2M_CLIENT_MODEM_LOGGING
-	int "Modem logging"
-	default 0
-	range 0 2
-	help
-	  "Enable modem logging. 0 = disabled, 1 = fidoless, 2 = fido"
-
-endmenu

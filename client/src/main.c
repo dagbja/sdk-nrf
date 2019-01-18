@@ -75,8 +75,6 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define BOOTSTRAP_URI                   "coaps://ddocdpboot.do.motive.com:5684"               /**< Server URI to the bootstrap server when using security (DTLS). */
 #endif
 
-#define CLIENT_IMEI_MSISDN              "urn:imei-msisdn:" IMEI "-" MSISDN                    /**< IMEI-MSISDN of the device. */
-
 #define SECURITY_SERVER_URI_SIZE_MAX    64                                                    /**< Max size of server URIs. */
 #define SECURITY_SMS_NUMBER_SIZE_MAX    20                                                    /**< Max size of server SMS number. */
 #define SERVER_BINDING_SIZE_MAX         4                                                     /**< Max size of server binding. */
@@ -89,7 +87,6 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #else
 #define APP_BOOTSTRAP_SEC_PSK           "d6160c2e7c90399ee7d207a22611e3d3a87241b0462976b935341d000a91e747" /**< Pre-shared key used for bootstrap server in hex format. */
 #endif
-#define APP_BOOTSTRAP_SEC_IDENTITY      CLIENT_IMEI_MSISDN                                    /**< Client identity used for bootstrap server. */
 
 #define APP_MAX_AT_READ_LENGTH          100
 #define APP_MAX_AT_WRITE_LENGTH         256
@@ -272,6 +269,19 @@ typedef struct
 } server_settings_t;
 
 static server_settings_t     m_server_settings[1+LWM2M_MAX_SERVERS];
+
+/**@brief Configurable device values. */
+typedef struct {
+    char imei[16];
+    char msisdn[16];
+    char manufacturer[64];
+    char model_number[16];
+    char serial_number[16];
+    char modem_logging[65];
+} device_settings_t;
+
+static device_settings_t m_device_settings;
+#define DEVICE_FLASH_ID 10
 
 #if CONFIG_FLASH
 /* NVS-related defines */
@@ -499,6 +509,16 @@ static void app_buttons_leds_init(void)
     k_delayed_work_submit(&leds_update_work, APP_LEDS_UPDATE_INTERVAL);
 }
 #endif
+
+
+static char * app_client_imei_msisdn()
+{
+    static char client_id[128];
+
+    snprintf(client_id, 128, "urn:imei-msisdn:%s-%s", m_device_settings.imei, m_device_settings.msisdn);
+
+    return client_id;
+}
 
 
 /**@brief Application implementation of the root handler interface.
@@ -1831,7 +1851,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             m_server_settings[0].is.bootstrapped = 0;
             m_server_settings[0].hold_off_timer = 10;
 
-            app_provision_psk(APP_BOOTSTRAP_SEC_TAG, APP_BOOTSTRAP_SEC_IDENTITY, APP_BOOTSTRAP_SEC_PSK);
+            app_provision_psk(APP_BOOTSTRAP_SEC_TAG, app_client_imei_msisdn(), APP_BOOTSTRAP_SEC_PSK);
 
             break;
         }
@@ -1885,6 +1905,17 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
 }
 
 
+static void app_init_device_settings(void)
+{
+    strcpy(m_device_settings.imei, IMEI);
+    strcpy(m_device_settings.msisdn, MSISDN);
+    strcpy(m_device_settings.manufacturer, "Nordic Semiconductor ASA");
+    strcpy(m_device_settings.model_number, "nRF9160");
+    strcpy(m_device_settings.serial_number, "1234567890");
+    strcpy(m_device_settings.modem_logging, "1");
+}
+
+
 static void app_factory_reset(void)
 {
 #if CONFIG_FLASH
@@ -1900,6 +1931,12 @@ static void app_read_flash_storage(void)
 {
 #if CONFIG_FLASH
     int rc;
+
+    rc = nvs_read(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
+    if (rc <= 0) {
+        app_init_device_settings();
+        nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
+    }
 
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
@@ -1921,6 +1958,8 @@ static void app_read_flash_storage(void)
         }
     }
 #else
+    app_init_device_settings();
+
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
         app_factory_bootstrap_server_object(i);
@@ -2002,8 +2041,6 @@ static void app_read_flash_storage(void)
 
 static void app_lwm2m_create_objects(void)
 {
-    app_read_flash_storage();
-
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
         m_instance_server[i].short_server_id = m_server_settings[i].short_server_id;
@@ -2057,11 +2094,11 @@ static void app_lwm2m_create_objects(void)
     //
     lwm2m_instance_device_init(&m_instance_device);
 
-    m_instance_device.manufacturer.p_val = "Nordic Semiconductor";
+    m_instance_device.manufacturer.p_val = m_device_settings.manufacturer;
     m_instance_device.manufacturer.len = strlen(m_instance_device.manufacturer.p_val);
-    m_instance_device.model_number.p_val = "nRF91";
+    m_instance_device.model_number.p_val = m_device_settings.model_number;
     m_instance_device.model_number.len = strlen(m_instance_device.model_number.p_val);
-    m_instance_device.serial_number.p_val = "1234567890";
+    m_instance_device.serial_number.p_val = m_device_settings.serial_number;
     m_instance_device.serial_number.len = strlen(m_instance_device.serial_number.p_val);
     m_instance_device.firmware_version.p_val = "1.0";
     m_instance_device.firmware_version.len = strlen(m_instance_device.firmware_version.p_val);
@@ -2233,7 +2270,7 @@ static void app_lwm2m_setup(void)
     }
 
     // Set client ID.
-    memcpy(&m_client_id.value.imei_msisdn[0], CLIENT_IMEI_MSISDN, LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN);
+    memcpy(&m_client_id.value.imei_msisdn[0], app_client_imei_msisdn(), LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN);
     m_client_id.type = LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN;
 }
 
@@ -2681,8 +2718,7 @@ static void app_flash_init(void)
 }
 
 
-#if (CONFIG_NRF_LWM2M_CLIENT_MODEM_LOGGING == 1) || (CONFIG_SHELL)
-static void send_at_command(const char *at_command)
+static void send_at_command(const char *at_command, bool do_logging)
 {
 #define APP_MAX_AT_READ_LENGTH          100
 #define APP_MAX_AT_WRITE_LENGTH         256
@@ -2699,14 +2735,19 @@ static void send_at_command(const char *at_command)
         return;
     }
 
-    printk("send: %s\n", at_command);
+    if (do_logging) {
+        printk("send: %s\n", at_command);
+    }
+
     snprintf(write_buffer, APP_MAX_AT_WRITE_LENGTH, "%s", at_command);
     length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
 
     if (length == strlen(write_buffer)) {
         length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
         if (length > 0) {
-            printk("recv: %s\n", read_buffer);
+            if (do_logging) {
+                printk("recv: %s\n", read_buffer);
+            }
         } else {
             printk("recv() failed\n");
         }
@@ -2716,10 +2757,8 @@ static void send_at_command(const char *at_command)
 
     close(at_socket_fd);
 }
-#endif
 
 
-#if (CONFIG_NRF_LWM2M_CLIENT_MODEM_LOGGING == 2)
 static void modem_trace_enable(void)
 {
     /* GPIO configurations for trace and debug */
@@ -2752,7 +2791,6 @@ static void modem_trace_enable(void)
 
     NRF_P0_NS->DIR = 0xFFFFFFFF;
 }
-#endif
 
 
 #if CONFIG_DK_LIBRARY
@@ -2787,7 +2825,7 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
         return 0;
     }
 
-    send_at_command(argv[1]);
+    send_at_command(argv[1], true);
 
     return 0;
 }
@@ -2815,10 +2853,10 @@ static int cmd_config_print(const struct shell *shell, size_t argc, char **argv)
     {
         if (m_server_settings[i].short_server_id) {
             shell_print(shell, "Instance %d", i);
-            shell_print(shell, " Short Server ID  %d", m_server_settings[i].short_server_id);
-            shell_print(shell, " Server URI       %s", m_server_settings[i].server_uri);
-            shell_print(shell, " Lifetime         %lld", m_server_settings[i].lifetime);
-            shell_print(shell, " Owner            %d", m_server_settings[i].owner);
+            shell_print(shell, "  Short Server ID  %d", m_server_settings[i].short_server_id);
+            shell_print(shell, "  Server URI       %s", m_server_settings[i].server_uri);
+            shell_print(shell, "  Lifetime         %lld", m_server_settings[i].lifetime);
+            shell_print(shell, "  Owner            %d", m_server_settings[i].owner);
         }
     }
 
@@ -2921,6 +2959,184 @@ static int cmd_config_owner(const struct shell *shell, size_t argc, char **argv)
 
     return 0;
 }
+
+
+static int cmd_device_print(const struct shell *shell, size_t argc, char **argv)
+{
+    shell_print(shell, "Device configuration");
+    shell_print(shell, "  Manufacturer   %s", m_device_settings.manufacturer);
+    shell_print(shell, "  Model number   %s", m_device_settings.model_number);
+    shell_print(shell, "  Serial number  %s", m_device_settings.serial_number);
+    shell_print(shell, "  IMEI           %s", m_device_settings.imei);
+    shell_print(shell, "  MSISDN         %s", m_device_settings.msisdn);
+    shell_print(shell, "  Logging        %s", m_device_settings.modem_logging);
+
+    return 0;
+}
+
+
+static int cmd_device_reset(const struct shell *shell, size_t argc, char **argv)
+{
+    app_init_device_settings();
+    nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
+
+    return 0;
+}
+
+
+static int cmd_device_manufacturer(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s \"Manufacturer\"", argv[0]);
+        return 0;
+    }
+
+    char *manufacturer = argv[1];
+    size_t manufacturer_len = strlen(manufacturer);
+
+    if (manufacturer_len > sizeof(m_device_settings.manufacturer))
+    {
+        shell_print(shell, "maximum manufacturer length is %d", sizeof(m_device_settings.manufacturer));
+        return 0;
+    }
+
+    memset(m_device_settings.manufacturer, 0, sizeof(m_device_settings.manufacturer));
+    strcpy(m_device_settings.manufacturer, manufacturer);
+    nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
+
+    shell_print(shell, "Set manufacturer: %s", manufacturer);
+
+    return 0;
+}
+
+
+static int cmd_device_model_number(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s \"Model number\"", argv[0]);
+        return 0;
+    }
+
+    char *model = argv[1];
+    size_t model_len = strlen(model);
+
+    if (model_len > sizeof(m_device_settings.model_number))
+    {
+        shell_print(shell, "maximum model number length is %d", sizeof(m_device_settings.model_number));
+        return 0;
+    }
+
+    memset(m_device_settings.model_number, 0, sizeof(m_device_settings.model_number));
+    strcpy(m_device_settings.model_number, model);
+    nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
+
+    shell_print(shell, "Set model number: %s", model);
+
+    return 0;
+}
+
+
+static int cmd_device_serial_number(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s \"Serial number\"", argv[0]);
+        return 0;
+    }
+
+    char *serial = argv[1];
+    size_t serial_len = strlen(serial);
+
+    if (serial_len > sizeof(m_device_settings.serial_number))
+    {
+        shell_print(shell, "maximum serial number length is %d", sizeof(m_device_settings.serial_number));
+        return 0;
+    }
+
+    memset(m_device_settings.serial_number, 0, sizeof(m_device_settings.serial_number));
+    strcpy(m_device_settings.serial_number, serial);
+    nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
+
+    shell_print(shell, "Set serial number: %s", serial);
+
+    return 0;
+}
+
+
+static int cmd_device_imei(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s IMEI", argv[0]);
+        return 0;
+    }
+
+    char *imei = argv[1];
+    size_t imei_len = strlen(imei);
+
+    if (imei_len != 15) {
+        shell_print(shell, "length of IMEI must be 15");
+        return 0;
+    }
+
+    memset(m_device_settings.imei, 0, sizeof(m_device_settings.imei));
+    strcpy(m_device_settings.imei, imei);
+    nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
+
+    shell_print(shell, "Set IMEI: %s", imei);
+
+    return 0;
+}
+
+
+static int cmd_device_msisdn(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s MSISDN", argv[0]);
+        return 0;
+    }
+
+    char *msisdn = argv[1];
+    size_t msisdn_len = strlen(msisdn);
+
+    if (msisdn_len != 10) {
+        shell_print(shell, "length of MSISDN must be 10");
+        return 0;
+    }
+
+    memset(m_device_settings.msisdn, 0, sizeof(m_device_settings.msisdn));
+    strcpy(m_device_settings.msisdn, msisdn);
+    nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
+
+    shell_print(shell, "Set MSISDN: %s", msisdn);
+
+    return 0;
+}
+
+
+static int cmd_device_logging(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s <value>", argv[0]);
+        return 0;
+    }
+
+    char *logging = argv[1];
+    size_t logging_len = strlen(logging);
+
+    if (logging_len != 1 && logging_len != 64) {
+        shell_print(shell, "invalid logging value");
+        return 0;
+    }
+
+    memset(m_device_settings.modem_logging, 0, sizeof(m_device_settings.modem_logging));
+    strcpy(m_device_settings.modem_logging, logging);
+    nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
+
+    shell_print(shell, "Set logging value: %s", logging);
+
+    return 0;
+}
+
+
 #endif
 
 
@@ -3097,6 +3313,19 @@ SHELL_CREATE_STATIC_SUBCMD_SET(sub_config)
     SHELL_CMD(factory_reset, NULL, "Factory reset", cmd_factory_reset),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 };
+
+SHELL_CREATE_STATIC_SUBCMD_SET(sub_device)
+{
+    SHELL_CMD(print, NULL, "Print configuration", cmd_device_print),
+    SHELL_CMD(reset, NULL, "Reset configuration", cmd_device_reset),
+    SHELL_CMD(manufacturer, NULL, "Set manufacturer", cmd_device_manufacturer),
+    SHELL_CMD(model_number, NULL, "Set model number", cmd_device_model_number),
+    SHELL_CMD(serial_number, NULL, "Set serial number", cmd_device_serial_number),
+    SHELL_CMD(imei, NULL, "Set IMEI", cmd_device_imei),
+    SHELL_CMD(msisdn, NULL, "Set MSISDN", cmd_device_msisdn),
+    SHELL_CMD(logging, NULL, "Set logging value", cmd_device_logging),
+    SHELL_SUBCMD_SET_END /* Array terminated. */
+};
 #endif
 
 
@@ -3113,6 +3342,7 @@ SHELL_CREATE_STATIC_SUBCMD_SET(sub_lwm2m)
 SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
 #if CONFIG_FLASH
 SHELL_CMD_REGISTER(config, &sub_config, "Instance configuration", NULL);
+SHELL_CMD_REGISTER(device, &sub_device, "Device configuration", NULL);
 #endif
 SHELL_CMD_REGISTER(lwm2m, &sub_lwm2m, "LwM2M operations", NULL);
 SHELL_CMD_REGISTER(reboot, NULL, "Reboot", cmd_reboot);
@@ -3179,12 +3409,13 @@ int main(void)
 {
     printk("\n\nInitializing LTE link, please wait...\n");
 
-#if (CONFIG_NRF_LWM2M_CLIENT_MODEM_LOGGING == 2)
-    modem_trace_enable();
-#endif
-
     // Initialize Non-volatile Storage.
     app_flash_init();
+    app_read_flash_storage();
+
+    if (strcmp(m_device_settings.modem_logging, "2") == 0) {
+        modem_trace_enable();
+    }
 
 #if CONFIG_DK_LIBRARY
     // Initialize LEDs and Buttons.
@@ -3204,16 +3435,20 @@ int main(void)
     // Establish LTE link.
     lte_lc_init_and_connect();
 
-#if (CONFIG_NRF_LWM2M_CLIENT_MODEM_LOGGING == 1)
-    // 1,0 = disable
-    // 1,1 = coredump only
-    // 1,2 = generic (and coredump)
-    // 1,3 = lwm2m   (and coredump)
-    // 1,4 = ip only (and coredump)
-    send_at_command("AT%XMODEMTRACE=1,2");
-    send_at_command("AT%XMODEMTRACE=1,3");
-    send_at_command("AT%XMODEMTRACE=1,4");
-#endif
+    if (strcmp(m_device_settings.modem_logging, "1") == 0) {
+        // 1,0 = disable
+        // 1,1 = coredump only
+        // 1,2 = generic (and coredump)
+        // 1,3 = lwm2m   (and coredump)
+        // 1,4 = ip only (and coredump)
+        send_at_command("AT%XMODEMTRACE=1,2", false);
+        send_at_command("AT%XMODEMTRACE=1,3", false);
+        send_at_command("AT%XMODEMTRACE=1,4", false);
+    } else if (strlen(m_device_settings.modem_logging) == 64) {
+        char at_command[128];
+        sprintf(at_command, "AT%%XMODEMTRACE=2,,3,%s", m_device_settings.modem_logging);
+        send_at_command(at_command, false);
+    }
 
 #if CONFIG_AT_HOST_LIBRARY
     int at_host_err = at_host_init(CONFIG_AT_HOST_UART, CONFIG_AT_HOST_TERMINATION);
