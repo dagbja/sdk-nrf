@@ -56,6 +56,30 @@ uint32_t lwm2m_bytebuffer_to_string(char * p_payload, uint16_t payload_len, lwm2
     return 0;
 }
 
+uint32_t lwm2m_bytebuffer_to_list(char * p_payload, uint16_t payload_len, lwm2m_list_t * p_list)
+{
+    NULL_PARAM_CHECK(p_payload);
+    NULL_PARAM_CHECK(p_list);
+
+    char * p_value = (char *)lwm2m_malloc(payload_len);
+
+    if (p_value == NULL)
+    {
+        return ENOMEM;
+    }
+
+    memcpy(p_value, p_payload, payload_len);
+
+    if (p_list->val.p_uint8)
+    {
+        lwm2m_free(p_list->val.p_uint8);
+    }
+
+    p_list->val.p_uint8 = p_value;
+    p_list->len         = payload_len;
+
+    return 0;
+}
 
 void lwm2m_instance_security_init(lwm2m_security_t * p_instance)
 {
@@ -152,16 +176,29 @@ void lwm2m_instance_firmware_init(lwm2m_firmware_t * p_instance)
     p_instance->operations[1] = LWM2M_OPERATION_CODE_WRITE;
     p_instance->operations[2] = LWM2M_OPERATION_CODE_EXECUTE;
     p_instance->operations[3] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[4] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
+    p_instance->operations[4] = 0; // "Update Supported Objects" is not available anymore, but reserved.
     p_instance->operations[5] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[6] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[7] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[8] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[9] = LWM2M_OPERATION_CODE_READ;
 
     // Set resource IDs.
     p_instance->resource_ids[0] = LWM2M_FIRMWARE_PACKAGE;
     p_instance->resource_ids[1] = LWM2M_FIRMWARE_PACKAGE_URI;
     p_instance->resource_ids[2] = LWM2M_FIRMWARE_UPDATE;
     p_instance->resource_ids[3] = LWM2M_FIRMWARE_STATE;
-    p_instance->resource_ids[4] = LWM2M_FIRMWARE_UPDATE_SUPPORTED_OBJECTS;
+    p_instance->resource_ids[4] = LWM2M_FIRMWARE_LEGACY_DO_NOT_RENDER;
     p_instance->resource_ids[5] = LWM2M_FIRMWARE_UPDATE_RESULT;
+    p_instance->resource_ids[6] = LWM2M_FIRMWARE_PKG_NAME;
+    p_instance->resource_ids[7] = LWM2M_FIRMWARE_PKG_VERSION;
+    p_instance->resource_ids[8] = LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT;
+    p_instance->resource_ids[9] = LWM2M_FIRMWARE_FIRMWARE_UPDATE_DELIVERY_METHOD;
+
+    p_instance->firmware_update_protocol_support.type        = LWM2M_LIST_TYPE_UINT8;
+    p_instance->firmware_update_protocol_support.max_len     = 1;
+    p_instance->firmware_update_protocol_support.val.p_uint8 = NULL;
+    p_instance->firmware_update_protocol_support.len         = 0;
 }
 
 

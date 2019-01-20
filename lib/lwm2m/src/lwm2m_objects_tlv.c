@@ -78,6 +78,13 @@ uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
                 break;
             }
 
+            case LWM2M_OBJ_FIRMWARE:
+                err_code = lwm2m_tlv_firmware_encode(p_buffer + index,
+                                                     p_buffer_len,
+                                                     p_resource_ids[i],
+                                                     (lwm2m_firmware_t *)p_instance);
+                break;
+
             default:
             {
                 err_code = ENOENT;
@@ -1087,6 +1094,159 @@ uint32_t lwm2m_tlv_device_encode(uint8_t        * p_buffer,
             err_code = lwm2m_tlv_instance_encode(p_buffer,
                                                  p_buffer_len,
                                                  (lwm2m_instance_t *)p_device);
+            break;
+        }
+
+        default:
+        {
+            err_code = ENOENT;
+            break;
+        }
+    }
+
+    return err_code;
+}
+
+
+uint32_t lwm2m_tlv_firmware_decode(lwm2m_firmware_t     * p_firmware,
+                                   uint8_t              * p_buffer,
+                                   uint32_t               buffer_len,
+                                   lwm2m_tlv_callback_t   resource_callback)
+{
+    NULL_PARAM_CHECK(p_firmware);
+    NULL_PARAM_CHECK(p_buffer);
+
+    uint32_t     err_code;
+    uint32_t     index = 0;
+    lwm2m_tlv_t  tlv;
+
+    while (index < buffer_len)
+    {
+        err_code = lwm2m_tlv_decode(&tlv, &index, p_buffer, buffer_len);
+
+        if (err_code != 0)
+        {
+            return err_code;
+        }
+
+        switch (tlv.id)
+        {
+            case LWM2M_FIRMWARE_PACKAGE:
+            {
+                p_firmware->package.p_val = tlv.value;
+                p_firmware->package.len   = tlv.length;
+                break;
+            }
+
+            case LWM2M_FIRMWARE_PACKAGE_URI:
+            {
+                err_code = lwm2m_bytebuffer_to_string((char *)tlv.value,
+                                                      tlv.length,
+                                                      &p_firmware->package_uri);
+                break;
+            }
+
+            default:
+            {
+                if (resource_callback)
+                {
+                    err_code = resource_callback(((lwm2m_instance_t *)p_firmware)->instance_id, &tlv);
+                }
+                break;
+            }
+        }
+
+        if (err_code != 0)
+        {
+            return EINVAL;
+        }
+    }
+
+    return 0;
+}
+
+uint32_t lwm2m_tlv_firmware_encode(uint8_t          * p_buffer,
+                                   uint32_t         * p_buffer_len,
+                                   uint16_t           resource_id,
+                                   lwm2m_firmware_t * p_firmware)
+{
+    NULL_PARAM_CHECK(p_buffer);
+    NULL_PARAM_CHECK(p_buffer_len);
+    NULL_PARAM_CHECK(p_firmware);
+
+    uint32_t err_code;
+
+    switch (resource_id)
+    {
+        case LWM2M_FIRMWARE_PACKAGE_URI:
+        {
+            err_code = lwm2m_tlv_string_encode(p_buffer,
+                                               p_buffer_len,
+                                               LWM2M_FIRMWARE_PACKAGE_URI,
+                                               p_firmware->package_uri);
+            break;
+        }
+
+        case LWM2M_FIRMWARE_STATE:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                LWM2M_FIRMWARE_STATE,
+                                                p_firmware->state);
+            break;
+        }
+
+        case LWM2M_FIRMWARE_UPDATE_RESULT:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                LWM2M_FIRMWARE_UPDATE_RESULT,
+                                                p_firmware->update_result);
+            break;
+        }
+
+        case LWM2M_FIRMWARE_PKG_NAME:
+        {
+            err_code = lwm2m_tlv_string_encode(p_buffer,
+                                               p_buffer_len,
+                                               LWM2M_FIRMWARE_PKG_NAME,
+                                               p_firmware->pkg_name);
+            break;
+        }
+
+        case LWM2M_FIRMWARE_PKG_VERSION:
+        {
+            err_code = lwm2m_tlv_string_encode(p_buffer,
+                                               p_buffer_len,
+                                               LWM2M_FIRMWARE_PKG_VERSION,
+                                               p_firmware->pkg_version);
+            break;
+        }
+
+        case LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT:
+        {
+            err_code = lwm2m_tlv_list_encode(p_buffer,
+                                             p_buffer_len,
+                                             LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT,
+                                             &p_firmware->firmware_update_protocol_support);
+            break;
+        }
+
+        case LWM2M_FIRMWARE_FIRMWARE_UPDATE_DELIVERY_METHOD:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                LWM2M_FIRMWARE_FIRMWARE_UPDATE_DELIVERY_METHOD,
+                                                p_firmware->firmware_update_delivery_method);
+            break;
+        }
+
+        case LWM2M_NAMED_OBJECT:
+        {
+            // This is a callback to the instance, not a specific resource.
+            err_code = lwm2m_tlv_instance_encode(p_buffer,
+                                                 p_buffer_len,
+                                                 (lwm2m_instance_t *)p_firmware);
             break;
         }
 

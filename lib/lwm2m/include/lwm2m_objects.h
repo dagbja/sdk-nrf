@@ -68,25 +68,42 @@ extern "C" {
 
 
 /* LWM2M Firmware update Resources Appendix E.6 */
-#define LWM2M_FIRMWARE_PACKAGE                         0
-#define LWM2M_FIRMWARE_PACKAGE_URI                     1
-#define LWM2M_FIRMWARE_UPDATE                          2
-#define LWM2M_FIRMWARE_STATE                           3
-#define LWM2M_FIRMWARE_UPDATE_SUPPORTED_OBJECTS        4
-#define LWM2M_FIRMWARE_UPDATE_RESULT                   5
+#define LWM2M_FIRMWARE_PACKAGE                          0
+#define LWM2M_FIRMWARE_PACKAGE_URI                      1
+#define LWM2M_FIRMWARE_UPDATE                           2
+#define LWM2M_FIRMWARE_STATE                            3
+#define LWM2M_FIRMWARE_LEGACY_DO_NOT_RENDER             4
+#define LWM2M_FIRMWARE_UPDATE_RESULT                    5
+#define LWM2M_FIRMWARE_PKG_NAME                         6
+#define LWM2M_FIRMWARE_PKG_VERSION                      7
+#define LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT 8
+#define LWM2M_FIRMWARE_FIRMWARE_UPDATE_DELIVERY_METHOD  9
 
 #define LWM2M_FIRMWARE_STATE_IDLE                      1
 #define LWM2M_FIRMWARE_STATE_DOWNLOADING               2
 #define LWM2M_FIRMWARE_STATE_DOWNLOADED                3
+#define LWM2M_FIRMWARE_STATE_UPDATING                  4
 
-#define LWM2M_FIRMWARE_UPDATE_RESULT_DEFAULT           0
-#define LWM2M_FIRMWARE_UPDATE_RESULT_SUCCESS           1
-#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_STORAGE     2
-#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_MEMORY      3
-#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CONN_LOST   4
-#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CRC         5
-#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_UNSUPPORTED 6
-#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI 7
+#define LWM2M_FIRMWARE_UPDATE_RESULT_DEFAULT                      0
+#define LWM2M_FIRMWARE_UPDATE_RESULT_SUCCESS                      1
+#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_STORAGE                2
+#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_MEMORY                 3
+#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CONN_LOST              4
+#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CRC                    5
+#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_UNSUPPORTED_PKT_TYPE   6
+#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI            7
+#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_FIRMWARE_UPDATE_FAILED 8
+#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_UNSUPPORTED_PROTOCOL   9
+
+#define LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT_COAP  0
+#define LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT_COAPS 1
+#define LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT_HTTP  2
+#define LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT_HTTPS 3
+
+#define LWM2M_FIRMWARE_FIRMWARE_UPDATE_DELIVERY_METHOD_PULL_ONLY     0
+#define LWM2M_FIRMWARE_FIRMWARE_UPDATE_DELIVERY_METHOD_PUSH_ONLY     1
+#define LWM2M_FIRMWARE_FIRMWARE_UPDATE_DELIVERY_METHOD_PUSH_AND_PULL 2
+
 
 
 /* LWM2M ACL Resources */
@@ -210,16 +227,19 @@ typedef struct
 
 typedef struct
 {
-    lwm2m_instance_t           proto;           /* Internal. MUST be first. */
-    uint8_t                    operations[6];   /* Internal. MUST be second. */
-    uint16_t                   resource_ids[6]; /* Internal. MUST be third. */
+    lwm2m_instance_t           proto;            /* Internal. MUST be first. */
+    uint8_t                    operations[10];   /* Internal. MUST be second. */
+    uint16_t                   resource_ids[10]; /* Internal. MUST be third. */
 
     /* Public members. */
     lwm2m_opaque_t             package;
     lwm2m_string_t             package_uri;
     uint8_t                    state;
-    bool                       update_supported_objects;
     uint8_t                    update_result;
+    lwm2m_string_t             pkg_name;
+    lwm2m_string_t             pkg_version;
+    lwm2m_list_t               firmware_update_protocol_support;
+    uint8_t                    firmware_update_delivery_method;
 
 } lwm2m_firmware_t;
 
@@ -338,6 +358,17 @@ typedef struct
  * @retval NRF_ERROR_NO_MEM  If allocation was unsuccessful
  */
 uint32_t lwm2m_bytebuffer_to_string(char * p_payload, uint16_t payload_len, lwm2m_string_t * p_string);
+
+/**@brief Allocate lwm2m_string_t memory to hold a list.
+ *
+ * @param[in]  p_payload Buffer which holds a list.
+ * @param[in]  payload_len  Length of the value in the buffer.
+ * @param[out] p_list By reference pointer to the result lwm2m_list_t.
+ *
+ * @return NRF_SUCCESS       If allocation was successful
+ * @retval NRF_ERROR_NO_MEM  If allocation was unsuccessful
+ */
+uint32_t lwm2m_bytebuffer_to_list(char * p_payload, uint16_t payload_len, lwm2m_list_t * p_list);
 
 /**@brief Initialize a LWM2M security object instance.
  *

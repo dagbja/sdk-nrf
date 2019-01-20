@@ -46,6 +46,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <lwm2m_server.h>
 #include <lwm2m_device.h>
 #include <lwm2m_security.h>
+#include <lwm2m_firmware.h>
 #include <common.h>
 
 /* Hardcoded IMEI for now, will be fetched from modem using AT+CGSN=1 */
@@ -219,7 +220,7 @@ static struct k_delayed_work connection_update_work[1+LWM2M_MAX_SERVERS];
 
 /* Resolved server addresses */
 #if APP_USE_CONTABO
-static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET, AF_INET, 0, AF_INET };  /**< Current IP versions, start using IPv6. */
+static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET6, AF_INET6, 0, AF_INET6 };  /**< Current IP versions, start using IPv6. */
 #else
 static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET6, AF_INET6, 0, AF_INET6 };  /**< Current IP versions, start using IPv6. */
 #endif
@@ -812,6 +813,25 @@ uint32_t lwm2m_handler_error(uint16_t           short_server_id,
                              uint32_t           err_code)
 {
     // LWM2M will send an answer to the server based on the error code.
+    switch (err_code)
+    {
+        case ENOENT:
+            (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
+            break;
+
+        case EPERM:
+            (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+            break;
+
+        case EINVAL:
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            break;
+
+        default:
+            // Pass error to lower layer which will send out INTERNAL_SERVER_ERROR.
+            break;
+    }
+
     return err_code;
 }
 
@@ -856,11 +876,15 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 #endif
 
     milliseconds_spent = k_uptime_delta(&time_stamp);
-
+#if APP_USE_CONTABO
+    // On contabo we want to jump directly to start connecting to servers when bootstrap is complete.
+    m_app_state = APP_STATE_SERVER_CONNECT;
+#else
     m_app_state = APP_STATE_SERVER_CONNECT_WAIT;
     s32_t hold_off_time = (lwm2m_server_hold_off_timer_get(m_server_instance) * 1000) - milliseconds_spent;
     APPL_LOG("Client holdoff timer: sleeping %d milliseconds...", hold_off_time);
     k_delayed_work_submit(&state_update_work, hold_off_time);
+#endif
 
     return 0;
 }
@@ -1220,6 +1244,7 @@ static void app_lwm2m_create_objects(void)
 
     lwm2m_device_init();
     lwm2m_conn_mon_init();
+    lwm2m_firmware_init();
 }
 
 
@@ -1251,6 +1276,9 @@ static void app_lwm2m_setup(void)
 
     // Add connectivity monitoring support.
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_conn_mon_get_object());
+
+    // Add firmware support.
+    (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_firmware_get_object());
 
     // Set client ID.
     char * p_ep_id = app_client_imei_msisdn();
@@ -1610,7 +1638,7 @@ static void app_coap_init(void)
     struct sockaddr local_addr;
     struct sockaddr non_sec_local_addr;
     app_init_sockaddr_in(&local_addr, AF_INET, COAP_LOCAL_LISTENER_PORT);
-    app_init_sockaddr_in(&non_sec_local_addr, AF_INET, LWM2M_LOCAL_LISTENER_PORT);
+    app_init_sockaddr_in(&non_sec_local_addr, m_family_type[1], LWM2M_LOCAL_LISTENER_PORT);
 
     // If bootstrap server and server is using different port we can
     // register the ports individually.
@@ -2404,6 +2432,7 @@ static void app_lwm2m_observer_process(void)
 {
     lwm2m_server_observer_process();
     lwm2m_conn_mon_observer_process();
+    lwm2m_firmware_observer_process();
 }
 
 #define APP_CUSTOM_APN "VZWADMIN"

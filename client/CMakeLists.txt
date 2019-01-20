@@ -14,6 +14,7 @@ target_sources(app PRIVATE src/lwm2m_conn_mon.c)
 target_sources(app PRIVATE src/lwm2m_server.c)
 target_sources(app PRIVATE src/lwm2m_security.c)
 target_sources(app PRIVATE src/lwm2m_device.c)
+target_sources(app PRIVATE src/lwm2m_firmware.c)
 target_sources(app PRIVATE src/common.c)
 zephyr_include_directories(src)
 
