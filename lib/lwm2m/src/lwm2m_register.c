@@ -25,7 +25,7 @@ static uint16_t m_token = TOKEN_START;
 static uint32_t internal_message_new(coap_message_t **         pp_msg,
                                      coap_msg_code_t           code,
                                      coap_response_callback_t  callback,
-                                     coap_transport_handle_t * p_transport)
+                                     coap_transport_handle_t   transport)
 {
     uint32_t            err_code;
     coap_message_conf_t conf;
@@ -35,7 +35,7 @@ static uint32_t internal_message_new(coap_message_t **         pp_msg,
     conf.type              = COAP_TYPE_CON;
     conf.code              = code;
     conf.response_callback = callback;
-    conf.transport         = p_transport;
+    conf.transport         = transport;
     conf.token_len         = uint16_encode(m_token, conf.token);
     m_token++;
 
@@ -193,7 +193,7 @@ static void lwm2m_register_cb(u32_t status, void * p_arg, coap_message_t * p_mes
 uint32_t lwm2m_register(struct sockaddr         * p_remote,
                         lwm2m_client_identity_t * p_id,
                         lwm2m_server_config_t   * p_config,
-                        coap_transport_handle_t * p_transport,
+                        coap_transport_handle_t   transport,
                         uint8_t                 * p_link_format_string,
                         uint16_t                  link_format_len)
 {
@@ -215,7 +215,7 @@ uint32_t lwm2m_register(struct sockaddr         * p_remote,
     uri_path.p_val = LWM2M_REGISTER_URI_PATH;
     uri_path.len   = 2;
 
-    err_code = internal_message_new(&p_msg, COAP_CODE_POST, lwm2m_register_cb, p_transport);
+    err_code = internal_message_new(&p_msg, COAP_CODE_POST, lwm2m_register_cb, transport);
     if (err_code != 0)
     {
         LWM2M_MUTEX_UNLOCK();
@@ -317,7 +317,7 @@ void lwm2m_update_cb(u32_t status, void * p_arg, coap_message_t * p_message)
 
 uint32_t lwm2m_update(struct sockaddr         * p_remote,
                       lwm2m_server_config_t   * p_config,
-                      coap_transport_handle_t * p_transport)
+                      coap_transport_handle_t   transport)
 {
     LWM2M_ENTRY();
 
@@ -334,7 +334,7 @@ uint32_t lwm2m_update(struct sockaddr         * p_remote,
     uri_path.p_val = LWM2M_REGISTER_URI_PATH;
     uri_path.len   = 2;
 
-    err_code = internal_message_new(&p_msg, COAP_CODE_POST, lwm2m_update_cb, p_transport);
+    err_code = internal_message_new(&p_msg, COAP_CODE_POST, lwm2m_update_cb, transport);
     if (err_code != 0)
     {
         LWM2M_MUTEX_UNLOCK();
@@ -442,7 +442,7 @@ void lwm2m_deregister_cb(u32_t status, void * p_arg, coap_message_t * p_message)
 }
 
 
-uint32_t lwm2m_deregister(struct sockaddr * p_remote, coap_transport_handle_t * p_transport)
+uint32_t lwm2m_deregister(struct sockaddr * p_remote, coap_transport_handle_t transport)
 {
     LWM2M_ENTRY();
 
@@ -458,7 +458,7 @@ uint32_t lwm2m_deregister(struct sockaddr * p_remote, coap_transport_handle_t * 
     uri_path.p_val = LWM2M_REGISTER_URI_PATH;
     uri_path.len   = 2;
 
-    err_code = internal_message_new(&p_msg, COAP_CODE_DELETE, lwm2m_deregister_cb, p_transport);
+    err_code = internal_message_new(&p_msg, COAP_CODE_DELETE, lwm2m_deregister_cb, transport);
     if (err_code != 0)
     {
         LWM2M_MUTEX_UNLOCK();

@@ -105,7 +105,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #if CONFIG_LOG
 #define APPL_LOG  LOG_DBG
 #else
-#define APPL_LOG
+#define APPL_LOG(...)
 #endif
 
 #if CONFIG_DK_LIBRARY
@@ -191,9 +191,9 @@ static char m_bootstrap_object_alias_name[] = "bs";                             
 
 #define VERIZON_RESOURCE 30000
 
-static coap_transport_handle_t *           mp_coap_transport;                                 /**< CoAP transport handle for the non bootstrap server. */
-static coap_transport_handle_t *           mp_lwm2m_bs_transport;                             /**< CoAP transport handle for the secure bootstrap server. Obtained on @coap_security_setup. */
-static coap_transport_handle_t *           mp_lwm2m_transport[1+LWM2M_MAX_SERVERS];           /**< CoAP transport handle for the secure server. Obtained on @coap_security_setup. */
+static coap_transport_handle_t             m_coap_transport;                                  /**< CoAP transport handle for the non bootstrap server. */
+static coap_transport_handle_t             m_lwm2m_bs_transport;                              /**< CoAP transport handle for the secure bootstrap server. Obtained on @coap_security_setup. */
+static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS];            /**< CoAP transport handle for the secure server. Obtained on @coap_security_setup. */
 
 static volatile app_state_t m_app_state = APP_STATE_IDLE;                                     /**< Application state. Should be one of @ref app_state_t. */
 static volatile uint16_t    m_server_instance;                                                /**< Server instance handled. */
@@ -730,10 +730,10 @@ void lwm2m_notification(lwm2m_notification_type_t type,
                         uint8_t                   coap_code,
                         uint32_t                  err_code)
 {
-    if (IS_ENABLED(CONFIG_LOG)) {
+    #if CONFIG_LOG
         static char *str_type[] = { "Bootstrap", "Register", "Update", "Deregister" };
         APPL_LOG("Got LWM2M notifcation %s  CoAP %d.%02d  err:%lu", str_type[type], coap_code >> 5, coap_code & 0x1f, err_code);
-    }
+    #endif
 
     if (type == LWM2M_NOTIFCATION_TYPE_BOOTSTRAP)
     {
@@ -827,10 +827,10 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     k_sleep(10); // TODO: figure out why this is needed before closing the connection
 
     // Close connection to bootstrap server.
-    uint32_t err_code = coap_security_destroy(mp_lwm2m_bs_transport);
+    uint32_t err_code = coap_security_destroy(m_lwm2m_bs_transport);
     APP_ERROR_CHECK(err_code);
 
-    mp_lwm2m_bs_transport = NULL;
+    m_lwm2m_bs_transport = 0xFFFFFFFF;
 
     m_app_state = APP_STATE_BOOTSTRAPPED;
     m_server_settings[0].retry_count = 0;
@@ -1290,7 +1290,7 @@ static void app_bootstrap_connect(void)
         if (err_code == 0)
         {
             m_app_state = APP_STATE_BS_CONNECTED;
-            mp_lwm2m_bs_transport = local_port.transport;
+            m_lwm2m_bs_transport = local_port.transport;
         }
         else
         {
@@ -1312,7 +1312,7 @@ static void app_bootstrap_connect(void)
 
 static void app_bootstrap(void)
 {
-    uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)&m_bs_remote_server, &m_client_id, mp_lwm2m_bs_transport);
+    uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)&m_bs_remote_server, &m_client_id, m_lwm2m_bs_transport);
     if (err_code == 0)
     {
         m_app_state = APP_STATE_BOOTSTRAP_REQUESTED;
@@ -1353,16 +1353,16 @@ static void app_server_connect(void)
 
         coap_sec_config_t setting =
         {
-            .role           = 0,    // 0 -> Client role
-            .sec_tag_count  = SEC_TAG_COUNT,
-            .sec_tag_list = sec_tag_list
+            .role          = 0,    // 0 -> Client role
+            .sec_tag_count = SEC_TAG_COUNT,
+            .sec_tag_list  = sec_tag_list
         };
 
         coap_local_t local_port =
         {
-            .addr    = &local_addr,
-            .setting = &setting,
-            .protocol  = IPPROTO_DTLS_1_2
+            .addr     = &local_addr,
+            .setting  = &setting,
+            .protocol = IPPROTO_DTLS_1_2
         };
 
         // NOTE: This method initiates a DTLS handshake and may block for some seconds.
@@ -1371,7 +1371,7 @@ static void app_server_connect(void)
         if (err_code == 0)
         {
             m_app_state = APP_STATE_SERVER_CONNECTED;
-            mp_lwm2m_transport[m_server_instance] = local_port.transport;
+            m_lwm2m_transport[m_server_instance] = local_port.transport;
             m_server_settings[m_server_instance].retry_count = 0;
         }
         else
@@ -1414,7 +1414,7 @@ static void app_server_register(void)
         err_code = lwm2m_register((struct sockaddr *)&m_remote_server[m_server_instance],
                                   &m_client_id,
                                   &m_server_conf[m_server_instance],
-                                  mp_lwm2m_transport[m_server_instance],
+                                  m_lwm2m_transport[m_server_instance],
                                   p_link_format_string,
                                   (uint16_t)link_format_string_len);
         APP_ERROR_CHECK(err_code);
@@ -1431,7 +1431,7 @@ void app_server_update(uint16_t instance_id)
 
     err_code = lwm2m_update((struct sockaddr *)&m_remote_server[instance_id],
                             &m_server_conf[instance_id],
-                            mp_lwm2m_transport[instance_id]);
+                            m_lwm2m_transport[instance_id]);
     ARG_UNUSED(err_code);
 
     // Restart lifetime timer
@@ -1452,7 +1452,7 @@ static void app_server_deregister(uint16_t instance_id)
     uint32_t err_code;
 
     err_code = lwm2m_deregister((struct sockaddr *)&m_remote_server[instance_id],
-                                mp_lwm2m_transport[instance_id]);
+                                m_lwm2m_transport[instance_id]);
     APP_ERROR_CHECK(err_code);
 
     m_app_state = APP_STATE_SERVER_DEREGISTERING;
@@ -1464,21 +1464,21 @@ static void app_disconnect(void)
     uint32_t err_code;
 
     // Destroy the secure session if any.
-    if (mp_lwm2m_bs_transport)
+    if (m_lwm2m_bs_transport != 0xFFFFFFFF)
     {
-        err_code = coap_security_destroy(mp_lwm2m_bs_transport);
-        ARG_UNUSED(err_code);
+        err_code = coap_security_destroy(m_lwm2m_bs_transport);
+        APP_ERROR_CHECK(err_code);
 
-        mp_lwm2m_bs_transport = NULL;
+        m_lwm2m_bs_transport = 0xFFFFFFFF;
     }
 
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-        if (mp_lwm2m_transport[i])
+        if (m_lwm2m_transport[i])
         {
-            err_code = coap_security_destroy(mp_lwm2m_transport[i]);
-            ARG_UNUSED(err_code);
+            err_code = coap_security_destroy(m_lwm2m_transport[i]);
+            APP_ERROR_CHECK(err_code);
 
-            mp_lwm2m_transport[i] = NULL;
+            m_lwm2m_transport[i] = 0xFFFFFFFF;
         }
     }
 
@@ -1534,7 +1534,7 @@ static void app_lwm2m_process(void)
         case APP_STATE_BS_CONNECT:
         {
             APPL_LOG("app_bootstrap_connect");
-            if (mp_lwm2m_bs_transport)
+            if (m_lwm2m_bs_transport != 0xFFFFFFFF)
             {
                 // Already connected. Disconnect first.
                 app_disconnect();
@@ -1620,10 +1620,10 @@ static void app_coap_init(void)
     err_code = coap_init(17, &port_list, k_malloc, k_free);
     APP_ERROR_CHECK(err_code);
 
-    mp_coap_transport = local_port_list[0].transport;
-    mp_lwm2m_transport[1] = local_port_list[1].transport;
-    ARG_UNUSED(mp_coap_transport);
-    ARG_UNUSED(mp_lwm2m_transport);
+    m_coap_transport = local_port_list[0].transport;
+    m_lwm2m_transport[1] = local_port_list[1].transport;
+    ARG_UNUSED(m_coap_transport);
+    ARG_UNUSED(m_lwm2m_transport);
 }
 
 

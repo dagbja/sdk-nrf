@@ -352,14 +352,14 @@ uint32_t lwm2m_init(lwm2m_alloc_t alloc_fn, lwm2m_free_t free_fn);
  * @param[in] p_remote    Pointer to the structure holding connection information of the remote
  *                        LWM2M bootstrap server.
  * @param[in] p_id        Pointer to the structure holding the Id of the client.
- * @param[in] p_transport Handle to the CoAP Transport Layer.
+ * @param[in] transport   Handle to the CoAP Transport Layer.
  *
  * @retval NRF_SUCCESS    If bootstrap request to the LWM2M bootstrap server was sent successfully.
  * @retval NRF_ERROR_NULL If one of the parameters was a NULL pointer.
  */
 uint32_t lwm2m_bootstrap(struct sockaddr         * p_remote,
                          lwm2m_client_identity_t * p_id,
-                         coap_transport_handle_t * p_transport);
+                         coap_transport_handle_t   transport);
 
 /**@brief Register with a remote LWM2M server.
  *
@@ -378,7 +378,7 @@ uint32_t lwm2m_bootstrap(struct sockaddr         * p_remote,
 uint32_t lwm2m_register(struct sockaddr         * p_remote,
                         lwm2m_client_identity_t * p_id,
                         lwm2m_server_config_t   * p_config,
-                        coap_transport_handle_t * p_transport,
+                        coap_transport_handle_t   transport,
                         uint8_t                 * p_link_format_string,
                         uint16_t                  link_format_len);
 
@@ -393,7 +393,7 @@ uint32_t lwm2m_register(struct sockaddr         * p_remote,
  */
 uint32_t lwm2m_update(struct sockaddr         * p_remote,
                       lwm2m_server_config_t   * p_config,
-                      coap_transport_handle_t * p_transport);
+                      coap_transport_handle_t   transport);
 
 /**@brief Deregister from a remote server.
  *
@@ -403,7 +403,7 @@ uint32_t lwm2m_update(struct sockaddr         * p_remote,
  *
  * @retval NRF_SUCCESS If deregister request to the LWM2M server was sent out successfully.
  */
-uint32_t lwm2m_deregister(struct sockaddr * p_remote, coap_transport_handle_t * p_transport);
+uint32_t lwm2m_deregister(struct sockaddr * p_remote, coap_transport_handle_t transport);
 
 /**@brief Add an instance to coap_handler in order to match requests to the given instance.
  *
@@ -499,9 +499,9 @@ uint32_t lwm2m_respond_with_code(coap_msg_code_t code, coap_message_t * p_reques
 uint32_t lwm2m_observe_register(uint8_t             * p_payload,
                                 uint16_t              payload_len,
                                 uint16_t              max_age,
-                                coap_message_t       * p_request,
+                                coap_message_t      * p_request,
                                 coap_content_type_t   content_type,
-                                lwm2m_instance_t     * p_instance_proto);
+                                lwm2m_instance_t    * p_instance_proto);
 
 uint32_t lwm2m_notify(uint8_t         * p_payload,
                       uint16_t          payload_len,
