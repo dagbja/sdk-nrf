@@ -573,7 +573,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
 
     uint16_t port;
     const char *hostname = app_uri_get(server_uri_val, &port, secure);
-    
+
     if (hostname == NULL) {
         return EINVAL;
     }
@@ -965,7 +965,7 @@ static uint32_t tlv_server_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * p_
 
 static uint32_t tlv_server_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
 {
-    uint32_t err_code;
+    uint32_t err_code = 0;
 
     switch (p_tlv->id)
     {
@@ -2641,7 +2641,7 @@ static void app_provision_secret_keys(void)
         {
             static char server_uri_val[SECURITY_SERVER_URI_SIZE_MAX];
             strcpy(server_uri_val, (char *)&m_server_settings[i].server_uri);
-            
+
             bool secure = false;
             uint16_t port = 0;
             const char * hostname = app_uri_get(server_uri_val, &port, &secure);
