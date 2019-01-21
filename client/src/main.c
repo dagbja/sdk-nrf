@@ -736,8 +736,12 @@ void lwm2m_notification(lwm2m_notification_type_t type,
     else if (type == LWM2M_NOTIFCATION_TYPE_REGISTER)
     {
         // Start lifetime timer
-        k_delayed_work_submit(&connection_update_work[m_server_instance],
-                              m_server_settings[m_server_instance].lifetime * 1000);
+        s32_t timeout = (s32_t)(m_server_settings[m_server_instance].lifetime * 1000);
+        if (timeout <= 0) {
+            // FIXME: Lifetime timer too big for Zephyr, set to maximum possible value for now
+            timeout = INT32_MAX;
+        }
+        k_delayed_work_submit(&connection_update_work[m_server_instance], timeout);
 
         if (coap_code == COAP_CODE_201_CREATED || coap_code == COAP_CODE_204_CHANGED)
         {
@@ -2421,8 +2425,13 @@ static void app_server_update(uint16_t instance_id)
     ARG_UNUSED(err_code);
 
     // Restart lifetime timer
-    k_delayed_work_submit(&connection_update_work[instance_id],
-                          m_server_settings[instance_id].lifetime * 1000);
+    s32_t timeout = (s32_t)(m_server_settings[instance_id].lifetime * 1000);
+    if (timeout <= 0) {
+        // FIXME: Lifetime timer too big for Zephyr, set to maximum possible value for now
+        timeout = INT32_MAX;
+    }
+
+    k_delayed_work_submit(&connection_update_work[instance_id], timeout);
 }
 
 
