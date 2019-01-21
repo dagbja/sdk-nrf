@@ -2446,7 +2446,7 @@ static void app_disconnect(void)
     if (mp_lwm2m_bs_transport)
     {
         err_code = coap_security_destroy(mp_lwm2m_bs_transport);
-        APP_ERROR_CHECK(err_code);
+        ARG_UNUSED(err_code);
 
         mp_lwm2m_bs_transport = NULL;
     }
@@ -2455,7 +2455,7 @@ static void app_disconnect(void)
         if (mp_lwm2m_transport[i])
         {
             err_code = coap_security_destroy(mp_lwm2m_transport[i]);
-            APP_ERROR_CHECK(err_code);
+            ARG_UNUSED(err_code);
 
             mp_lwm2m_transport[i] = NULL;
         }
