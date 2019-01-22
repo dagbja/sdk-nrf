@@ -2639,8 +2639,11 @@ static void app_lwm2m_process(void)
         {
             if (m_update_server > 0)
             {
-                APPL_LOG("app_server_update");
-                app_server_update(m_update_server);
+                if (m_server_settings[m_update_server].is.registered)
+                {
+                    APPL_LOG("app_server_update");
+                    app_server_update(m_update_server);
+                }
                 m_update_server = 0;
             }
             break;
@@ -3410,12 +3413,12 @@ SHELL_CMD_REGISTER(reboot, NULL, "Reboot", cmd_reboot);
  */
 static void app_connection_update(struct k_work *work)
 {
-    if (m_app_state == APP_STATE_SERVER_REGISTERED) {
-        for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-            if (work == (struct k_work *)&connection_update_work[i]) {
+    for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+        if (work == (struct k_work *)&connection_update_work[i]) {
+            if (m_server_settings[i].is.registered) {
                 app_server_update(i);
-                break;
             }
+            break;
         }
     }
 }
