@@ -514,8 +514,21 @@ static void app_buttons_leds_init(void)
 static char * app_client_imei_msisdn()
 {
     static char client_id[128];
+    extern char imei[];
+    extern char msisdn[];
 
-    snprintf(client_id, 128, "urn:imei-msisdn:%s-%s", m_device_settings.imei, m_device_settings.msisdn);
+    char * p_imei = imei;
+    char * p_msisdn = msisdn;
+
+    if (m_device_settings.imei[0]) {
+        p_imei = m_device_settings.imei;
+    }
+
+    if (m_device_settings.msisdn[0]) {
+        p_msisdn = m_device_settings.msisdn;
+    }
+
+    snprintf(client_id, 128, "urn:imei-msisdn:%s-%s", p_imei, p_msisdn);
 
     return client_id;
 }
@@ -616,8 +629,39 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
 
     if (result->ai_family == AF_INET) {
         ((struct sockaddr_in *)addr)->sin_addr.s_addr = ((struct sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
+        char verbose_ipv4_buffer[27];
+        snprintf(verbose_ipv4_buffer,
+                 sizeof(verbose_ipv4_buffer),
+                 "DNS IPV4 %u.%u.%u.%u",
+                 ((uint8_t *)&(((struct sockaddr_in *)addr)->sin_addr.s_addr))[0],
+                 ((uint8_t *)&(((struct sockaddr_in *)addr)->sin_addr.s_addr))[1],
+                 ((uint8_t *)&(((struct sockaddr_in *)addr)->sin_addr.s_addr))[2],
+                 ((uint8_t *)&(((struct sockaddr_in *)addr)->sin_addr.s_addr))[3]);
+
+        APPL_LOG("%s", verbose_ipv4_buffer);
     } else {
         memcpy(((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr, ((struct sockaddr_in6 *)result->ai_addr)->sin6_addr.s6_addr, 16);
+        char verbose_ipv6_buffer[51];
+        snprintf(verbose_ipv6_buffer,
+                 sizeof(verbose_ipv6_buffer),
+                 "DNS IPV6: %02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[0],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[1],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[2],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[3],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[4],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[5],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[6],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[7],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[8],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[9],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[10],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[11],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[12],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[13],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[14],
+                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[15]);
+        APPL_LOG("%s", verbose_ipv6_buffer);
     }
 
     freeaddrinfo(result);
@@ -2963,12 +3007,23 @@ static int cmd_config_owner(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_device_print(const struct shell *shell, size_t argc, char **argv)
 {
+    extern char imei[];
+    extern char msisdn[];
+
     shell_print(shell, "Device configuration");
     shell_print(shell, "  Manufacturer   %s", m_device_settings.manufacturer);
     shell_print(shell, "  Model number   %s", m_device_settings.model_number);
     shell_print(shell, "  Serial number  %s", m_device_settings.serial_number);
-    shell_print(shell, "  IMEI           %s", m_device_settings.imei);
-    shell_print(shell, "  MSISDN         %s", m_device_settings.msisdn);
+    if (m_device_settings.imei[0]) {
+        shell_print(shell, "  IMEI           %s (static)", m_device_settings.imei);
+    } else {
+        shell_print(shell, "  IMEI           %s", imei);
+    }
+    if (m_device_settings.msisdn[0]) {
+        shell_print(shell, "  MSISDN         %s (static)", m_device_settings.msisdn);
+    } else {
+        shell_print(shell, "  MSISDN         %s", msisdn);
+    }
     shell_print(shell, "  Logging        %s", m_device_settings.modem_logging);
 
     return 0;
@@ -3072,7 +3127,7 @@ static int cmd_device_imei(const struct shell *shell, size_t argc, char **argv)
     char *imei = argv[1];
     size_t imei_len = strlen(imei);
 
-    if (imei_len != 15) {
+    if (imei_len != 0 && imei_len != 15) {
         shell_print(shell, "length of IMEI must be 15");
         return 0;
     }
@@ -3081,7 +3136,11 @@ static int cmd_device_imei(const struct shell *shell, size_t argc, char **argv)
     strcpy(m_device_settings.imei, imei);
     nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
 
-    shell_print(shell, "Set IMEI: %s", imei);
+    if (imei_len) {
+        shell_print(shell, "Set IMEI: %s", imei);
+    } else {
+        shell_print(shell, "Removed IMEI");
+    }
 
     return 0;
 }
@@ -3097,7 +3156,7 @@ static int cmd_device_msisdn(const struct shell *shell, size_t argc, char **argv
     char *msisdn = argv[1];
     size_t msisdn_len = strlen(msisdn);
 
-    if (msisdn_len != 10) {
+    if (msisdn_len != 0 && msisdn_len != 10) {
         shell_print(shell, "length of MSISDN must be 10");
         return 0;
     }
@@ -3106,7 +3165,11 @@ static int cmd_device_msisdn(const struct shell *shell, size_t argc, char **argv
     strcpy(m_device_settings.msisdn, msisdn);
     nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
 
-    shell_print(shell, "Set MSISDN: %s", msisdn);
+    if (msisdn_len) {
+        shell_print(shell, "Set MSISDN: %s", msisdn);
+    } else {
+        shell_print(shell, "Removed MSISDN");
+    }
 
     return 0;
 }
@@ -3403,6 +3466,24 @@ static void app_lwm2m_observer_process(void)
     }
 }
 
+#define APP_CUSTOM_APN "VZWADMIN"
+void app_apn_connect(void)
+{
+    int apn_fd;
+
+    apn_fd = nrf_socket(NRF_AF_LTE, NRF_SOCK_MGMT, NRF_PROTO_PDN);
+    __ASSERT(apn_fd >= 0, "PDN Socket creation failed.");
+    printk("PDN management socket created.\n");
+    printk("Connecting to APN %s.\n", APP_CUSTOM_APN);
+
+    // Connect to the APN.
+    int err = nrf_connect(apn_fd, APP_CUSTOM_APN, strlen(APP_CUSTOM_APN));
+    __ASSERT(err == 0, "APN Connection Failed.");
+
+    send_at_command("AT+CGDCONT?", true);
+}
+
+
 /**@brief Function for application main entry.
  */
 int main(void)
@@ -3429,6 +3510,11 @@ int main(void)
     // Setup LWM2M endpoints.
     app_lwm2m_setup();
 
+    // Turn on SIM to resolve MSISDN.
+    lte_lc_init_and_connect();
+    read_emei_and_msisdn();
+    lte_lc_offline();
+
     // Create LwM2M factory bootstraped objects.
     app_lwm2m_create_objects();
 
@@ -3449,6 +3535,10 @@ int main(void)
         sprintf(at_command, "AT%%XMODEMTRACE=2,,3,%s", m_device_settings.modem_logging);
         send_at_command(at_command, false);
     }
+
+#if (APP_USE_CONTABO != 1)
+    app_apn_connect();
+#endif
 
 #if CONFIG_AT_HOST_LIBRARY
     int at_host_err = at_host_init(CONFIG_AT_HOST_UART, CONFIG_AT_HOST_TERMINATION);
