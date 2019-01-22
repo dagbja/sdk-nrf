@@ -43,8 +43,8 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <lwm2m_objects_plain_text.h>
 
 #define APP_MOTIVE_FIX_UPDATE_TRIGGER   1 // To adjust for MotiveBridge posting /1/0/8 instead of /1/1/8
-#define APP_MOTIVE_NO_REBOOT            1 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
-#define APP_MOTIVE_FAKE_POWER_SOURCES   1 // To pass MotiveBridge power source tests (4.10, 4.11 and 4.12)
+#define APP_MOTIVE_NO_REBOOT            0 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
+#define APP_MOTIVE_FAKE_POWER_SOURCES   0 // To pass MotiveBridge power source tests (4.10, 4.11 and 4.12)
 
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_CONTABO                 0
