@@ -66,7 +66,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT     9998                                            /**< Local port to connect to the LWM2M bootstrap server. */
 #define LWM2M_BOOTSTRAP_SERVER_REMOTE_PORT    5684                                            /**< Remote port of the LWM2M bootstrap server. */
 #endif
-#define LWM2M_LOCAL_CLIENT_PORT               9999                                            /**< Local port to connect to the LWM2M server. */
+#define LWM2M_LOCAL_CLIENT_PORT_OFFSET        9999                                            /**< Local port to connect to the LWM2M server. */
 #define LWM2M_SERVER_REMORT_PORT              5684                                            /**< Remote port of the LWM2M server. */
 
 #if APP_USE_CONTABO
@@ -2335,7 +2335,7 @@ static void app_server_connect(void)
         APPL_LOG("SECURE session (register)");
 
         struct sockaddr local_addr;
-        app_init_sockaddr_in(&local_addr, m_remote_server[m_server_instance].sa_family, LWM2M_LOCAL_CLIENT_PORT);
+        app_init_sockaddr_in(&local_addr, m_remote_server[m_server_instance].sa_family, LWM2M_LOCAL_CLIENT_PORT_OFFSET + m_server_instance);
 
         #define SEC_TAG_COUNT 1
 
