@@ -42,12 +42,6 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
 
-/* Hardcoded IMEI for now, will be fetched from modem using AT+CGSN=1 */
-#define IMEI            "004402990020434"
-
-/* Hardcoded MSISDN fro now, will be fetched from modem using AT+CNUM */
-#define MSISDN          "0123456789"
-
 #define APP_MOTIVE_FIX_UPDATE_TRIGGER   1 // To adjust for MotiveBridge posting /1/0/8 instead of /1/1/8
 #define APP_MOTIVE_NO_REBOOT            1 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
 #define APP_MOTIVE_FAKE_POWER_SOURCES   1 // To pass MotiveBridge power source tests (4.10, 4.11 and 4.12)
@@ -1951,8 +1945,8 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
 
 static void app_init_device_settings(void)
 {
-    strcpy(m_device_settings.imei, IMEI);
-    strcpy(m_device_settings.msisdn, MSISDN);
+    strcpy(m_device_settings.imei, "");
+    strcpy(m_device_settings.msisdn, "");
     strcpy(m_device_settings.manufacturer, "Nordic Semiconductor ASA");
     strcpy(m_device_settings.model_number, "nRF9160");
     strcpy(m_device_settings.serial_number, "1234567890");
