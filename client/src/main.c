@@ -3549,6 +3549,18 @@ int main(void)
 
     work_init();
 
+#if (CONFIG_DK_LIBRARY && CONFIG_SHELL)
+    // Switch 2 in right position will enter maintenance mode
+    u32_t button_state = 0;
+    dk_read_buttons(&button_state, NULL);
+
+    if (!(button_state & 0x08))
+    {
+        printk("Entering maintenance mode!\n");
+        m_app_state = APP_STATE_IP_INTERFACE_UP;
+    }
+    else
+#endif
     if (m_server_settings[0].is.bootstrapped)
     {
         m_app_state = APP_STATE_SERVER_CONNECT;
