@@ -205,9 +205,9 @@ static char m_bootstrap_object_alias_name[] = "bs";                             
 
 #define VERIZON_RESOURCE 30000
 
-static coap_transport_handle_t             m_coap_transport;                                  /**< CoAP transport handle for the non bootstrap server. */
-static coap_transport_handle_t             m_lwm2m_bs_transport;                              /**< CoAP transport handle for the secure bootstrap server. Obtained on @coap_security_setup. */
-static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS];            /**< CoAP transport handle for the secure server. Obtained on @coap_security_setup. */
+static coap_transport_handle_t             m_coap_transport = 0xFFFFFFFF;                     /**< CoAP transport handle for the non bootstrap server. */
+static coap_transport_handle_t             m_lwm2m_bs_transport = 0xFFFFFFFF;                 /**< CoAP transport handle for the secure bootstrap server. Obtained on @coap_security_setup. */
+static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };            /**< CoAP transport handle for the secure server. Obtained on @coap_security_setup. */
 
 static volatile app_state_t m_app_state = APP_STATE_IDLE;                                     /**< Application state. Should be one of @ref app_state_t. */
 static volatile uint16_t    m_server_instance;                                                /**< Server instance handled. */
@@ -757,9 +757,18 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             m_server_settings[m_server_instance].retry_count = 0;
             lwm2m_server_registered_set(m_server_instance, true);
 
+            u32_t button_state = 0;
+            dk_read_buttons(&button_state, NULL);
+
+            bool switch1_right = false;
+            if (!(button_state & 0x04)) // Switch 1 in right position
+            {
+                switch1_right = true;
+            }
+
             uint8_t uri_len = 0;
             (void)lwm2m_security_server_uri_get(3, &uri_len);
-            if ((m_server_instance == 1) && (uri_len > 0)) {
+            if (!switch1_right && (m_server_instance == 1) && (uri_len > 0)) {
                 m_app_state = APP_STATE_SERVER_CONNECT;
                 m_server_instance = 3;
             }
@@ -838,7 +847,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 
     // Close connection to bootstrap server.
     uint32_t err_code = coap_security_destroy(m_lwm2m_bs_transport);
-    APP_ERROR_CHECK(err_code);
+    ARG_UNUSED(err_code);
 
     m_lwm2m_bs_transport = 0xFFFFFFFF;
 
@@ -1499,16 +1508,16 @@ static void app_disconnect(void)
     if (m_lwm2m_bs_transport != 0xFFFFFFFF)
     {
         err_code = coap_security_destroy(m_lwm2m_bs_transport);
-        APP_ERROR_CHECK(err_code);
+        ARG_UNUSED(err_code);
 
         m_lwm2m_bs_transport = 0xFFFFFFFF;
     }
 
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-        if (m_lwm2m_transport[i])
+        if (m_lwm2m_transport[i] != 0xFFFFFFFF)
         {
             err_code = coap_security_destroy(m_lwm2m_transport[i]);
-            APP_ERROR_CHECK(err_code);
+            ARG_UNUSED(err_code);
 
             m_lwm2m_transport[i] = 0xFFFFFFFF;
         }
@@ -2420,24 +2429,6 @@ static void app_lwm2m_observer_process(void)
     lwm2m_firmware_observer_process();
 }
 
-#define APP_CUSTOM_APN "VZWADMIN"
-#if (APP_USE_BOOTSTRAP_APN == 1)
-void app_apn_connect(void)
-{
-    int apn_fd;
-
-    apn_fd = nrf_socket(NRF_AF_LTE, NRF_SOCK_MGMT, NRF_PROTO_PDN);
-    __ASSERT(apn_fd >= 0, "PDN Socket creation failed.");
-    printk("PDN management socket created.\n");
-    printk("Connecting to APN %s.\n", APP_CUSTOM_APN);
-
-    // Connect to the APN.
-    int err = nrf_connect(apn_fd, APP_CUSTOM_APN, strlen(APP_CUSTOM_APN));
-    __ASSERT(err == 0, "APN Connection Failed.");
-
-    send_at_command("AT+CGDCONT?", true);
-}
-#endif
 
 /**@brief Function for application main entry.
  */
@@ -2458,12 +2449,19 @@ int main(void)
     lte_lc_offline();
 #endif
 
+    // Turn on SIM to resolve MSISDN.
+    lte_lc_init_and_connect();
+    read_emei_and_msisdn();
+    lte_lc_offline();
+
     // Initialize Non-volatile Storage.
     lwm2m_instance_storage_init();
 
     if (strcmp(m_device_settings.modem_logging, "2") == 0) {
         modem_trace_enable();
     }
+
+    app_provision_psk(APP_BOOTSTRAP_SEC_TAG, app_client_imei_msisdn(), APP_BOOTSTRAP_SEC_PSK);
 
 #if CONFIG_DK_LIBRARY
     // Initialize LEDs and Buttons.
@@ -2500,10 +2498,6 @@ int main(void)
         sprintf(at_command, "AT%%XMODEMTRACE=2,,3,%s", m_device_settings.modem_logging);
         send_at_command(at_command, false);
     }
-
-#if (APP_USE_BOOTSTRAP_APN == 1)
-    app_apn_connect();
-#endif
 
 #if CONFIG_AT_HOST_LIBRARY
     int at_host_err = at_host_init(CONFIG_AT_HOST_UART, CONFIG_AT_HOST_TERMINATION);
