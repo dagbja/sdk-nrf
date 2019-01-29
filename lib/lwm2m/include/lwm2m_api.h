@@ -104,7 +104,7 @@ typedef enum
 {
     LWM2M_CLIENT_ID_TYPE_UUID = 36,
     LWM2M_CLIENT_ID_TYPE_IMEI = 15,
-    LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN = 42,
+    LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN = 44,
     LWM2M_CLIENT_ID_TYPE_ESN  = 8,
     LWM2M_CLIENT_ID_TYPE_MEID = 14
 } lwm2m_client_identity_type_t;
@@ -117,11 +117,11 @@ typedef enum
  */
 typedef union
 {
-    char uuid[36];
-    char imei[15];
-    char imei_msisdn[42];
-    char esn[8];
-    char meid[14];
+    char uuid[LWM2M_CLIENT_ID_TYPE_UUID];
+    char imei[LWM2M_CLIENT_ID_TYPE_IMEI];
+    char imei_msisdn[LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN];
+    char esn[LWM2M_CLIENT_ID_TYPE_ESN];
+    char meid[LWM2M_CLIENT_ID_TYPE_MEID];
 } lwm2m_identity_string_t;
 
 /**@brief LWM2M client identity structure type. */

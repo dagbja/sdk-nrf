@@ -8,9 +8,9 @@
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
 
-char * lwm2m_security_server_uri_get(uint16_t instance_id);
+char * lwm2m_security_server_uri_get(uint16_t instance_id, uint8_t * p_len);
 
-void lwm2m_security_server_uri_set(uint16_t instance_id, char * value);
+void lwm2m_security_server_uri_set(uint16_t instance_id, char * p_value, uint8_t len);
 
 uint32_t lwm2m_security_is_bootstrap_server_get(uint16_t instance_id);
 
@@ -24,13 +24,13 @@ uint32_t lwm2m_security_hold_off_timer_get(uint16_t instance_id);
 
 void lwm2m_security_hold_off_timer_set(uint16_t instance_id, uint32_t value);
 
-char * lwm2m_security_identity_get(uint16_t instance_id);
+char * lwm2m_security_identity_get(uint16_t instance_id, uint8_t * p_len);
 
-void lwm2m_security_identity_set(uint16_t instance_id, char * value);
+void lwm2m_security_identity_set(uint16_t instance_id, char * p_value, uint8_t len);
 
-char * lwm2m_security_psk_get(uint16_t instance_id);
+char * lwm2m_security_psk_get(uint16_t instance_id, uint8_t * p_len);
 
-void lwm2m_security_psk_set(uint16_t instance_id, char * value);
+void lwm2m_security_psk_set(uint16_t instance_id, char * p_value, uint8_t len);
 
 void lwm2m_security_init(void);
 

@@ -94,7 +94,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #define APP_BOOTSTRAP_SEC_TAG           APP_SEC_TAG_OFFSET                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
 #if APP_USE_CONTABO
-#define APP_BOOTSTRAP_SEC_PSK           "676c656e6e73736563726574"                            /**< Pre-shared key used for bootstrap server in hex format. */
+#define APP_BOOTSTRAP_SEC_PSK           "glennssecret"                                        /**< Pre-shared key used for bootstrap server in hex format. */
 #else
 #define APP_BOOTSTRAP_SEC_PSK           "d6160c2e7c90399ee7d207a22611e3d3a87241b0462976b935341d000a91e747" /**< Pre-shared key used for bootstrap server in hex format. */
 #endif
@@ -273,11 +273,11 @@ uint32_t app_store_bootstrap_server_values(uint16_t instance_id);
 void app_server_update(uint16_t instance_id);
 void app_factory_reset(void);
 static void app_server_deregister(uint16_t instance_id);
-static void app_provision_psk(int sec_tag, char * identity, char * psk);
+static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
 static void app_provision_secret_keys(void);
 static void app_disconnect(void);
 static void app_wait_state_update(struct k_work *work);
-static const char * app_uri_get(char * server_uri, uint16_t * p_port, bool * p_secure);
+static const char * app_uri_get(char * server_uri, uint8_t uri_len, uint16_t * p_port, bool * p_secure);
 
 /**@brief Recoverable BSD library error. */
 void bsd_recoverable_error_handler(uint32_t error)
@@ -541,7 +541,7 @@ static void app_init_sockaddr_in(struct sockaddr *addr, sa_family_t ai_family, u
     }
 }
 
-static const char * app_uri_get(char * server_uri, uint16_t * p_port, bool * p_secure) {
+static const char * app_uri_get(char * server_uri, uint8_t uri_len, uint16_t * p_port, bool * p_secure) {
     const char *hostname;
 
     if (strncmp(server_uri, "coaps://", 8) == 0) {
@@ -567,16 +567,18 @@ static const char * app_uri_get(char * server_uri, uint16_t * p_port, bool * p_s
 }
 
 static uint32_t app_resolve_server_uri(char            * server_uri,
+                                       uint8_t           uri_len,
                                        struct sockaddr * addr,
                                        bool            * secure,
                                        uint16_t          instance_id)
 {
     // Create a string copy to null-terminate hostname within the server_uri.
     char server_uri_val[SECURITY_SERVER_URI_SIZE_MAX];
-    strcpy(server_uri_val, server_uri);
+    strncpy(server_uri_val, server_uri, uri_len);
+    server_uri_val[uri_len] = 0;
 
     uint16_t port;
-    const char *hostname = app_uri_get(server_uri_val, &port, secure);
+    const char *hostname = app_uri_get(server_uri_val, uri_len, &port, secure);
 
     if (hostname == NULL) {
         return EINVAL;
@@ -645,13 +647,14 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
 /**@brief Helper function to parse the uri and save the remote to the LWM2M remote database. */
 static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_server_id,
                                                     char            * server_uri,
+                                                    uint8_t           uri_len,
                                                     bool            * secure,
                                                     struct sockaddr * p_remote)
 {
     uint32_t err_code;
 
     // Use DNS to lookup the IP
-    err_code = app_resolve_server_uri(server_uri, p_remote, secure, 0);
+    err_code = app_resolve_server_uri(server_uri, uri_len, p_remote, secure, 0);
 
     if (err_code == 0)
     {
@@ -714,7 +717,7 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
     {
         s32_t retry_delay = app_retry_delay[m_server_settings[instance_id].retry_count];
 
-        APPL_LOG("Retry delay for %d minutes...", retry_delay / 60);
+        APPL_LOG("Retry delay for %d minutes..., server %u", retry_delay / 60, instance_id);
         k_delayed_work_submit(&state_update_work, retry_delay * 1000);
 
         m_server_settings[instance_id].retry_count++;
@@ -766,13 +769,15 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             printk("Registered %d\n", m_server_instance);
             m_server_settings[m_server_instance].retry_count = 0;
             lwm2m_server_registered_set(m_server_instance, true);
-#if (APP_USE_CONTABO != 1)
-            if (m_server_instance == 1 && strlen(lwm2m_security_server_uri_get(3))) {
+
+            uint8_t uri_len = 0;
+            (void)lwm2m_security_server_uri_get(3, &uri_len);
+
+            if ((m_server_instance == 1) && (uri_len > 0)) {
                 m_app_state = APP_STATE_SERVER_CONNECT;
                 m_server_instance = 3;
             }
             else
-#endif
             {
                 m_app_state = APP_STATE_SERVER_REGISTERED;
             }
@@ -965,7 +970,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             lwm2m_server_short_server_id_set(0, 100);
             lwm2m_server_hold_off_timer_set(0, 10);
 
-            lwm2m_security_server_uri_set(0, BOOTSTRAP_URI);
+            lwm2m_security_server_uri_set(0, BOOTSTRAP_URI, strlen(BOOTSTRAP_URI));
             lwm2m_security_is_bootstrap_server_set(0, true);
             lwm2m_security_bootstrapped_set(0, 0);
 
@@ -973,8 +978,8 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             m_server_settings[0].access[0] = rwde_access;
             m_server_settings[0].server[0] = 102;
             m_server_settings[0].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
-
-            app_provision_psk(APP_BOOTSTRAP_SEC_TAG, app_client_imei_msisdn(), APP_BOOTSTRAP_SEC_PSK);
+            char * p_identity = app_client_imei_msisdn();
+            app_provision_psk(APP_BOOTSTRAP_SEC_TAG, p_identity, strlen(p_identity), APP_BOOTSTRAP_SEC_PSK, strlen(APP_BOOTSTRAP_SEC_PSK));
 
             break;
         }
@@ -997,7 +1002,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             lwm2m_server_short_server_id_set(2, 101);
             lwm2m_server_hold_off_timer_set(2, 30);
 
-            lwm2m_security_server_uri_set(2, "");
+            lwm2m_security_server_uri_set(2, "", 0);
             lwm2m_server_lifetime_set(2, 86400);
             lwm2m_server_min_period_set(2, 300);
             lwm2m_server_min_period_set(2, 6000);
@@ -1116,10 +1121,11 @@ void app_read_flash_storage(void)
     // DM server
     lwm2m_server_short_server_id_set(1, 102);
 #if APP_USE_CONTABO
-    lwm2m_security_server_uri_set(1, "coap://vmi36865.contabo.host:5683");
+    char server_1_uri[] = "coaps://vmi36865.contabo.host:5684";
 #else
-    lwm2m_security_server_uri_set(1, "coaps://ddocdp.do.motive.com:5684");
+    char server_1_uri[] = "coaps://ddocdp.do.motive.com:5684";
 #endif
+    lwm2m_security_server_uri_set(1, server_1_uri, strlen(server_1_uri));
     lwm2m_server_lifetime_set(1, 2592000);
     lwm2m_server_min_period_set(1, 1);
     lwm2m_server_max_period_set(1, 60);
@@ -1146,8 +1152,12 @@ void app_read_flash_storage(void)
     }
 
     // Repository server
-    lwm2m_security_server_uri_set(3, "coaps://xvzwmpctii.xdev.motive.com:5684");
-
+#if APP_USE_CONTABO
+    char server_3_uri[] = "coap://vmi36865.contabo.host:6684";
+#else
+    char server_3_uri[] = "coaps://xvzwmpctii.xdev.motive.com:5684";
+#endif
+    lwm2m_security_server_uri_set(3, server_3_uri, strlen(server_3_uri));
     lwm2m_server_short_server_id_set(3, 1000);
     lwm2m_server_lifetime_set(3, 86400);
     lwm2m_server_min_period_set(3, 1);
@@ -1243,7 +1253,8 @@ static void app_lwm2m_setup(void)
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_conn_mon_get_object());
 
     // Set client ID.
-    memcpy(&m_client_id.value.imei_msisdn[0], app_client_imei_msisdn(), LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN);
+    char * p_ep_id = app_client_imei_msisdn();
+    memcpy(&m_client_id.value.imei_msisdn[0], p_ep_id, strlen(p_ep_id));
     m_client_id.type = LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN;
 }
 
@@ -1254,8 +1265,10 @@ static void app_bootstrap_connect(void)
     bool secure;
 
     // Save the remote address of the bootstrap server.
+    uint8_t uri_len = 0;
     (void)app_lwm2m_parse_uri_and_save_remote(LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
-                                              lwm2m_security_server_uri_get(0),
+                                              lwm2m_security_server_uri_get(0, &uri_len),
+                                              uri_len,
                                               &secure,
                                               &m_bs_remote_server);
 
@@ -1332,7 +1345,8 @@ static void app_server_connect(void)
     // Set the short server id of the server in the config.
     m_server_conf[m_server_instance].short_server_id = lwm2m_server_short_server_id_get(m_server_instance);
 
-    err_code = app_resolve_server_uri(lwm2m_security_server_uri_get(m_server_instance),
+    uint8_t uri_len = 0;
+    err_code = app_resolve_server_uri(lwm2m_security_server_uri_get(m_server_instance, &uri_len), uri_len,
                                       &m_remote_server[m_server_instance], &secure, m_server_instance);
     if (err_code != 0)
     {
@@ -1344,6 +1358,7 @@ static void app_server_connect(void)
     {
         APPL_LOG("SECURE session (register)");
 
+        // TODO: Check if this has to be static.
         struct sockaddr local_addr;
         app_init_sockaddr_in(&local_addr, m_remote_server[m_server_instance].sa_family, LWM2M_LOCAL_CLIENT_PORT_OFFSET + m_server_instance);
 
@@ -1627,18 +1642,25 @@ static void app_coap_init(void)
 }
 
 
-static void app_provision_psk(int sec_tag, char * identity, char * psk)
+static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len)
 {
     uint32_t err_code;
 
     err_code = nrf_inbuilt_key_write(sec_tag,
                                      NRF_KEY_MGMT_CRED_TYPE_IDENTITY,
-                                     identity, strlen(identity));
+                                     identity, identity_len);
     APP_ERROR_CHECK(err_code);
 
+    size_t secret_key_nrf9160_style_len = psk_len * 2;
+    uint8_t * p_secret_key_nrf9160_style = k_malloc(secret_key_nrf9160_style_len);
+    for (int i = 0; i < psk_len; i++)
+    {
+        sprintf(&p_secret_key_nrf9160_style[i * 2], "%02x", psk[i]);
+    }
     err_code = nrf_inbuilt_key_write(sec_tag,
                                      NRF_KEY_MGMT_CRED_TYPE_PSK,
-                                     psk, strlen(psk));
+                                     p_secret_key_nrf9160_style, secret_key_nrf9160_style_len);
+    k_free(p_secret_key_nrf9160_style);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -1652,22 +1674,29 @@ static void app_provision_secret_keys(void)
 
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
-        if (lwm2m_security_identity_get(i) && lwm2m_security_psk_get(i))
+        uint8_t identity_len = 0;
+        uint8_t psk_len      = 0;
+        char * p_identity    = lwm2m_security_identity_get(i, &identity_len);
+        char * p_psk         = lwm2m_security_psk_get(i, &psk_len);
+
+        if ((identity_len > 0) && (psk_len >0))
         {
             static char server_uri_val[SECURITY_SERVER_URI_SIZE_MAX];
-            strcpy(server_uri_val, (char *)lwm2m_security_server_uri_get(i));
-            
+            uint8_t uri_len; // Will be filled by server_uri query.
+            strncpy(server_uri_val, (char *)lwm2m_security_server_uri_get(i, &uri_len), uri_len);
+            server_uri_val[uri_len] = 0;
+
             bool secure = false;
             uint16_t port = 0;
-            const char * hostname = app_uri_get(server_uri_val, &port, &secure);
+            const char * hostname = app_uri_get(server_uri_val, uri_len, &port, &secure);
             (void)hostname;
 
             if (secure) {
                 APPL_LOG("Provisioning key for %s, short-id: %u", server_uri_val, lwm2m_server_short_server_id_get(i));
-                app_provision_psk(APP_SEC_TAG_OFFSET + i, lwm2m_security_identity_get(i), lwm2m_security_psk_get(i));
+                app_provision_psk(APP_SEC_TAG_OFFSET + i, p_identity, identity_len, p_psk, psk_len);
             }
-            lwm2m_security_identity_set(i, NULL);
-            lwm2m_security_psk_set(i, NULL);
+            lwm2m_security_identity_set(i, NULL, 0);
+            lwm2m_security_psk_set(i, NULL, 0);
         }
     }
     APPL_LOG("Wrote secret keys");
@@ -2400,6 +2429,8 @@ void app_apn_connect(void)
 int main(void)
 {
     printk("\n\nInitializing LTE link, please wait...\n");
+    m_lwm2m_bs_transport = 0xFFFFFFFF;
+    m_coap_transport = 0xFFFFFFFF;
 
     // Initialize Non-volatile Storage.
     app_flash_init();
@@ -2489,7 +2520,7 @@ int main(void)
     {
         if (IS_ENABLED(CONFIG_LOG)) {
             /* if logging is enabled, sleep */
-            k_sleep(K_MSEC(10));
+            k_sleep(K_MSEC(100));
         } else {
             /* other, put CPU to idle to save power */
             k_cpu_idle();

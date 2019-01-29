@@ -31,7 +31,6 @@ extern uint32_t app_store_bootstrap_security_values(uint16_t instance_id);
 typedef struct
 {
     // Security object values
-    char     server_uri[SECURITY_SERVER_URI_SIZE_MAX];                 /**< Server URI to the server. */
     bool     is_bootstrap_server;
     uint8_t  sms_security_mode;
     //char     sms_binding_key_param[6];
@@ -47,18 +46,27 @@ static security_settings_t m_security_settings[1+LWM2M_MAX_SERVERS];
 static lwm2m_object_t    m_object_security;                                 /**< LWM2M security base object. */
 static lwm2m_security_t  m_instance_security[1+LWM2M_MAX_SERVERS];          /**< Security object instances. Index 0 is always bootstrap instance. */
 
-static char *            m_public_key[1+LWM2M_MAX_SERVERS];
-static char *            m_secret_key[1+LWM2M_MAX_SERVERS];
-
-
-char * lwm2m_security_server_uri_get(uint16_t instance_id)
+char * lwm2m_security_server_uri_get(uint16_t instance_id, uint8_t * p_len)
 {
-    return m_security_settings[instance_id].server_uri;
+    *p_len = m_instance_security[instance_id].server_uri.len;
+    return m_instance_security[instance_id].server_uri.p_val;
 }
 
-void lwm2m_security_server_uri_set(uint16_t instance_id, char * value)
+void lwm2m_security_server_uri_set(uint16_t instance_id, char * p_value, uint8_t len)
 {
-    strncpy(m_security_settings[instance_id].server_uri, value, strlen(value));
+    if (m_instance_security[instance_id].server_uri.p_val != NULL)
+    {
+        k_free(m_instance_security[instance_id].server_uri.p_val);
+        m_instance_security[instance_id].server_uri.len = 0;
+    }
+
+    if ((len > 0) && (p_value != NULL))
+    {
+        m_instance_security[instance_id].server_uri.p_val = k_malloc(len);
+        m_instance_security[instance_id].server_uri.len = len;
+
+        memcpy(m_instance_security[instance_id].server_uri.p_val, p_value, len);
+    }
 }
 
 uint32_t lwm2m_security_is_bootstrap_server_get(uint16_t instance_id)
@@ -91,45 +99,49 @@ void lwm2m_security_hold_off_timer_set(uint16_t instance_id, uint32_t value)
     m_security_settings[instance_id].hold_off_timer = value;
 }
 
-char * lwm2m_security_identity_get(uint16_t instance_id)
+char * lwm2m_security_identity_get(uint16_t instance_id, uint8_t * p_len)
 {
-    return m_public_key[instance_id];
+    *p_len = m_instance_security[instance_id].public_key.len;
+    return m_instance_security[instance_id].public_key.p_val;
 }
 
-void lwm2m_security_identity_set(uint16_t instance_id, char * value)
+void lwm2m_security_identity_set(uint16_t instance_id, char * p_value, uint8_t len)
 {
-    char * p_id = m_public_key[instance_id];
-    if (p_id != NULL) {
-        k_free(m_public_key[instance_id]);
+    if (m_instance_security[instance_id].public_key.p_val != NULL)
+    {
+        k_free(m_instance_security[instance_id].public_key.p_val);
+        m_instance_security[instance_id].public_key.len = 0;
     }
 
-    if (value != NULL) {
-        size_t public_key_len = m_instance_security[instance_id].public_key.len;
-        m_public_key[instance_id] = k_malloc(strlen(value) + 1);
-        memcpy(m_public_key[instance_id], m_instance_security[instance_id].public_key.p_val, public_key_len);
-        m_public_key[instance_id][public_key_len] = 0;
+    if ((len > 0) && (p_value != NULL))
+    {
+        m_instance_security[instance_id].public_key.p_val = k_malloc(len);
+        m_instance_security[instance_id].public_key.len = len;
+
+        memcpy(m_instance_security[instance_id].public_key.p_val, p_value, len);
     }
 }
 
-char * lwm2m_security_psk_get(uint16_t instance_id)
+char * lwm2m_security_psk_get(uint16_t instance_id, uint8_t * p_len)
 {
-    return m_secret_key[instance_id];
+    *p_len = m_instance_security[instance_id].secret_key.len;
+    return m_instance_security[instance_id].secret_key.p_val;
 }
 
-void lwm2m_security_psk_set(uint16_t instance_id, char * value)
+void lwm2m_security_psk_set(uint16_t instance_id, char * p_value, uint8_t len)
 {
-    char * p_id = m_secret_key[instance_id];
-    if (p_id != NULL) {
-        k_free(m_secret_key[instance_id]);
+    if (m_instance_security[instance_id].secret_key.p_val != NULL)
+    {
+        k_free(m_instance_security[instance_id].secret_key.p_val);
+        m_instance_security[instance_id].secret_key.len = 0;
     }
 
-    if (value != NULL) {
-        size_t secret_key_len = m_instance_security[instance_id].secret_key.len * 2;
-        m_secret_key[instance_id] = k_malloc(secret_key_len + 1);
-        for (int i = 0; i < m_instance_security[instance_id].secret_key.len; i++) {
-            sprintf(&m_secret_key[instance_id][i*2], "%02x", m_instance_security[instance_id].secret_key.p_val[i]);
-        }
-        m_secret_key[instance_id][secret_key_len] = 0;
+    if ((len > 0) && (p_value != NULL))
+    {
+        m_instance_security[instance_id].secret_key.p_val = k_malloc(len);
+        m_instance_security[instance_id].secret_key.len = len;
+
+        memcpy(m_instance_security[instance_id].secret_key.p_val, p_value, len);
     }
 }
 
@@ -264,7 +276,10 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
 
     if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
-        uint32_t err_code = lwm2m_tlv_security_decode(&m_instance_security[instance_id],
+        lwm2m_security_t unpack_struct;
+        memset(&unpack_struct, 0, sizeof(lwm2m_security_t));
+
+        uint32_t err_code = lwm2m_tlv_security_decode(&unpack_struct,
                                                       p_request->payload,
                                                       p_request->payload_len,
                                                       tlv_security_resource_decode);
@@ -273,23 +288,13 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
             return 0;
         }
 
-        // Copy public key as string
-        size_t public_key_len = m_instance_security[instance_id].public_key.len;
-        m_public_key[instance_id] = k_malloc(public_key_len + 1);
-        memcpy(m_public_key[instance_id], m_instance_security[instance_id].public_key.p_val, public_key_len);
-        m_public_key[instance_id][public_key_len] = 0;
-
-        // Convert secret key from binary to string
-        size_t secret_key_len = m_instance_security[instance_id].secret_key.len * 2;
-        m_secret_key[instance_id] = k_malloc(secret_key_len + 1);
-        for (int i = 0; i < m_instance_security[instance_id].secret_key.len; i++) {
-            sprintf(&m_secret_key[instance_id][i*2], "%02x", m_instance_security[instance_id].secret_key.p_val[i]);
-        }
-        m_secret_key[instance_id][secret_key_len] = 0;
-
-        LWM2M_TRC("Secret key %d: %s", instance_id, m_secret_key[instance_id]);
-
-        LWM2M_TRC("decoded security.");
+        // Copy fields from parsed TLV to the instance.
+        // Server URI.
+        lwm2m_security_server_uri_set(instance_id, unpack_struct.server_uri.p_val, unpack_struct.server_uri.len);
+        // identity.
+        lwm2m_security_identity_set(instance_id, unpack_struct.public_key.p_val, unpack_struct.public_key.len);
+        // PSK.
+        lwm2m_security_psk_set(instance_id, unpack_struct.secret_key.p_val, unpack_struct.secret_key.len);
 
         m_instance_security[instance_id].proto.instance_id = instance_id;
         m_instance_security[instance_id].proto.object_id   = p_object->object_id;
