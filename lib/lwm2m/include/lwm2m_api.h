@@ -32,7 +32,7 @@ extern "C" {
 #define LWM2M_CONNECTIVITY_MONITORING_MAX_IP_ADDRESSES CONFIG_NRF_LWM2M_CONNECTIVITY_MONITORING_MAX_IP_ADDRESSES
 #define LWM2M_CONNECTIVITY_MONITORING_MAX_APNS CONFIG_NRF_LWM2M_CONNECTIVITY_MONITORING_MAX_APNS
 
-
+#define USE_SHORT_SMS 0
 /**@addtogroup LWM2M_opcodes Types
  * @{
  * @brief LWMW2M Bootstrap type definitions.
@@ -104,7 +104,11 @@ typedef enum
 {
     LWM2M_CLIENT_ID_TYPE_UUID = 36,
     LWM2M_CLIENT_ID_TYPE_IMEI = 15,
+#if USE_SHORT_SMS
+    LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN = 42,
+#else
     LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN = 44,
+#endif
     LWM2M_CLIENT_ID_TYPE_ESN  = 8,
     LWM2M_CLIENT_ID_TYPE_MEID = 14
 } lwm2m_client_identity_type_t;
@@ -127,6 +131,7 @@ typedef union
 /**@brief LWM2M client identity structure type. */
 typedef struct
 {
+    uint16_t                     len;
     lwm2m_identity_string_t      value;
     lwm2m_client_identity_type_t type;
 } lwm2m_client_identity_t;

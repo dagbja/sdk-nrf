@@ -47,6 +47,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <lwm2m_device.h>
 #include <lwm2m_security.h>
 #include <lwm2m_firmware.h>
+#include <lwm2m_instance_storage.h>
 #include <common.h>
 
 /* Hardcoded IMEI for now, will be fetched from modem using AT+CGSN=1 */
@@ -56,15 +57,18 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define MSISDN          "0123456789"
 
 #define APP_MOTIVE_NO_REBOOT            1 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
-
+#define APP_USE_BOOTSTRAP_APN           0
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_CONTABO                 0
 
-#define APP_RESOLVE_URN                 1
-// Emulate externs for time being if not use on real network.
-#if (APP_RESOLVE_URN != 1)
-    char imei[] = IMEI;
-    char msisdn[] = MSISDN;
+#define APP_RESOLVE_URN                 0
+
+#if APP_RESOLVE_URN
+extern char imei[];
+extern char msisdn[];
+#else
+char imei[128];
+char msisdn[128];
 #endif
 
 #define APP_LEDS_UPDATE_INTERVAL        500                                                   /**< Interval in milliseconds between each time status LEDs are updated. */
@@ -95,10 +99,19 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #define APP_BOOTSTRAP_SEC_TAG           APP_SEC_TAG_OFFSET                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
 #if APP_USE_CONTABO
-#define APP_BOOTSTRAP_SEC_PSK           "glennssecret"                                        /**< Pre-shared key used for bootstrap server in hex format. */
+#define APP_BOOTSTRAP_SEC_PSK           {'g', 'l', 'e', 'n', 'n', 's', 's', 'e', 'c', 'r', 'e', 't'}  /**< Pre-shared key used for bootstrap server in hex format. */
 #else
-#define APP_BOOTSTRAP_SEC_PSK           "d6160c2e7c90399ee7d207a22611e3d3a87241b0462976b935341d000a91e747" /**< Pre-shared key used for bootstrap server in hex format. */
+#define APP_BOOTSTRAP_SEC_PSK           {0xd6, 0x16, 0x0c, 0x2e, \
+                                         0x7c, 0x90, 0x39, 0x9e, \
+                                         0xe7, 0xd2, 0x07, 0xa2, \
+                                         0x26, 0x11, 0xe3, 0xd3, \
+                                         0xa8, 0x72, 0x41, 0xb0, \
+                                         0x46, 0x29, 0x76, 0xb9, \
+                                         0x35, 0x34, 0x1d, 0x00, \
+                                         0x0a, 0x91, 0xe7, 0x47} /**< Pre-shared key used for bootstrap server in hex format. */
 #endif
+
+static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
 
 #define APP_MAX_AT_READ_LENGTH          100
 #define APP_MAX_AT_WRITE_LENGTH         256
@@ -220,7 +233,7 @@ static struct k_delayed_work connection_update_work[1+LWM2M_MAX_SERVERS];
 
 /* Resolved server addresses */
 #if APP_USE_CONTABO
-static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET6, AF_INET6, 0, AF_INET6 };  /**< Current IP versions, start using IPv6. */
+static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET, AF_INET, 0, AF_INET };  /**< Current IP versions, start using IPv6. */
 #else
 static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET6, AF_INET6, 0, AF_INET6 };  /**< Current IP versions, start using IPv6. */
 #endif
@@ -228,7 +241,6 @@ static struct sockaddr m_bs_remote_server;                                      
 
 static struct sockaddr m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
 static volatile uint32_t tick_count = 0;
-
 
 /**@brief Bootstrap values to store in app persistent storage. */
 typedef struct
@@ -253,23 +265,8 @@ typedef struct {
 } device_settings_t;
 
 static device_settings_t m_device_settings;
-#define DEVICE_FLASH_ID 10
 
-#if CONFIG_FLASH
-/* NVS-related defines */
-#define NVS_SECTOR_SIZE    FLASH_ERASE_BLOCK_SIZE    /* Multiple of FLASH_PAGE_SIZE */
-#define NVS_SECTOR_COUNT   2                         /* At least 2 sectors */
-#define NVS_STORAGE_OFFSET FLASH_AREA_STORAGE_OFFSET /* Start address of the filesystem in flash */
-
-static struct nvs_fs fs = {
-    .sector_size  = NVS_SECTOR_SIZE,
-    .sector_count = NVS_SECTOR_COUNT,
-    .offset       = NVS_STORAGE_OFFSET,
-};
-#endif
-
-
-static uint32_t app_store_bootstrap_server_acl(uint16_t instance_id);
+//static uint32_t app_store_bootstrap_server_acl(uint16_t instance_id);
 uint32_t app_store_bootstrap_server_values(uint16_t instance_id);
 void app_server_update(uint16_t instance_id);
 void app_factory_reset(void);
@@ -310,14 +307,7 @@ void bsd_irrecoverable_error_handler(uint32_t error)
 
 #if CONFIG_DK_LIBRARY
     k_delayed_work_cancel(&leds_update_work);
-
-    /* Blinking all LEDs ON/OFF if there is an irrecoverable error. */
-    while (true) {
-        dk_set_leds_state(DK_ALL_LEDS_MSK, 0x00);
-        k_sleep(250);
-        dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
-        k_sleep(250);
-    }
+    printk("IRRECOVERABLE ERROR %lu\n", error);
 #else
     while (true);
 #endif
@@ -485,10 +475,7 @@ static void app_buttons_leds_init(void)
 static char * app_client_imei_msisdn()
 {
     static char client_id[128];
-#if APP_RESOLVE_URN
-    extern char imei[];
-    extern char msisdn[];
-#endif
+
     char * p_imei = imei;
     char * p_msisdn = msisdn;
 
@@ -520,7 +507,6 @@ uint32_t lwm2m_coap_handler_root(uint8_t op_code, coap_message_t * p_request)
 
     return 0;
 }
-
 
 static void app_init_sockaddr_in(struct sockaddr *addr, sa_family_t ai_family, u16_t port)
 {
@@ -773,7 +759,6 @@ void lwm2m_notification(lwm2m_notification_type_t type,
 
             uint8_t uri_len = 0;
             (void)lwm2m_security_server_uri_get(3, &uri_len);
-
             if ((m_server_instance == 1) && (uri_len > 0)) {
                 m_app_state = APP_STATE_SERVER_CONNECT;
                 m_server_instance = 3;
@@ -867,12 +852,16 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     lwm2m_security_bootstrapped_set(0, true);  // TODO: this should be set by bootstrap server when bootstrapped
     m_did_bootstrap = true;
 
+    // Clean bootstrap, should trigger a new misc_data.
+    lwm2m_instance_storage_misc_data_t misc_data;
+    misc_data.bootstrapped = 1;
+    (void)lwm2m_instance_storage_misc_data_store(&misc_data);
+
 #if CONFIG_FLASH
     APPL_LOG("Store bootstrap settings");
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-        app_store_bootstrap_server_acl(i);
-        nvs_write(&fs, i, &m_server_settings[i], sizeof(m_server_settings[i]));
-     }
+        lwm2m_instance_storage_security_store(i);
+    }
 #endif
 
     milliseconds_spent = k_uptime_delta(&time_stamp);
@@ -923,7 +912,7 @@ uint32_t app_store_bootstrap_security_values(uint16_t instance_id)
 */
     return 0;
 }
-
+/*
 static uint32_t app_store_bootstrap_server_acl(uint16_t instance_id)
 {
     lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
@@ -936,7 +925,7 @@ static uint32_t app_store_bootstrap_server_acl(uint16_t instance_id)
 
     return 0;
 }
-
+*/
 
 uint32_t app_store_bootstrap_server_values(uint16_t instance_id)
 {
@@ -1003,7 +992,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             m_server_settings[0].server[0] = 102;
             m_server_settings[0].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
             char * p_identity = app_client_imei_msisdn();
-            app_provision_psk(APP_BOOTSTRAP_SEC_TAG, p_identity, strlen(p_identity), APP_BOOTSTRAP_SEC_PSK, strlen(APP_BOOTSTRAP_SEC_PSK));
+            app_provision_psk(APP_BOOTSTRAP_SEC_TAG, p_identity, strlen(p_identity), m_app_bootstrap_psk, sizeof(m_app_bootstrap_psk));
 
             break;
         }
@@ -1031,7 +1020,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             lwm2m_server_min_period_set(2, 300);
             lwm2m_server_min_period_set(2, 6000);
             lwm2m_server_notif_storing_set(2, 1);
-            lwm2m_server_binding_set(2, "UQS");
+            lwm2m_server_binding_set(2, "UQS", 3);
 
             memset(&m_server_settings[2], 0, sizeof(m_server_settings[2]));
             m_server_settings[2].access[0] = rwde_access;
@@ -1059,7 +1048,6 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
     }
 }
 
-
 static void app_init_device_settings(void)
 {
     strcpy(m_device_settings.imei, "");
@@ -1070,14 +1058,15 @@ static void app_init_device_settings(void)
     strcpy(m_device_settings.modem_logging, "1");
 }
 
-
 void app_factory_reset(void)
 {
 #if CONFIG_FLASH
-        for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
-        {
-            nvs_delete(&fs, i);
-        }
+    lwm2m_instance_storage_misc_data_delete();
+
+    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+    {
+        lwm2m_instance_storage_security_delete(i);
+    }
 #endif
 }
 
@@ -1085,6 +1074,14 @@ void app_factory_reset(void)
 void app_read_flash_storage(void)
 {
 #if CONFIG_FLASH
+
+    app_init_device_settings();
+
+    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+    {
+        app_factory_bootstrap_server_object(i);
+    }
+/*
     int rc;
 
     rc = nvs_read(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
@@ -1092,25 +1089,11 @@ void app_read_flash_storage(void)
         app_init_device_settings();
         nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
     }
-
-    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+*/
+    // Read flash overlay files.
+    for (uint32_t i = 0; i < 1 + LWM2M_MAX_SERVERS; i++)
     {
-        rc = nvs_read(&fs, i, &m_server_settings[i], sizeof(m_server_settings[i]));
-        if (rc <= 0) // TODO: check if written size is correct?
-        {
-            // Not found, create new factory bootstrapped object.
-            app_factory_bootstrap_server_object(i);
-
-            if (lwm2m_server_short_server_id_get(i))
-            {
-                // Write settings for initialized server objects.
-                rc = nvs_write(&fs, i, &m_server_settings[i], sizeof(m_server_settings[i]));
-                if (rc <= 0)
-                {
-                    APPL_LOG("Storing server settings failed");
-                }
-            }
-        }
+        lwm2m_instance_storage_security_load(i);
     }
 #else
     app_init_device_settings();
@@ -1119,6 +1102,7 @@ void app_read_flash_storage(void)
     {
         app_factory_bootstrap_server_object(i);
     }
+#endif
 
 #if CONFIG_DK_LIBRARY
     // Workaround for not storing is.bootstrapped:
@@ -1133,10 +1117,21 @@ void app_read_flash_storage(void)
     }
     else
     {
-        lwm2m_security_bootstrapped_set(0, true);
+        lwm2m_instance_storage_misc_data_t misc_data;
+        int32_t result = lwm2m_instance_storage_misc_data_load(&misc_data);
+        if (result != 0)
+        {
+            // storage reports that bootstrap has not been done, continue with bootstrap.
+            lwm2m_security_bootstrapped_set(0, false);
+        }
+        else
+        {
+            lwm2m_security_bootstrapped_set(0, true);
+        }
     }
 #endif
 
+#if CONFIG_FLASH
     // Bootstrap values (will be fetched from NVS after bootstrap)
     uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
                             LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE);
@@ -1144,18 +1139,12 @@ void app_read_flash_storage(void)
 
     // DM server
     lwm2m_server_short_server_id_set(1, 102);
-#if APP_USE_CONTABO
-    char server_1_uri[] = "coaps://vmi36865.contabo.host:5684";
-#else
-    char server_1_uri[] = "coaps://ddocdp.do.motive.com:5684";
-#endif
-    lwm2m_security_server_uri_set(1, server_1_uri, strlen(server_1_uri));
     lwm2m_server_lifetime_set(1, 2592000);
     lwm2m_server_min_period_set(1, 1);
     lwm2m_server_max_period_set(1, 60);
     lwm2m_server_disable_timeout_set(1, 86400);
     lwm2m_server_notif_storing_set(1, 1);
-    lwm2m_server_binding_set(1, "UQS");
+    lwm2m_server_binding_set(1, "UQS", 3);
     lwm2m_server_hold_off_timer_set(1, 30);
     m_server_settings[1].access[0] = rwde_access;
     m_server_settings[1].server[0] = 101;
@@ -1164,8 +1153,6 @@ void app_read_flash_storage(void)
     m_server_settings[1].access[2] = rwde_access;
     m_server_settings[1].server[2] = 1000;
     
-
-
     if (lwm2m_security_bootstrapped_get(0))
     {
         m_server_settings[1].owner = 102;
@@ -1177,7 +1164,7 @@ void app_read_flash_storage(void)
 
     // Repository server
 #if APP_USE_CONTABO
-    char server_3_uri[] = "coap://vmi36865.contabo.host:6684";
+    char server_3_uri[] = "coaps://vmi36865.contabo.host:6684";
 #else
     char server_3_uri[] = "coaps://xvzwmpctii.xdev.motive.com:5684";
 #endif
@@ -1188,7 +1175,7 @@ void app_read_flash_storage(void)
     lwm2m_server_max_period_set(3, 6000);
     lwm2m_server_disable_timeout_set(3, 86400);
     lwm2m_server_notif_storing_set(3, 1);
-    lwm2m_server_binding_set(3, "UQ");
+    lwm2m_server_binding_set(3, "UQ", 2);
     lwm2m_server_hold_off_timer_set(3, 30);
     m_server_settings[3].access[0] = rwde_access;
     m_server_settings[3].server[0] = 101;
@@ -1223,7 +1210,7 @@ static void app_lwm2m_create_objects(void)
 
         // Initialize ACL on the instance.
         (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)lwm2m_server_get_instance(i),
-                                        m_server_settings[i].owner);
+                                        LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
 
         // Set default access to LWM2M_PERMISSION_READ.
         (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)lwm2m_server_get_instance(i),
@@ -1269,7 +1256,7 @@ static void app_lwm2m_setup(void)
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_security_get_object());
 
     // Add server support.
-    (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_conn_mon_get_object());
+    (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_server_get_object());
 
     // Add device support.
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_device_get_object());
@@ -1282,7 +1269,9 @@ static void app_lwm2m_setup(void)
 
     // Set client ID.
     char * p_ep_id = app_client_imei_msisdn();
+
     memcpy(&m_client_id.value.imei_msisdn[0], p_ep_id, strlen(p_ep_id));
+    m_client_id.len  = strlen(p_ep_id);
     m_client_id.type = LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN;
 }
 
@@ -1669,10 +1658,11 @@ static void app_coap_init(void)
     ARG_UNUSED(m_lwm2m_transport);
 }
 
-
 static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len)
 {
     uint32_t err_code;
+
+//    err_code = nrf_inbuilt_key_delete(sec_tag, NRF_KEY_MGMT_CRED_TYPE_IDENTITY);
 
     err_code = nrf_inbuilt_key_write(sec_tag,
                                      NRF_KEY_MGMT_CRED_TYPE_IDENTITY,
@@ -1723,8 +1713,6 @@ static void app_provision_secret_keys(void)
                 APPL_LOG("Provisioning key for %s, short-id: %u", server_uri_val, lwm2m_server_short_server_id_get(i));
                 app_provision_psk(APP_SEC_TAG_OFFSET + i, p_identity, identity_len, p_psk, psk_len);
             }
-            lwm2m_security_identity_set(i, NULL, 0);
-            lwm2m_security_psk_set(i, NULL, 0);
         }
     }
     APPL_LOG("Wrote secret keys");
@@ -1737,19 +1725,6 @@ static void app_provision_secret_keys(void)
 
     APPL_LOG("Normal mode");
 }
-
-
-/**@brief Initialize Non-volatile Storage. */
-static void app_flash_init(void)
-{
-#if CONFIG_FLASH
-    int rc = nvs_init(&fs, DT_FLASH_DEV_NAME);
-    if (rc) {
-        APPL_LOG("Flash init failed: %d", rc);
-    }
-#endif
-}
-
 
 static void send_at_command(const char *at_command, bool do_logging)
 {
@@ -1866,6 +1841,16 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
 #if CONFIG_FLASH
 static int cmd_config_clear(const struct shell *shell, size_t argc, char **argv)
 {
+    lwm2m_instance_storage_security_delete(1);
+    lwm2m_instance_storage_server_delete(1);
+
+    lwm2m_instance_storage_security_delete(2);
+    lwm2m_instance_storage_server_delete(2);
+
+    lwm2m_instance_storage_security_delete(3);
+    lwm2m_instance_storage_server_delete(3);
+
+/*
     lwm2m_security_bootstrapped_set(0, false);
     nvs_write(&fs, 0, &m_server_settings[0], sizeof(m_server_settings[0]));
 
@@ -1874,7 +1859,7 @@ static int cmd_config_clear(const struct shell *shell, size_t argc, char **argv)
 
     app_factory_bootstrap_server_object(3);
     nvs_delete(&fs, 3);
-
+*/
     shell_print(shell, "Deleted all bootstrapped values");
     return 0;
 }
@@ -2457,13 +2442,23 @@ void app_apn_connect(void)
  */
 int main(void)
 {
+#if (APP_RESOLVE_URN != 1)
+    memcpy(imei, IMEI, sizeof(IMEI));
+    memcpy(msisdn, MSISDN, sizeof(MSISDN));
+#endif
     printk("\n\nInitializing LTE link, please wait...\n");
     m_lwm2m_bs_transport = 0xFFFFFFFF;
     m_coap_transport = 0xFFFFFFFF;
 
+#if APP_RESOLVE_URN
+    // Turn on SIM to resolve MSISDN.
+    lte_lc_init_and_connect();
+    read_emei_and_msisdn();
+    lte_lc_offline();
+#endif
+
     // Initialize Non-volatile Storage.
-    app_flash_init();
-    app_read_flash_storage();
+    lwm2m_instance_storage_init();
 
     if (strcmp(m_device_settings.modem_logging, "2") == 0) {
         modem_trace_enable();
@@ -2481,15 +2476,11 @@ int main(void)
     // Setup LWM2M endpoints.
     app_lwm2m_setup();
 
-#if APP_RESOLVE_URN
-    // Turn on SIM to resolve MSISDN.
-    lte_lc_init_and_connect();
-    read_emei_and_msisdn();
-    lte_lc_offline();
-#endif
-
     // Create LwM2M factory bootstraped objects.
     app_lwm2m_create_objects();
+
+    // Factory bootstrap objects created.
+    app_read_flash_storage();
 
     // Establish LTE link.
     lte_lc_init_and_connect();
@@ -2509,7 +2500,7 @@ int main(void)
         send_at_command(at_command, false);
     }
 
-#if (APP_USE_CONTABO != 1)
+#if (APP_USE_BOOTSTRAP_APN == 1)
     app_apn_connect();
 #endif
 
@@ -2549,7 +2540,7 @@ int main(void)
     {
         if (IS_ENABLED(CONFIG_LOG)) {
             /* if logging is enabled, sleep */
-            k_sleep(K_MSEC(100));
+            k_sleep(K_MSEC(10));
         } else {
             /* other, put CPU to idle to save power */
             k_cpu_idle();

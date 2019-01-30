@@ -22,6 +22,9 @@
 static lwm2m_object_t   m_object_firmware;
 static lwm2m_firmware_t m_instance_firmware;
 
+// Forward declare.
+static void lwm2m_firmware_notify_resource(uint16_t resource_id);
+
 char * lwm2m_firmware_package_uri_get(uint16_t instance_id, uint8_t * p_len)
 {
     *p_len = m_instance_firmware.package_uri.len;
@@ -297,7 +300,7 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
     return err_code;
 }
 
-void lwm2m_firmware_notify_resource(uint16_t resource_id)
+static void lwm2m_firmware_notify_resource(uint16_t resource_id)
 {
     coap_observer_t * p_observer = NULL;
     while (coap_observe_server_next_get(&p_observer, p_observer, (coap_resource_t *)&m_instance_firmware) == 0)

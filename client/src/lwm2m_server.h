@@ -7,12 +7,17 @@
 #include <stdint.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
+#include <lwm2m_tlv.h>
 
 void lwm2m_server_init(void);
 
 uint32_t lwm2m_server_registered_get(uint16_t instance_id);
 
 void lwm2m_server_registered_set(uint16_t instance_id, uint32_t value);
+
+uint32_t lwm2m_server_hold_off_timer_get(uint16_t instance_id);
+
+void lwm2m_server_hold_off_timer_set(uint16_t instance_id, uint32_t value);
 
 time_t lwm2m_server_lifetime_get(uint16_t instance_id);
 
@@ -34,17 +39,9 @@ bool lwm2m_server_notif_storing_get(uint16_t instance_id);
 
 void lwm2m_server_notif_storing_set(uint16_t instance_id, bool value);
 
-char * lwm2m_server_binding_get(uint16_t instance_id);
+char * lwm2m_server_binding_get(uint16_t instance_id, uint8_t * p_len);
 
-void lwm2m_server_binding_set(uint16_t instance_id, char * value);
-
-// uint32_t lwm2m_server_bootstrapped_get(uint16_t instance_id);
-
-// void lwm2m_server_bootstrapped_set(uint16_t instance_id, uint32_t value);
-
-uint32_t lwm2m_server_hold_off_timer_get(uint16_t instance_id);
-
-void lwm2m_server_hold_off_timer_set(uint16_t instance_id, uint32_t value);
+void lwm2m_server_binding_set(uint16_t instance_id, char * value, uint8_t len);
 
 uint16_t lwm2m_server_short_server_id_get(uint16_t instance_id);
 

@@ -24,27 +24,39 @@
 #define SECURITY_SERVER_URI_SIZE_MAX    64                                                    /**< Max size of server URIs. */
 #define SECURITY_SMS_NUMBER_SIZE_MAX    20                                                    /**< Max size of server SMS number. */
 #define SERVER_BINDING_SIZE_MAX         4                                                     /**< Max size of server binding. */
-#define VERIZON_RESOURCE 30000
+#define VERIZON_RESOURCE                30000
 
 extern uint32_t app_store_bootstrap_security_values(uint16_t instance_id);
 
-typedef struct
-{
-    // Security object values
-    bool     is_bootstrap_server;
-    uint8_t  sms_security_mode;
-    //char     sms_binding_key_param[6];
-    //char     sms_binding_secret_keys[48];
-    char     sms_number[SECURITY_SMS_NUMBER_SIZE_MAX];
-    time_t   client_hold_off_time;
+typedef struct {
+    uint32_t is_bootstrapped;
     uint32_t hold_off_timer;
-    uint32_t bootstrapped;
-} security_settings_t;
+} vzw_bootstrap_server_settings_t;
 
-static security_settings_t m_security_settings[1+LWM2M_MAX_SERVERS];
+static vzw_bootstrap_server_settings_t vzw_boostrap_security_settings;
 
 static lwm2m_object_t    m_object_security;                                 /**< LWM2M security base object. */
 static lwm2m_security_t  m_instance_security[1+LWM2M_MAX_SERVERS];          /**< Security object instances. Index 0 is always bootstrap instance. */
+
+uint32_t lwm2m_security_bootstrapped_get(uint16_t instance_id)
+{
+    return vzw_boostrap_security_settings.is_bootstrapped;
+}
+
+void lwm2m_security_bootstrapped_set(uint16_t instance_id, uint32_t value)
+{
+    vzw_boostrap_security_settings.is_bootstrapped = value;
+}
+
+uint32_t lwm2m_security_hold_off_timer_get(uint16_t instance_id)
+{
+    return vzw_boostrap_security_settings.hold_off_timer;
+}
+
+void lwm2m_security_hold_off_timer_set(uint16_t instance_id, uint32_t value)
+{
+    vzw_boostrap_security_settings.hold_off_timer = value;
+}
 
 char * lwm2m_security_server_uri_get(uint16_t instance_id, uint8_t * p_len)
 {
@@ -54,49 +66,20 @@ char * lwm2m_security_server_uri_get(uint16_t instance_id, uint8_t * p_len)
 
 void lwm2m_security_server_uri_set(uint16_t instance_id, char * p_value, uint8_t len)
 {
-    if (m_instance_security[instance_id].server_uri.p_val != NULL)
+    if (lwm2m_bytebuffer_to_string(p_value, len, &m_instance_security[instance_id].server_uri) != 0)
     {
-        k_free(m_instance_security[instance_id].server_uri.p_val);
-        m_instance_security[instance_id].server_uri.len = 0;
-    }
-
-    if ((len > 0) && (p_value != NULL))
-    {
-        m_instance_security[instance_id].server_uri.p_val = k_malloc(len);
-        m_instance_security[instance_id].server_uri.len = len;
-
-        memcpy(m_instance_security[instance_id].server_uri.p_val, p_value, len);
+        LWM2M_ERR("Could not set server URI");
     }
 }
 
 uint32_t lwm2m_security_is_bootstrap_server_get(uint16_t instance_id)
 {
-    return m_security_settings[instance_id].is_bootstrap_server;
+    return m_instance_security[instance_id].bootstrap_server;
 }
 
 void lwm2m_security_is_bootstrap_server_set(uint16_t instance_id, bool value)
 {
-    m_security_settings[instance_id].is_bootstrap_server = value;
-}
-
-uint32_t lwm2m_security_bootstrapped_get(uint16_t instance_id)
-{
-    return m_security_settings[instance_id].bootstrapped;
-}
-
-void lwm2m_security_bootstrapped_set(uint16_t instance_id, uint32_t value)
-{
-    m_security_settings[instance_id].bootstrapped = value;
-}
-
-uint32_t lwm2m_security_hold_off_timer_get(uint16_t instance_id)
-{
-    return m_security_settings[instance_id].hold_off_timer;
-}
-
-void lwm2m_security_hold_off_timer_set(uint16_t instance_id, uint32_t value)
-{
-    m_security_settings[instance_id].hold_off_timer = value;
+    m_instance_security[instance_id].bootstrap_server = value;
 }
 
 char * lwm2m_security_identity_get(uint16_t instance_id, uint8_t * p_len)
@@ -107,18 +90,9 @@ char * lwm2m_security_identity_get(uint16_t instance_id, uint8_t * p_len)
 
 void lwm2m_security_identity_set(uint16_t instance_id, char * p_value, uint8_t len)
 {
-    if (m_instance_security[instance_id].public_key.p_val != NULL)
+    if (lwm2m_bytebuffer_to_opaque(p_value, len, &m_instance_security[instance_id].public_key) != 0)
     {
-        k_free(m_instance_security[instance_id].public_key.p_val);
-        m_instance_security[instance_id].public_key.len = 0;
-    }
-
-    if ((len > 0) && (p_value != NULL))
-    {
-        m_instance_security[instance_id].public_key.p_val = k_malloc(len);
-        m_instance_security[instance_id].public_key.len = len;
-
-        memcpy(m_instance_security[instance_id].public_key.p_val, p_value, len);
+        LWM2M_ERR("Could not set identity");
     }
 }
 
@@ -130,18 +104,9 @@ char * lwm2m_security_psk_get(uint16_t instance_id, uint8_t * p_len)
 
 void lwm2m_security_psk_set(uint16_t instance_id, char * p_value, uint8_t len)
 {
-    if (m_instance_security[instance_id].secret_key.p_val != NULL)
+    if (lwm2m_bytebuffer_to_opaque(p_value, len, &m_instance_security[instance_id].secret_key) != 0)
     {
-        k_free(m_instance_security[instance_id].secret_key.p_val);
-        m_instance_security[instance_id].secret_key.len = 0;
-    }
-
-    if ((len > 0) && (p_value != NULL))
-    {
-        m_instance_security[instance_id].secret_key.p_val = k_malloc(len);
-        m_instance_security[instance_id].secret_key.len = len;
-
-        memcpy(m_instance_security[instance_id].secret_key.p_val, p_value, len);
+        LWM2M_ERR("Could not set PSK");
     }
 }
 
@@ -167,16 +132,18 @@ static uint32_t tlv_security_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * 
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
                                                          tlv.length,
-                                                         &m_security_settings[instance_id].hold_off_timer);
+                                                         &vzw_boostrap_security_settings.hold_off_timer);
                 break;
             }
+
             case 1: // IsBootstrapped
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
                                                          tlv.length,
-                                                         &m_security_settings[instance_id].bootstrapped);
+                                                         &vzw_boostrap_security_settings.is_bootstrapped);
                 break;
             }
+
             default:
                 break;
         }
@@ -237,20 +204,83 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
 
     if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
-        uint16_t instance_id = p_instance->instance_id;
+        u32_t mask = 0;
+        err_code = coap_message_ct_mask_get(p_request, &mask);
 
-        err_code = lwm2m_tlv_security_decode(&m_instance_security[instance_id],
-                                             p_request->payload,
-                                             p_request->payload_len,
-                                             tlv_security_resource_decode);
         if (err_code != 0)
         {
-            return err_code;
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            return 0;
+        }
+        if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
+        {
+            uint16_t instance_id = p_instance->instance_id;
+
+            lwm2m_security_t unpack_struct;
+            memset(&unpack_struct, 0, sizeof(lwm2m_firmware_t));
+
+            err_code = lwm2m_tlv_security_decode(&unpack_struct,
+                                                p_request->payload,
+                                                p_request->payload_len,
+                                                NULL);
+            if (err_code != 0)
+            {
+                return err_code;
+            }
+
+            if (resource_id == LWM2M_NAMED_OBJECT)
+            {
+                // Write the whole object instance.
+                lwm2m_security_server_uri_set(instance_id, unpack_struct.server_uri.p_val, unpack_struct.server_uri.len);
+                lwm2m_security_identity_set(instance_id, unpack_struct.public_key.p_val, unpack_struct.public_key.len);
+                lwm2m_security_psk_set(instance_id, unpack_struct.secret_key.p_val, unpack_struct.secret_key.len);
+            }
+            else
+            {
+                switch (resource_id)
+                {
+                    case LWM2M_SECURITY_SERVER_URI:
+                    {
+                        lwm2m_security_server_uri_set(instance_id, unpack_struct.server_uri.p_val, unpack_struct.server_uri.len);
+                        break;
+                    }
+
+                    case LWM2M_SECURITY_PUBLIC_KEY:
+                    {
+                        lwm2m_security_identity_set(instance_id, unpack_struct.public_key.p_val, unpack_struct.public_key.len);
+                        break;
+                    }
+
+                    case LWM2M_SECURITY_SECRET_KEY:
+                    {
+                        lwm2m_security_psk_set(instance_id, unpack_struct.secret_key.p_val, unpack_struct.secret_key.len);
+                        break;
+                    }
+
+                    default:
+                        // Default to BAD_REQUEST error.
+                        err_code = EINVAL;
+                        break;
+                }
+            }
+        }
+        else if ((mask & COAP_CT_MASK_PLAIN_TEXT) || (mask & COAP_CT_MASK_APP_OCTET_STREAM))
+        {
+            lwm2m_respond_with_code(COAP_CODE_501_NOT_IMPLEMENTED, p_request);
+        }
+        else
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_request);
+            return 0;
         }
 
-        if (app_store_bootstrap_security_values(instance_id) == 0)
+        if (err_code == 0)
         {
             (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+        }
+        else if (err_code == ENOTSUP)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
         }
         else
         {
@@ -339,8 +369,6 @@ lwm2m_object_t * lwm2m_security_get_object(void)
 
 void lwm2m_security_init(void)
 {
-    memset(m_security_settings, 0, ARRAY_SIZE(m_security_settings));
-
     m_object_security.object_id = LWM2M_OBJ_SECURITY;
     m_object_security.callback = security_object_callback;
 

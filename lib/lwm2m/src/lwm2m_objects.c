@@ -56,6 +56,11 @@ uint32_t lwm2m_bytebuffer_to_string(char * p_payload, uint16_t payload_len, lwm2
     return 0;
 }
 
+uint32_t lwm2m_bytebuffer_to_opaque(char * p_payload, uint16_t payload_len, lwm2m_opaque_t * p_opaque)
+{
+    return lwm2m_bytebuffer_to_string(p_payload, payload_len, (lwm2m_string_t *)p_opaque);
+}
+
 uint32_t lwm2m_bytebuffer_to_list(char * p_payload, uint16_t payload_len, lwm2m_list_t * p_list)
 {
     NULL_PARAM_CHECK(p_payload);

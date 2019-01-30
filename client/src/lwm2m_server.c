@@ -34,42 +34,42 @@ static lwm2m_object_t                      m_object_server;                     
 
 // Local values
 typedef struct {
-    union {
-        uint32_t bootstrapped;
-        uint32_t registered;
-    } is;
-    uint16_t short_server_id;
-    uint32_t hold_off_timer;      /**< The number of seconds to wait before attempting bootstrap or registration. */
-    time_t   lifetime;
-    time_t   default_minimum_period;
-    time_t   default_maximum_period;
-    time_t   disable_timeout;
-    bool     notification_storing_on_disabled;
-    char     binding[SERVER_BINDING_SIZE_MAX];
-} server_settings_t;
+    uint32_t is_registered;
+    uint32_t client_hold_off_timer;      /**< The number of seconds to wait before attempting bootstrap or registration. */
+} vzw_server_settings_t;
 
-static server_settings_t m_server_settings[1+LWM2M_MAX_SERVERS];
+static vzw_server_settings_t vzw_server_settings[1+LWM2M_MAX_SERVERS];
 
 uint32_t lwm2m_server_registered_get(uint16_t instance_id)
 {
-    return m_server_settings[instance_id].is.registered;
+    return vzw_server_settings[instance_id].is_registered;
 }
 
 void lwm2m_server_registered_set(uint16_t instance_id, uint32_t value)
 {
-    m_server_settings[instance_id].is.registered = value;
+    vzw_server_settings[instance_id].is_registered = value;
+}
+
+uint32_t lwm2m_server_hold_off_timer_get(uint16_t instance_id)
+{
+    return vzw_server_settings[instance_id].client_hold_off_timer;
+}
+
+void lwm2m_server_hold_off_timer_set(uint16_t instance_id, uint32_t value)
+{
+    vzw_server_settings[instance_id].client_hold_off_timer = value;
 }
 
 time_t lwm2m_server_lifetime_get(uint16_t instance_id)
 {
-    return m_server_settings[instance_id].lifetime;
+    return m_instance_server[instance_id].lifetime;
 }
 
 void lwm2m_server_lifetime_set(uint16_t instance_id, time_t value)
 {
-    time_t previous = m_server_settings[instance_id].lifetime = value;
-    m_server_settings[instance_id].lifetime = value;
-    if ((value != previous) && m_server_settings[instance_id].is.registered)
+    time_t previous = m_instance_server[instance_id].lifetime = value;
+    m_instance_server[instance_id].lifetime = value;
+    if (value != previous)
     {
         app_server_update(instance_id);
     }
@@ -77,72 +77,66 @@ void lwm2m_server_lifetime_set(uint16_t instance_id, time_t value)
 
 time_t lwm2m_server_min_period_get(uint16_t instance_id)
 {
-    return m_server_settings[instance_id].default_minimum_period;
+    return m_instance_server[instance_id].default_minimum_period;
 }
 
 void lwm2m_server_min_period_set(uint16_t instance_id, time_t value)
 {
-    m_server_settings[instance_id].default_minimum_period = value;
+    m_instance_server[instance_id].default_minimum_period = value;
 }
 
 time_t lwm2m_server_max_period_get(uint16_t instance_id)
 {
-    return m_server_settings[instance_id].default_maximum_period;
+    return m_instance_server[instance_id].default_maximum_period;
 }
 
 void lwm2m_server_max_period_set(uint16_t instance_id, time_t value)
 {
-    m_server_settings[instance_id].default_maximum_period = value;
+    m_instance_server[instance_id].default_maximum_period = value;
 }
 
 time_t lwm2m_server_disable_timeout_get(uint16_t instance_id)
 {
-    return m_server_settings[instance_id].disable_timeout;
+    return m_instance_server[instance_id].disable_timeout;
 }
 
 void lwm2m_server_disable_timeout_set(uint16_t instance_id, time_t value)
 {
-    m_server_settings[instance_id].disable_timeout = value;
+    m_instance_server[instance_id].disable_timeout = value;
 }
 
 bool lwm2m_server_notif_storing_get(uint16_t instance_id)
 {
-    return m_server_settings[instance_id].notification_storing_on_disabled;
+    return m_instance_server[instance_id].notification_storing_on_disabled;
 }
 
 void lwm2m_server_notif_storing_set(uint16_t instance_id, bool value)
 {
-    m_server_settings[instance_id].notification_storing_on_disabled = value;
+    m_instance_server[instance_id].notification_storing_on_disabled = value;
 }
 
-char * lwm2m_server_binding_get(uint16_t instance_id)
+char * lwm2m_server_binding_get(uint16_t instance_id, uint8_t * p_len)
 {
-    return m_server_settings[instance_id].binding;
+    *p_len = m_instance_server[instance_id].binding.len;
+    return m_instance_server[instance_id].binding.p_val;
 }
 
-void lwm2m_server_binding_set(uint16_t instance_id, char * value)
+void lwm2m_server_binding_set(uint16_t instance_id, char * p_value, uint8_t len)
 {
-    strncpy(m_server_settings[instance_id].binding, value, strlen(value));
-}
-
-uint32_t lwm2m_server_hold_off_timer_get(uint16_t instance_id)
-{
-    return m_server_settings[instance_id].hold_off_timer;
-}
-
-void lwm2m_server_hold_off_timer_set(uint16_t instance_id, uint32_t value)
-{
-    m_server_settings[instance_id].hold_off_timer = value;
+    if (lwm2m_bytebuffer_to_string(p_value, len, &m_instance_server[instance_id].binding) != 0)
+    {
+        LWM2M_ERR("Could not set binding");
+    }
 }
 
 uint16_t lwm2m_server_short_server_id_get(uint16_t instance_id)
 {
-    return m_server_settings[instance_id].short_server_id;
+    return m_instance_server[instance_id].short_server_id;
 }
 
 void lwm2m_server_short_server_id_set(uint16_t instance_id, uint16_t value)
 {
-    m_server_settings[instance_id].short_server_id = value;
+    m_instance_server[instance_id].short_server_id = value;
 }
 
 lwm2m_server_t * lwm2m_server_get_instance(uint16_t instance_id)
@@ -164,8 +158,8 @@ static uint32_t tlv_server_verizon_encode(uint16_t instance_id, uint8_t * p_buff
 {
     int32_t list_values[2] =
     {
-        m_server_settings[instance_id].is.registered,
-        m_server_settings[instance_id].hold_off_timer
+        vzw_server_settings[instance_id].is_registered,
+        vzw_server_settings[instance_id].client_hold_off_timer
     };
 
     lwm2m_list_t list =
@@ -201,14 +195,14 @@ static uint32_t tlv_server_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * p_
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
                                                          tlv.length,
-                                                         &m_server_settings[instance_id].is.registered);
+                                                         &vzw_server_settings[instance_id].is_registered);
                 break;
             }
             case 1: // ClientHoldOffTimer
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
                                                          tlv.length,
-                                                         &m_server_settings[instance_id].hold_off_timer);
+                                                         &vzw_server_settings[instance_id].client_hold_off_timer);
                 break;
             }
             default:
@@ -221,7 +215,7 @@ static uint32_t tlv_server_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * p_
 
 uint32_t tlv_server_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
 {
-    uint32_t err_code;
+    uint32_t err_code = 0;
 
     switch (p_tlv->id)
     {
@@ -448,37 +442,22 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
 
 void lwm2m_server_init(void)
 {
-
-    memset(m_server_settings, 0, ARRAY_SIZE(m_server_settings));
+    memset(vzw_server_settings, 0, ARRAY_SIZE(vzw_server_settings));
 
     m_object_server.object_id = LWM2M_OBJ_SERVER;
     m_object_server.callback = lwm2m_server_object_callback;
 
     // Initialize the instances.
-    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+    for (uint32_t i = 0; i < 1 + LWM2M_MAX_SERVERS; i++)
     {
         lwm2m_instance_server_init(&m_instance_server[i]);
         m_instance_server[i].proto.instance_id = i;
     }
-    
-    app_read_flash_storage();
 
-    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+    for (uint32_t i = 0; i < 1 + LWM2M_MAX_SERVERS; i++)
     {
-        m_instance_server[i].short_server_id = m_server_settings[i].short_server_id;
-        m_instance_server[i].lifetime = m_server_settings[i].lifetime;
-        m_instance_server[i].default_minimum_period = m_server_settings[i].default_minimum_period;
-        m_instance_server[i].default_maximum_period = m_server_settings[i].default_maximum_period;
-        m_instance_server[i].disable_timeout = m_server_settings[i].disable_timeout;
-        m_instance_server[i].notification_storing_on_disabled = m_server_settings[i].notification_storing_on_disabled;
-
-        (void)lwm2m_bytebuffer_to_string(m_server_settings[i].binding,
-                                         strlen(m_server_settings[i].binding),
-                                         &m_instance_server[i].binding);
-
         m_instance_server[i].proto.callback = server_instance_callback;
 
         (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[i]);
     }
-
 }

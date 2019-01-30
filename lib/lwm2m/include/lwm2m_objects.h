@@ -359,7 +359,19 @@ typedef struct
  */
 uint32_t lwm2m_bytebuffer_to_string(char * p_payload, uint16_t payload_len, lwm2m_string_t * p_string);
 
-/**@brief Allocate lwm2m_string_t memory to hold a list.
+/**@brief Allocate lwm2m_opaque_t memory to hold a opaque.
+ *
+ * @param[in]  p_payload Buffer which holds a opaque.
+ * @param[in]  payload_len  Length of the value in the buffer.
+ * @param[out] p_opaque By reference pointer to the result lwm2m_opaque_t.
+ *
+ * @return NRF_SUCCESS       If allocation was successful
+ * @retval NRF_ERROR_NO_MEM  If allocation was unsuccessful
+ */
+uint32_t lwm2m_bytebuffer_to_opaque(char * p_payload, uint16_t payload_len, lwm2m_opaque_t * p_opaque);
+
+
+/**@brief Allocate lwm2m_list_t memory to hold a list.
  *
  * @param[in]  p_payload Buffer which holds a list.
  * @param[in]  payload_len  Length of the value in the buffer.
