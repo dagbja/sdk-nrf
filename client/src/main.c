@@ -314,6 +314,15 @@ void bsd_irrecoverable_error_handler(uint32_t error)
 }
 
 
+void app_system_reset(void)
+{
+    app_disconnect();
+
+    lte_lc_offline();
+    NVIC_SystemReset();
+}
+
+
 #if CONFIG_DK_LIBRARY
 /**@brief Callback for button events from the DK buttons and LEDs library. */
 static void app_button_handler(u32_t buttons, u32_t has_changed)
@@ -341,6 +350,10 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
         if (m_app_state == APP_STATE_SERVER_REGISTERED)
         {
             m_app_state = APP_STATE_SERVER_DEREGISTER;
+        }
+        else if (m_app_state == APP_STATE_IP_INTERFACE_UP)
+        {
+            app_system_reset();
         }
     }
 }
@@ -2338,7 +2351,7 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
 static int cmd_factory_reset(const struct shell *shell, size_t argc, char **argv)
 {
     app_factory_reset();
-    NVIC_SystemReset();
+    app_system_reset();
 
     return 0;
 }
@@ -2346,7 +2359,7 @@ static int cmd_factory_reset(const struct shell *shell, size_t argc, char **argv
 
 static int cmd_reboot(const struct shell *shell, size_t argc, char **argv)
 {
-    NVIC_SystemReset();
+    app_system_reset();
 
     return 0;
 }

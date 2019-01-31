@@ -18,7 +18,7 @@ The switches are used to control the behaviour of the client when not having fla
 The buttons are used to control the behaviour of the client as follows:
 
 * Button 1: Update server if registered. Register server if not registered.
-* Button 2: Deregister server if registered.
+* Button 2: Deregister server if registered. Reset if if not registered.
 
 
 LED states
