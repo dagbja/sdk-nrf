@@ -1080,17 +1080,13 @@ void app_factory_reset(void)
 }
 
 
-void app_read_flash_storage(void)
+static void app_read_flash_device(void)
 {
 #if CONFIG_FLASH
 
     app_init_device_settings();
 
-    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
-    {
-        app_factory_bootstrap_server_object(i);
-    }
-/*
+#if CONFIG_SHELL
     int rc;
 
     rc = nvs_read(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
@@ -1098,15 +1094,22 @@ void app_read_flash_storage(void)
         app_init_device_settings();
         nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
     }
-*/
-    // Read flash overlay files.
-    for (uint32_t i = 0; i < 1 + LWM2M_MAX_SERVERS; i++)
+#endif
+#else
+    app_init_device_settings();
+#endif
+}
+
+
+static void app_read_flash_servers(void)
+{
+#if CONFIG_FLASH
+    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
+        app_factory_bootstrap_server_object(i);
         lwm2m_instance_storage_security_load(i);
     }
 #else
-    app_init_device_settings();
-
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
         app_factory_bootstrap_server_object(i);
@@ -2449,25 +2452,30 @@ int main(void)
     lte_lc_offline();
 #endif
 
-    // Turn on SIM to resolve MSISDN.
-    lte_lc_init_and_connect();
-    read_emei_and_msisdn();
-    lte_lc_offline();
-
     // Initialize Non-volatile Storage.
     lwm2m_instance_storage_init();
-
-    if (strcmp(m_device_settings.modem_logging, "2") == 0) {
-        modem_trace_enable();
-    }
-
-    app_provision_psk(APP_BOOTSTRAP_SEC_TAG, app_client_imei_msisdn(), APP_BOOTSTRAP_SEC_PSK);
 
 #if CONFIG_DK_LIBRARY
     // Initialize LEDs and Buttons.
     app_buttons_leds_init();
     app_check_buttons_pressed();
 #endif
+
+    // Initialize device from flash.
+    app_read_flash_device();
+
+    if (strcmp(m_device_settings.modem_logging, "2") == 0) {
+        modem_trace_enable();
+    }
+
+    // Turn on SIM to resolve IMEI and MSISDN.
+    lte_lc_init_and_connect();
+    read_emei_and_msisdn();
+    lte_lc_offline();
+
+    if (!m_server_settings[0].is.bootstrapped) {
+        app_provision_psk(APP_BOOTSTRAP_SEC_TAG, app_client_imei_msisdn(), APP_BOOTSTRAP_SEC_PSK);
+    }
 
     // Initialize CoAP.
     app_coap_init();
@@ -2478,8 +2486,8 @@ int main(void)
     // Create LwM2M factory bootstraped objects.
     app_lwm2m_create_objects();
 
-    // Factory bootstrap objects created.
-    app_read_flash_storage();
+    // Initialize servers from flash.
+    app_read_flash_servers();
 
     // Establish LTE link.
     lte_lc_init_and_connect();
