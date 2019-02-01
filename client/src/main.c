@@ -599,39 +599,8 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
 
     if (result->ai_family == AF_INET) {
         ((struct sockaddr_in *)addr)->sin_addr.s_addr = ((struct sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
-        char verbose_ipv4_buffer[27];
-        snprintf(verbose_ipv4_buffer,
-                 sizeof(verbose_ipv4_buffer),
-                 "DNS IPV4 %u.%u.%u.%u",
-                 ((uint8_t *)&(((struct sockaddr_in *)addr)->sin_addr.s_addr))[0],
-                 ((uint8_t *)&(((struct sockaddr_in *)addr)->sin_addr.s_addr))[1],
-                 ((uint8_t *)&(((struct sockaddr_in *)addr)->sin_addr.s_addr))[2],
-                 ((uint8_t *)&(((struct sockaddr_in *)addr)->sin_addr.s_addr))[3]);
-
-        APPL_LOG("%s", verbose_ipv4_buffer);
     } else {
         memcpy(((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr, ((struct sockaddr_in6 *)result->ai_addr)->sin6_addr.s6_addr, 16);
-        char verbose_ipv6_buffer[51];
-        snprintf(verbose_ipv6_buffer,
-                 sizeof(verbose_ipv6_buffer),
-                 "DNS IPV6: %02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[0],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[1],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[2],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[3],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[4],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[5],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[6],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[7],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[8],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[9],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[10],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[11],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[12],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[13],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[14],
-                 ((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[15]);
-        APPL_LOG("%s", verbose_ipv6_buffer);
     }
 
     freeaddrinfo(result);
