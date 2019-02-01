@@ -113,9 +113,6 @@ char msisdn[128];
 
 static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
 
-#define APP_MAX_AT_READ_LENGTH          100
-#define APP_MAX_AT_WRITE_LENGTH         256
-
 #if CONFIG_LOG
 #define APPL_LOG  LOG_DBG
 #else
@@ -1753,7 +1750,7 @@ static void app_provision_secret_keys(void)
 
 static void send_at_command(const char *at_command, bool do_logging)
 {
-#define APP_MAX_AT_READ_LENGTH          100
+#define APP_MAX_AT_READ_LENGTH          256
 #define APP_MAX_AT_WRITE_LENGTH         256
 
     char write_buffer[APP_MAX_AT_WRITE_LENGTH];
