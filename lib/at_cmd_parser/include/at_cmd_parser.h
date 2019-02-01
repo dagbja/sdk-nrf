@@ -35,7 +35,7 @@ typedef enum
  *
  * @param p_at_params_str   AT parameters as a null-terminated String. Can be numeric or string parameters.
  * @param p_list            Pointer to an initialized list where parameters will be stored. Should not be null.
- * @param max_params_count  Maximum number of parameter expected in @ref p_at_params_str. Can be set to a smaller value to parse only some paramaters.
+ * @param max_params_count  Maximum number of parameter expected in @ref p_at_params_str. Can be set to a smaller value to parse only some parameters.
  *
  * @return An error code or success if parsing is successful.
  */
