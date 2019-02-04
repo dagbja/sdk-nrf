@@ -254,12 +254,9 @@ static server_settings_t     m_server_settings[1+LWM2M_MAX_SERVERS];
 
 /**@brief Configurable device values. */
 typedef struct {
-    char imei[16];
-    char msisdn[16];
-    char manufacturer[64];
-    char model_number[16];
-    char serial_number[16];
-    char modem_logging[65];
+    char imei[16];                /**< Static configured IMEI to overwrite value from SIP, used for debugging. */
+    char msisdn[16];              /**< Static configured MSISDN to overwrite value from SIM, used for debugging. */
+    char modem_logging[65];       /**< Modem logging: 0=off, 1=fidoless, 2=fido, other=XMODEMTRACE bitmap */
 } device_settings_t;
 
 static device_settings_t m_device_settings;
@@ -1092,10 +1089,7 @@ static void app_init_device_settings(void)
 {
     strcpy(m_device_settings.imei, "");
     strcpy(m_device_settings.msisdn, "");
-    strcpy(m_device_settings.manufacturer, "Nordic Semiconductor ASA");
-    strcpy(m_device_settings.model_number, "nRF9160");
-    strcpy(m_device_settings.serial_number, "1234567890");
-    strcpy(m_device_settings.modem_logging, "1");
+    strcpy(m_device_settings.modem_logging, "0");
 }
 
 void app_factory_reset(void)
@@ -1121,7 +1115,7 @@ static void app_read_flash_device(void)
     int rc;
 
     rc = nvs_read(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
-    if (rc <= 0) {
+    if (rc != sizeof(m_device_settings)) {
         app_init_device_settings();
         nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
     }
@@ -2029,9 +2023,6 @@ static int cmd_device_print(const struct shell *shell, size_t argc, char **argv)
 #endif
 
     shell_print(shell, "Device configuration");
-    shell_print(shell, "  Manufacturer   %s", m_device_settings.manufacturer);
-    shell_print(shell, "  Model number   %s", m_device_settings.model_number);
-    shell_print(shell, "  Serial number  %s", m_device_settings.serial_number);
     if (m_device_settings.imei[0]) {
         shell_print(shell, "  IMEI           %s (static)", m_device_settings.imei);
     } else {
@@ -2052,84 +2043,6 @@ static int cmd_device_reset(const struct shell *shell, size_t argc, char **argv)
 {
     app_init_device_settings();
     nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
-
-    return 0;
-}
-
-
-static int cmd_device_manufacturer(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc != 2) {
-        shell_print(shell, "%s \"Manufacturer\"", argv[0]);
-        return 0;
-    }
-
-    char *manufacturer = argv[1];
-    size_t manufacturer_len = strlen(manufacturer);
-
-    if (manufacturer_len > sizeof(m_device_settings.manufacturer))
-    {
-        shell_print(shell, "maximum manufacturer length is %d", sizeof(m_device_settings.manufacturer));
-        return 0;
-    }
-
-    memset(m_device_settings.manufacturer, 0, sizeof(m_device_settings.manufacturer));
-    strcpy(m_device_settings.manufacturer, manufacturer);
-    nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
-
-    shell_print(shell, "Set manufacturer: %s", manufacturer);
-
-    return 0;
-}
-
-
-static int cmd_device_model_number(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc != 2) {
-        shell_print(shell, "%s \"Model number\"", argv[0]);
-        return 0;
-    }
-
-    char *model = argv[1];
-    size_t model_len = strlen(model);
-
-    if (model_len > sizeof(m_device_settings.model_number))
-    {
-        shell_print(shell, "maximum model number length is %d", sizeof(m_device_settings.model_number));
-        return 0;
-    }
-
-    memset(m_device_settings.model_number, 0, sizeof(m_device_settings.model_number));
-    strcpy(m_device_settings.model_number, model);
-    nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
-
-    shell_print(shell, "Set model number: %s", model);
-
-    return 0;
-}
-
-
-static int cmd_device_serial_number(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc != 2) {
-        shell_print(shell, "%s \"Serial number\"", argv[0]);
-        return 0;
-    }
-
-    char *serial = argv[1];
-    size_t serial_len = strlen(serial);
-
-    if (serial_len > sizeof(m_device_settings.serial_number))
-    {
-        shell_print(shell, "maximum serial number length is %d", sizeof(m_device_settings.serial_number));
-        return 0;
-    }
-
-    memset(m_device_settings.serial_number, 0, sizeof(m_device_settings.serial_number));
-    strcpy(m_device_settings.serial_number, serial);
-    nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
-
-    shell_print(shell, "Set serial number: %s", serial);
 
     return 0;
 }
@@ -2399,9 +2312,6 @@ SHELL_CREATE_STATIC_SUBCMD_SET(sub_device)
 {
     SHELL_CMD(print, NULL, "Print configuration", cmd_device_print),
     SHELL_CMD(reset, NULL, "Reset configuration", cmd_device_reset),
-    SHELL_CMD(manufacturer, NULL, "Set manufacturer", cmd_device_manufacturer),
-    SHELL_CMD(model_number, NULL, "Set model number", cmd_device_model_number),
-    SHELL_CMD(serial_number, NULL, "Set serial number", cmd_device_serial_number),
     SHELL_CMD(imei, NULL, "Set IMEI", cmd_device_imei),
     SHELL_CMD(msisdn, NULL, "Set MSISDN", cmd_device_msisdn),
     SHELL_CMD(logging, NULL, "Set logging value", cmd_device_logging),
