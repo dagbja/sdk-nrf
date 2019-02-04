@@ -57,6 +57,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define MSISDN          "0123456789"
 
 #define APP_MOTIVE_NO_REBOOT            1 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
+#define APP_DETECT_MSISDN_CHANGE        0
 #define APP_USE_BOOTSTRAP_APN           0
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_CONTABO                 0
@@ -262,6 +263,9 @@ typedef struct {
 } device_settings_t;
 
 static device_settings_t m_device_settings;
+
+#define DEVICE_FLASH_ID 10
+#define MSISDN_FLASH_ID 11
 
 //static uint32_t app_store_bootstrap_server_acl(uint16_t instance_id);
 uint32_t app_store_bootstrap_server_values(uint16_t instance_id);
@@ -482,24 +486,74 @@ static void app_buttons_leds_init(void)
 }
 #endif
 
-static char * app_client_imei_msisdn()
+
+static char * app_client_imei_msisdn(void)
 {
     static char client_id[128];
 
-    char * p_imei = imei;
-    char * p_msisdn = msisdn;
+    if (client_id[0] == 0) {
+        extern char imei[];
+        extern char msisdn[];
 
-    if (m_device_settings.imei[0]) {
-        p_imei = m_device_settings.imei;
+        char * p_imei = imei;
+        char * p_msisdn = msisdn;
+
+        if (m_device_settings.imei[0]) {
+            p_imei = m_device_settings.imei;
+        }
+
+        if (m_device_settings.msisdn[0]) {
+            p_msisdn = m_device_settings.msisdn;
+        }
+
+        snprintf(client_id, 128, "urn:imei-msisdn:%s-%s", p_imei, p_msisdn);
     }
+
+    return client_id;
+}
+
+
+/**@brief Initialize MSISDN to use. Start bootstrap if different than last time. */
+static void app_initialize_msisdn(void)
+{
+    bool provision_bs_psk = false;
+
+#if APP_DETECT_MSISDN_CHANGE
+    char last_used_msisdn[128];
+    extern char msisdn[];
+    char *p_msisdn;
+    int rc;
 
     if (m_device_settings.msisdn[0]) {
         p_msisdn = m_device_settings.msisdn;
+    } else {
+        p_msisdn = msisdn;
     }
 
-    snprintf(client_id, 128, "urn:imei-msisdn:%s-%s", p_imei, p_msisdn);
+    rc = nvs_read(&fs, MSISDN_FLASH_ID, &last_used_msisdn, sizeof(last_used_msisdn));
+    if (rc > 0) {
+        if (strlen(p_msisdn) > 0 && strcmp(p_msisdn, last_used_msisdn) != 0) {
+            // MSISDN has changed, factory reset and initiate bootstrap.
+            APPL_LOG("Detected changed MSISDN: %s -> %s", last_used_msisdn, p_msisdn);
+            app_factory_reset();
+            nvs_write(&fs, MSISDN_FLASH_ID, p_msisdn, strlen(p_msisdn) + 1);
+            provision_bs_psk = true;
+        }
+    } else {
+        nvs_write(&fs, MSISDN_FLASH_ID, p_msisdn, strlen(p_msisdn) + 1);
+        provision_bs_psk = true;
+    }
+#else
+    if (!lwm2m_security_bootstrapped_get(0)) {
+        // Last MSISDN state is unknown, always update bootstrap sec tag.
+        provision_bs_psk = true;
+    }
+#endif
 
-    return client_id;
+    if (provision_bs_psk) {
+        char * p_identity = app_client_imei_msisdn();
+        app_provision_psk(APP_BOOTSTRAP_SEC_TAG, p_identity, strlen(p_identity), m_app_bootstrap_psk, sizeof(m_app_bootstrap_psk));
+    }
 }
 
 
@@ -979,8 +1033,6 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             m_server_settings[0].access[0] = rwde_access;
             m_server_settings[0].server[0] = 102;
             m_server_settings[0].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
-            char * p_identity = app_client_imei_msisdn();
-            app_provision_psk(APP_BOOTSTRAP_SEC_TAG, p_identity, strlen(p_identity), m_app_bootstrap_psk, sizeof(m_app_bootstrap_psk));
 
             break;
         }
@@ -2452,9 +2504,7 @@ int main(void)
     read_emei_and_msisdn();
     lte_lc_offline();
 
-    if (!m_server_settings[0].is.bootstrapped) {
-        app_provision_psk(APP_BOOTSTRAP_SEC_TAG, app_client_imei_msisdn(), APP_BOOTSTRAP_SEC_PSK);
-    }
+    app_initialize_msisdn();
 
     // Initialize CoAP.
     app_coap_init();
