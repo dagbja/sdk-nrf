@@ -22,6 +22,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 #if CONFIG_SHELL
 #include <shell/shell.h>
+#include <fcntl.h>
 #endif
 
 #if CONFIG_DK_LIBRARY
@@ -178,6 +179,7 @@ typedef enum
     APP_STATE_IP_INTERFACE_UP,
     APP_STATE_BS_CONNECT,
     APP_STATE_BS_CONNECT_WAIT,
+    APP_STATE_BS_CONNECT_RETRY_WAIT,
     APP_STATE_BS_CONNECTED,
     APP_STATE_BOOTSTRAP_REQUESTED,
     APP_STATE_BOOTSTRAP_WAIT,
@@ -185,6 +187,7 @@ typedef enum
     APP_STATE_BOOTSTRAPPED,
     APP_STATE_SERVER_CONNECT,
     APP_STATE_SERVER_CONNECT_WAIT,
+    APP_STATE_SERVER_CONNECT_RETRY_WAIT,
     APP_STATE_SERVER_CONNECTED,
     APP_STATE_SERVER_REGISTER_WAIT,
     APP_STATE_SERVER_REGISTERED,
@@ -203,9 +206,8 @@ static char m_bootstrap_object_alias_name[] = "bs";                             
 
 #define VERIZON_RESOURCE 30000
 
-static coap_transport_handle_t             m_coap_transport = 0xFFFFFFFF;                     /**< CoAP transport handle for the non bootstrap server. */
-static coap_transport_handle_t             m_lwm2m_bs_transport = 0xFFFFFFFF;                 /**< CoAP transport handle for the secure bootstrap server. Obtained on @coap_security_setup. */
-static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF };            /**< CoAP transport handle for the secure server. Obtained on @coap_security_setup. */
+static coap_transport_handle_t             m_coap_transport = -1;                             /**< CoAP transport handle for the non bootstrap server. */
+static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS];            /**< CoAP transport handles for the secure servers. Obtained on @coap_security_setup. */
 
 static volatile app_state_t m_app_state = APP_STATE_IDLE;                                     /**< Application state. Should be one of @ref app_state_t. */
 static volatile uint16_t    m_server_instance;                                                /**< Server instance handled. */
@@ -377,6 +379,7 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
             break;
 
         case APP_STATE_BS_CONNECT_WAIT:
+        case APP_STATE_BS_CONNECT_RETRY_WAIT:
             *blink = (DK_LED2_MSK | DK_LED4_MSK);
             break;
 
@@ -405,6 +408,7 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
             break;
 
         case APP_STATE_SERVER_CONNECT_WAIT:
+        case APP_STATE_SERVER_CONNECT_RETRY_WAIT:
             *blink = (DK_LED3_MSK | DK_LED4_MSK);
             break;
 
@@ -876,10 +880,10 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     k_sleep(10); // TODO: figure out why this is needed before closing the connection
 
     // Close connection to bootstrap server.
-    uint32_t err_code = coap_security_destroy(m_lwm2m_bs_transport);
+    uint32_t err_code = coap_security_destroy(m_lwm2m_transport[m_server_instance]);
     ARG_UNUSED(err_code);
 
-    m_lwm2m_bs_transport = 0xFFFFFFFF;
+    m_lwm2m_transport[m_server_instance] = -1;
 
     m_app_state = APP_STATE_BOOTSTRAPPED;
     m_server_settings[0].retry_count = 0;
@@ -890,6 +894,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 
     lwm2m_security_bootstrapped_set(0, true);  // TODO: this should be set by bootstrap server when bootstrapped
     m_did_bootstrap = true;
+    m_server_instance = 1;
 
     // Clean bootstrap, should trigger a new misc_data.
     lwm2m_instance_storage_misc_data_t misc_data;
@@ -908,7 +913,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     // On contabo we want to jump directly to start connecting to servers when bootstrap is complete.
     m_app_state = APP_STATE_SERVER_CONNECT;
 #else
-    m_app_state = APP_STATE_SERVER_CONNECT_WAIT;
+    m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
     s32_t hold_off_time = (lwm2m_server_hold_off_timer_get(m_server_instance) * 1000) - milliseconds_spent;
     APPL_LOG("Client holdoff timer: sleeping %d milliseconds...", hold_off_time);
     k_delayed_work_submit(&state_update_work, hold_off_time);
@@ -1346,9 +1351,10 @@ static void app_bootstrap_connect(void)
 
         coap_local_t local_port =
         {
-            .addr     = &local_addr,
-            .setting  = &setting,
-            .protocol = IPPROTO_DTLS_1_2
+            .addr         = &local_addr,
+            .setting      = &setting,
+            .protocol     = IPPROTO_DTLS_1_2,
+            .non_blocking = true
         };
 
         // NOTE: This method initiates a DTLS handshake and may block for a some seconds.
@@ -1357,11 +1363,16 @@ static void app_bootstrap_connect(void)
         if (err_code == 0)
         {
             m_app_state = APP_STATE_BS_CONNECTED;
-            m_lwm2m_bs_transport = local_port.transport;
+            m_lwm2m_transport[m_server_instance] = local_port.transport;
+        }
+        else if (err_code == EINPROGRESS)
+        {
+            m_app_state = APP_STATE_BS_CONNECT_WAIT;
+            m_lwm2m_transport[m_server_instance] = local_port.transport;
         }
         else
         {
-            m_app_state = APP_STATE_BS_CONNECT_WAIT;
+            m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
             // Check for no IPv6 support (EINVAL) and no response (ENETUNREACH)
             if (err_code == EIO && (errno == EINVAL || errno == ENETUNREACH)) {
                 app_handle_connect_retry(0, true);
@@ -1379,7 +1390,9 @@ static void app_bootstrap_connect(void)
 
 static void app_bootstrap(void)
 {
-    uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)&m_bs_remote_server, &m_client_id, m_lwm2m_bs_transport);
+    uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)&m_bs_remote_server,
+                                        &m_client_id,
+                                        m_lwm2m_transport[m_server_instance]);
     if (err_code == 0)
     {
         m_app_state = APP_STATE_BOOTSTRAP_REQUESTED;
@@ -1429,9 +1442,10 @@ static void app_server_connect(void)
 
         coap_local_t local_port =
         {
-            .addr     = &local_addr,
-            .setting  = &setting,
-            .protocol = IPPROTO_DTLS_1_2
+            .addr         = &local_addr,
+            .setting      = &setting,
+            .protocol     = IPPROTO_DTLS_1_2,
+            .non_blocking = true
         };
 
         // NOTE: This method initiates a DTLS handshake and may block for some seconds.
@@ -1443,9 +1457,14 @@ static void app_server_connect(void)
             m_lwm2m_transport[m_server_instance] = local_port.transport;
             m_server_settings[m_server_instance].retry_count = 0;
         }
-        else
+        else if (err_code == EINPROGRESS)
         {
             m_app_state = APP_STATE_SERVER_CONNECT_WAIT;
+            m_lwm2m_transport[m_server_instance] = local_port.transport;
+        }
+        else
+        {
+            m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
             // Check for no IPv6 support (EINVAL) and no response (ENETUNREACH)
             if (err_code == EIO && (errno == EINVAL || errno == ENETUNREACH)) {
                 app_handle_connect_retry(m_server_instance, true);
@@ -1533,21 +1552,13 @@ static void app_disconnect(void)
     uint32_t err_code;
 
     // Destroy the secure session if any.
-    if (m_lwm2m_bs_transport != 0xFFFFFFFF)
-    {
-        err_code = coap_security_destroy(m_lwm2m_bs_transport);
-        ARG_UNUSED(err_code);
-
-        m_lwm2m_bs_transport = 0xFFFFFFFF;
-    }
-
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-        if (m_lwm2m_transport[i] != 0xFFFFFFFF)
+        if (m_lwm2m_transport[i] != -1)
         {
             err_code = coap_security_destroy(m_lwm2m_transport[i]);
             ARG_UNUSED(err_code);
 
-            m_lwm2m_transport[i] = 0xFFFFFFFF;
+            m_lwm2m_transport[i] = -1;
         }
     }
 
@@ -1561,7 +1572,7 @@ static void app_wait_state_update(struct k_work *work)
 
     switch(m_app_state)
     {
-        case APP_STATE_BS_CONNECT_WAIT:
+        case APP_STATE_BS_CONNECT_RETRY_WAIT:
             // Timeout waiting for DTLS connection to bootstrap server
             m_app_state = APP_STATE_BS_CONNECT;
             break;
@@ -1573,11 +1584,11 @@ static void app_wait_state_update(struct k_work *work)
 
         case APP_STATE_BOOTSTRAPPING:
             // Timeout waiting for bootstrap to finish
-            m_app_state = APP_STATE_BS_CONNECT_WAIT;
+            m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
             app_handle_connect_retry(0, false);
             break;
 
-        case APP_STATE_SERVER_CONNECT_WAIT:
+        case APP_STATE_SERVER_CONNECT_RETRY_WAIT:
             // Timeout waiting for DTLS connection to registration server
             m_app_state = APP_STATE_SERVER_CONNECT;
             break;
@@ -1594,16 +1605,108 @@ static void app_wait_state_update(struct k_work *work)
 }
 
 
+static bool app_coap_socket_poll(void)
+{
+    struct pollfd fds[1+LWM2M_MAX_SERVERS];
+    int nfds = 0;
+
+    // Find active sockets
+    for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+        if (m_lwm2m_transport[i] != -1) {
+            fds[nfds].fd = m_lwm2m_transport[i];
+            fds[nfds].events = POLLIN;
+
+            // Only check POLLOUT (writing possible) when waiting for connect()
+            if ((i == m_server_instance) &&
+                ((m_app_state == APP_STATE_BS_CONNECT_WAIT) ||
+                 (m_app_state == APP_STATE_SERVER_CONNECT_WAIT))) {
+                fds[nfds].events |= POLLOUT;
+            }
+            nfds++;
+        }
+    }
+
+    int ret = poll(fds, nfds, K_FOREVER);
+
+    if (ret == 0) {
+        // Timeout should not happen when using K_FOREVER
+        return false;
+    } else if (ret < 0) {
+        printk("poll error: %d", errno);
+        return false;
+    }
+
+    bool data_ready = false;
+
+    for (int i = 0; i < nfds; i++) {
+        if ((fds[i].revents & POLLIN) == POLLIN) {
+            // There is data to read.
+            data_ready = true;
+        }
+
+        if ((fds[i].revents & POLLOUT) == POLLOUT) {
+            // Writing is now possible.
+            if (m_app_state == APP_STATE_BS_CONNECT_WAIT) {
+                m_app_state = APP_STATE_BS_CONNECTED;
+                m_server_settings[i].retry_count = 0;
+            } else if (m_app_state == APP_STATE_SERVER_CONNECT_WAIT) {
+                m_app_state = APP_STATE_SERVER_CONNECTED;
+                m_server_settings[i].retry_count = 0;
+            }
+        }
+
+        if ((fds[i].revents & POLLERR) == POLLERR) {
+            // Error condition.
+            if (m_app_state == APP_STATE_BS_CONNECT_WAIT) {
+                m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
+            } else if (m_app_state == APP_STATE_SERVER_CONNECT_WAIT) {
+                m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
+            } else {
+                // TODO handle?
+                printk("POLLERR: %d\n", i);
+                continue;
+            }
+
+            int error = 0;
+            int len = sizeof(error);
+            getsockopt(fds[i].fd, SOL_SOCKET, SO_ERROR, &error, &len);
+
+            uint32_t err_code = coap_security_destroy(fds[i].fd);
+            ARG_UNUSED(err_code);
+
+            // NOTE: This works because we are only connecting to one server at a time.
+            m_lwm2m_transport[m_server_instance] = -1;
+
+            // Check for no IPv6 support (EINVAL) and no response (ENETUNREACH)
+            if (error == EINVAL || error == ENETUNREACH) {
+                app_handle_connect_retry(m_server_instance, true);
+            } else {
+                app_handle_connect_retry(m_server_instance, false);
+            }
+        }
+
+        if ((fds[i].revents & POLLNVAL) == POLLNVAL) {
+            // TODO: Ignore POLLNVAL for now.
+            printk("POLLNVAL: %d\n", i);
+        }
+    }
+
+    return data_ready;
+}
+
+
 static void app_lwm2m_process(void)
 {
-    coap_input();
+    if (app_coap_socket_poll()) {
+        coap_input();
+    }
 
     switch(m_app_state)
     {
         case APP_STATE_BS_CONNECT:
         {
             APPL_LOG("app_bootstrap_connect");
-            if (m_lwm2m_bs_transport != 0xFFFFFFFF)
+            if (m_lwm2m_transport[m_server_instance] != -1)
             {
                 // Already connected. Disconnect first.
                 app_disconnect();
@@ -1690,9 +1793,17 @@ static void app_coap_init(void)
     APP_ERROR_CHECK(err_code);
 
     m_coap_transport = local_port_list[0].transport;
-    m_lwm2m_transport[1] = local_port_list[1].transport;
     ARG_UNUSED(m_coap_transport);
+
+    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+    {
+        m_lwm2m_transport[i] = -1;
+    }
+
+#if APP_USE_CONTABO
+    m_lwm2m_transport[1].fd = local_port_list[1].transport;
     ARG_UNUSED(m_lwm2m_transport);
+#endif
 }
 
 static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len)
@@ -2213,6 +2324,9 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Bootstrap connect [%s]", ip_version);
             break;
         case APP_STATE_BS_CONNECT_WAIT:
+            shell_print(shell, "Bootstrap connect wait [%s]", ip_version);
+            break;
+        case APP_STATE_BS_CONNECT_RETRY_WAIT:
             if (m_server_settings[0].retry_count > 0) {
                 shell_print(shell, "Bootstrap retry delay (%d minutes) [%s]", app_retry_delay[m_server_settings[0].retry_count - 1] / 60, ip_version);
             } else {
@@ -2242,6 +2356,9 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Server %d connect [%s]", m_server_instance, ip_version);
             break;
         case APP_STATE_SERVER_CONNECT_WAIT:
+            shell_print(shell, "Server %d connect wait [%s]", m_server_instance, ip_version);
+            break;
+        case APP_STATE_SERVER_CONNECT_RETRY_WAIT:
             if (m_server_settings[m_server_instance].retry_count > 0) {
                 shell_print(shell, "Server %d retry delay (%d minutes) [%s]", m_server_instance, app_retry_delay[m_server_settings[m_server_instance].retry_count - 1] / 60, ip_version);
             } else {
@@ -2383,7 +2500,6 @@ int main(void)
     memcpy(msisdn, MSISDN, sizeof(MSISDN));
 #endif
     printk("\n\nInitializing LTE link, please wait...\n");
-    m_lwm2m_bs_transport = 0xFFFFFFFF;
     m_coap_transport = 0xFFFFFFFF;
 
 #if APP_RESOLVE_URN
@@ -2470,12 +2586,13 @@ int main(void)
     if (lwm2m_security_bootstrapped_get(0))
     {
         m_app_state = APP_STATE_SERVER_CONNECT;
+        m_server_instance = 1;
     }
     else
     {
         m_app_state = APP_STATE_BS_CONNECT;
+        m_server_instance = 0;
     }
-    m_server_instance = 1;
 
     // Enter main loop
     for (;;)
