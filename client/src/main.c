@@ -2328,9 +2328,11 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             break;
         case APP_STATE_BS_CONNECT_RETRY_WAIT:
             if (m_server_settings[0].retry_count > 0) {
-                shell_print(shell, "Bootstrap retry delay (%d minutes) [%s]", app_retry_delay[m_server_settings[0].retry_count - 1] / 60, ip_version);
+                s32_t delay = k_delayed_work_remaining_get(&state_update_work) / 1000;
+                shell_print(shell, "Bootstrap connect delay (%d minutes, %d seconds left) [%s]",
+                            app_retry_delay[m_server_settings[0].retry_count - 1] / 60, delay, ip_version);
             } else {
-                shell_print(shell, "Bootstrap connect wait [%s]", ip_version);
+                shell_print(shell, "Bootstrap connect timed wait [%s]", ip_version);
             }
             break;
         case APP_STATE_BS_CONNECTED:
@@ -2341,7 +2343,9 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             break;
         case APP_STATE_BOOTSTRAP_WAIT:
             if (m_server_settings[0].retry_count > 0) {
-                shell_print(shell, "Bootstrap delay (%d minutes) [%s]", app_retry_delay[m_server_settings[0].retry_count - 1] / 60, ip_version);
+                s32_t delay = k_delayed_work_remaining_get(&state_update_work) / 1000;
+                shell_print(shell, "Bootstrap delay (%d minutes, %d seconds left) [%s]",
+                            app_retry_delay[m_server_settings[0].retry_count - 1] / 60, delay, ip_version);
             } else {
                 shell_print(shell, "Bootstrap wait [%s]", ip_version);
             }
@@ -2360,9 +2364,11 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             break;
         case APP_STATE_SERVER_CONNECT_RETRY_WAIT:
             if (m_server_settings[m_server_instance].retry_count > 0) {
-                shell_print(shell, "Server %d retry delay (%d minutes) [%s]", m_server_instance, app_retry_delay[m_server_settings[m_server_instance].retry_count - 1] / 60, ip_version);
+                s32_t delay = k_delayed_work_remaining_get(&state_update_work) / 1000;
+                shell_print(shell, "Server %d connect delay (%d minutes, %d seconds left) [%s]",
+                            m_server_instance, app_retry_delay[m_server_settings[m_server_instance].retry_count - 1] / 60, delay, ip_version);
             } else {
-                shell_print(shell, "Server %d connect wait [%s]", m_server_instance, ip_version);
+                shell_print(shell, "Server %d connect timed wait [%s]", m_server_instance, ip_version);
             }
             break;
         case APP_STATE_SERVER_CONNECTED:
@@ -2370,7 +2376,9 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             break;
         case APP_STATE_SERVER_REGISTER_WAIT:
             if (m_server_settings[m_server_instance].retry_count > 0) {
-                shell_print(shell, "Server %d register delay (%d minutes) [%s]", m_server_instance, app_retry_delay[m_server_settings[m_server_instance].retry_count - 1] / 60, ip_version);
+                s32_t delay = k_delayed_work_remaining_get(&state_update_work) / 1000;
+                shell_print(shell, "Server %d register delay (%d minutes, %d seconds left) [%s]",
+                            m_server_instance, app_retry_delay[m_server_settings[m_server_instance].retry_count - 1] / 60, delay, ip_version);
             } else {
                 shell_print(shell, "Server %d register wait [%s]", m_server_instance, ip_version);
             }
@@ -2379,10 +2387,10 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Server %d registered [%s]", m_server_instance, ip_version);
             break;
         case APP_STATE_SERVER_DEREGISTER:
-            shell_print(shell, "Server deregister");
+            shell_print(shell, "Server %d deregister", m_server_instance);
             break;
         case APP_STATE_SERVER_DEREGISTERING:
-            shell_print(shell, "Server deregistering");
+            shell_print(shell, "Server %d deregistering", m_server_instance);
             break;
         case APP_STATE_DISCONNECT:
             shell_print(shell, "Disconnect");
