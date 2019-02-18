@@ -20,11 +20,6 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <nrf_inbuilt_key.h>
 #include <nrf.h>
 
-#if CONFIG_SHELL
-#include <shell/shell.h>
-#include <fcntl.h>
-#endif
-
 #if CONFIG_DK_LIBRARY
 #include <dk_buttons_and_leds.h>
 #endif
@@ -49,7 +44,9 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <lwm2m_security.h>
 #include <lwm2m_firmware.h>
 #include <lwm2m_instance_storage.h>
+#include <lwm2m_debug.h>
 #include <common.h>
+#include <main.h>
 
 /* Hardcoded IMEI for now, will be fetched from modem using AT+CGSN=1 */
 #define IMEI            "004402990020434"
@@ -172,29 +169,6 @@ static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
     } while (0)
 #endif
 
-typedef enum
-{
-    APP_STATE_IDLE,
-    APP_STATE_IP_INTERFACE_UP,
-    APP_STATE_BS_CONNECT,
-    APP_STATE_BS_CONNECT_WAIT,
-    APP_STATE_BS_CONNECT_RETRY_WAIT,
-    APP_STATE_BS_CONNECTED,
-    APP_STATE_BOOTSTRAP_REQUESTED,
-    APP_STATE_BOOTSTRAP_WAIT,
-    APP_STATE_BOOTSTRAPPING,
-    APP_STATE_BOOTSTRAPPED,
-    APP_STATE_SERVER_CONNECT,
-    APP_STATE_SERVER_CONNECT_WAIT,
-    APP_STATE_SERVER_CONNECT_RETRY_WAIT,
-    APP_STATE_SERVER_CONNECTED,
-    APP_STATE_SERVER_REGISTER_WAIT,
-    APP_STATE_SERVER_REGISTERED,
-    APP_STATE_SERVER_DEREGISTER,
-    APP_STATE_SERVER_DEREGISTERING,
-    APP_STATE_DISCONNECT
-} app_state_t;
-
 static lwm2m_server_config_t               m_server_conf[1+LWM2M_MAX_SERVERS];                /**< Server configuration structure. */
 static lwm2m_client_identity_t             m_client_id;                                       /**< Client ID structure to hold the client's UUID. */
 
@@ -253,17 +227,6 @@ typedef struct
 
 static server_settings_t     m_server_settings[1+LWM2M_MAX_SERVERS];
 
-/**@brief Configurable device values. */
-typedef struct {
-    char imei[16];                /**< Static configured IMEI to overwrite value from SIP, used for debugging. */
-    char msisdn[16];              /**< Static configured MSISDN to overwrite value from SIM, used for debugging. */
-    char modem_logging[65];       /**< Modem logging: 0=off, 1=fidoless, 2=fido, other=XMODEMTRACE bitmap */
-} device_settings_t;
-
-static device_settings_t m_device_settings;
-
-#define DEVICE_FLASH_ID 10
-
 //static uint32_t app_store_bootstrap_server_acl(uint16_t instance_id);
 uint32_t app_store_bootstrap_server_values(uint16_t instance_id);
 void app_server_update(uint16_t instance_id);
@@ -274,6 +237,61 @@ static void app_provision_secret_keys(void);
 static void app_disconnect(void);
 static void app_wait_state_update(struct k_work *work);
 static const char * app_uri_get(char * server_uri, uint8_t uri_len, uint16_t * p_port, bool * p_secure);
+
+void read_emei_and_msisdn(void)
+{
+    // Temporary hack for IMEI and MSISDN
+    strcpy(imei, "352656100005548");
+    strcpy(msisdn, "0011600034");
+}
+
+/** Functions available from shell access */
+void app_update_server(uint16_t update_server)
+{
+    m_update_server = update_server;
+}
+
+#if CONFIG_SHELL
+app_state_t app_state_get(void)
+{
+    return m_app_state;
+}
+
+void app_state_set(app_state_t app_state)
+{
+    m_app_state = app_state;
+}
+
+bool app_did_bootstrap(void)
+{
+    return m_did_bootstrap;
+}
+
+uint16_t app_server_instance(void)
+{
+    return m_server_instance;
+}
+
+uint32_t app_server_retry_count(uint16_t instance_id)
+{
+    return m_server_settings[instance_id].retry_count;
+}
+
+int32_t app_retry_delay_get(uint16_t instance_id)
+{
+    return app_retry_delay[m_server_settings[instance_id].retry_count - 1];
+}
+
+sa_family_t app_family_type_get(uint16_t instance_id)
+{
+    return m_family_type[instance_id];
+}
+
+int32_t app_state_update_delay(void)
+{
+    return k_delayed_work_remaining_get(&state_update_work);
+}
+#endif // CONFIG_SHELL
 
 /**@brief Recoverable BSD library error. */
 void bsd_recoverable_error_handler(uint32_t error)
@@ -340,7 +358,7 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
         }
         else if (m_app_state == APP_STATE_SERVER_REGISTERED)
         {
-            m_update_server = 1;
+            app_update_server(1);
         }
     }
     else if (buttons & 0x02) // Button 2 has changed
@@ -494,15 +512,17 @@ static char * app_client_imei_msisdn(void)
         extern char imei[];
         extern char msisdn[];
 
-        char * p_imei = imei;
-        char * p_msisdn = msisdn;
+        const char * p_imei = imei;
+        const char * p_msisdn = msisdn;
 
-        if (m_device_settings.imei[0]) {
-            p_imei = m_device_settings.imei;
+        const char * p_debug_imei = lwm2m_debug_imei_get();
+        if (p_debug_imei && p_debug_imei[0]) {
+            p_imei = p_debug_imei;
         }
 
-        if (m_device_settings.msisdn[0]) {
-            p_msisdn = m_device_settings.msisdn;
+        const char * p_debug_msisdn = lwm2m_debug_msisdn_get();
+        if (p_debug_msisdn && p_debug_msisdn[0]) {
+            p_msisdn = p_debug_msisdn;
         }
 
         snprintf(client_id, 128, "urn:imei-msisdn:%s-%s", p_imei, p_msisdn);
@@ -520,10 +540,11 @@ static void app_initialize_msisdn(void)
 #if CONFIG_FLASH
     char last_used_msisdn[128];
     extern char msisdn[];
-    char *p_msisdn;
+    const char *p_msisdn;
 
-    if (m_device_settings.msisdn[0]) {
-        p_msisdn = m_device_settings.msisdn;
+    const char * p_debug_msisdn = lwm2m_debug_msisdn_get();
+    if (p_debug_msisdn && p_debug_msisdn[0]) {
+        p_msisdn = p_debug_msisdn;
     } else {
         p_msisdn = msisdn;
     }
@@ -981,7 +1002,7 @@ uint32_t app_store_bootstrap_server_values(uint16_t instance_id)
     if (m_server_settings[instance_id].lifetime != lwm2m_server_get_instance(instance_id)->lifetime) {
         if (instance_id == 1 || instance_id == 3) {
             // Lifetime changed, send update server
-            m_update_server = instance_id;
+            app_update_server(instance_id);
         }
     }
     */
@@ -1087,12 +1108,6 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
     }
 }
 
-static void app_init_device_settings(void)
-{
-    strcpy(m_device_settings.imei, "");
-    strcpy(m_device_settings.msisdn, "");
-    strcpy(m_device_settings.modem_logging, "0");
-}
 
 void app_factory_reset(void)
 {
@@ -1103,27 +1118,6 @@ void app_factory_reset(void)
     {
         lwm2m_instance_storage_security_delete(i);
     }
-#endif
-}
-
-
-static void app_read_flash_device(void)
-{
-#if CONFIG_FLASH
-
-    app_init_device_settings();
-
-#if CONFIG_SHELL
-    int rc;
-
-    rc = nvs_read(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
-    if (rc != sizeof(m_device_settings)) {
-        app_init_device_settings();
-        nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
-    }
-#endif
-#else
-    app_init_device_settings();
 #endif
 }
 
@@ -1750,7 +1744,7 @@ static void app_lwm2m_process(void)
                     APPL_LOG("app_server_update");
                     app_server_update(m_update_server);
                 }
-                m_update_server = 0;
+                app_update_server(0);
             }
             break;
         }
@@ -1871,7 +1865,7 @@ static void app_provision_secret_keys(void)
     APPL_LOG("Normal mode");
 }
 
-static void send_at_command(const char *at_command, bool do_logging)
+void send_at_command(const char *at_command, bool do_logging)
 {
 #define APP_MAX_AT_READ_LENGTH          256
 #define APP_MAX_AT_WRITE_LENGTH         256
@@ -1970,498 +1964,6 @@ void app_check_buttons_pressed(void)
 #endif
 
 
-#ifdef CONFIG_SHELL
-static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc != 2) {
-        shell_print(shell, "%s \"AT command\"", argv[0]);
-        return 0;
-    }
-
-    send_at_command(argv[1], true);
-
-    return 0;
-}
-
-#if CONFIG_FLASH
-static int cmd_config_clear(const struct shell *shell, size_t argc, char **argv)
-{
-    lwm2m_instance_storage_security_delete(1);
-    lwm2m_instance_storage_server_delete(1);
-
-    lwm2m_instance_storage_security_delete(2);
-    lwm2m_instance_storage_server_delete(2);
-
-    lwm2m_instance_storage_security_delete(3);
-    lwm2m_instance_storage_server_delete(3);
-
-/*
-    lwm2m_security_bootstrapped_set(0, false);
-    nvs_write(&fs, 0, &m_server_settings[0], sizeof(m_server_settings[0]));
-
-    app_factory_bootstrap_server_object(1);
-    nvs_delete(&fs, 1);
-
-    app_factory_bootstrap_server_object(3);
-    nvs_delete(&fs, 3);
-*/
-    shell_print(shell, "Deleted all bootstrapped values");
-    return 0;
-}
-
-
-static int cmd_config_print(const struct shell *shell, size_t argc, char **argv)
-{
-    for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++)
-    {
-        if (lwm2m_server_short_server_id_get(i)) {
-            shell_print(shell, "Instance %d", i);
-            shell_print(shell, "  Short Server ID  %d", lwm2m_server_short_server_id_get(i));
-            shell_print(shell, "  Server URI       %s", lwm2m_security_server_uri_get(i));
-            shell_print(shell, "  Lifetime         %lld", lwm2m_server_lifetime_get(i));
-            shell_print(shell, "  Owner            %d", m_server_settings[i].owner);
-        }
-    }
-
-    return 0;
-}
-
-
-static int cmd_config_uri(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc != 3) {
-        shell_print(shell, "%s <instance> <URI>", argv[0]);
-        return 0;
-    }
-
-    int instance_id = atoi(argv[1]);
-    char *uri = argv[2];
-    size_t uri_len = strlen(uri);
-
-    if (instance_id < 0 || instance_id >= (1+LWM2M_MAX_SERVERS))
-    {
-        shell_print(shell, "instance must be between 0 and %d", LWM2M_MAX_SERVERS);
-        return 0;
-    }
-
-    if (uri_len > SECURITY_SERVER_URI_SIZE_MAX)
-    {
-        shell_print(shell, "maximum URI length is %d", SECURITY_SERVER_URI_SIZE_MAX);
-        return 0;
-    }
-
-    lwm2m_security_server_uri_set(instance_id, uri);
-    nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[0]));
-
-    shell_print(shell, "Set URI %d: %s", instance_id, uri);
-
-    return 0;
-}
-
-
-static int cmd_config_lifetime(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc != 3) {
-        shell_print(shell, "%s <instance> <seconds>", argv[0]);
-        return 0;
-    }
-
-    int instance_id = atoi(argv[1]);
-    time_t lifetime = (time_t) atoi(argv[2]);
-
-    if (instance_id < 0 || instance_id >= (1+LWM2M_MAX_SERVERS))
-    {
-        shell_print(shell, "instance must be between 0 and %d", LWM2M_MAX_SERVERS);
-        return 0;
-    }
-
-    if (lifetime != lwm2m_server_lifetime_get(instance_id)) {
-        if (instance_id == 1 || instance_id == 3) {
-            // Lifetime changed, send update server
-            m_update_server = instance_id;
-        }
-
-        lwm2m_server_lifetime_set(instance_id, lifetime);
-        m_server_conf[instance_id].lifetime = lifetime;
-
-        nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[0]));
-
-        shell_print(shell, "Set lifetime %d: %d", instance_id, lifetime);
-    }
-
-    return 0;
-}
-
-static int cmd_config_owner(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc != 3) {
-        shell_print(shell, "%s <instance> <owner>", argv[0]);
-        return 0;
-    }
-
-    int instance_id = atoi(argv[1]);
-    uint16_t owner = (uint16_t) atoi(argv[2]);
-
-    if (instance_id < 0 || instance_id >= (1+LWM2M_MAX_SERVERS))
-    {
-        shell_print(shell, "instance must be between 0 and %d", LWM2M_MAX_SERVERS);
-        return 0;
-    }
-
-    if (owner != m_server_settings[instance_id].owner) {
-
-        m_server_settings[instance_id].owner = owner;
-        lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
-        p_instance->acl.owner = owner;
-
-        nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[0]));
-
-        shell_print(shell, "Set owner %d: %d", instance_id, owner);
-    }
-
-    return 0;
-}
-
-
-static int cmd_device_print(const struct shell *shell, size_t argc, char **argv)
-{
-#if APP_RESOLVE_URN
-    extern char imei[];
-    extern char msisdn[];
-#endif
-
-    shell_print(shell, "Device configuration");
-    if (m_device_settings.imei[0]) {
-        shell_print(shell, "  IMEI           %s (static)", m_device_settings.imei);
-    } else {
-        shell_print(shell, "  IMEI           %s", imei);
-    }
-    if (m_device_settings.msisdn[0]) {
-        shell_print(shell, "  MSISDN         %s (static)", m_device_settings.msisdn);
-    } else {
-        shell_print(shell, "  MSISDN         %s", msisdn);
-    }
-    shell_print(shell, "  Logging        %s", m_device_settings.modem_logging);
-
-    return 0;
-}
-
-
-static int cmd_device_reset(const struct shell *shell, size_t argc, char **argv)
-{
-    app_init_device_settings();
-    nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
-
-    return 0;
-}
-
-
-static int cmd_device_imei(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc != 2) {
-        shell_print(shell, "%s IMEI", argv[0]);
-        return 0;
-    }
-
-    char *imei = argv[1];
-    size_t imei_len = strlen(imei);
-
-    if (imei_len != 0 && imei_len != 15) {
-        shell_print(shell, "length of IMEI must be 15");
-        return 0;
-    }
-
-    memset(m_device_settings.imei, 0, sizeof(m_device_settings.imei));
-    strcpy(m_device_settings.imei, imei);
-    nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
-
-    if (imei_len) {
-        shell_print(shell, "Set IMEI: %s", imei);
-    } else {
-        shell_print(shell, "Removed IMEI");
-    }
-
-    return 0;
-}
-
-
-static int cmd_device_msisdn(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc != 2) {
-        shell_print(shell, "%s MSISDN", argv[0]);
-        return 0;
-    }
-
-    char *msisdn = argv[1];
-    size_t msisdn_len = strlen(msisdn);
-
-    if (msisdn_len != 0 && msisdn_len != 10) {
-        shell_print(shell, "length of MSISDN must be 10");
-        return 0;
-    }
-
-    memset(m_device_settings.msisdn, 0, sizeof(m_device_settings.msisdn));
-    strcpy(m_device_settings.msisdn, msisdn);
-    nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
-
-    if (msisdn_len) {
-        shell_print(shell, "Set MSISDN: %s", msisdn);
-    } else {
-        shell_print(shell, "Removed MSISDN");
-    }
-
-    return 0;
-}
-
-
-static int cmd_device_logging(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc != 2) {
-        shell_print(shell, "%s <value>", argv[0]);
-        return 0;
-    }
-
-    char *logging = argv[1];
-    size_t logging_len = strlen(logging);
-
-    if (logging_len != 1 && logging_len != 64) {
-        shell_print(shell, "invalid logging value");
-        return 0;
-    }
-
-    memset(m_device_settings.modem_logging, 0, sizeof(m_device_settings.modem_logging));
-    strcpy(m_device_settings.modem_logging, logging);
-    nvs_write(&fs, DEVICE_FLASH_ID, &m_device_settings, sizeof(m_device_settings));
-
-    shell_print(shell, "Set logging value: %s", logging);
-
-    return 0;
-}
-
-
-#endif
-
-
-static int cmd_lwm2m_register(const struct shell *shell, size_t argc, char **argv)
-{
-    if (m_app_state == APP_STATE_IP_INTERFACE_UP) {
-        if (lwm2m_security_bootstrapped_get(0)) {
-            m_app_state = APP_STATE_SERVER_CONNECT;
-        } else {
-            m_app_state = APP_STATE_BS_CONNECT;
-        }
-    } else if (m_app_state == APP_STATE_SERVER_REGISTERED) {
-        shell_print(shell, "Already registered");
-    } else {
-        shell_print(shell, "Wrong state for registration");
-    }
-
-    return 0;
-}
-
-
-static int cmd_lwm2m_update(const struct shell *shell, size_t argc, char **argv)
-{
-    uint16_t instance_id = 1;
-
-    if (argc == 2) {
-        instance_id = atoi(argv[1]);
-
-        if (instance_id != 1 && instance_id != 3)
-        {
-            shell_print(shell, "instance must be 1 or 3");
-            return 0;
-        }
-    }
-
-    if (m_app_state == APP_STATE_SERVER_REGISTERED) {
-        m_update_server = instance_id;
-    } else {
-        shell_print(shell, "Not registered");
-    }
-
-    return 0;
-}
-
-
-static int cmd_lwm2m_deregister(const struct shell *shell, size_t argc, char **argv)
-{
-    if (m_app_state == APP_STATE_SERVER_REGISTERED) {
-        m_app_state = APP_STATE_SERVER_DEREGISTER;
-    } else {
-        shell_print(shell, "Not registered");
-    }
-
-    return 0;
-}
-
-
-static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
-{
-    char ip_version[] = "IPvX";
-    ip_version[3] = (m_family_type[m_server_instance] == AF_INET6) ? '6' : '4';
-
-    if (m_did_bootstrap) {
-        shell_print(shell, "Bootstrap completed [%s]", (m_family_type[0] == AF_INET6) ? "IPv6" : "IPv4");
-    }
-
-    if (m_server_instance == 3) {
-        shell_print(shell, "Server 1 registered [%s]", (m_family_type[1] == AF_INET6) ? "IPv6" : "IPv4");
-    }
-
-    switch(m_app_state)
-    {
-        case APP_STATE_IDLE:
-            shell_print(shell, "Idle");
-            break;
-        case APP_STATE_IP_INTERFACE_UP:
-            shell_print(shell, "Disconnected");
-            break;
-        case APP_STATE_BS_CONNECT:
-            shell_print(shell, "Bootstrap connect [%s]", ip_version);
-            break;
-        case APP_STATE_BS_CONNECT_WAIT:
-            shell_print(shell, "Bootstrap connect wait [%s]", ip_version);
-            break;
-        case APP_STATE_BS_CONNECT_RETRY_WAIT:
-            if (m_server_settings[0].retry_count > 0) {
-                s32_t delay = k_delayed_work_remaining_get(&state_update_work) / 1000;
-                shell_print(shell, "Bootstrap connect delay (%d minutes, %d seconds left) [%s]",
-                            app_retry_delay[m_server_settings[0].retry_count - 1] / 60, delay, ip_version);
-            } else {
-                shell_print(shell, "Bootstrap connect timed wait [%s]", ip_version);
-            }
-            break;
-        case APP_STATE_BS_CONNECTED:
-            shell_print(shell, "Bootstrap connected [%s]", ip_version);
-            break;
-        case APP_STATE_BOOTSTRAP_REQUESTED:
-            shell_print(shell, "Bootstrap requested [%s]", ip_version);
-            break;
-        case APP_STATE_BOOTSTRAP_WAIT:
-            if (m_server_settings[0].retry_count > 0) {
-                s32_t delay = k_delayed_work_remaining_get(&state_update_work) / 1000;
-                shell_print(shell, "Bootstrap delay (%d minutes, %d seconds left) [%s]",
-                            app_retry_delay[m_server_settings[0].retry_count - 1] / 60, delay, ip_version);
-            } else {
-                shell_print(shell, "Bootstrap wait [%s]", ip_version);
-            }
-            break;
-        case APP_STATE_BOOTSTRAPPING:
-            shell_print(shell, "Bootstrapping [%s]", ip_version);
-            break;
-        case APP_STATE_BOOTSTRAPPED:
-            shell_print(shell, "Bootstrapped [%s]", ip_version);
-            break;
-        case APP_STATE_SERVER_CONNECT:
-            shell_print(shell, "Server %d connect [%s]", m_server_instance, ip_version);
-            break;
-        case APP_STATE_SERVER_CONNECT_WAIT:
-            shell_print(shell, "Server %d connect wait [%s]", m_server_instance, ip_version);
-            break;
-        case APP_STATE_SERVER_CONNECT_RETRY_WAIT:
-            if (m_server_settings[m_server_instance].retry_count > 0) {
-                s32_t delay = k_delayed_work_remaining_get(&state_update_work) / 1000;
-                shell_print(shell, "Server %d connect delay (%d minutes, %d seconds left) [%s]",
-                            m_server_instance, app_retry_delay[m_server_settings[m_server_instance].retry_count - 1] / 60, delay, ip_version);
-            } else {
-                shell_print(shell, "Server %d connect timed wait [%s]", m_server_instance, ip_version);
-            }
-            break;
-        case APP_STATE_SERVER_CONNECTED:
-            shell_print(shell, "Server %d connected [%s]", m_server_instance, ip_version);
-            break;
-        case APP_STATE_SERVER_REGISTER_WAIT:
-            if (m_server_settings[m_server_instance].retry_count > 0) {
-                s32_t delay = k_delayed_work_remaining_get(&state_update_work) / 1000;
-                shell_print(shell, "Server %d register delay (%d minutes, %d seconds left) [%s]",
-                            m_server_instance, app_retry_delay[m_server_settings[m_server_instance].retry_count - 1] / 60, delay, ip_version);
-            } else {
-                shell_print(shell, "Server %d register wait [%s]", m_server_instance, ip_version);
-            }
-            break;
-        case APP_STATE_SERVER_REGISTERED:
-            shell_print(shell, "Server %d registered [%s]", m_server_instance, ip_version);
-            break;
-        case APP_STATE_SERVER_DEREGISTER:
-            shell_print(shell, "Server %d deregister", m_server_instance);
-            break;
-        case APP_STATE_SERVER_DEREGISTERING:
-            shell_print(shell, "Server %d deregistering", m_server_instance);
-            break;
-        case APP_STATE_DISCONNECT:
-            shell_print(shell, "Disconnect");
-            break;
-        default:
-            shell_print(shell, "Unknown state: %d", m_app_state);
-            break;
-    };
-
-    return 0;
-}
-
-
-static int cmd_factory_reset(const struct shell *shell, size_t argc, char **argv)
-{
-    app_factory_reset();
-    app_system_reset();
-
-    return 0;
-}
-
-
-static int cmd_reboot(const struct shell *shell, size_t argc, char **argv)
-{
-    app_system_reset();
-
-    return 0;
-}
-
-
-#if CONFIG_FLASH
-SHELL_CREATE_STATIC_SUBCMD_SET(sub_config)
-{
-    SHELL_CMD(print, NULL, "Print configuration", cmd_config_print),
-    SHELL_CMD(clear, NULL, "Clear bootstrapped values", cmd_config_clear),
-    SHELL_CMD(uri, NULL, "Set URI", cmd_config_uri),
-    SHELL_CMD(lifetime, NULL, "Set lifetime", cmd_config_lifetime),
-    SHELL_CMD(owner, NULL, "Set access control owner", cmd_config_owner),
-    SHELL_CMD(factory_reset, NULL, "Factory reset", cmd_factory_reset),
-    SHELL_SUBCMD_SET_END /* Array terminated. */
-};
-
-SHELL_CREATE_STATIC_SUBCMD_SET(sub_device)
-{
-    SHELL_CMD(print, NULL, "Print configuration", cmd_device_print),
-    SHELL_CMD(reset, NULL, "Reset configuration", cmd_device_reset),
-    SHELL_CMD(imei, NULL, "Set IMEI", cmd_device_imei),
-    SHELL_CMD(msisdn, NULL, "Set MSISDN", cmd_device_msisdn),
-    SHELL_CMD(logging, NULL, "Set logging value", cmd_device_logging),
-    SHELL_SUBCMD_SET_END /* Array terminated. */
-};
-#endif
-
-
-SHELL_CREATE_STATIC_SUBCMD_SET(sub_lwm2m)
-{
-    SHELL_CMD(status, NULL, "Application status", cmd_lwm2m_status),
-    SHELL_CMD(register, NULL, "Register server", cmd_lwm2m_register),
-    SHELL_CMD(update, NULL, "Update server", cmd_lwm2m_update),
-    SHELL_CMD(deregister, NULL, "Deregister server", cmd_lwm2m_deregister),
-    SHELL_SUBCMD_SET_END /* Array terminated. */
-};
-
-
-SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
-#if CONFIG_FLASH
-SHELL_CMD_REGISTER(config, &sub_config, "Instance configuration", NULL);
-SHELL_CMD_REGISTER(device, &sub_device, "Device configuration", NULL);
-#endif
-SHELL_CMD_REGISTER(lwm2m, &sub_lwm2m, "LwM2M operations", NULL);
-SHELL_CMD_REGISTER(reboot, NULL, "Reboot", cmd_reboot);
-#endif
-
-
 /**@brief Handle server lifetime.
  */
 #if (APP_USE_CONTABO != 1)
@@ -2524,9 +2026,10 @@ int main(void)
 #endif
 
     // Initialize device from flash.
-    app_read_flash_device();
+    lwm2m_debug_init();
 
-    if (strcmp(m_device_settings.modem_logging, "2") == 0) {
+    const char * modem_logging = lwm2m_debug_modem_logging_get();
+    if (strcmp(modem_logging, "2") == 0) {
         modem_trace_enable();
     }
 
@@ -2552,7 +2055,7 @@ int main(void)
     // Establish LTE link.
     lte_lc_init_and_connect();
 
-    if (strcmp(m_device_settings.modem_logging, "1") == 0) {
+    if (strcmp(modem_logging, "1") == 0) {
         // 1,0 = disable
         // 1,1 = coredump only
         // 1,2 = generic (and coredump)
@@ -2561,9 +2064,9 @@ int main(void)
         send_at_command("AT%XMODEMTRACE=1,2", false);
         send_at_command("AT%XMODEMTRACE=1,3", false);
         send_at_command("AT%XMODEMTRACE=1,4", false);
-    } else if (strlen(m_device_settings.modem_logging) == 64) {
+    } else if (strlen(modem_logging) == 64) {
         char at_command[128];
-        sprintf(at_command, "AT%%XMODEMTRACE=2,,3,%s", m_device_settings.modem_logging);
+        sprintf(at_command, "AT%%XMODEMTRACE=2,,3,%s", modem_logging);
         send_at_command(at_command, false);
     }
 

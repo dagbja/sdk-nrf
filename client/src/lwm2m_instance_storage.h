@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
+#include <lwm2m_debug.h>
 
 #ifndef LWM2M_INSTANCE_STORAGE_H__
 #define LWM2M_INSTANCE_STORAGE_H__
@@ -33,5 +34,8 @@ int32_t lwm2m_instance_storage_server_delete(uint16_t instance_id);
 
 int32_t lwm2m_last_used_msisdn_get(char * p_msisdn, uint8_t max_len);
 int32_t lwm2m_last_used_msisdn_set(const char * p_msisdn, uint8_t len);
+
+int32_t lwm2m_debug_settings_load(debug_settings_t * debug_settings);
+int32_t lwm2m_debug_settings_store(const debug_settings_t * debug_settings);
 
 #endif // LWM2M_INSTANCE_STORAGE_H__

@@ -27,6 +27,7 @@ static struct nvs_fs fs = {
 #define LWM2M_INSTANCE_STORAGE_TYPE_MAX_COUNT 10
 #define LWM2M_INSTANCE_STORAGE_MISC_DATA       1
 #define LWM2M_INSTANCE_STORAGE_MSISDN          2
+#define LWM2M_INSTANCE_STORAGE_DEBUG_SETTINGS  9
 #define LWM2M_INSTANCE_STORAGE_BASE_SECURITY  (1 * LWM2M_INSTANCE_STORAGE_TYPE_MAX_COUNT)
 #define LWM2M_INSTANCE_STORAGE_BASE_SERVER    (2 * LWM2M_INSTANCE_STORAGE_TYPE_MAX_COUNT)
 
@@ -172,6 +173,16 @@ int32_t lwm2m_last_used_msisdn_get(char * p_msisdn, uint8_t max_len)
 int32_t lwm2m_last_used_msisdn_set(const char * p_msisdn, uint8_t len)
 {
     return nvs_write(&fs, LWM2M_INSTANCE_STORAGE_MSISDN, p_msisdn, len);
+}
+
+int32_t lwm2m_debug_settings_load(debug_settings_t * debug_settings)
+{
+    return nvs_read(&fs, LWM2M_INSTANCE_STORAGE_DEBUG_SETTINGS, debug_settings, sizeof(*debug_settings));
+}
+
+int32_t lwm2m_debug_settings_store(const debug_settings_t * debug_settings)
+{
+    return nvs_write(&fs, LWM2M_INSTANCE_STORAGE_DEBUG_SETTINGS, debug_settings, sizeof(*debug_settings));
 }
 
 #endif // CONFIG_FLASH

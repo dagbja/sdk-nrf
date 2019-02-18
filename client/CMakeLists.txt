@@ -17,6 +17,8 @@ target_sources(app PRIVATE src/lwm2m_device.c)
 target_sources(app PRIVATE src/lwm2m_firmware.c)
 target_sources(app PRIVATE src/lwm2m_instance_storage.c)
 target_sources(app PRIVATE src/common.c)
+target_sources(app PRIVATE src/lwm2m_shell.c)
+target_sources(app PRIVATE src/lwm2m_debug.c)
 zephyr_include_directories(src)
 
 add_subdirectory(.. ${PROJECT_BINARY_DIR}/zephyr/lwm2m)
