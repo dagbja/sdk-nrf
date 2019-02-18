@@ -107,7 +107,7 @@ void lwm2m_mdm_interface_uninit()
     if (m_at_socket_handle >= 0)
     {
         // Gracefully close the AT socket.
-        UNUSED_RETURN_VALUE(at_interface_close(m_at_socket_handle));
+        close(m_at_socket_handle);
     }
 }
 
@@ -135,7 +135,7 @@ static const at_cmd_cb_t * get_at_cmd_decode_handler(const char * const p_atstri
 static uint32_t at_read_response(void * const p_out)
 {
     // Read the response from AT socket and check the command response type.
-    ssize_t len = read(m_at_socket_handle, m_at_read_buf, LWM2M_AT_IFACE_MAX_AT_READ_LENGTH);
+    ssize_t len = recv(m_at_socket_handle, m_at_read_buf, LWM2M_AT_IFACE_MAX_AT_READ_LENGTH, 0);
 
     // We should at least get an "OK\r\n\0" back.
     LWM2M_AT_IFACE_VERIFY_TRUE(len >= 5);
@@ -176,7 +176,7 @@ uint32_t lwm2m_mdm_interface_read_cesq(lwm2m_model_cesq_rsp_t * const p_cesq_rsp
 
     // Write the AT command and check the number of written bytes.
     static const char at_cmd[] = "AT+CESQ";
-    ssize_t len = write(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
+    ssize_t len = send(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd), 0);
     LWM2M_AT_IFACE_VERIFY_TRUE(len == LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
 
     // Read and parse the AT command response parameters.
@@ -201,7 +201,7 @@ uint32_t lwm2m_mdm_interface_read_cereg(lwm2m_model_cereg_rsp_t * const p_cereg_
 
     // Write the AT command and check the number of written bytes.
     static const char at_cmd[] = "AT+CEREG?"; // Read command
-    ssize_t len = write(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
+    ssize_t len = send(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd), 0);
     LWM2M_AT_IFACE_VERIFY_TRUE(len == LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
 
     // Read and parse the AT command response parameters.
@@ -227,7 +227,7 @@ uint32_t lwm2m_mdm_interface_read_cops(lwm2m_model_cops_rsp_t * const p_cops_rsp
 
     // Write the AT command and check the number of written bytes.
     static const char at_cmd[] = "AT+COPS?"; // Read command
-    ssize_t len = write(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
+    ssize_t len = send(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd), 0);
     LWM2M_AT_IFACE_VERIFY_TRUE(len == LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
 
     // Read and parse the AT command response parameters.
@@ -253,7 +253,7 @@ uint32_t lwm2m_mdm_interface_read_cnum(lwm2m_model_cnum_rsp_t * const p_cnum_rsp
 
     // Write the AT command and check the number of written bytes.
     static const char at_cmd[] = "AT+CNUM"; // Set command
-    ssize_t len = write(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
+    ssize_t len = send(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd), 0);
     LWM2M_AT_IFACE_VERIFY_TRUE(len == LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
 
     // Read and parse the AT command response parameters.
@@ -279,19 +279,19 @@ uint32_t lwm2m_mdm_interface_read_cgmi(lwm2m_model_cgmi_rsp_t * const p_cgmi_rsp
 
     // Write the AT command and check the number of written bytes.
     static const char at_cmd[] = "AT+CGMI"; // Set command
-    ssize_t len = write(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
+    ssize_t len = send(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd), 0);
     LWM2M_AT_IFACE_VERIFY_TRUE(len == LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
 
     // Read the response from AT socket and check the command response type.
     // No parsing needed here.
-    len = read(m_at_socket_handle, m_at_read_buf, LWM2M_AT_IFACE_MAX_AT_READ_LENGTH);
+    len = recv(m_at_socket_handle, m_at_read_buf, LWM2M_AT_IFACE_MAX_AT_READ_LENGTH, 0);
 
     // We should at least get an "\r\nOK\r\n\0" back.
     LWM2M_AT_IFACE_VERIFY_TRUE(len >= 7);
 
     // Read manufacturer name from success AT command result.
     size_t man_strlen = len - 7;
-    char * manufacturer = (char *)nrf_calloc(1, man_strlen + 1);
+    char * manufacturer = (char *)k_calloc(1, man_strlen + 1);
     if (manufacturer == NULL)
     {
         return NRF_ERROR_NO_MEM;
@@ -315,19 +315,19 @@ uint32_t lwm2m_mdm_interface_read_cgmm(lwm2m_model_cgmm_rsp_t * const p_cgmm_rsp
 
     // Write the AT command and check the number of written bytes.
     static const char at_cmd[] = "AT+CGMM"; // Set command
-    ssize_t len = write(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
+    ssize_t len = send(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd), 0);
     LWM2M_AT_IFACE_VERIFY_TRUE(len == LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
 
     // Read the response from AT socket and check the command response type.
     // No parsing needed here.
-    len = read(m_at_socket_handle, m_at_read_buf, LWM2M_AT_IFACE_MAX_AT_READ_LENGTH);
+    len = recv(m_at_socket_handle, m_at_read_buf, LWM2M_AT_IFACE_MAX_AT_READ_LENGTH, 0);
 
     // We should at least get an "\r\nOK\r\n\0" back.
     LWM2M_AT_IFACE_VERIFY_TRUE(len >= 7);
 
     // Read model identification from success AT command result.
     size_t model_strlen = len - 7;
-    char * model = (char *)nrf_calloc(1, model_strlen + 1);
+    char * model = (char *)k_calloc(1, model_strlen + 1);
     if (model == NULL)
     {
         return NRF_ERROR_NO_MEM;
@@ -351,19 +351,19 @@ uint32_t lwm2m_mdm_interface_read_cgmr(lwm2m_model_cgmr_rsp_t * const p_cgmr_rsp
 
     // Write the AT command and check the number of written bytes.
     static const char at_cmd[] = "AT+CGMR"; // Set command
-    ssize_t len = write(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
+    ssize_t len = send(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd), 0);
     LWM2M_AT_IFACE_VERIFY_TRUE(len == LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
 
     // Read the response from AT socket and check the command response type.
     // No parsing needed here.
-    len = read(m_at_socket_handle, m_at_read_buf, LWM2M_AT_IFACE_MAX_AT_READ_LENGTH);
+    len = recv(m_at_socket_handle, m_at_read_buf, LWM2M_AT_IFACE_MAX_AT_READ_LENGTH, 0);
 
     // We should at least get an "\r\nOK\r\n\0" back.
     LWM2M_AT_IFACE_VERIFY_TRUE(len >= 7);
 
     // Read model identification from success AT command result.
     size_t rev_strlen = len - 7;
-    char * revision = (char *)nrf_calloc(1, rev_strlen + 1);
+    char * revision = (char *)k_calloc(1, rev_strlen + 1);
     if (revision == NULL)
     {
         return NRF_ERROR_NO_MEM;
@@ -387,19 +387,19 @@ uint32_t lwm2m_mdm_interface_read_cgsn(lwm2m_model_cgsn_rsp_t * const p_cgsn_rsp
 
     // Write the AT command and check the number of written bytes.
     static const char at_cmd[] = "AT+CGSN"; // Set command
-    ssize_t len = write(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
+    ssize_t len = send(m_at_socket_handle, at_cmd, LWM2M_AT_IFACE_CMD_SIZE(at_cmd), 0);
     LWM2M_AT_IFACE_VERIFY_TRUE(len == LWM2M_AT_IFACE_CMD_SIZE(at_cmd));
 
     // Read the response from AT socket and check the command response type.
     // No parsing needed here.
-    len = read(m_at_socket_handle, m_at_read_buf, LWM2M_AT_IFACE_MAX_AT_READ_LENGTH);
+    len = recv(m_at_socket_handle, m_at_read_buf, LWM2M_AT_IFACE_MAX_AT_READ_LENGTH, 0);
 
     // We should at least get an "\r\nOK\r\n\0" back.
     LWM2M_AT_IFACE_VERIFY_TRUE(len >= 7);
 
     // Read product serial number identification from success AT command result.
     size_t serial_strlen = len - 7;
-    char * serial = (char *)nrf_calloc(1, serial_strlen + 1);
+    char * serial = (char *)k_calloc(1, serial_strlen + 1);
     if (serial == NULL)
     {
         return NRF_ERROR_NO_MEM;
@@ -474,7 +474,7 @@ static uint32_t at_CEREG_decode(const char * const p_at_params, void * const out
 
     // TODO: read all parameters if optional parameters are available.
 
-    model.ci = (char *)nrf_malloc(4 + 1);
+    model.ci = (char *)k_malloc(4 + 1);
     if(model.ci == NULL)
     {
         return NRF_ERROR_NO_MEM;
@@ -518,7 +518,7 @@ static uint32_t at_COPS_decode(const char * const p_at_params, void * const out)
     // A string consisting of the operator name in the alphanumeric format or a string of MCC and MNC values.
     size_t len;
     ret = at_params_get_size(&m_param_list, 2, &len);
-    model.oper = (char *)nrf_calloc(1, len + 1);
+    model.oper = (char *)k_calloc(1, len + 1);
     if(model.oper == NULL)
     {
         return NRF_ERROR_NO_MEM;
@@ -547,7 +547,7 @@ static uint32_t at_CNUM_decode(const char * const p_at_params, void * const out)
     // TODO: Decode phone number according to the typex value (see 3GPP TS 24.008 subclause 10.5.4.7).
     size_t phone_num_len = 0;
     ret = at_params_get_size(&m_param_list, 1, &phone_num_len);
-    char * numberx = (char *)nrf_calloc(1, phone_num_len + 1);
+    char * numberx = (char *)k_calloc(1, phone_num_len + 1);
     if (numberx == NULL)
     {
         return NRF_ERROR_NO_MEM;
