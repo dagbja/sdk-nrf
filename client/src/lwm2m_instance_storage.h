@@ -31,4 +31,7 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id);
 int32_t lwm2m_instance_storage_server_store(uint16_t instance_id);
 int32_t lwm2m_instance_storage_server_delete(uint16_t instance_id);
 
+int32_t lwm2m_last_used_msisdn_get(char * p_msisdn, uint8_t max_len);
+int32_t lwm2m_last_used_msisdn_set(const char * p_msisdn, uint8_t len);
+
 #endif // LWM2M_INSTANCE_STORAGE_H__

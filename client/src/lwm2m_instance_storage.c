@@ -26,6 +26,7 @@ static struct nvs_fs fs = {
 
 #define LWM2M_INSTANCE_STORAGE_TYPE_MAX_COUNT 10
 #define LWM2M_INSTANCE_STORAGE_MISC_DATA       1
+#define LWM2M_INSTANCE_STORAGE_MSISDN          2
 #define LWM2M_INSTANCE_STORAGE_BASE_SECURITY  (1 * LWM2M_INSTANCE_STORAGE_TYPE_MAX_COUNT)
 #define LWM2M_INSTANCE_STORAGE_BASE_SERVER    (2 * LWM2M_INSTANCE_STORAGE_TYPE_MAX_COUNT)
 
@@ -115,7 +116,7 @@ int32_t lwm2m_instance_storage_security_load(uint16_t instance_id)
     }
 
     lwm2m_free(p_storage_security);
-    
+
     return err_code;
 }
 
@@ -160,6 +161,17 @@ int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
 int32_t lwm2m_instance_storage_server_delete(uint16_t instance_id)
 {
     return 0;
+}
+
+
+int32_t lwm2m_last_used_msisdn_get(char * p_msisdn, uint8_t max_len)
+{
+    return nvs_read(&fs, LWM2M_INSTANCE_STORAGE_MSISDN, p_msisdn, max_len);
+}
+
+int32_t lwm2m_last_used_msisdn_set(const char * p_msisdn, uint8_t len)
+{
+    return nvs_write(&fs, LWM2M_INSTANCE_STORAGE_MSISDN, p_msisdn, len);
 }
 
 #endif // CONFIG_FLASH

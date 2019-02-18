@@ -58,7 +58,6 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define MSISDN          "0123456789"
 
 #define APP_MOTIVE_NO_REBOOT            1 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
-#define APP_DETECT_MSISDN_CHANGE        0
 #define APP_USE_BOOTSTRAP_APN           0
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_CONTABO                 0
@@ -264,7 +263,6 @@ typedef struct {
 static device_settings_t m_device_settings;
 
 #define DEVICE_FLASH_ID 10
-#define MSISDN_FLASH_ID 11
 
 //static uint32_t app_store_bootstrap_server_acl(uint16_t instance_id);
 uint32_t app_store_bootstrap_server_values(uint16_t instance_id);
@@ -519,11 +517,10 @@ static void app_initialize_msisdn(void)
 {
     bool provision_bs_psk = false;
 
-#if APP_DETECT_MSISDN_CHANGE
+#if CONFIG_FLASH
     char last_used_msisdn[128];
     extern char msisdn[];
     char *p_msisdn;
-    int rc;
 
     if (m_device_settings.msisdn[0]) {
         p_msisdn = m_device_settings.msisdn;
@@ -531,17 +528,17 @@ static void app_initialize_msisdn(void)
         p_msisdn = msisdn;
     }
 
-    rc = nvs_read(&fs, MSISDN_FLASH_ID, &last_used_msisdn, sizeof(last_used_msisdn));
-    if (rc > 0) {
+    int32_t len = lwm2m_last_used_msisdn_get(last_used_msisdn, sizeof(last_used_msisdn));
+    if (len > 0) {
         if (strlen(p_msisdn) > 0 && strcmp(p_msisdn, last_used_msisdn) != 0) {
             // MSISDN has changed, factory reset and initiate bootstrap.
             APPL_LOG("Detected changed MSISDN: %s -> %s", last_used_msisdn, p_msisdn);
             app_factory_reset();
-            nvs_write(&fs, MSISDN_FLASH_ID, p_msisdn, strlen(p_msisdn) + 1);
+            lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
             provision_bs_psk = true;
         }
     } else {
-        nvs_write(&fs, MSISDN_FLASH_ID, p_msisdn, strlen(p_msisdn) + 1);
+        lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
         provision_bs_psk = true;
     }
 #else
