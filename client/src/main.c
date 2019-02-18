@@ -1152,7 +1152,7 @@ void app_read_flash_storage(void)
     m_server_settings[1].server[1] = 102;
     m_server_settings[1].access[2] = rwde_access;
     m_server_settings[1].server[2] = 1000;
-    
+
     if (lwm2m_security_bootstrapped_get(0))
     {
         m_server_settings[1].owner = 102;
@@ -2421,6 +2421,7 @@ static void app_lwm2m_observer_process(void)
 }
 
 #define APP_CUSTOM_APN "VZWADMIN"
+#if (APP_USE_BOOTSTRAP_APN == 1)
 void app_apn_connect(void)
 {
     int apn_fd;
@@ -2436,7 +2437,7 @@ void app_apn_connect(void)
 
     send_at_command("AT+CGDCONT?", true);
 }
-
+#endif
 
 /**@brief Function for application main entry.
  */
