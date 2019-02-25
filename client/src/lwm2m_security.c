@@ -14,6 +14,7 @@
 #include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
+#include <lwm2m_security.h>
 
 #include <net/coap_option.h>
 #include <net/coap_observe_api.h>
@@ -21,41 +22,45 @@
 
 #include <common.h>
 
-#define SECURITY_SERVER_URI_SIZE_MAX    64                                                    /**< Max size of server URIs. */
-#define SECURITY_SMS_NUMBER_SIZE_MAX    20                                                    /**< Max size of server SMS number. */
-#define SERVER_BINDING_SIZE_MAX         4                                                     /**< Max size of server binding. */
 #define VERIZON_RESOURCE                30000
 
 extern uint32_t app_store_bootstrap_security_values(uint16_t instance_id);
-
-typedef struct {
-    uint32_t is_bootstrapped;
-    uint32_t hold_off_timer;
-} vzw_bootstrap_server_settings_t;
 
 static vzw_bootstrap_server_settings_t vzw_boostrap_security_settings;
 
 static lwm2m_object_t    m_object_security;                                 /**< LWM2M security base object. */
 static lwm2m_security_t  m_instance_security[1+LWM2M_MAX_SERVERS];          /**< Security object instances. Index 0 is always bootstrap instance. */
 
-uint32_t lwm2m_security_bootstrapped_get(uint16_t instance_id)
+// Verizon specific resources.
+bool lwm2m_security_bootstrapped_get(uint16_t instance_id)
 {
     return vzw_boostrap_security_settings.is_bootstrapped;
 }
 
-void lwm2m_security_bootstrapped_set(uint16_t instance_id, uint32_t value)
+void lwm2m_security_bootstrapped_set(uint16_t instance_id, bool value)
 {
     vzw_boostrap_security_settings.is_bootstrapped = value;
 }
 
-uint32_t lwm2m_security_hold_off_timer_get(uint16_t instance_id)
+int32_t lwm2m_security_hold_off_timer_get(uint16_t instance_id)
 {
     return vzw_boostrap_security_settings.hold_off_timer;
 }
 
-void lwm2m_security_hold_off_timer_set(uint16_t instance_id, uint32_t value)
+void lwm2m_security_hold_off_timer_set(uint16_t instance_id, int32_t value)
 {
     vzw_boostrap_security_settings.hold_off_timer = value;
+}
+
+// LWM2M core resources.
+int32_t lwm2m_security_client_hold_off_time_get(uint16_t instance_id)
+{
+    return m_instance_security[instance_id].client_hold_off_time;
+}
+
+void lwm2m_security_client_hold_off_time_set(uint16_t instance_id, int32_t value)
+{
+    m_instance_security[instance_id].client_hold_off_time = value;
 }
 
 char * lwm2m_security_server_uri_get(uint16_t instance_id, uint8_t * p_len)
@@ -72,7 +77,7 @@ void lwm2m_security_server_uri_set(uint16_t instance_id, char * p_value, uint8_t
     }
 }
 
-uint32_t lwm2m_security_is_bootstrap_server_get(uint16_t instance_id)
+bool lwm2m_security_is_bootstrap_server_get(uint16_t instance_id)
 {
     return m_instance_security[instance_id].bootstrap_server;
 }
@@ -110,6 +115,29 @@ void lwm2m_security_psk_set(uint16_t instance_id, char * p_value, uint8_t len)
     }
 }
 
+char * lwm2m_security_sms_number_get(uint16_t instance_id, uint8_t * p_len)
+{
+    *p_len = m_instance_security[instance_id].sms_number.len;
+    return m_instance_security[instance_id].sms_number.p_val;
+}
+
+void lwm2m_security_sms_number_set(uint16_t instance_id, char * p_value, uint8_t len)
+{
+    if (lwm2m_bytebuffer_to_string(p_value, len, &m_instance_security[instance_id].sms_number) != 0)
+    {
+        LWM2M_ERR("Could not set SMS number");
+    }
+}
+
+uint16_t lwm2m_security_short_server_id_get(uint16_t instance_id)
+{
+    return m_instance_security[instance_id].short_server_id;
+}
+
+void lwm2m_security_short_server_id_set(uint16_t instance_id, uint16_t value)
+{
+    m_instance_security[instance_id].short_server_id = value;
+}
 
 static uint32_t tlv_security_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
 {

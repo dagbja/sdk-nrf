@@ -5,6 +5,7 @@
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
+#include <lwm2m_acl.h>
 
 #include <lwm2m_instance_storage.h>
 
@@ -34,12 +35,29 @@ static struct nvs_fs fs = {
 typedef struct __attribute__((__packed__))
 {
     uint8_t bootstrapped;
+/*
+    // One bit for each server.
+    uint8_t server_is_registered_mask;                // Server object extended data?
+    uint8_t dfu_state;
+    uint8_t world_clock;
+    // Identify mode and carrier switch.
+    char * msisdn;
+    uint8_t carrier_id;
+    uint8_t server_retry_timeouts[LWM2M_MAX_SERVERS]; // Server object extended data?
+*/
 } storage_misc_data_t;
 
 typedef struct __attribute__((__packed__))
 {
-    uint8_t  uri_len;
-    char     uri[];
+    uint8_t  boostrap_server;
+    uint16_t client_hold_off_time;
+    uint16_t short_server_id;
+
+    // Offsets into data post static sized values.
+    uint16_t offset_uri;
+    uint16_t offset_sms_number;
+    uint16_t offset_carrier_specific;
+    uint16_t offset_acl;
 } storage_security_t;
 
 typedef struct __attribute__((__packed__))
@@ -87,37 +105,56 @@ int32_t lwm2m_instance_storage_misc_data_delete(void)
 
 int32_t lwm2m_instance_storage_security_load(uint16_t instance_id)
 {
-    storage_security_t head;
     u16_t id = LWM2M_INSTANCE_STORAGE_BASE_SECURITY + instance_id;
 
-    uint32_t head_len = offsetof(storage_security_t, uri);
-    ssize_t read_count = nvs_read(&fs, id, &head, head_len);
+    // Peek file size.
+    char peak_buffer[1];
+    ssize_t read_count = nvs_read(&fs, id, peak_buffer, 1);
 
-    if (read_count != head_len)
+    // Read full entry.
+    uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
+    read_count = nvs_read(&fs, id, p_scratch_buffer, read_count);
+    (void)read_count;
+
+    storage_security_t * p_storage_security = (storage_security_t *)p_scratch_buffer;
+
+    // Set static sized values.
+    lwm2m_security_is_bootstrap_server_set(instance_id, p_storage_security->boostrap_server);
+    lwm2m_security_client_hold_off_time_set(instance_id, p_storage_security->client_hold_off_time);
+    lwm2m_security_short_server_id_set(instance_id, p_storage_security->short_server_id);
+
+    // Set URI.
+    uint8_t uri_len = p_storage_security->offset_sms_number - p_storage_security->offset_uri;
+    lwm2m_security_server_uri_set(instance_id, &p_scratch_buffer[p_storage_security->offset_uri], uri_len);
+
+    // Set SMS number.
+    uint8_t sms_number_len = p_storage_security->offset_carrier_specific - p_storage_security->offset_sms_number;
+    lwm2m_security_sms_number_set(instance_id, &p_scratch_buffer[p_storage_security->offset_sms_number], sms_number_len);
+
+    // Set carrier specific data.
+    vzw_bootstrap_server_settings_t * p_data_carrier_specific = NULL;
+    p_data_carrier_specific = (vzw_bootstrap_server_settings_t *)&p_scratch_buffer[p_storage_security->offset_carrier_specific];
+    lwm2m_security_bootstrapped_set(instance_id, p_data_carrier_specific->is_bootstrapped);
+    lwm2m_security_client_hold_off_time_set(instance_id, p_data_carrier_specific->hold_off_timer);
+
+    // Write the ACL of the instance.
+    lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_security_get_instance(instance_id);
+    lwm2m_instance_acl_t * p_acl = (lwm2m_instance_acl_t *)&p_scratch_buffer[p_storage_security->offset_acl];
+
+    uint32_t err_code = lwm2m_acl_permissions_init(p_instance, p_acl->owner);
+    for (uint8_t i = 0; i < (1 + LWM2M_MAX_SERVERS); i++)
     {
-        return -1;
+        err_code = lwm2m_acl_permissions_add(p_instance,
+                                  p_acl->access[i],
+                                  p_acl->server[i]);
     }
 
-    uint16_t full_len = head_len + head.uri_len;
-    storage_security_t * p_storage_security = (storage_security_t *)lwm2m_malloc(full_len);
-    read_count = nvs_read(&fs, id, p_storage_security, full_len);
+    // Override instance id. Experimental.
+    lwm2m_instance_acl_t * p_real_acl = &p_instance->acl;
+    p_real_acl->id = p_acl->id;
 
-    uint32_t err_code = 0;
-    if (read_count != full_len)
-    {
-        err_code = -1;
-    }
-
-    if (err_code == 0)
-    {
-        if (p_storage_security->uri_len)
-        {
-            lwm2m_security_server_uri_set(instance_id, p_storage_security->uri, p_storage_security->uri_len);
-        }
-    }
-
-    lwm2m_free(p_storage_security);
-
+    lwm2m_free(p_scratch_buffer);
+    
     return err_code;
 }
 
@@ -125,19 +162,51 @@ int32_t lwm2m_instance_storage_security_store(uint16_t instance_id)
 {
     u16_t id = LWM2M_INSTANCE_STORAGE_BASE_SECURITY + instance_id;
 
+    // Fetch URI.
     uint8_t uri_len;
     char * uri = lwm2m_security_server_uri_get(instance_id, &uri_len);
 
-    uint32_t head_len = offsetof(storage_security_t, uri);
-    uint8_t full_len = head_len + uri_len;
-    storage_security_t * p_storage_security = (storage_security_t *)lwm2m_malloc(full_len);
+    // Fetch SMS number.
+    uint8_t sms_number_len;
+    char * sms_number = lwm2m_security_sms_number_get(instance_id, &sms_number_len);
 
-    memcpy(&p_storage_security->uri[0], uri, uri_len);
-    p_storage_security->uri_len = uri_len;
+    // Fetch carrier specific data.
+    vzw_bootstrap_server_settings_t data_carrier_specific;
+    data_carrier_specific.is_bootstrapped = lwm2m_security_bootstrapped_get(instance_id);
+    data_carrier_specific.hold_off_timer = lwm2m_security_client_hold_off_time_get(instance_id);
 
-    nvs_write(&fs, id, p_storage_security, full_len);
+    // Locate the ACL of the instance.
+    lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_security_get_instance(instance_id);
+    lwm2m_instance_acl_t * p_acl = &p_instance->acl;
 
-    lwm2m_free(p_storage_security);
+    uint16_t total_entry_len = 0;
+    total_entry_len += sizeof(storage_security_t);
+    total_entry_len += uri_len;
+    total_entry_len += sms_number_len;
+    total_entry_len += sizeof(vzw_bootstrap_server_settings_t);
+    total_entry_len += sizeof(lwm2m_instance_acl_t); // Full ACL to be dumped. Due to default ACL index 0.
+
+    storage_security_t temp_storage;
+
+    // Fetch static sized values.
+    temp_storage.boostrap_server         = lwm2m_security_is_bootstrap_server_get(instance_id);
+    temp_storage.client_hold_off_time    = lwm2m_security_client_hold_off_time_get(instance_id);
+    temp_storage.short_server_id         = lwm2m_security_short_server_id_get(instance_id);
+    temp_storage.offset_uri              = sizeof(storage_security_t); // Where storage_security_t ends.
+    temp_storage.offset_sms_number       = temp_storage.offset_uri + uri_len;
+    temp_storage.offset_carrier_specific = temp_storage.offset_sms_number + sms_number_len;
+    temp_storage.offset_acl              = temp_storage.offset_carrier_specific + sizeof(vzw_bootstrap_server_settings_t);
+
+    uint8_t * p_scratch_buffer = lwm2m_malloc(total_entry_len);
+    memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_security_t));
+    memcpy(&p_scratch_buffer[temp_storage.offset_uri], uri, uri_len);
+    memcpy(&p_scratch_buffer[temp_storage.offset_sms_number], sms_number, sms_number_len);
+    memcpy(&p_scratch_buffer[temp_storage.offset_carrier_specific], &data_carrier_specific, sizeof(vzw_bootstrap_server_settings_t));
+    memcpy(&p_scratch_buffer[temp_storage.offset_acl], p_acl, sizeof(lwm2m_instance_acl_t));
+
+    nvs_write(&fs, id, p_scratch_buffer, total_entry_len);
+
+    lwm2m_free(p_scratch_buffer);
 
     return 0;
 }
