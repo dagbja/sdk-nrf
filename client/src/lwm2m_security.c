@@ -26,12 +26,12 @@
 
 extern uint32_t app_store_bootstrap_security_values(uint16_t instance_id);
 
-static vzw_bootstrap_server_settings_t vzw_boostrap_security_settings;
-
 static lwm2m_object_t    m_object_security;                                 /**< LWM2M security base object. */
 static lwm2m_security_t  m_instance_security[1+LWM2M_MAX_SERVERS];          /**< Security object instances. Index 0 is always bootstrap instance. */
 
 // Verizon specific resources.
+static vzw_bootstrap_security_settings_t vzw_boostrap_security_settings;
+
 bool lwm2m_security_bootstrapped_get(uint16_t instance_id)
 {
     return vzw_boostrap_security_settings.is_bootstrapped;

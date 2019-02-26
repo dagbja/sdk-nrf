@@ -13,6 +13,7 @@
 #include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
+#include <lwm2m_server.h>
 
 #include <net/coap_option.h>
 #include <net/coap_observe_api.h>
@@ -24,7 +25,6 @@ extern void app_read_flash_storage(void);
 extern void app_server_update(uint16_t instance_id);
 extern uint32_t app_store_bootstrap_server_values(uint16_t instance_id);
 
-#define SERVER_BINDING_SIZE_MAX         4                                                     /**< Max size of server binding. */
 #define VERIZON_RESOURCE 30000
 
 #define APP_MOTIVE_FIX_UPDATE_TRIGGER   1 // To adjust for MotiveBridge posting /1/0/8 instead of /1/1/8
@@ -32,12 +32,7 @@ extern uint32_t app_store_bootstrap_server_values(uint16_t instance_id);
 static lwm2m_server_t                      m_instance_server[1+LWM2M_MAX_SERVERS];            /**< Server object instance to be filled by the bootstrap server. */
 static lwm2m_object_t                      m_object_server;                                   /**< LWM2M server base object. */
 
-// Local values
-typedef struct {
-    uint32_t is_registered;
-    uint32_t client_hold_off_timer;      /**< The number of seconds to wait before attempting bootstrap or registration. */
-} vzw_server_settings_t;
-
+// Verizon specific resources.
 static vzw_server_settings_t vzw_server_settings[1+LWM2M_MAX_SERVERS];
 
 uint32_t lwm2m_server_registered_get(uint16_t instance_id)
@@ -50,16 +45,17 @@ void lwm2m_server_registered_set(uint16_t instance_id, uint32_t value)
     vzw_server_settings[instance_id].is_registered = value;
 }
 
-uint32_t lwm2m_server_hold_off_timer_get(uint16_t instance_id)
+uint32_t lwm2m_server_client_hold_off_timer_get(uint16_t instance_id)
 {
     return vzw_server_settings[instance_id].client_hold_off_timer;
 }
 
-void lwm2m_server_hold_off_timer_set(uint16_t instance_id, uint32_t value)
+void lwm2m_server_client_hold_off_timer_set(uint16_t instance_id, uint32_t value)
 {
     vzw_server_settings[instance_id].client_hold_off_timer = value;
 }
 
+// LWM2M core resources.
 time_t lwm2m_server_lifetime_get(uint16_t instance_id)
 {
     return m_instance_server[instance_id].lifetime;

@@ -10,9 +10,9 @@
 
 // TODO: Move to new carrier specific extended object/header.
 typedef struct {
-    bool    is_bootstrapped;
+    int32_t is_bootstrapped;
     int32_t hold_off_timer;
-} vzw_bootstrap_server_settings_t;
+} vzw_bootstrap_security_settings_t;
 
 // Verizon specific resources.
 char * lwm2m_security_server_uri_get(uint16_t instance_id, uint8_t * p_len);

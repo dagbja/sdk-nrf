@@ -919,7 +919,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     m_app_state = APP_STATE_SERVER_CONNECT;
 #else
     m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
-    s32_t hold_off_time = (lwm2m_server_hold_off_timer_get(m_server_instance) * 1000) - milliseconds_spent;
+    s32_t hold_off_time = (lwm2m_server_client_hold_off_timer_get(m_server_instance) * 1000) - milliseconds_spent;
     APPL_LOG("Client holdoff timer: sleeping %d milliseconds...", hold_off_time);
     k_delayed_work_submit(&state_update_work, hold_off_time);
 #endif
@@ -1030,7 +1030,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
         case 0: // Bootstrap server
         {
             lwm2m_server_short_server_id_set(0, 100);
-            lwm2m_server_hold_off_timer_set(0, 10);
+            lwm2m_server_client_hold_off_timer_set(0, 10);
 
             lwm2m_security_server_uri_set(0, BOOTSTRAP_URI, strlen(BOOTSTRAP_URI));
             lwm2m_security_is_bootstrap_server_set(0, true);
@@ -1060,7 +1060,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
         case 2: // Diagnostics server
         {
             lwm2m_server_short_server_id_set(2, 101);
-            lwm2m_server_hold_off_timer_set(2, 30);
+            lwm2m_server_client_hold_off_timer_set(2, 30);
 
             lwm2m_security_server_uri_set(2, "", 0);
             lwm2m_server_lifetime_set(2, 86400);
@@ -1165,7 +1165,7 @@ static void app_read_flash_servers(void)
     lwm2m_server_disable_timeout_set(1, 86400);
     lwm2m_server_notif_storing_set(1, 1);
     lwm2m_server_binding_set(1, "UQS", 3);
-    lwm2m_server_hold_off_timer_set(1, 30);
+    lwm2m_server_client_hold_off_timer_set(1, 30);
     m_server_settings[1].access[0] = rwde_access;
     m_server_settings[1].server[0] = 101;
     m_server_settings[1].access[1] = rwde_access;
@@ -1196,7 +1196,7 @@ static void app_read_flash_servers(void)
     lwm2m_server_disable_timeout_set(3, 86400);
     lwm2m_server_notif_storing_set(3, 1);
     lwm2m_server_binding_set(3, "UQ", 2);
-    lwm2m_server_hold_off_timer_set(3, 30);
+    lwm2m_server_client_hold_off_timer_set(3, 30);
     m_server_settings[3].access[0] = rwde_access;
     m_server_settings[3].server[0] = 101;
     m_server_settings[3].access[1] = rwde_access;
