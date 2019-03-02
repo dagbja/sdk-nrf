@@ -19,6 +19,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <lte_lc.h>
 #include <nrf_inbuilt_key.h>
 #include <nrf.h>
+#include <at_interface.h>
 
 #if CONFIG_DK_LIBRARY
 #include <dk_buttons_and_leds.h>
@@ -48,26 +49,11 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <common.h>
 #include <main.h>
 
-/* Hardcoded IMEI for now, will be fetched from modem using AT+CGSN=1 */
-#define IMEI            "004402990020434"
-
-/* Hardcoded MSISDN fro now, will be fetched from modem using AT+CNUM */
-#define MSISDN          "0123456789"
 
 #define APP_MOTIVE_NO_REBOOT            1 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
 #define APP_USE_BOOTSTRAP_APN           0
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_CONTABO                 0
-
-#define APP_RESOLVE_URN                 0
-
-#if APP_RESOLVE_URN
-extern char imei[];
-extern char msisdn[];
-#else
-char imei[128];
-char msisdn[128];
-#endif
 
 #define APP_LEDS_UPDATE_INTERVAL        500                                                   /**< Interval in milliseconds between each time status LEDs are updated. */
 
@@ -238,12 +224,6 @@ static void app_disconnect(void);
 static void app_wait_state_update(struct k_work *work);
 static const char * app_uri_get(char * server_uri, uint8_t uri_len, uint16_t * p_port, bool * p_secure);
 
-void read_emei_and_msisdn(void)
-{
-    // Temporary hack for IMEI and MSISDN
-    strcpy(imei, "352656100005548");
-    strcpy(msisdn, "0011600034");
-}
 
 /** Functions available from shell access */
 void app_update_server(uint16_t update_server)
@@ -2002,19 +1982,8 @@ static void app_lwm2m_observer_process(void)
  */
 int main(void)
 {
-#if (APP_RESOLVE_URN != 1)
-    memcpy(imei, IMEI, sizeof(IMEI));
-    memcpy(msisdn, MSISDN, sizeof(MSISDN));
-#endif
     printk("\n\nInitializing LTE link, please wait...\n");
     m_coap_transport = 0xFFFFFFFF;
-
-#if APP_RESOLVE_URN
-    // Turn on SIM to resolve MSISDN.
-    lte_lc_init_and_connect();
-    read_emei_and_msisdn();
-    lte_lc_offline();
-#endif
 
     // Initialize Non-volatile Storage.
     lwm2m_instance_storage_init();
@@ -2035,7 +2004,7 @@ int main(void)
 
     // Turn on SIM to resolve IMEI and MSISDN.
     lte_lc_init_and_connect();
-    read_emei_and_msisdn();
+    read_imei_and_msisdn();
     lte_lc_offline();
 
     app_initialize_msisdn();
