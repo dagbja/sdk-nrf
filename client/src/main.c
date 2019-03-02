@@ -512,10 +512,15 @@ static char * app_client_imei_msisdn(void)
 }
 
 
-/**@brief Initialize MSISDN to use. Start bootstrap if different than last time. */
-static void app_initialize_msisdn(void)
+/**@brief Initialize IMEI and MSISDN to use.
+ *
+ * Factory reset to start bootstrap if MSISDN is different than last start.
+ */
+static void app_initialize_imei_msisdn(void)
 {
     bool provision_bs_psk = false;
+
+    read_imei_and_msisdn();
 
 #if CONFIG_FLASH
     char last_used_msisdn[128];
@@ -551,7 +556,9 @@ static void app_initialize_msisdn(void)
 
     if (provision_bs_psk) {
         char * p_identity = app_client_imei_msisdn();
+        lte_lc_offline();
         app_provision_psk(APP_BOOTSTRAP_SEC_TAG, p_identity, strlen(p_identity), m_app_bootstrap_psk, sizeof(m_app_bootstrap_psk));
+        lte_lc_normal();
     }
 }
 
@@ -2002,12 +2009,11 @@ int main(void)
         modem_trace_enable();
     }
 
-    // Turn on SIM to resolve IMEI and MSISDN.
+    // Establish LTE link.
     lte_lc_init_and_connect();
-    read_imei_and_msisdn();
-    lte_lc_offline();
 
-    app_initialize_msisdn();
+    // Initialize IMEI and MSISDN.
+    app_initialize_imei_msisdn();
 
     // Initialize CoAP.
     app_coap_init();
@@ -2020,9 +2026,6 @@ int main(void)
 
     // Initialize servers from flash.
     app_read_flash_servers();
-
-    // Establish LTE link.
-    lte_lc_init_and_connect();
 
     if (strcmp(modem_logging, "1") == 0) {
         // 1,0 = disable
