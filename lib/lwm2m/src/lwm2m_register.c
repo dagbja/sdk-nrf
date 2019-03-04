@@ -252,12 +252,12 @@ uint32_t lwm2m_register(struct sockaddr         * p_remote,
         buffer[0] = 'e';
         buffer[1] = 'p';
         buffer[2] = '=';
-        memcpy(buffer + 3, &p_id->value, p_id->type);
+        memcpy(buffer + 3, &p_id->value, p_id->len);
 
         err_code = coap_message_opt_str_add(p_msg,
                                             COAP_OPT_URI_QUERY,
                                             (uint8_t *)buffer,
-                                            p_id->type + 3);
+                                            p_id->len + 3);
     }
 
     if (err_code == 0)
