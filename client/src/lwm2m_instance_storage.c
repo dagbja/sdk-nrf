@@ -199,6 +199,10 @@ int32_t lwm2m_instance_storage_security_load(uint16_t instance_id)
     char peak_buffer[1];
     ssize_t read_count = nvs_read(&fs, id, peak_buffer, 1);
 
+    if (read_count <= 0) {
+        return -read_count;
+    }
+
     // Read full entry.
     uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
     read_count = nvs_read(&fs, id, p_scratch_buffer, read_count);
@@ -334,6 +338,10 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
     char peak_buffer[1];
     ssize_t read_count = nvs_read(&fs, id, peak_buffer, 1);
 
+    if (read_count <= 0) {
+        return -read_count;
+    }
+
     // Read full entry.
     uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
     read_count = nvs_read(&fs, id, p_scratch_buffer, read_count);
@@ -453,6 +461,10 @@ int32_t lwm2m_instance_storage_device_load(uint16_t instance_id)
     char peak_buffer[1];
     ssize_t read_count = nvs_read(&fs, id, peak_buffer, 1);
 
+    if (read_count <= 0) {
+        return -read_count;
+    }
+
     // Read full entry.
     uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
     read_count = nvs_read(&fs, id, p_scratch_buffer, read_count);
@@ -531,6 +543,10 @@ int32_t lwm2m_instance_storage_conn_mon_load(uint16_t instance_id)
     char peak_buffer[1];
     ssize_t read_count = nvs_read(&fs, id, peak_buffer, 1);
 
+    if (read_count <= 0) {
+        return -read_count;
+    }
+
     // Read full entry.
     uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
     read_count = nvs_read(&fs, id, p_scratch_buffer, read_count);
@@ -608,6 +624,10 @@ int32_t lwm2m_instance_storage_firmware_load(uint16_t instance_id)
     // Peek file size.
     char peak_buffer[1];
     ssize_t read_count = nvs_read(&fs, id, peak_buffer, 1);
+
+    if (read_count <= 0) {
+        return -read_count;
+    }
 
     // Read full entry.
     uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
