@@ -159,12 +159,12 @@ int32_t lwm2m_instance_storage_all_objects_delete(void)
     // Delete all objects.
     for (int i = 0; i < (1 + LWM2M_MAX_SERVERS); i++)
     {
-        lwm2m_instance_storage_security_store(i);
-        lwm2m_instance_storage_server_store(i);
+        lwm2m_instance_storage_security_delete(i);
+        lwm2m_instance_storage_server_delete(i);
     }
-    lwm2m_instance_storage_device_store(0);
-    lwm2m_instance_storage_conn_mon_store(0);
-    lwm2m_instance_storage_firmware_store(0);
+    lwm2m_instance_storage_device_delete(0);
+    lwm2m_instance_storage_conn_mon_delete(0);
+    lwm2m_instance_storage_firmware_delete(0);
 
     return 0;
 }
