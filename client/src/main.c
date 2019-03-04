@@ -538,7 +538,7 @@ static void app_initialize_imei_msisdn(void)
     if (len > 0) {
         if (strlen(p_msisdn) > 0 && strcmp(p_msisdn, last_used_msisdn) != 0) {
             // MSISDN has changed, factory reset and initiate bootstrap.
-            APPL_LOG("Detected changed MSISDN: %s -> %s", last_used_msisdn, p_msisdn);
+            APPL_LOG("Detected changed MSISDN: %s -> %s", log_strdup(last_used_msisdn), log_strdup(p_msisdn));
             app_factory_reset();
             lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
             provision_bs_psk = true;
@@ -610,7 +610,7 @@ static const char * app_uri_get(char * server_uri, uint8_t uri_len, uint16_t * p
         *p_port = 5683;
         *p_secure = false;
     } else {
-        APPL_LOG("Invalid server URI: %s", server_uri);
+        APPL_LOG("Invalid server URI: %s", log_strdup(server_uri));
         return NULL;
     }
 
@@ -651,7 +651,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     int ret_val = getaddrinfo(hostname, NULL, &hints, &result);
 
     if (ret_val != 0) {
-        APPL_LOG("Failed to lookup \"%s\": %d (%d)", hostname, ret_val, errno);
+        APPL_LOG("Failed to lookup \"%s\": %d (%d)", log_strdup(hostname), ret_val, errno);
         return errno;
     }
 
@@ -1839,7 +1839,7 @@ static void app_provision_secret_keys(void)
             (void)hostname;
 
             if (secure) {
-                APPL_LOG("Provisioning key for %s, short-id: %u", server_uri_val, lwm2m_server_short_server_id_get(i));
+                APPL_LOG("Provisioning key for %s, short-id: %u", log_strdup(server_uri_val), lwm2m_server_short_server_id_get(i));
                 app_provision_psk(APP_SEC_TAG_OFFSET + i, p_identity, identity_len, p_psk, psk_len);
             }
         }
