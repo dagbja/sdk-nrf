@@ -910,6 +910,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     APPL_LOG("Store bootstrap settings");
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
         lwm2m_instance_storage_security_store(i);
+        lwm2m_instance_storage_server_store(i);
     }
 #endif
 
@@ -1104,6 +1105,7 @@ void app_factory_reset(void)
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
         lwm2m_instance_storage_security_delete(i);
+        lwm2m_instance_storage_server_delete(i);
     }
 #endif
 }
@@ -1116,6 +1118,7 @@ static void app_read_flash_servers(void)
     {
         app_factory_bootstrap_server_object(i);
         lwm2m_instance_storage_security_load(i);
+        lwm2m_instance_storage_server_load(i);
     }
 
     lwm2m_instance_storage_misc_data_t misc_data;
