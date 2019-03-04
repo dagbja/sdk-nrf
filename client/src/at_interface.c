@@ -55,11 +55,16 @@ void read_imei_and_msisdn(void)
         length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
         if (length > 0) {
             char * p_start = strstr(read_buffer, "\"");
-            char * p_end = strstr(p_start + 2, "\"");
-
-            if (p_start && p_end && (p_end - p_start - 1 >= 10)) {
-                // FIXME: This only uses the last 10 digits
-                memcpy(msisdn, p_end - 10, 10);
+            if (p_start) {
+                char * p_end = strstr(p_start + 1, "\"");
+                if (p_end && (p_end - p_start - 1 >= 10)) {
+                    // FIXME: This only uses the last 10 digits
+                    memcpy(msisdn, p_end - 10, 10);
+                }
+            }
+            if (!msisdn[0]) {
+                // SIM has no number
+                memcpy(msisdn, "0000000000", 10);
             }
         } else {
             printk("recv(%s) failed\n", at_cnum);
