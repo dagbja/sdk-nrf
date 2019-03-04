@@ -225,7 +225,7 @@ int32_t lwm2m_instance_storage_security_load(uint16_t instance_id)
         vzw_bootstrap_security_settings_t * p_data_carrier_specific = NULL;
         p_data_carrier_specific = (vzw_bootstrap_security_settings_t *)&p_scratch_buffer[p_storage_security->offset_carrier_specific];
         lwm2m_security_bootstrapped_set(instance_id, p_data_carrier_specific->is_bootstrapped);
-        lwm2m_security_client_hold_off_time_set(instance_id, p_data_carrier_specific->hold_off_timer);
+        lwm2m_security_hold_off_timer_set(instance_id, p_data_carrier_specific->hold_off_timer);
     }
 
     // Write the ACL of the instance.
@@ -308,7 +308,7 @@ int32_t lwm2m_instance_storage_security_store(uint16_t instance_id)
         // Fetch carrier specific data.
         vzw_bootstrap_security_settings_t data_carrier_specific;
         data_carrier_specific.is_bootstrapped = lwm2m_security_bootstrapped_get(instance_id);
-        data_carrier_specific.hold_off_timer = lwm2m_security_client_hold_off_time_get(instance_id);
+        data_carrier_specific.hold_off_timer = lwm2m_security_hold_off_timer_get(instance_id);
         memcpy(&p_scratch_buffer[temp_storage.offset_carrier_specific], &data_carrier_specific, sizeof(vzw_bootstrap_security_settings_t));
     }
 
