@@ -1117,12 +1117,23 @@ static void app_read_flash_servers(void)
         app_factory_bootstrap_server_object(i);
         lwm2m_instance_storage_security_load(i);
     }
+
+    lwm2m_instance_storage_misc_data_t misc_data;
+    int32_t result = lwm2m_instance_storage_misc_data_load(&misc_data);
+    if (result == 0 && misc_data.bootstrapped)
+    {
+        lwm2m_security_bootstrapped_set(0, true);
+    }
+    else
+    {
+        // storage reports that bootstrap has not been done, continue with bootstrap.
+        lwm2m_security_bootstrapped_set(0, false);
+    }
 #else
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
         app_factory_bootstrap_server_object(i);
     }
-#endif
 
 #if CONFIG_DK_LIBRARY
     // Workaround for not storing is.bootstrapped:
@@ -1137,21 +1148,10 @@ static void app_read_flash_servers(void)
     }
     else
     {
-        lwm2m_instance_storage_misc_data_t misc_data;
-        int32_t result = lwm2m_instance_storage_misc_data_load(&misc_data);
-        if (result != 0)
-        {
-            // storage reports that bootstrap has not been done, continue with bootstrap.
-            lwm2m_security_bootstrapped_set(0, false);
-        }
-        else
-        {
-            lwm2m_security_bootstrapped_set(0, true);
-        }
+        lwm2m_security_bootstrapped_set(0, true);
     }
 #endif
 
-#if CONFIG_FLASH
     // Bootstrap values (will be fetched from NVS after bootstrap)
     uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
                             LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE);
