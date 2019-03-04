@@ -14,9 +14,9 @@
 #if CONFIG_FLASH
 
 /* NVS-related defines */
-#define NVS_SECTOR_SIZE    FLASH_ERASE_BLOCK_SIZE    /* Multiple of FLASH_PAGE_SIZE */
-#define NVS_SECTOR_COUNT   2                         /* At least 2 sectors */
-#define NVS_STORAGE_OFFSET FLASH_AREA_STORAGE_OFFSET /* Start address of the filesystem in flash */
+#define NVS_SECTOR_SIZE    DT_FLASH_ERASE_BLOCK_SIZE    /* Multiple of FLASH_PAGE_SIZE */
+#define NVS_SECTOR_COUNT   2                            /* At least 2 sectors */
+#define NVS_STORAGE_OFFSET DT_FLASH_AREA_STORAGE_OFFSET /* Start address of the filesystem in flash */
 
 static struct nvs_fs fs = {
     .sector_size  = NVS_SECTOR_SIZE,
