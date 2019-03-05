@@ -14,6 +14,7 @@
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
 #include <lwm2m_server.h>
+#include <lwm2m_instance_storage.h>
 
 #include <net/coap_option.h>
 #include <net/coap_observe_api.h>
@@ -21,9 +22,7 @@
 
 #include <common.h>
 
-extern void app_read_flash_storage(void);
 extern void app_server_update(uint16_t instance_id);
-extern uint32_t app_store_bootstrap_server_values(uint16_t instance_id);
 
 #define VERIZON_RESOURCE 30000
 
@@ -331,7 +330,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
 
         if (err_code == 0)
         {
-            if (app_store_bootstrap_server_values(instance_id) == 0)
+            if (lwm2m_instance_storage_server_store(instance_id) == 0)
             {
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
             }
@@ -409,7 +408,7 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
         m_instance_server[instance_id].proto.object_id   = p_object->object_id;
         m_instance_server[instance_id].proto.callback    = server_instance_callback;
 
-        if (app_store_bootstrap_server_values(instance_id) == 0)
+        if (lwm2m_instance_storage_server_store(instance_id) == 0)
         {
             // Cast the instance to its prototype and add it.
             (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_server[instance_id]);

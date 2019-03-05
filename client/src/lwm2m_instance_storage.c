@@ -15,8 +15,6 @@
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_firmware.h>
 
-#define CONFIG_FLASH 1
-
 #if CONFIG_FLASH
 
 /* NVS-related defines */
@@ -68,7 +66,6 @@ typedef struct __attribute__((__packed__))
     uint16_t offset_uri;
     uint16_t offset_sms_number;
     uint16_t offset_carrier_specific;
-    uint16_t offset_acl;
 } storage_security_t;
 
 typedef struct __attribute__((__packed__))
@@ -224,7 +221,7 @@ int32_t lwm2m_instance_storage_security_load(uint16_t instance_id)
     lwm2m_security_sms_number_set(instance_id, &p_scratch_buffer[p_storage_security->offset_sms_number], sms_number_len);
 
     // Set carrier specific data if bootstrap server.
-    if ((instance_id == 0) && (p_storage_security->offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET))
+    if (p_storage_security->offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET)
     {
         vzw_bootstrap_security_settings_t * p_data_carrier_specific = NULL;
         p_data_carrier_specific = (vzw_bootstrap_security_settings_t *)&p_scratch_buffer[p_storage_security->offset_carrier_specific];
@@ -232,25 +229,9 @@ int32_t lwm2m_instance_storage_security_load(uint16_t instance_id)
         lwm2m_security_hold_off_timer_set(instance_id, p_data_carrier_specific->hold_off_timer);
     }
 
-    // Write the ACL of the instance.
-    lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_security_get_instance(instance_id);
-    lwm2m_instance_acl_t * p_acl = (lwm2m_instance_acl_t *)&p_scratch_buffer[p_storage_security->offset_acl];
-
-    uint32_t err_code = lwm2m_acl_permissions_init(p_instance, p_acl->owner);
-    for (uint8_t i = 0; i < (1 + LWM2M_MAX_SERVERS); i++)
-    {
-        err_code = lwm2m_acl_permissions_add(p_instance,
-                                  p_acl->access[i],
-                                  p_acl->server[i]);
-    }
-
-    // Override instance id. Experimental.
-    lwm2m_instance_acl_t * p_real_acl = &p_instance->acl;
-    p_real_acl->id = p_acl->id;
-
     lwm2m_free(p_scratch_buffer);
-    
-    return err_code;
+
+    return 0;
 }
 
 int32_t lwm2m_instance_storage_security_store(uint16_t instance_id)
@@ -265,21 +246,11 @@ int32_t lwm2m_instance_storage_security_store(uint16_t instance_id)
     uint8_t sms_number_len;
     char * sms_number = lwm2m_security_sms_number_get(instance_id, &sms_number_len);
 
-    // Locate the ACL of the instance.
-    lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_security_get_instance(instance_id);
-    lwm2m_instance_acl_t * p_acl = &p_instance->acl;
-
     uint16_t total_entry_len = 0;
     total_entry_len += sizeof(storage_security_t);
     total_entry_len += uri_len;
     total_entry_len += sms_number_len;
     total_entry_len += sizeof(lwm2m_instance_acl_t); // Full ACL to be dumped. Due to default ACL index 0.
-
-    // if bootstrap server.
-    if (instance_id == 0)
-    {
-        total_entry_len += sizeof(vzw_bootstrap_security_settings_t);
-    }
 
     storage_security_t temp_storage;
 
@@ -293,21 +264,19 @@ int32_t lwm2m_instance_storage_security_store(uint16_t instance_id)
     // If bootstrap server.
     if (instance_id == 0)
     {
+        total_entry_len += sizeof(vzw_bootstrap_security_settings_t);
         temp_storage.offset_carrier_specific = temp_storage.offset_sms_number + sms_number_len;
-        temp_storage.offset_acl              = temp_storage.offset_carrier_specific + sizeof(vzw_bootstrap_security_settings_t);
     } else {
         temp_storage.offset_carrier_specific = LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET;
-        temp_storage.offset_acl              = temp_storage.offset_sms_number + sms_number_len;
     }
 
     uint8_t * p_scratch_buffer = lwm2m_malloc(total_entry_len);
     memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_security_t));
     memcpy(&p_scratch_buffer[temp_storage.offset_uri], uri, uri_len);
     memcpy(&p_scratch_buffer[temp_storage.offset_sms_number], sms_number, sms_number_len);
-    memcpy(&p_scratch_buffer[temp_storage.offset_acl], p_acl, sizeof(lwm2m_instance_acl_t));
 
     // If bootstrap server.
-    if ((instance_id == 0) && (temp_storage.offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET))
+    if (temp_storage.offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET)
     {
         // Fetch carrier specific data.
         vzw_bootstrap_security_settings_t data_carrier_specific;
@@ -358,7 +327,7 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
     lwm2m_server_notif_storing_set(instance_id, p_storage_server->notif_storing);
 
     // Set carrier specific data if bootstrap server.
-    if ((instance_id != 0) && (p_storage_server->offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET))
+    if (p_storage_server->offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET)
     {
         vzw_server_settings_t * p_data_carrier_specific = NULL;
         p_data_carrier_specific = (vzw_server_settings_t *)&p_scratch_buffer[p_storage_server->offset_carrier_specific];
@@ -373,9 +342,7 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
     uint32_t err_code = lwm2m_acl_permissions_init(p_instance, p_acl->owner);
     for (uint8_t i = 0; i < (1 + LWM2M_MAX_SERVERS); i++)
     {
-        err_code = lwm2m_acl_permissions_add(p_instance,
-                                  p_acl->access[i],
-                                  p_acl->server[i]);
+        err_code = lwm2m_acl_permissions_add(p_instance, p_acl->access[i], p_acl->server[i]);
     }
 
     // Override instance id. Experimental.
@@ -399,12 +366,6 @@ int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
     total_entry_len += sizeof(storage_server_t);
     total_entry_len += sizeof(lwm2m_instance_acl_t); // Full ACL to be dumped. Due to default ACL index 0.
 
-    // if bootstrap server.
-    if (instance_id == 0)
-    {
-        total_entry_len += sizeof(vzw_bootstrap_security_settings_t);
-    }
-
     storage_server_t temp_storage;
 
     // Fetch static sized values.
@@ -421,16 +382,17 @@ int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
         temp_storage.offset_carrier_specific = LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET;
         temp_storage.offset_acl              = sizeof(storage_server_t);
     } else {
+        total_entry_len += sizeof(vzw_server_settings_t);
         temp_storage.offset_carrier_specific = sizeof(storage_server_t);
         temp_storage.offset_acl              = temp_storage.offset_carrier_specific + sizeof(vzw_server_settings_t);
     }
 
     uint8_t * p_scratch_buffer = lwm2m_malloc(total_entry_len);
-    memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_security_t));
+    memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_server_t));
     memcpy(&p_scratch_buffer[temp_storage.offset_acl], p_acl, sizeof(lwm2m_instance_acl_t));
 
     // If not bootstrap server.
-    if ((instance_id != 0) && (temp_storage.offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET))
+    if (temp_storage.offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET)
     {
         // Fetch carrier specific data.
         vzw_server_settings_t data_carrier_specific;
@@ -448,7 +410,7 @@ int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
 
 int32_t lwm2m_instance_storage_server_delete(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_DEVICE + instance_id;
+    u16_t id = LWM2M_INSTANCE_STORAGE_BASE_SERVER + instance_id;
     nvs_delete(&fs, id);
     return 0;
 }
@@ -485,9 +447,7 @@ int32_t lwm2m_instance_storage_device_load(uint16_t instance_id)
     uint32_t err_code = lwm2m_acl_permissions_init(p_instance, p_acl->owner);
     for (uint8_t i = 0; i < (1 + LWM2M_MAX_SERVERS); i++)
     {
-        err_code = lwm2m_acl_permissions_add(p_instance,
-                                  p_acl->access[i],
-                                  p_acl->server[i]);
+        err_code = lwm2m_acl_permissions_add(p_instance, p_acl->access[i], p_acl->server[i]);
     }
 
     // Override instance id. Experimental.
@@ -567,9 +527,7 @@ int32_t lwm2m_instance_storage_conn_mon_load(uint16_t instance_id)
     uint32_t err_code = lwm2m_acl_permissions_init(p_instance, p_acl->owner);
     for (uint8_t i = 0; i < (1 + LWM2M_MAX_SERVERS); i++)
     {
-        err_code = lwm2m_acl_permissions_add(p_instance,
-                                  p_acl->access[i],
-                                  p_acl->server[i]);
+        err_code = lwm2m_acl_permissions_add(p_instance, p_acl->access[i], p_acl->server[i]);
     }
 
     // Override instance id. Experimental.
@@ -649,9 +607,7 @@ int32_t lwm2m_instance_storage_firmware_load(uint16_t instance_id)
     uint32_t err_code = lwm2m_acl_permissions_init(p_instance, p_acl->owner);
     for (uint8_t i = 0; i < (1 + LWM2M_MAX_SERVERS); i++)
     {
-        err_code = lwm2m_acl_permissions_add(p_instance,
-                                  p_acl->access[i],
-                                  p_acl->server[i]);
+        err_code = lwm2m_acl_permissions_add(p_instance, p_acl->access[i], p_acl->server[i]);
     }
 
     // Override instance id. Experimental.
@@ -699,7 +655,6 @@ int32_t lwm2m_instance_storage_firmware_delete(uint16_t instance_id)
     nvs_delete(&fs, id);
     return 0;
 }
-
 
 int32_t lwm2m_last_used_msisdn_get(char * p_msisdn, uint8_t max_len)
 {

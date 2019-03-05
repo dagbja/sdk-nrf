@@ -15,6 +15,7 @@
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
 #include <lwm2m_security.h>
+#include <lwm2m_instance_storage.h>
 
 #include <net/coap_option.h>
 #include <net/coap_observe_api.h>
@@ -23,8 +24,6 @@
 #include <common.h>
 
 #define VERIZON_RESOURCE                30000
-
-extern uint32_t app_store_bootstrap_security_values(uint16_t instance_id);
 
 static lwm2m_object_t    m_object_security;                                 /**< LWM2M security base object. */
 static lwm2m_security_t  m_instance_security[1+LWM2M_MAX_SERVERS];          /**< Security object instances. Index 0 is always bootstrap instance. */
@@ -358,7 +357,7 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
         m_instance_security[instance_id].proto.object_id   = p_object->object_id;
         m_instance_security[instance_id].proto.callback    = security_instance_callback;
 
-        if (app_store_bootstrap_security_values(instance_id) == 0)
+        if (lwm2m_instance_storage_security_store(instance_id) == 0)
         {
             // No ACL object for security objects.
             ((lwm2m_instance_t *)&m_instance_security[instance_id])->acl.id = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;

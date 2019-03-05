@@ -51,7 +51,6 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 
 #define APP_MOTIVE_NO_REBOOT            1 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
-#define APP_USE_BOOTSTRAP_APN           0
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_CONTABO                 0
 
@@ -204,17 +203,11 @@ static volatile uint32_t tick_count = 0;
 /**@brief Bootstrap values to store in app persistent storage. */
 typedef struct
 {
-    // ACL values
-    uint16_t access[1+LWM2M_MAX_SERVERS];                              /**< ACL array. */
-    uint16_t server[1+LWM2M_MAX_SERVERS];                              /**< Short server id to ACL array index. */
-    uint16_t owner;                                                    /**< Owner of this ACL entry. Short server id */
     uint32_t retry_count;         /**< The number of unsuccessful registration retries to reach the server. */
 } server_settings_t;
 
 static server_settings_t     m_server_settings[1+LWM2M_MAX_SERVERS];
 
-//static uint32_t app_store_bootstrap_server_acl(uint16_t instance_id);
-uint32_t app_store_bootstrap_server_values(uint16_t instance_id);
 void app_server_update(uint16_t instance_id);
 void app_factory_reset(void);
 static void app_server_deregister(uint16_t instance_id);
@@ -928,95 +921,29 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     return 0;
 }
 
-uint32_t app_store_bootstrap_security_values(uint16_t instance_id)
+
+static void app_init_server_acl(uint16_t instance_id, lwm2m_instance_acl_t *acl)
 {
-/*
-    if ((m_instance_security[instance_id].server_uri.len >= SECURITY_SERVER_URI_SIZE_MAX) ||
-        (m_instance_security[instance_id].sms_number.len >= SECURITY_SMS_NUMBER_SIZE_MAX))
+    lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
+
+    // Initialize ACL on the instance.
+    (void)lwm2m_acl_permissions_init(p_instance, acl->owner);
+
+    // Set default access to LWM2M_PERMISSION_READ.
+    (void)lwm2m_acl_permissions_add(p_instance,
+                                    LWM2M_PERMISSION_READ,
+                                    LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
+
+    for (uint32_t j = 0; j < ARRAY_SIZE(acl->server); j++)
     {
-        // URI or SMS number was to long to be copied.
-        return EINVAL;
-    }
-
-    m_server_settings[instance_id].is_bootstrap_server  = m_instance_security[instance_id].bootstrap_server;
-    m_server_settings[instance_id].sms_security_mode    = m_instance_security[instance_id].sms_security_mode;
-    m_server_settings[instance_id].client_hold_off_time = m_instance_security[instance_id].client_hold_off_time;
-
-    // Copy the URI.
-    memset(m_server_settings[instance_id].server_uri, 0, SECURITY_SERVER_URI_SIZE_MAX);
-    char * uri = lwm2m_security_server_uri_get(instance_id);
-    memcpy(m_server_settings[instance_id].server_uri, uri, strlen(uri));
-    m_instance_security[instance_id].server_uri.p_val = m_server_settings[instance_id].server_uri;
-
-    // Copy SMS number.
-    memset(m_server_settings[instance_id].sms_number, 0, SECURITY_SMS_NUMBER_SIZE_MAX);
-    memcpy(m_server_settings[instance_id].sms_number,
-           m_instance_security[instance_id].sms_number.p_val,
-           m_instance_security[instance_id].sms_number.len);
-    m_instance_security[instance_id].sms_number.p_val = m_server_settings[instance_id].sms_number;
-
-#if CONFIG_FLASH
-    APPL_LOG("Store bootstrap security values");
-    nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[instance_id]));
-#endif
-*/
-    return 0;
-}
-/*
-static uint32_t app_store_bootstrap_server_acl(uint16_t instance_id)
-{
-    lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
-    for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++)
-    {
-        m_server_settings[instance_id].access[i] = p_instance->acl.access[i];
-        m_server_settings[instance_id].server[i] = p_instance->acl.server[i];
-    }
-    m_server_settings[instance_id].owner = p_instance->acl.owner;
-
-    return 0;
-}
-*/
-
-uint32_t app_store_bootstrap_server_values(uint16_t instance_id)
-{
-    if (lwm2m_server_get_instance(instance_id)->binding.len >= SERVER_BINDING_SIZE_MAX)
-    {
-        // Binding was to long to be copied.
-        return EINVAL;
-    }
-
-    // TODO: Callback moved to call app_server_update upon value change inside lwm2m_server.
-    /*
-    if (m_server_settings[instance_id].lifetime != lwm2m_server_get_instance(instance_id)->lifetime) {
-        if (instance_id == 1 || instance_id == 3) {
-            // Lifetime changed, send update server
-            app_update_server(instance_id);
+        if (acl->server[j] != 0)
+        {
+            // Set server access.
+            (void)lwm2m_acl_permissions_add(p_instance, acl->access[j], acl->server[j]);
         }
     }
-    */
-/*
-    m_server_settings[instance_id].lifetime = lwm2m_server_get_instance(instance_id)->lifetime;
-    m_server_settings[instance_id].default_minimum_period = lwm2m_server_get_instance(instance_id)->default_minimum_period;
-    m_server_settings[instance_id].default_maximum_period = lwm2m_server_get_instance(instance_id)->default_maximum_period;
-    m_server_settings[instance_id].disable_timeout = lwm2m_server_get_instance(instance_id)->disable_timeout;
-    m_server_settings[instance_id].notification_storing_on_disabled = lwm2m_server_get_instance(instance_id)->notification_storing_on_disabled;
-
-    // Copy Binding.
-    memset(m_server_settings[instance_id].binding, 0, SERVER_BINDING_SIZE_MAX);
-    memcpy(m_server_settings[instance_id].binding,
-           lwm2m_server_get_instance(instance_id)->binding.p_val,
-           lwm2m_server_get_instance(instance_id)->binding.len);
-
-    // Copy ACL.
-    app_store_bootstrap_server_acl(instance_id);
-
-#if CONFIG_FLASH
-    APPL_LOG("Store bootstrap server values");
-    nvs_write(&fs, instance_id, &m_server_settings[instance_id], sizeof(m_server_settings[instance_id]));
-#endif
-*/
-    return 0;
 }
+
 
 /**@brief Create factory bootstrapped server objects.
  *        Depends on carrier, this is Verizon / MotiveBridge.
@@ -1025,6 +952,12 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
 {
     uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
                             LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE);
+
+    lwm2m_instance_acl_t acl = {
+        .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID
+    };
+
+    memset(&m_server_settings[instance_id], 0, sizeof(m_server_settings[instance_id]));
 
     switch (instance_id)
     {
@@ -1037,24 +970,21 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             lwm2m_security_is_bootstrap_server_set(0, true);
             lwm2m_security_bootstrapped_set(0, 0);
 
-            memset(&m_server_settings[0], 0, sizeof(m_server_settings[0]));
-            m_server_settings[0].access[0] = rwde_access;
-            m_server_settings[0].server[0] = 102;
-            m_server_settings[0].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
-
+            acl.access[0] = rwde_access;
+            acl.server[0] = 102;
+            app_init_server_acl(0, &acl);
             break;
         }
 
         case 1: // DM server
         {
-            memset(&m_server_settings[1], 0, sizeof(m_server_settings[1]));
-            m_server_settings[1].access[0] = rwde_access;
-            m_server_settings[1].server[0] = 101;
-            m_server_settings[1].access[1] = rwde_access;
-            m_server_settings[1].server[1] = 102;
-            m_server_settings[1].access[2] = rwde_access;
-            m_server_settings[1].server[2] = 1000;
-            m_server_settings[1].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
+            acl.access[0] = rwde_access;
+            acl.server[0] = 101;
+            acl.access[1] = rwde_access;
+            acl.server[1] = 102;
+            acl.access[2] = rwde_access;
+            acl.server[2] = 1000;
+            app_init_server_acl(1, &acl);
             break;
         }
 
@@ -1070,30 +1000,28 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             lwm2m_server_notif_storing_set(2, 1);
             lwm2m_server_binding_set(2, "UQS", 3);
 
-            memset(&m_server_settings[2], 0, sizeof(m_server_settings[2]));
-            m_server_settings[2].access[0] = rwde_access;
-            m_server_settings[2].server[0] = 102;
-            m_server_settings[2].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
-
+            acl.access[0] = rwde_access;
+            acl.server[0] = 102;
+            app_init_server_acl(2, &acl);
             break;
         }
 
         case 3: // Repository server
         {
-            memset(&m_server_settings[3], 0, sizeof(m_server_settings[3]));
-            m_server_settings[3].access[0] = rwde_access;
-            m_server_settings[3].server[0] = 101;
-            m_server_settings[3].access[1] = rwde_access;
-            m_server_settings[3].server[1] = 102;
-            m_server_settings[3].access[2] = rwde_access;
-            m_server_settings[3].server[2] = 1000;
-            m_server_settings[3].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
+            acl.access[0] = rwde_access;
+            acl.server[0] = 101;
+            acl.access[1] = rwde_access;
+            acl.server[1] = 102;
+            acl.access[2] = rwde_access;
+            acl.server[2] = 1000;
+            app_init_server_acl(3, &acl);
             break;
         }
 
         default:
             break;
     }
+
 }
 
 
@@ -1111,14 +1039,27 @@ void app_factory_reset(void)
 }
 
 
-static void app_read_flash_servers(void)
+static void app_load_flash_objects(void)
 {
 #if CONFIG_FLASH
+#if APP_ACL_DM_SERVER_HACK
+    // FIXME: Init ACL for DM server[1] first to get ACL /2/0 which is according to Verizon spec
+    uint32_t acl_init_order[] = { 1, 0, 2, 3 };
+    for (uint32_t k = 0; k < ARRAY_SIZE(acl_init_order); k++)
+    {
+        uint32_t i = acl_init_order[k];
+#else
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
-        app_factory_bootstrap_server_object(i);
+#endif
         lwm2m_instance_storage_security_load(i);
         lwm2m_instance_storage_server_load(i);
+
+        if (lwm2m_server_short_server_id_get(i) == 0)
+        {
+            // Instance not loaded from flash, init factory defaults
+            app_factory_bootstrap_server_object(i);
+        }
     }
 
     lwm2m_instance_storage_misc_data_t misc_data;
@@ -1169,20 +1110,11 @@ static void app_read_flash_servers(void)
     lwm2m_server_notif_storing_set(1, 1);
     lwm2m_server_binding_set(1, "UQS", 3);
     lwm2m_server_client_hold_off_timer_set(1, 30);
-    m_server_settings[1].access[0] = rwde_access;
-    m_server_settings[1].server[0] = 101;
-    m_server_settings[1].access[1] = rwde_access;
-    m_server_settings[1].server[1] = 102;
-    m_server_settings[1].access[2] = rwde_access;
-    m_server_settings[1].server[2] = 1000;
 
     if (lwm2m_security_bootstrapped_get(0))
     {
-        m_server_settings[1].owner = 102;
-    }
-    else
-    {
-        m_server_settings[1].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
+        lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
+        p_instance->acl.owner = 102;
     }
 
     // Repository server
@@ -1200,57 +1132,17 @@ static void app_read_flash_servers(void)
     lwm2m_server_notif_storing_set(3, 1);
     lwm2m_server_binding_set(3, "UQ", 2);
     lwm2m_server_client_hold_off_timer_set(3, 30);
-    m_server_settings[3].access[0] = rwde_access;
-    m_server_settings[3].server[0] = 101;
-    m_server_settings[3].access[1] = rwde_access;
-    m_server_settings[3].server[1] = 102;
-    m_server_settings[3].access[2] = rwde_access;
-    m_server_settings[3].server[2] = 1000;
-    m_server_settings[3].owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
 #endif
 }
 
 
 static void app_lwm2m_create_objects(void)
 {
-    // TODO: Security needs to be inited first as it memset the m_security_settings internally,
-    // and lwm2m_server_init() will update server and security instances through a callback
-    // to app_read_flash_storage().
     lwm2m_security_init();
     lwm2m_server_init();
 
-    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
-    {
-#if APP_ACL_DM_SERVER_HACK
-    }
-
-    // FIXME: Init ACL for DM server[1] first to get ACL /2/0 which is according to Verizon spec
-    uint32_t acl_init_order[] = { 1, 0, 2, 3 };
-    for (uint32_t k = 0; k < ARRAY_SIZE(acl_init_order); k++)
-    {
-        uint32_t i = acl_init_order[k];
-#endif
-
-        // Initialize ACL on the instance.
-        (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)lwm2m_server_get_instance(i),
-                                        LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-
-        // Set default access to LWM2M_PERMISSION_READ.
-        (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)lwm2m_server_get_instance(i),
-                                        LWM2M_PERMISSION_READ,
-                                        LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
-
-        for (uint32_t j = 0; j < ARRAY_SIZE(m_server_settings[i].server); j++)
-        {
-            if (m_server_settings[i].server[j] != 0)
-            {
-                // Set server access.
-                (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)lwm2m_server_get_instance(i),
-                                                m_server_settings[i].access[j],
-                                                m_server_settings[i].server[j]);
-            }
-        }
-    }
+    // Initialize security, server and acl from flash.
+    app_load_flash_objects();
 
     lwm2m_device_init();
     lwm2m_conn_mon_init();
@@ -2027,9 +1919,6 @@ int main(void)
     // Create LwM2M factory bootstraped objects.
     app_lwm2m_create_objects();
 
-    // Initialize servers from flash.
-    app_read_flash_servers();
-
     if (strcmp(modem_logging, "1") == 0) {
         // 1,0 = disable
         // 1,1 = coredump only
@@ -2066,6 +1955,7 @@ int main(void)
     }
     else
 #endif
+
     if (lwm2m_security_bootstrapped_get(0))
     {
         m_app_state = APP_STATE_SERVER_CONNECT;
