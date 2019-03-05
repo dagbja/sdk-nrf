@@ -54,10 +54,12 @@ static int cmd_config_print(const struct shell *shell, size_t argc, char **argv)
     for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++)
     {
         if (lwm2m_server_short_server_id_get(i)) {
+            lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(i);
             shell_print(shell, "Instance %d", i);
             shell_print(shell, "  Short Server ID  %d", lwm2m_server_short_server_id_get(i));
             shell_print(shell, "  Server URI       %s", lwm2m_security_server_uri_get(i, &uri_len));
             shell_print(shell, "  Lifetime         %lld", lwm2m_server_lifetime_get(i));
+            shell_print(shell, "  Owner            %d", p_instance->acl.owner);
         }
     }
 
@@ -180,9 +182,9 @@ static int cmd_debug_imei(const struct shell *shell, size_t argc, char **argv)
     lwm2m_debug_imei_set(imei);
 
     if (imei_len) {
-        shell_print(shell, "Set IMEI: %s", imei);
+        shell_print(shell, "Set static IMEI: %s", imei);
     } else {
-        shell_print(shell, "Removed IMEI");
+        shell_print(shell, "Removed static IMEI");
     }
 
     return 0;
@@ -207,9 +209,9 @@ static int cmd_debug_msisdn(const struct shell *shell, size_t argc, char **argv)
     lwm2m_debug_msisdn_set(msisdn);
 
     if (msisdn_len) {
-        shell_print(shell, "Set MSISDN: %s", msisdn);
+        shell_print(shell, "Set static MSISDN: %s", msisdn);
     } else {
-        shell_print(shell, "Removed MSISDN");
+        shell_print(shell, "Removed static MSISDN");
     }
 
     return 0;
@@ -435,8 +437,8 @@ SHELL_CREATE_STATIC_SUBCMD_SET(sub_debug)
 {
     SHELL_CMD(print, NULL, "Print configuration", cmd_debug_print),
     SHELL_CMD(reset, NULL, "Reset configuration", cmd_debug_reset),
-    SHELL_CMD(imei, NULL, "Set IMEI", cmd_debug_imei),
-    SHELL_CMD(msisdn, NULL, "Set MSISDN", cmd_debug_msisdn),
+    SHELL_CMD(imei, NULL, "Set static IMEI", cmd_debug_imei),
+    SHELL_CMD(msisdn, NULL, "Set static MSISDN", cmd_debug_msisdn),
     SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 };
