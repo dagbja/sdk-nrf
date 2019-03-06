@@ -1674,7 +1674,7 @@ static void app_coap_init(void)
     }
 
 #if APP_USE_CONTABO
-    m_lwm2m_transport[1].fd = local_port_list[1].transport;
+    m_lwm2m_transport[1] = local_port_list[1].transport;
     ARG_UNUSED(m_lwm2m_transport);
 #endif
 }
