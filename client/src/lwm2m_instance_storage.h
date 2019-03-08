@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
-#include <lwm2m_debug.h>
+#include <app_debug.h>
 
 #ifndef LWM2M_INSTANCE_STORAGE_H__
 #define LWM2M_INSTANCE_STORAGE_H__

@@ -9,7 +9,7 @@
 
 #include <net/socket.h>
 
-#define SECURITY_SERVER_URI_SIZE_MAX    64                                                    /**< Max size of server URIs. */
+#define SECURITY_SERVER_URI_SIZE_MAX 64    /**< Max size of server URIs. */
 
 typedef enum
 {
@@ -34,7 +34,7 @@ typedef enum
     APP_STATE_DISCONNECT
 } app_state_t;
 
-#if CONFIG_SHELL
+#if (CONFIG_SHELL || CONFIG_DK_LIBRARY)
 app_state_t app_state_get(void);
 void app_state_set(app_state_t app_state);
 
@@ -45,7 +45,7 @@ uint32_t app_server_retry_count(uint16_t instance_id);
 int32_t app_retry_delay_get(uint16_t instance_id);
 sa_family_t app_family_type_get(uint16_t instance_id);
 int32_t app_state_update_delay(void);
-#endif // CONFIG_SHELL
+#endif // CONFIG_SHELL || CONFIG_DK_LIBRARY
 
 void app_factory_reset(void);
 void app_system_reset(void);

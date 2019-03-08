@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#ifndef LWM2M_DEBUG_H__
-#define LWM2M_DEBUG_H__
+#ifndef APP_DEBUG_H__
+#define APP_DEBUG_H__
 
 #include <stdint.h>
 
@@ -16,16 +16,17 @@ typedef struct {
     char modem_logging[65];       /**< Modem logging: 0=off, 1=fidoless, 2=fido, other=XMODEMTRACE bitmap */
 } debug_settings_t;
 
-void lwm2m_debug_init(void);
-void lwm2m_debug_clear(void);
+void app_debug_init(void);
+void app_debug_clear(void);
 
-const char * lwm2m_debug_imei_get(void);
-int32_t lwm2m_debug_imei_set(const char * imei);
+const char * app_debug_imei_get(void);
+int32_t app_debug_imei_set(const char * imei);
 
-const char * lwm2m_debug_msisdn_get(void);
-int32_t lwm2m_debug_msisdn_set(const char * msisdn);
+const char * app_debug_msisdn_get(void);
+int32_t app_debug_msisdn_set(const char * msisdn);
 
-const char * lwm2m_debug_modem_logging_get(void);
-int32_t lwm2m_debug_modem_logging_set(const char * modem_logging);
+const char * app_debug_modem_logging_get(void);
+int32_t app_debug_modem_logging_set(const char * modem_logging);
+void app_debug_modem_logging_enable(void);
 
-#endif // LWM2M_DEBUG_H__
+#endif // APP_DEBUG_H__

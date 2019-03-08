@@ -8,14 +8,14 @@
 #include <stdio.h>
 #include <net/socket.h>
 
-char imei[16];
-char msisdn[16];
-
-void read_imei_and_msisdn(void)
-{
 #define APP_MAX_AT_READ_LENGTH          256
 #define APP_MAX_AT_WRITE_LENGTH         256
 
+char imei[16];
+char msisdn[16];
+
+void at_read_imei_and_msisdn(void)
+{
     char write_buffer[APP_MAX_AT_WRITE_LENGTH];
     char read_buffer[APP_MAX_AT_READ_LENGTH];
 
@@ -71,6 +71,44 @@ void read_imei_and_msisdn(void)
         }
     } else {
         printk("send(%s) failed\n", at_cnum);
+    }
+
+    close(at_socket_fd);
+}
+
+
+void at_send_command(const char *at_command, bool do_logging)
+{
+    char write_buffer[APP_MAX_AT_WRITE_LENGTH];
+    char read_buffer[APP_MAX_AT_READ_LENGTH];
+
+    int at_socket_fd;
+    int length;
+
+    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
+    if (at_socket_fd < 0) {
+        printk("socket() failed\n");
+        return;
+    }
+
+    if (do_logging) {
+        printk("send: %s\n", at_command);
+    }
+
+    snprintf(write_buffer, APP_MAX_AT_WRITE_LENGTH, "%s", at_command);
+    length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
+
+    if (length == strlen(write_buffer)) {
+        length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
+        if (length > 0) {
+            if (do_logging) {
+                printk("recv: %s\n", read_buffer);
+            }
+        } else {
+            printk("recv() failed\n");
+        }
+    } else {
+        printk("send() failed\n");
     }
 
     close(at_socket_fd);

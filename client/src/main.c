@@ -45,10 +45,9 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <lwm2m_security.h>
 #include <lwm2m_firmware.h>
 #include <lwm2m_instance_storage.h>
-#include <lwm2m_debug.h>
+#include <app_debug.h>
 #include <common.h>
 #include <main.h>
-
 
 #define APP_MOTIVE_NO_REBOOT            1 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
 #define APP_ACL_DM_SERVER_HACK          1
@@ -73,8 +72,6 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #endif
 
 #define SECURITY_SERVER_URI_SIZE_MAX    64                                                    /**< Max size of server URIs. */
-#define SECURITY_SMS_NUMBER_SIZE_MAX    20                                                    /**< Max size of server SMS number. */
-#define SERVER_BINDING_SIZE_MAX         4                                                     /**< Max size of server binding. */
 
 #define APP_SEC_TAG_OFFSET              25
 
@@ -94,11 +91,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
 
-#if CONFIG_LOG
 #define APPL_LOG  LOG_DBG
-#else
-#define APPL_LOG(...)
-#endif
 
 #if CONFIG_DK_LIBRARY
 #define APP_ERROR_CHECK(error_code) \
@@ -141,8 +134,6 @@ static lwm2m_client_identity_t             m_client_id;                         
 static lwm2m_object_t                      m_bootstrap_server;                                /**< Named object to be used as callback object when bootstrap is completed. */
 
 static char m_bootstrap_object_alias_name[] = "bs";                                           /**< Name of the bootstrap complete object. */
-
-#define VERIZON_RESOURCE 30000
 
 static coap_transport_handle_t             m_coap_transport = -1;                             /**< CoAP transport handle for the non bootstrap server. */
 static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS];            /**< CoAP transport handles for the secure servers. Obtained on @coap_security_setup. */
@@ -194,14 +185,13 @@ static void app_disconnect(void);
 static void app_wait_state_update(struct k_work *work);
 static const char * app_uri_get(char * server_uri, uint8_t uri_len, uint16_t * p_port, bool * p_secure);
 
-
 /** Functions available from shell access */
 void app_update_server(uint16_t update_server)
 {
     m_update_server = update_server;
 }
 
-#if CONFIG_SHELL || CONFIG_DK_LIBRARY
+#if (CONFIG_SHELL || CONFIG_DK_LIBRARY)
 app_state_t app_state_get(void)
 {
     return m_app_state;
@@ -255,7 +245,6 @@ void bsd_recoverable_error_handler(uint32_t error)
 #endif
 }
 
-
 /**@brief Irrecoverable BSD library error. */
 void bsd_irrecoverable_error_handler(uint32_t error)
 {
@@ -267,7 +256,6 @@ void bsd_irrecoverable_error_handler(uint32_t error)
     while (true);
 }
 
-
 void app_system_reset(void)
 {
     app_disconnect();
@@ -275,7 +263,6 @@ void app_system_reset(void)
     lte_lc_offline();
     NVIC_SystemReset();
 }
-
 
 static char * app_client_imei_msisdn(void)
 {
@@ -288,12 +275,12 @@ static char * app_client_imei_msisdn(void)
         const char * p_imei = imei;
         const char * p_msisdn = msisdn;
 
-        const char * p_debug_imei = lwm2m_debug_imei_get();
+        const char * p_debug_imei = app_debug_imei_get();
         if (p_debug_imei && p_debug_imei[0]) {
             p_imei = p_debug_imei;
         }
 
-        const char * p_debug_msisdn = lwm2m_debug_msisdn_get();
+        const char * p_debug_msisdn = app_debug_msisdn_get();
         if (p_debug_msisdn && p_debug_msisdn[0]) {
             p_msisdn = p_debug_msisdn;
         }
@@ -304,7 +291,6 @@ static char * app_client_imei_msisdn(void)
     return client_id;
 }
 
-
 /**@brief Initialize IMEI and MSISDN to use.
  *
  * Factory reset to start bootstrap if MSISDN is different than last start.
@@ -313,14 +299,14 @@ static void app_initialize_imei_msisdn(void)
 {
     bool provision_bs_psk = false;
 
-    read_imei_and_msisdn();
+    at_read_imei_and_msisdn();
 
 #if CONFIG_FLASH
     char last_used_msisdn[128];
     extern char msisdn[];
     const char *p_msisdn;
 
-    const char * p_debug_msisdn = lwm2m_debug_msisdn_get();
+    const char * p_debug_msisdn = app_debug_msisdn_get();
     if (p_debug_msisdn && p_debug_msisdn[0]) {
         p_msisdn = p_debug_msisdn;
     } else {
@@ -354,7 +340,6 @@ static void app_initialize_imei_msisdn(void)
         lte_lc_normal();
     }
 }
-
 
 /**@brief Application implementation of the root handler interface.
  *
@@ -462,7 +447,6 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     return 0;
 }
 
-
 /**@brief Helper function to parse the uri and save the remote to the LWM2M remote database. */
 static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_server_id,
                                                     char            * server_uri,
@@ -487,17 +471,18 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_serv
     return err_code;
 }
 
-void app_request_reboot(void) {
-    // TODO: Shutdown and reboot
+void app_request_reboot(void)
+{
     app_disconnect();
+
 #if APP_MOTIVE_NO_REBOOT
     m_app_state = APP_STATE_SERVER_CONNECT;
     m_server_instance = 1;
 #else
+    lte_lc_offline();
     NVIC_SystemReset();
 #endif
 }
-
 
 /**@brief Helper function to handle a connect retry. */
 void app_handle_connect_retry(int instance_id, bool no_reply)
@@ -544,7 +529,6 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
         k_delayed_work_submit(&state_update_work, 0);
     }
 }
-
 
 /**@brief LWM2M notification handler. */
 void lwm2m_notification(lwm2m_notification_type_t type,
@@ -623,7 +607,6 @@ void lwm2m_notification(lwm2m_notification_type_t type,
     }
 }
 
-
 uint32_t lwm2m_handler_error(uint16_t           short_server_id,
                              lwm2m_instance_t * p_instance,
                              coap_message_t   * p_request,
@@ -651,7 +634,6 @@ uint32_t lwm2m_handler_error(uint16_t           short_server_id,
 
     return err_code;
 }
-
 
 /**@brief Callback function for the named bootstrap complete object. */
 uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
@@ -712,7 +694,6 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     return 0;
 }
 
-
 static void app_init_server_acl(uint16_t instance_id, lwm2m_instance_acl_t *acl)
 {
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
@@ -734,7 +715,6 @@ static void app_init_server_acl(uint16_t instance_id, lwm2m_instance_acl_t *acl)
         }
     }
 }
-
 
 /**@brief Create factory bootstrapped server objects.
  *        Depends on carrier, this is Verizon / MotiveBridge.
@@ -815,7 +795,6 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
 
 }
 
-
 void app_factory_reset(void)
 {
 #if CONFIG_FLASH
@@ -828,7 +807,6 @@ void app_factory_reset(void)
     }
 #endif
 }
-
 
 static void app_load_flash_objects(void)
 {
@@ -874,7 +852,6 @@ static void app_load_flash_objects(void)
     uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
                             LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE);
 
-
     // DM server
     lwm2m_server_short_server_id_set(1, 102);
     lwm2m_server_lifetime_set(1, 2592000);
@@ -909,7 +886,6 @@ static void app_load_flash_objects(void)
 #endif
 }
 
-
 static void app_lwm2m_create_objects(void)
 {
     lwm2m_security_init();
@@ -922,7 +898,6 @@ static void app_lwm2m_create_objects(void)
     lwm2m_conn_mon_init();
     lwm2m_firmware_init();
 }
-
 
 /**@brief LWM2M initialization.
  *
@@ -963,7 +938,6 @@ static void app_lwm2m_setup(void)
     m_client_id.len  = strlen(p_ep_id);
     m_client_id.type = LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN;
 }
-
 
 static void app_bootstrap_connect(void)
 {
@@ -1034,7 +1008,6 @@ static void app_bootstrap_connect(void)
     }
 }
 
-
 static void app_bootstrap(void)
 {
     uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)&m_bs_remote_server,
@@ -1045,7 +1018,6 @@ static void app_bootstrap(void)
         m_app_state = APP_STATE_BOOTSTRAP_REQUESTED;
     }
 }
-
 
 static void app_server_connect(void)
 {
@@ -1127,7 +1099,6 @@ static void app_server_connect(void)
     }
 }
 
-
 static void app_server_register(void)
 {
     uint32_t err_code;
@@ -1159,7 +1130,6 @@ static void app_server_register(void)
     }
 }
 
-
 void app_server_update(uint16_t instance_id)
 {
     uint32_t err_code;
@@ -1181,7 +1151,6 @@ void app_server_update(uint16_t instance_id)
 #endif
 }
 
-
 static void app_server_deregister(uint16_t instance_id)
 {
     uint32_t err_code;
@@ -1192,7 +1161,6 @@ static void app_server_deregister(uint16_t instance_id)
 
     m_app_state = APP_STATE_SERVER_DEREGISTERING;
 }
-
 
 static void app_disconnect(void)
 {
@@ -1212,12 +1180,11 @@ static void app_disconnect(void)
     m_app_state = APP_STATE_IP_INTERFACE_UP;
 }
 
-
 static void app_wait_state_update(struct k_work *work)
 {
     ARG_UNUSED(work);
 
-    switch(m_app_state)
+    switch (m_app_state)
     {
         case APP_STATE_BS_CONNECT_RETRY_WAIT:
             // Timeout waiting for DTLS connection to bootstrap server
@@ -1250,7 +1217,6 @@ static void app_wait_state_update(struct k_work *work)
             break;
     }
 }
-
 
 static bool app_coap_socket_poll(void)
 {
@@ -1341,14 +1307,13 @@ static bool app_coap_socket_poll(void)
     return data_ready;
 }
 
-
 static void app_lwm2m_process(void)
 {
     if (app_coap_socket_poll()) {
         coap_input();
     }
 
-    switch(m_app_state)
+    switch (m_app_state)
     {
         case APP_STATE_BS_CONNECT:
         {
@@ -1457,8 +1422,6 @@ static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len
 {
     uint32_t err_code;
 
-//    err_code = nrf_inbuilt_key_delete(sec_tag, NRF_KEY_MGMT_CRED_TYPE_IDENTITY);
-
     err_code = nrf_inbuilt_key_write(sec_tag,
                                      NRF_KEY_MGMT_CRED_TYPE_IDENTITY,
                                      identity, identity_len);
@@ -1476,7 +1439,6 @@ static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len
     k_free(p_secret_key_nrf9160_style);
     APP_ERROR_CHECK(err_code);
 }
-
 
 static void app_provision_secret_keys(void)
 {
@@ -1521,81 +1483,6 @@ static void app_provision_secret_keys(void)
     APPL_LOG("Normal mode");
 }
 
-void send_at_command(const char *at_command, bool do_logging)
-{
-#define APP_MAX_AT_READ_LENGTH          256
-#define APP_MAX_AT_WRITE_LENGTH         256
-
-    char write_buffer[APP_MAX_AT_WRITE_LENGTH];
-    char read_buffer[APP_MAX_AT_READ_LENGTH];
-
-    int at_socket_fd;
-    int length;
-
-    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
-    if (at_socket_fd < 0) {
-        printk("socket() failed\n");
-        return;
-    }
-
-    if (do_logging) {
-        printk("send: %s\n", at_command);
-    }
-
-    snprintf(write_buffer, APP_MAX_AT_WRITE_LENGTH, "%s", at_command);
-    length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
-
-    if (length == strlen(write_buffer)) {
-        length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-        if (length > 0) {
-            if (do_logging) {
-                printk("recv: %s\n", read_buffer);
-            }
-        } else {
-            printk("recv() failed\n");
-        }
-    } else {
-        printk("send() failed\n");
-    }
-
-    close(at_socket_fd);
-}
-
-
-static void modem_trace_enable(void)
-{
-    /* GPIO configurations for trace and debug */
-    #define CS_PIN_CFG_TRACE_CLK    21 //GPIO_OUT_PIN21_Pos
-    #define CS_PIN_CFG_TRACE_DATA0  22 //GPIO_OUT_PIN22_Pos
-    #define CS_PIN_CFG_TRACE_DATA1  23 //GPIO_OUT_PIN23_Pos
-    #define CS_PIN_CFG_TRACE_DATA2  24 //GPIO_OUT_PIN24_Pos
-    #define CS_PIN_CFG_TRACE_DATA3  25 //GPIO_OUT_PIN25_Pos
-
-    // Configure outputs.
-    // CS_PIN_CFG_TRACE_CLK
-    NRF_P0_NS->PIN_CNF[CS_PIN_CFG_TRACE_CLK] = (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
-                                               (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-
-    // CS_PIN_CFG_TRACE_DATA0
-    NRF_P0_NS->PIN_CNF[CS_PIN_CFG_TRACE_DATA0] = (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
-                                                 (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-
-    // CS_PIN_CFG_TRACE_DATA1
-    NRF_P0_NS->PIN_CNF[CS_PIN_CFG_TRACE_DATA1] = (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
-                                                 (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-
-    // CS_PIN_CFG_TRACE_DATA2
-    NRF_P0_NS->PIN_CNF[CS_PIN_CFG_TRACE_DATA2] = (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
-                                                 (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-
-    // CS_PIN_CFG_TRACE_DATA3
-    NRF_P0_NS->PIN_CNF[CS_PIN_CFG_TRACE_DATA3] = (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos) |
-                                                 (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-
-    NRF_P0_NS->DIR = 0xFFFFFFFF;
-}
-
-
 /**@brief Handle server lifetime.
  */
 #if (APP_USE_CONTABO != 1)
@@ -1613,7 +1500,7 @@ static void app_connection_update(struct k_work *work)
 #endif
 
 /**@brief Initializes and submits delayed work. */
-static void work_init(void)
+static void app_work_init(void)
 {
 #if (APP_USE_CONTABO != 1)
     k_delayed_work_init(&connection_update_work[1], app_connection_update);
@@ -1629,13 +1516,11 @@ static void app_lwm2m_observer_process(void)
     lwm2m_firmware_observer_process();
 }
 
-
 /**@brief Function for application main entry.
  */
 int main(void)
 {
     printk("\n\nInitializing LTE link, please wait...\n");
-    m_coap_transport = 0xFFFFFFFF;
 
     // Initialize Non-volatile Storage.
     lwm2m_instance_storage_init();
@@ -1645,13 +1530,11 @@ int main(void)
     buttons_and_leds_init();
 #endif
 
-    // Initialize device from flash.
-    lwm2m_debug_init();
+    // Initialize debug settings from flash.
+    app_debug_init();
 
-    const char * modem_logging = lwm2m_debug_modem_logging_get();
-    if (strcmp(modem_logging, "2") == 0) {
-        modem_trace_enable();
-    }
+    // Enable FIDO logging before establing LTE link.
+    app_debug_modem_logging_enable();
 
     // Establish LTE link.
     lte_lc_init_and_connect();
@@ -1668,20 +1551,8 @@ int main(void)
     // Create LwM2M factory bootstraped objects.
     app_lwm2m_create_objects();
 
-    if (strcmp(modem_logging, "1") == 0) {
-        // 1,0 = disable
-        // 1,1 = coredump only
-        // 1,2 = generic (and coredump)
-        // 1,3 = lwm2m   (and coredump)
-        // 1,4 = ip only (and coredump)
-        send_at_command("AT%XMODEMTRACE=1,2", false);
-        send_at_command("AT%XMODEMTRACE=1,3", false);
-        send_at_command("AT%XMODEMTRACE=1,4", false);
-    } else if (strlen(modem_logging) == 64) {
-        char at_command[128];
-        sprintf(at_command, "AT%%XMODEMTRACE=2,,3,%s", modem_logging);
-        send_at_command(at_command, false);
-    }
+    // Enable fidoless logging after enabling LTE link.
+    app_debug_modem_logging_enable();
 
 #if CONFIG_AT_HOST_LIBRARY
     int at_host_err = at_host_init(CONFIG_AT_HOST_UART, CONFIG_AT_HOST_TERMINATION);
@@ -1690,7 +1561,7 @@ int main(void)
     }
 #endif
 
-    work_init();
+    app_work_init();
 
     if (lwm2m_security_bootstrapped_get(0))
     {

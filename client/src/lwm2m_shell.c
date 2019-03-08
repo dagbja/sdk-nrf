@@ -14,9 +14,9 @@
 #include <lwm2m_instance_storage.h>
 #include <lwm2m_security.h>
 #include <lwm2m_server.h>
+#include <at_interface.h>
 #include <main.h>
 
-extern void send_at_command(const char *at_command, bool do_logging);
 
 static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
 {
@@ -25,7 +25,7 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
         return 0;
     }
 
-    send_at_command(argv[1], true);
+    at_send_command(argv[1], true);
 
     return 0;
 }
@@ -33,14 +33,14 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
 #if CONFIG_FLASH
 static int cmd_config_clear(const struct shell *shell, size_t argc, char **argv)
 {
-    lwm2m_instance_storage_security_delete(1);
-    lwm2m_instance_storage_server_delete(1);
+    lwm2m_security_bootstrapped_set(0, false);
+    lwm2m_instance_storage_security_store(0);
+    lwm2m_instance_storage_misc_data_delete();
 
-    lwm2m_instance_storage_security_delete(2);
-    lwm2m_instance_storage_server_delete(2);
-
-    lwm2m_instance_storage_security_delete(3);
-    lwm2m_instance_storage_server_delete(3);
+    for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
+        lwm2m_instance_storage_security_delete(i);
+        lwm2m_instance_storage_server_delete(i);
+    }
 
     shell_print(shell, "Deleted all bootstrapped values");
     return 0;
@@ -136,8 +136,8 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     extern char imei[];
     extern char msisdn[];
 
-    const char * p_debug_imei = lwm2m_debug_imei_get();
-    const char * p_debug_msisdn = lwm2m_debug_msisdn_get();
+    const char * p_debug_imei = app_debug_imei_get();
+    const char * p_debug_msisdn = app_debug_msisdn_get();
 
     shell_print(shell, "Debug configuration");
     if (p_debug_imei && p_debug_imei[0]) {
@@ -150,7 +150,7 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     } else {
         shell_print(shell, "  MSISDN         %s", msisdn);
     }
-    shell_print(shell, "  Logging        %s", lwm2m_debug_modem_logging_get());
+    shell_print(shell, "  Logging        %s", app_debug_modem_logging_get());
 
     return 0;
 }
@@ -158,7 +158,7 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_debug_reset(const struct shell *shell, size_t argc, char **argv)
 {
-    lwm2m_debug_clear();
+    app_debug_clear();
 
     return 0;
 }
@@ -179,7 +179,7 @@ static int cmd_debug_imei(const struct shell *shell, size_t argc, char **argv)
         return 0;
     }
 
-    lwm2m_debug_imei_set(imei);
+    app_debug_imei_set(imei);
 
     if (imei_len) {
         shell_print(shell, "Set static IMEI: %s", imei);
@@ -206,7 +206,7 @@ static int cmd_debug_msisdn(const struct shell *shell, size_t argc, char **argv)
         return 0;
     }
 
-    lwm2m_debug_msisdn_set(msisdn);
+    app_debug_msisdn_set(msisdn);
 
     if (msisdn_len) {
         shell_print(shell, "Set static MSISDN: %s", msisdn);
@@ -233,14 +233,12 @@ static int cmd_debug_logging(const struct shell *shell, size_t argc, char **argv
         return 0;
     }
 
-    lwm2m_debug_modem_logging_set(logging);
+    app_debug_modem_logging_set(logging);
 
     shell_print(shell, "Set logging value: %s", logging);
 
     return 0;
 }
-
-
 #endif
 
 
