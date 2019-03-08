@@ -9,11 +9,7 @@ targeted for Zephyr on a nrf9160_pca10090 development kit.
 Switches and Buttons
 ********************
 
-The switches are used to control the behaviour of the client when not having flash support:
-
-* Switch 1: In left position do bootstrap procedure.
-            In right position skip bootstrap and use hardcoded values.
-* Switch 2: Currently unused.
+The switches are currently unused.
 
 The buttons are used to control the behaviour of the client as follows:
 

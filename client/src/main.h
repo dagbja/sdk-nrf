@@ -7,6 +7,8 @@
 #ifndef MAIN_H__
 #define MAIN_H__
 
+#include <net/socket.h>
+
 #define SECURITY_SERVER_URI_SIZE_MAX    64                                                    /**< Max size of server URIs. */
 
 typedef enum

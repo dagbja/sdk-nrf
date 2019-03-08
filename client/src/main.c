@@ -22,7 +22,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <at_interface.h>
 
 #if CONFIG_DK_LIBRARY
-#include <dk_buttons_and_leds.h>
+#include <buttons_and_leds.h>
 #endif
 
 #if CONFIG_AT_HOST_LIBRARY
@@ -53,8 +53,6 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define APP_MOTIVE_NO_REBOOT            1 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_CONTABO                 0
-
-#define APP_LEDS_UPDATE_INTERVAL        500                                                   /**< Interval in milliseconds between each time status LEDs are updated. */
 
 #define COAP_LOCAL_LISTENER_PORT              5683                                            /**< Local port to listen on any traffic, client or server. Not bound to any specific LWM2M functionality.*/
 #define LWM2M_LOCAL_LISTENER_PORT             9997                                            /**< Local port to listen on any traffic. Bound to specific LWM2M functionality. */
@@ -107,30 +105,15 @@ static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
     do { \
         if (error_code != 0) { \
             APPL_LOG("Error: %lu", error_code); \
-            k_delayed_work_cancel(&leds_update_work); \
-            /* Blinking all LEDs ON/OFF in pairs (1 and 2, 3 and 4) if there is an error. */ \
-            while (true) { \
-                dk_set_leds_state(DK_LED1_MSK | DK_LED2_MSK, DK_LED3_MSK | DK_LED4_MSK); \
-                k_sleep(250); \
-                dk_set_leds_state(DK_LED3_MSK | DK_LED4_MSK, DK_LED1_MSK | DK_LED2_MSK); \
-                k_sleep(250); \
-            } \
+            leds_error_loop(); \
         } \
     } while (0)
-
 #define APP_ERROR_CHECK_BOOL(boolean_value) \
     do { \
         const uint32_t local_value = (boolean_value); \
         if (!local_value) { \
             APPL_LOG("BOOL check failure"); \
-            k_delayed_work_cancel(&leds_update_work); \
-            /* Blinking all LEDs ON/OFF in pairs (1 and 2, 3 and 4) if there is an error. */ \
-            while (true) { \
-                dk_set_leds_state(DK_LED1_MSK | DK_LED2_MSK, DK_LED3_MSK | DK_LED4_MSK); \
-                k_sleep(250); \
-                dk_set_leds_state(DK_LED3_MSK | DK_LED4_MSK, DK_LED1_MSK | DK_LED2_MSK); \
-                k_sleep(250); \
-            } \
+            leds_error_loop(); \
         } \
     } while (0)
 #else
@@ -138,18 +121,15 @@ static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
     do { \
         if (error_code != 0) { \
             APPL_LOG("Error: %lu", error_code); \
-            while (1) \
-                ; \
+            while (1); \
         } \
     } while (0)
-
 #define APP_ERROR_CHECK_BOOL(boolean_value) \
     do { \
         const uint32_t local_value = (boolean_value); \
         if (!local_value) { \
             APPL_LOG("BOOL check failure"); \
-            while (1) \
-                ; \
+            while (1); \
         } \
     } while (0)
 #endif
@@ -181,9 +161,6 @@ static s32_t app_retry_delay[] = { 2*60, 4*60, 6*60, 8*60, 24*60*60 };
 
 /* Structures for delayed work */
 static struct k_delayed_work state_update_work;
-#if CONFIG_DK_LIBRARY
-static struct k_delayed_work leds_update_work;
-#endif
 
 #if (APP_USE_CONTABO != 1)
 static struct k_delayed_work connection_update_work[1+LWM2M_MAX_SERVERS];
@@ -224,7 +201,7 @@ void app_update_server(uint16_t update_server)
     m_update_server = update_server;
 }
 
-#if CONFIG_SHELL
+#if CONFIG_SHELL || CONFIG_DK_LIBRARY
 app_state_t app_state_get(void)
 {
     return m_app_state;
@@ -264,26 +241,16 @@ int32_t app_state_update_delay(void)
 {
     return k_delayed_work_remaining_get(&state_update_work);
 }
-#endif // CONFIG_SHELL
+#endif // CONFIG_SHELL || CONFIG_DK_LIBRARY
 
 /**@brief Recoverable BSD library error. */
 void bsd_recoverable_error_handler(uint32_t error)
 {
-    ARG_UNUSED(error);
-
 #if CONFIG_DK_LIBRARY
-    k_delayed_work_cancel(&leds_update_work);
-
-    /* Blinking all LEDs ON/OFF in pairs (1 and 3, 2 and 4)
-     * if there is an recoverable error.
-     */
-    while (true) {
-        dk_set_leds_state(DK_LED1_MSK | DK_LED3_MSK, DK_LED2_MSK | DK_LED4_MSK);
-        k_sleep(250);
-        dk_set_leds_state(DK_LED2_MSK | DK_LED4_MSK, DK_LED1_MSK | DK_LED3_MSK);
-        k_sleep(250);
-    }
+    ARG_UNUSED(error);
+    leds_recoverable_error_loop();
 #else
+    printk("RECOVERABLE ERROR %lu\n", error);
     while (true);
 #endif
 }
@@ -292,14 +259,12 @@ void bsd_recoverable_error_handler(uint32_t error)
 /**@brief Irrecoverable BSD library error. */
 void bsd_irrecoverable_error_handler(uint32_t error)
 {
-    ARG_UNUSED(error);
-
 #if CONFIG_DK_LIBRARY
-    k_delayed_work_cancel(&leds_update_work);
-    printk("IRRECOVERABLE ERROR %lu\n", error);
-#else
-    while (true);
+    ARG_UNUSED(error);
+    buttons_and_leds_uninit();
 #endif
+    printk("IRRECOVERABLE ERROR %lu\n", error);
+    while (true);
 }
 
 
@@ -310,171 +275,6 @@ void app_system_reset(void)
     lte_lc_offline();
     NVIC_SystemReset();
 }
-
-
-#if CONFIG_DK_LIBRARY
-/**@brief Callback for button events from the DK buttons and LEDs library. */
-static void app_button_handler(u32_t buttons, u32_t has_changed)
-{
-    if (buttons & 0x01) // Button 1 has changed
-    {
-        if (m_app_state == APP_STATE_IP_INTERFACE_UP)
-        {
-            if (lwm2m_security_bootstrapped_get(0))
-            {
-                m_app_state = APP_STATE_SERVER_CONNECT;
-            }
-            else
-            {
-                m_app_state = APP_STATE_BS_CONNECT;
-            }
-        }
-        else if (m_app_state == APP_STATE_SERVER_REGISTERED)
-        {
-            app_update_server(1);
-        }
-    }
-    else if (buttons & 0x02) // Button 2 has changed
-    {
-        if (m_app_state == APP_STATE_SERVER_REGISTERED)
-        {
-            m_app_state = APP_STATE_SERVER_DEREGISTER;
-        }
-        else if (m_app_state == APP_STATE_IP_INTERFACE_UP)
-        {
-            app_system_reset();
-        }
-    }
-}
-
-
-static void app_leds_get_state(u8_t *on, u8_t *blink)
-{
-    *on = 0;
-    *blink = 0;
-
-    switch (m_app_state)
-    {
-        case APP_STATE_IDLE:
-            *blink = DK_LED1_MSK;
-            break;
-
-        case APP_STATE_IP_INTERFACE_UP:
-            *on = DK_LED1_MSK;
-            break;
-
-        case APP_STATE_BS_CONNECT:
-            *blink = (DK_LED1_MSK | DK_LED2_MSK);
-            break;
-
-        case APP_STATE_BS_CONNECT_WAIT:
-        case APP_STATE_BS_CONNECT_RETRY_WAIT:
-            *blink = (DK_LED2_MSK | DK_LED4_MSK);
-            break;
-
-        case APP_STATE_BS_CONNECTED:
-        case APP_STATE_BOOTSTRAP_REQUESTED:
-            *on = DK_LED1_MSK;
-            *blink = DK_LED2_MSK;
-            break;
-
-        case APP_STATE_BOOTSTRAP_WAIT:
-            *on = DK_LED1_MSK;
-            *blink = (DK_LED2_MSK | DK_LED4_MSK);
-            break;
-
-        case APP_STATE_BOOTSTRAPPING:
-            *on = (DK_LED1_MSK | DK_LED2_MSK);
-            *blink = DK_LED4_MSK;
-            break;
-
-        case APP_STATE_BOOTSTRAPPED:
-            *on = (DK_LED1_MSK | DK_LED2_MSK);
-            break;
-
-        case APP_STATE_SERVER_CONNECT:
-            *blink = (DK_LED1_MSK | DK_LED3_MSK);
-            break;
-
-        case APP_STATE_SERVER_CONNECT_WAIT:
-        case APP_STATE_SERVER_CONNECT_RETRY_WAIT:
-            *blink = (DK_LED3_MSK | DK_LED4_MSK);
-            break;
-
-        case APP_STATE_SERVER_CONNECTED:
-            *on = DK_LED1_MSK;
-            *blink = DK_LED3_MSK;
-            break;
-
-        case APP_STATE_SERVER_REGISTER_WAIT:
-            *on = DK_LED1_MSK;
-            *blink = (DK_LED3_MSK | DK_LED4_MSK);
-            break;
-
-        case APP_STATE_SERVER_REGISTERED:
-            *on = (DK_LED1_MSK | DK_LED3_MSK);
-            break;
-
-        case APP_STATE_SERVER_DEREGISTER:
-        case APP_STATE_SERVER_DEREGISTERING:
-        case APP_STATE_DISCONNECT:
-            *on = DK_LED3_MSK;
-            *blink = DK_LED1_MSK;
-            break;
-    }
-}
-
-
-/**@brief Update LEDs state. */
-static void app_leds_update(struct k_work *work)
-{
-        static bool led_on;
-        static u8_t current_led_on_mask;
-        u8_t led_on_mask, led_blink_mask;
-
-        ARG_UNUSED(work);
-
-        /* Set led_on_mask to match current state. */
-        app_leds_get_state(&led_on_mask, &led_blink_mask);
-
-        if (m_did_bootstrap)
-        {
-            /* Only turn on LED2 if bootstrap was done. */
-            led_on_mask |= DK_LED2_MSK;
-        }
-
-        led_on = !led_on;
-        if (led_on) {
-                led_on_mask |= led_blink_mask;
-                if (led_blink_mask == 0) {
-                    // Only blink LED4 if no other led is blinking
-                    led_on_mask |= DK_LED4_MSK;
-                }
-        } else {
-                led_on_mask &= ~led_blink_mask;
-                led_on_mask &= ~DK_LED4_MSK;
-        }
-
-        if (led_on_mask != current_led_on_mask) {
-                dk_set_leds(led_on_mask);
-                current_led_on_mask = led_on_mask;
-        }
-
-        k_delayed_work_submit(&leds_update_work, APP_LEDS_UPDATE_INTERVAL);
-}
-
-
-/**@brief Initializes buttons and LEDs, using the DK buttons and LEDs library. */
-static void app_buttons_leds_init(void)
-{
-    dk_buttons_init(app_button_handler);
-    dk_leds_init();
-    dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
-
-    k_delayed_work_init(&leds_update_work, app_leds_update);
-    k_delayed_work_submit(&leds_update_work, APP_LEDS_UPDATE_INTERVAL);
-}
-#endif
 
 
 static char * app_client_imei_msisdn(void)
@@ -789,18 +589,9 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             m_server_settings[m_server_instance].retry_count = 0;
             lwm2m_server_registered_set(m_server_instance, true);
 
-            u32_t button_state = 0;
-            dk_read_buttons(&button_state, NULL);
-
-            bool switch1_right = false;
-            if (!(button_state & 0x04)) // Switch 1 in right position
-            {
-                switch1_right = true;
-            }
-
             uint8_t uri_len = 0;
             (void)lwm2m_security_server_uri_get(3, &uri_len);
-            if (!switch1_right && (m_server_instance == 1) && (uri_len > 0)) {
+            if ((m_server_instance == 1) && (uri_len > 0)) {
                 m_app_state = APP_STATE_SERVER_CONNECT;
                 m_server_instance = 3;
             }
@@ -1078,23 +869,6 @@ static void app_load_flash_objects(void)
     {
         app_factory_bootstrap_server_object(i);
     }
-
-#if CONFIG_DK_LIBRARY
-    // Workaround for not storing is.bootstrapped:
-    // - Switch 1 will determine if doing bootstrap
-
-    u32_t button_state = 0;
-    dk_read_buttons(&button_state, NULL);
-
-    if (button_state & 0x04) // Switch 1 in left position
-    {
-        lwm2m_security_bootstrapped_set(0, false);
-    }
-    else
-    {
-        lwm2m_security_bootstrapped_set(0, true);
-    }
-#endif
 
     // Bootstrap values (will be fetched from NVS after bootstrap)
     uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
@@ -1822,30 +1596,6 @@ static void modem_trace_enable(void)
 }
 
 
-#if CONFIG_DK_LIBRARY
-/**@brief Check buttons pressed at startup. */
-void app_check_buttons_pressed(void)
-{
-    u32_t button_state = 0;
-    dk_read_buttons(&button_state, NULL);
-
-    // Check if button 1 pressed during startup
-    if (button_state & 0x01) {
-        app_factory_reset();
-
-        printk("Factory reset!\n");
-        k_delayed_work_cancel(&leds_update_work);
-        while (true) { // Blink all LEDs
-            dk_set_leds_state(DK_LED1_MSK | DK_LED2_MSK | DK_LED3_MSK | DK_LED4_MSK, 0);
-            k_sleep(250);
-            dk_set_leds_state(0, DK_LED1_MSK | DK_LED2_MSK | DK_LED3_MSK | DK_LED4_MSK);
-            k_sleep(250);
-        }
-    }
-}
-#endif
-
-
 /**@brief Handle server lifetime.
  */
 #if (APP_USE_CONTABO != 1)
@@ -1892,8 +1642,7 @@ int main(void)
 
 #if CONFIG_DK_LIBRARY
     // Initialize LEDs and Buttons.
-    app_buttons_leds_init();
-    app_check_buttons_pressed();
+    buttons_and_leds_init();
 #endif
 
     // Initialize device from flash.
@@ -1942,19 +1691,6 @@ int main(void)
 #endif
 
     work_init();
-
-#if (CONFIG_DK_LIBRARY && CONFIG_SHELL)
-    // Switch 2 in right position will enter maintenance mode
-    u32_t button_state = 0;
-    dk_read_buttons(&button_state, NULL);
-
-    if (!(button_state & 0x08))
-    {
-        printk("Entering maintenance mode!\n");
-        m_app_state = APP_STATE_IP_INTERFACE_UP;
-    }
-    else
-#endif
 
     if (lwm2m_security_bootstrapped_get(0))
     {

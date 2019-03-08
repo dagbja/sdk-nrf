@@ -11,6 +11,7 @@ project(NONE)
 
 target_sources(app PRIVATE src/main.c)
 target_sources(app PRIVATE src/at_interface.c)
+target_sources(app PRIVATE src/buttons_and_leds.c)
 target_sources(app PRIVATE src/lwm2m_conn_mon.c)
 target_sources(app PRIVATE src/lwm2m_server.c)
 target_sources(app PRIVATE src/lwm2m_security.c)
