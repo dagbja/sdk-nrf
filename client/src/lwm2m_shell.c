@@ -30,7 +30,7 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
     return 0;
 }
 
-#if CONFIG_FLASH
+
 static int cmd_config_clear(const struct shell *shell, size_t argc, char **argv)
 {
     lwm2m_security_bootstrapped_set(0, false);
@@ -239,7 +239,6 @@ static int cmd_debug_logging(const struct shell *shell, size_t argc, char **argv
 
     return 0;
 }
-#endif
 
 
 static int cmd_lwm2m_register(const struct shell *shell, size_t argc, char **argv)
@@ -401,7 +400,6 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
 }
 
 
-#if CONFIG_FLASH
 static int cmd_factory_reset(const struct shell *shell, size_t argc, char **argv)
 {
     app_factory_reset();
@@ -409,7 +407,6 @@ static int cmd_factory_reset(const struct shell *shell, size_t argc, char **argv
 
     return 0;
 }
-#endif
 
 
 static int cmd_reboot(const struct shell *shell, size_t argc, char **argv)
@@ -420,7 +417,6 @@ static int cmd_reboot(const struct shell *shell, size_t argc, char **argv)
 }
 
 
-#if CONFIG_FLASH
 SHELL_CREATE_STATIC_SUBCMD_SET(sub_config)
 {
     SHELL_CMD(print, NULL, "Print configuration", cmd_config_print),
@@ -440,7 +436,6 @@ SHELL_CREATE_STATIC_SUBCMD_SET(sub_debug)
     SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 };
-#endif
 
 
 SHELL_CREATE_STATIC_SUBCMD_SET(sub_lwm2m)
@@ -454,10 +449,8 @@ SHELL_CREATE_STATIC_SUBCMD_SET(sub_lwm2m)
 
 
 SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
-#if CONFIG_FLASH
 SHELL_CMD_REGISTER(config, &sub_config, "Instance configuration", NULL);
 SHELL_CMD_REGISTER(debug, &sub_debug, "Debug configuration", NULL);
-#endif
 SHELL_CMD_REGISTER(lwm2m, &sub_lwm2m, "LwM2M operations", NULL);
 SHELL_CMD_REGISTER(reboot, NULL, "Reboot", cmd_reboot);
 

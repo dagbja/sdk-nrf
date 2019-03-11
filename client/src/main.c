@@ -301,7 +301,6 @@ static void app_initialize_imei_msisdn(void)
 
     at_read_imei_and_msisdn();
 
-#if CONFIG_FLASH
     char last_used_msisdn[128];
     extern char msisdn[];
     const char *p_msisdn;
@@ -326,12 +325,6 @@ static void app_initialize_imei_msisdn(void)
         lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
         provision_bs_psk = true;
     }
-#else
-    if (!lwm2m_security_bootstrapped_get(0)) {
-        // Last MSISDN state is unknown, always update bootstrap sec tag.
-        provision_bs_psk = true;
-    }
-#endif
 
     if (provision_bs_psk) {
         char * p_identity = app_client_imei_msisdn();
@@ -672,13 +665,11 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     misc_data.bootstrapped = 1;
     (void)lwm2m_instance_storage_misc_data_store(&misc_data);
 
-#if CONFIG_FLASH
     APPL_LOG("Store bootstrap settings");
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
         lwm2m_instance_storage_security_store(i);
         lwm2m_instance_storage_server_store(i);
     }
-#endif
 
     milliseconds_spent = k_uptime_delta(&time_stamp);
 #if APP_USE_CONTABO
@@ -797,7 +788,6 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
 
 void app_factory_reset(void)
 {
-#if CONFIG_FLASH
     lwm2m_instance_storage_misc_data_delete();
 
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
@@ -805,12 +795,10 @@ void app_factory_reset(void)
         lwm2m_instance_storage_security_delete(i);
         lwm2m_instance_storage_server_delete(i);
     }
-#endif
 }
 
 static void app_load_flash_objects(void)
 {
-#if CONFIG_FLASH
 #if APP_ACL_DM_SERVER_HACK
     // FIXME: Init ACL for DM server[1] first to get ACL /2/0 which is according to Verizon spec
     uint32_t acl_init_order[] = { 1, 0, 2, 3 };
@@ -842,48 +830,6 @@ static void app_load_flash_objects(void)
         // storage reports that bootstrap has not been done, continue with bootstrap.
         lwm2m_security_bootstrapped_set(0, false);
     }
-#else
-    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
-    {
-        app_factory_bootstrap_server_object(i);
-    }
-
-    // Bootstrap values (will be fetched from NVS after bootstrap)
-    uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                            LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE);
-
-    // DM server
-    lwm2m_server_short_server_id_set(1, 102);
-    lwm2m_server_lifetime_set(1, 2592000);
-    lwm2m_server_min_period_set(1, 1);
-    lwm2m_server_max_period_set(1, 60);
-    lwm2m_server_disable_timeout_set(1, 86400);
-    lwm2m_server_notif_storing_set(1, 1);
-    lwm2m_server_binding_set(1, "UQS", 3);
-    lwm2m_server_client_hold_off_timer_set(1, 30);
-
-    if (lwm2m_security_bootstrapped_get(0))
-    {
-        lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
-        p_instance->acl.owner = 102;
-    }
-
-    // Repository server
-#if APP_USE_CONTABO
-    char server_3_uri[] = "coaps://vmi36865.contabo.host:6684";
-#else
-    char server_3_uri[] = "coaps://xvzwmpctii.xdev.motive.com:5684";
-#endif
-    lwm2m_security_server_uri_set(3, server_3_uri, strlen(server_3_uri));
-    lwm2m_server_short_server_id_set(3, 1000);
-    lwm2m_server_lifetime_set(3, 86400);
-    lwm2m_server_min_period_set(3, 1);
-    lwm2m_server_max_period_set(3, 6000);
-    lwm2m_server_disable_timeout_set(3, 86400);
-    lwm2m_server_notif_storing_set(3, 1);
-    lwm2m_server_binding_set(3, "UQ", 2);
-    lwm2m_server_client_hold_off_timer_set(3, 30);
-#endif
 }
 
 static void app_lwm2m_create_objects(void)

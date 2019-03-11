@@ -15,8 +15,6 @@
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_firmware.h>
 
-#if CONFIG_FLASH
-
 /* NVS-related defines */
 #define NVS_SECTOR_SIZE    DT_FLASH_ERASE_BLOCK_SIZE    /* Multiple of FLASH_PAGE_SIZE */
 #define NVS_SECTOR_COUNT   2                            /* At least 2 sectors */
@@ -675,5 +673,3 @@ int32_t lwm2m_debug_settings_store(const debug_settings_t * debug_settings)
 {
     return nvs_write(&fs, LWM2M_INSTANCE_STORAGE_DEBUG_SETTINGS, debug_settings, sizeof(*debug_settings));
 }
-
-#endif // CONFIG_FLASH
