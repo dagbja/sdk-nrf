@@ -25,10 +25,6 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <buttons_and_leds.h>
 #endif
 
-#if CONFIG_AT_HOST_LIBRARY
-#include <at_host.h>
-#endif
-
 #include <net/coap_api.h>
 #include <net/coap_option.h>
 #include <net/coap_message.h>
@@ -1500,13 +1496,6 @@ int main(void)
     // Enable fidoless logging after enabling LTE link.
     app_debug_modem_logging_enable();
 
-#if CONFIG_AT_HOST_LIBRARY
-    int at_host_err = at_host_init(CONFIG_AT_HOST_UART, CONFIG_AT_HOST_TERMINATION);
-    if (at_host_err != 0) {
-        LOG_ERR("AT Host not initialized");
-    }
-#endif
-
     app_work_init();
 
     if (lwm2m_security_bootstrapped_get(0))
@@ -1542,15 +1531,5 @@ int main(void)
         {
             app_lwm2m_observer_process();
         }
-
-#if CONFIG_AT_HOST_LIBRARY
-        if (at_host_err == 0) {
-            at_host_process();
-        }
-#endif
     }
 }
-
-/**
- * @}
- */
