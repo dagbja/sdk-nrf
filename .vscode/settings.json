@@ -1,6 +1,6 @@
 {
     "cmake.environment": {
-        "BOARD": "nrf9160_pca10090",
+        "BOARD": "nrf9160_pca10090ns",
         "ZEPHYR_TOOLCHAIN_VARIANT": "gnuarmemb",
         "GNUARMEMB_TOOLCHAIN_PATH":"/usr/local/gcc-arm-none-eabi-7-2018-q2-update",
         "ZEPHYR_BASE": "${workspaceRoot}/../zephyr"
