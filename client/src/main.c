@@ -139,6 +139,9 @@ static volatile uint16_t    m_server_instance;                                  
 static volatile bool        m_did_bootstrap;
 static volatile uint16_t    m_update_server;
 
+static char m_imei[16];
+static char m_msisdn[16];
+
 // TODO: different retries for different vendors?
 #if APP_USE_CONTABO
 static s32_t app_retry_delay[] = { 2, 4, 6, 8, 24*60 };
@@ -196,6 +199,16 @@ app_state_t app_state_get(void)
 void app_state_set(app_state_t app_state)
 {
     m_app_state = app_state;
+}
+
+char *app_imei_get(void)
+{
+    return m_imei;
+}
+
+char *app_msisdn_get(void)
+{
+    return m_msisdn;
 }
 
 bool app_did_bootstrap(void)
@@ -265,11 +278,8 @@ static char * app_client_imei_msisdn(void)
     static char client_id[128];
 
     if (client_id[0] == 0) {
-        extern char imei[];
-        extern char msisdn[];
-
-        const char * p_imei = imei;
-        const char * p_msisdn = msisdn;
+        const char * p_imei = m_imei;
+        const char * p_msisdn = m_msisdn;
 
         const char * p_debug_imei = app_debug_imei_get();
         if (p_debug_imei && p_debug_imei[0]) {
@@ -295,17 +305,16 @@ static void app_initialize_imei_msisdn(void)
 {
     bool provision_bs_psk = false;
 
-    at_read_imei_and_msisdn();
+    (void)at_read_imei_and_msisdn(m_imei, sizeof(m_imei), m_msisdn, sizeof(m_msisdn));
 
     char last_used_msisdn[128];
-    extern char msisdn[];
     const char *p_msisdn;
 
     const char * p_debug_msisdn = app_debug_msisdn_get();
     if (p_debug_msisdn && p_debug_msisdn[0]) {
         p_msisdn = p_debug_msisdn;
     } else {
-        p_msisdn = msisdn;
+        p_msisdn = m_msisdn;
     }
 
     int32_t len = lwm2m_last_used_msisdn_get(last_used_msisdn, sizeof(last_used_msisdn));

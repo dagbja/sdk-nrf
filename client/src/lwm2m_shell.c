@@ -133,9 +133,6 @@ static int cmd_config_lifetime(const struct shell *shell, size_t argc, char **ar
 
 static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
 {
-    extern char imei[];
-    extern char msisdn[];
-
     const char * p_debug_imei = app_debug_imei_get();
     const char * p_debug_msisdn = app_debug_msisdn_get();
 
@@ -143,12 +140,12 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     if (p_debug_imei && p_debug_imei[0]) {
         shell_print(shell, "  IMEI           %s (static)", p_debug_imei);
     } else {
-        shell_print(shell, "  IMEI           %s", imei);
+        shell_print(shell, "  IMEI           %s", app_imei_get());
     }
     if (p_debug_msisdn && p_debug_msisdn[0]) {
         shell_print(shell, "  MSISDN         %s (static)", p_debug_msisdn);
     } else {
-        shell_print(shell, "  MSISDN         %s", msisdn);
+        shell_print(shell, "  MSISDN         %s", app_msisdn_get());
     }
     shell_print(shell, "  Logging        %s", app_debug_modem_logging_get());
 

@@ -11,21 +11,24 @@
 #define APP_MAX_AT_READ_LENGTH          256
 #define APP_MAX_AT_WRITE_LENGTH         256
 
-char imei[16];
-char msisdn[16];
 
-void at_read_imei_and_msisdn(void)
+int at_read_imei_and_msisdn(char *p_imei, int imei_len, char *p_msisdn, int msisdn_len)
 {
     char write_buffer[APP_MAX_AT_WRITE_LENGTH];
     char read_buffer[APP_MAX_AT_READ_LENGTH];
 
     int at_socket_fd;
     int length;
+    int retval = 0;
+
+    if (imei_len < 15 || msisdn_len < 10) {
+        return EINVAL;
+    }
 
     at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
     if (at_socket_fd < 0) {
         printk("socket() failed\n");
-        return;
+        return EIO;
     }
 
     // Read IMEI
@@ -34,15 +37,17 @@ void at_read_imei_and_msisdn(void)
     length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
 
     if (length == strlen(write_buffer)) {
-        memset(imei, 0, sizeof(imei));
+        memset(p_imei, 0, imei_len);
         length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
         if (length > 0) {
-            memcpy(imei, read_buffer, 15);
+            memcpy(p_imei, read_buffer, 15);
         } else {
             printk("recv(%s) failed\n", at_cgsn);
+            retval = EIO;
         }
     } else {
         printk("send(%s) failed\n", at_cgsn);
+        retval = EIO;
     }
 
     // Read MSISDN
@@ -51,7 +56,7 @@ void at_read_imei_and_msisdn(void)
     length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
 
     if (length == strlen(write_buffer)) {
-        memset(msisdn, 0, sizeof(msisdn));
+        memset(p_msisdn, 0, msisdn_len);
         length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
         if (length > 0) {
             char * p_start = strstr(read_buffer, "\"");
@@ -59,36 +64,41 @@ void at_read_imei_and_msisdn(void)
                 char * p_end = strstr(p_start + 1, "\"");
                 if (p_end && (p_end - p_start - 1 >= 10)) {
                     // FIXME: This only uses the last 10 digits
-                    memcpy(msisdn, p_end - 10, 10);
+                    memcpy(p_msisdn, p_end - 10, 10);
                 }
             }
-            if (!msisdn[0]) {
+            if (!p_msisdn[0]) {
                 // SIM has no number
-                memcpy(msisdn, "0000000000", 10);
+                memcpy(p_msisdn, "0000000000", 10);
             }
         } else {
             printk("recv(%s) failed\n", at_cnum);
+            retval = EIO;
         }
     } else {
         printk("send(%s) failed\n", at_cnum);
+        retval = EIO;
     }
 
     close(at_socket_fd);
+
+    return retval;
 }
 
 
-void at_send_command(const char *at_command, bool do_logging)
+int at_send_command(const char *at_command, bool do_logging)
 {
     char write_buffer[APP_MAX_AT_WRITE_LENGTH];
     char read_buffer[APP_MAX_AT_READ_LENGTH];
 
     int at_socket_fd;
     int length;
+    int retval = 0;
 
     at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
     if (at_socket_fd < 0) {
         printk("socket() failed\n");
-        return;
+        return EIO;
     }
 
     if (do_logging) {
@@ -106,10 +116,14 @@ void at_send_command(const char *at_command, bool do_logging)
             }
         } else {
             printk("recv() failed\n");
+            retval = EIO;
         }
     } else {
         printk("send() failed\n");
+        retval = EIO;
     }
 
     close(at_socket_fd);
+
+    return retval;
 }

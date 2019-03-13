@@ -37,6 +37,8 @@ typedef enum
 #if (CONFIG_SHELL || CONFIG_DK_LIBRARY)
 app_state_t app_state_get(void);
 void app_state_set(app_state_t app_state);
+char *app_imei_get(void);
+char *app_msisdn_get(void);
 
 void app_update_server(uint16_t update_server);
 bool app_did_bootstrap(void);
