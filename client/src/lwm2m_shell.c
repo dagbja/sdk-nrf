@@ -414,35 +414,33 @@ static int cmd_reboot(const struct shell *shell, size_t argc, char **argv)
 }
 
 
-SHELL_CREATE_STATIC_SUBCMD_SET(sub_config)
-{
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_config,
     SHELL_CMD(print, NULL, "Print configuration", cmd_config_print),
     SHELL_CMD(clear, NULL, "Clear bootstrapped values", cmd_config_clear),
     SHELL_CMD(uri, NULL, "Set URI", cmd_config_uri),
     SHELL_CMD(lifetime, NULL, "Set lifetime", cmd_config_lifetime),
     SHELL_CMD(factory_reset, NULL, "Factory reset", cmd_factory_reset),
     SHELL_SUBCMD_SET_END /* Array terminated. */
-};
+);
 
-SHELL_CREATE_STATIC_SUBCMD_SET(sub_debug)
-{
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(print, NULL, "Print configuration", cmd_debug_print),
     SHELL_CMD(reset, NULL, "Reset configuration", cmd_debug_reset),
     SHELL_CMD(imei, NULL, "Set static IMEI", cmd_debug_imei),
     SHELL_CMD(msisdn, NULL, "Set static MSISDN", cmd_debug_msisdn),
     SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
     SHELL_SUBCMD_SET_END /* Array terminated. */
-};
+);
 
 
-SHELL_CREATE_STATIC_SUBCMD_SET(sub_lwm2m)
-{
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_lwm2m,
     SHELL_CMD(status, NULL, "Application status", cmd_lwm2m_status),
     SHELL_CMD(register, NULL, "Register server", cmd_lwm2m_register),
     SHELL_CMD(update, NULL, "Update server", cmd_lwm2m_update),
     SHELL_CMD(deregister, NULL, "Deregister server", cmd_lwm2m_deregister),
     SHELL_SUBCMD_SET_END /* Array terminated. */
-};
+);
 
 
 SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
