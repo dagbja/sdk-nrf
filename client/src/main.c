@@ -519,7 +519,7 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
     {
         s32_t retry_delay = app_retry_delay[m_server_settings[instance_id].retry_count];
 
-        APPL_LOG("Retry delay for %d minutes..., server %u", retry_delay / 60, instance_id);
+        APPL_LOG("Retry delay for %d minutes (server %u)", retry_delay / 60, instance_id);
         k_delayed_work_submit(&state_update_work, retry_delay * 1000);
 
         m_server_settings[instance_id].retry_count++;
@@ -655,7 +655,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     m_lwm2m_transport[m_server_instance] = -1;
 
     m_app_state = APP_STATE_BOOTSTRAPPED;
-    m_server_settings[0].retry_count = 0;
+    m_server_settings[m_server_instance].retry_count = 0;
 
     time_stamp = k_uptime_get();
 
@@ -947,15 +947,16 @@ static void app_bootstrap_connect(void)
             m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
             // Check for no IPv6 support (EINVAL) and no response (ENETUNREACH)
             if (err_code == EIO && (errno == EINVAL || errno == ENETUNREACH)) {
-                app_handle_connect_retry(0, true);
+                app_handle_connect_retry(m_server_instance, true);
             } else {
-                app_handle_connect_retry(0, false);
+                app_handle_connect_retry(m_server_instance, false);
             }
         }
     }
     else
     {
         APPL_LOG("NON-SECURE session (bootstrap)");
+        m_app_state = APP_STATE_BS_CONNECTED;
     }
 }
 
@@ -1025,7 +1026,6 @@ static void app_server_connect(void)
         {
             m_app_state = APP_STATE_SERVER_CONNECTED;
             m_lwm2m_transport[m_server_instance] = local_port.transport;
-            m_server_settings[m_server_instance].retry_count = 0;
         }
         else if (err_code == EINPROGRESS)
         {
@@ -1149,6 +1149,7 @@ static void app_wait_state_update(struct k_work *work)
 
         case APP_STATE_BOOTSTRAPPING:
             // Timeout waiting for bootstrap to finish
+            app_disconnect();
             m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
             app_handle_connect_retry(0, false);
             break;
@@ -1212,10 +1213,8 @@ static bool app_coap_socket_poll(void)
             // Writing is now possible.
             if (m_app_state == APP_STATE_BS_CONNECT_WAIT) {
                 m_app_state = APP_STATE_BS_CONNECTED;
-                m_server_settings[i].retry_count = 0;
             } else if (m_app_state == APP_STATE_SERVER_CONNECT_WAIT) {
                 m_app_state = APP_STATE_SERVER_CONNECTED;
-                m_server_settings[i].retry_count = 0;
             }
         }
 
@@ -1269,11 +1268,6 @@ static void app_lwm2m_process(void)
         case APP_STATE_BS_CONNECT:
         {
             APPL_LOG("app_bootstrap_connect");
-            if (m_lwm2m_transport[m_server_instance] != -1)
-            {
-                // Already connected. Disconnect first.
-                app_disconnect();
-            }
             app_bootstrap_connect();
             break;
         }
