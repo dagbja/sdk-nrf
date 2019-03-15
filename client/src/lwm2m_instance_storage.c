@@ -76,6 +76,7 @@ typedef struct __attribute__((__packed__))
     uint8_t notif_storing;
 
     // Offsets into data post static sized values.
+    uint16_t offset_binding;
     uint16_t offset_carrier_specific;
     uint16_t offset_acl;
 } storage_server_t;
@@ -324,6 +325,10 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
     lwm2m_server_disable_timeout_set(instance_id, p_storage_server->disable_timeout);
     lwm2m_server_notif_storing_set(instance_id, p_storage_server->notif_storing);
 
+    // Set binding.
+    uint8_t binding_len = p_storage_server->offset_carrier_specific - p_storage_server->offset_binding;
+    lwm2m_server_binding_set(instance_id, &p_scratch_buffer[p_storage_server->offset_binding], binding_len);
+
     // Set carrier specific data if bootstrap server.
     if (p_storage_server->offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET)
     {
@@ -356,12 +361,17 @@ int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
 {
     u16_t id = LWM2M_INSTANCE_STORAGE_BASE_SERVER + instance_id;
 
+    // Fetch binding.
+    uint8_t binding_len;
+    char * binding = lwm2m_server_binding_get(instance_id, &binding_len);
+
     // Locate the ACL of the instance.
     lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
     lwm2m_instance_acl_t * p_acl = &p_instance->acl;
 
     uint16_t total_entry_len = 0;
     total_entry_len += sizeof(storage_server_t);
+    total_entry_len += binding_len;
     total_entry_len += sizeof(lwm2m_instance_acl_t); // Full ACL to be dumped. Due to default ACL index 0.
 
     storage_server_t temp_storage;
@@ -373,20 +383,22 @@ int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
     temp_storage.default_max_period = lwm2m_server_max_period_get(instance_id);
     temp_storage.disable_timeout    = lwm2m_server_disable_timeout_get(instance_id);
     temp_storage.notif_storing      = lwm2m_server_notif_storing_get(instance_id);
+    temp_storage.offset_binding     = sizeof(storage_server_t); // Where storage_server_t ends.
 
     // if bootstrap server.
     if (instance_id == 0)
     {
         temp_storage.offset_carrier_specific = LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET;
-        temp_storage.offset_acl              = sizeof(storage_server_t);
+        temp_storage.offset_acl              = temp_storage.offset_binding + binding_len;
     } else {
         total_entry_len += sizeof(vzw_server_settings_t);
-        temp_storage.offset_carrier_specific = sizeof(storage_server_t);
+        temp_storage.offset_carrier_specific = temp_storage.offset_binding + binding_len;
         temp_storage.offset_acl              = temp_storage.offset_carrier_specific + sizeof(vzw_server_settings_t);
     }
 
     uint8_t * p_scratch_buffer = lwm2m_malloc(total_entry_len);
     memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_server_t));
+    memcpy(&p_scratch_buffer[temp_storage.offset_binding], binding, binding_len);
     memcpy(&p_scratch_buffer[temp_storage.offset_acl], p_acl, sizeof(lwm2m_instance_acl_t));
 
     // If not bootstrap server.
