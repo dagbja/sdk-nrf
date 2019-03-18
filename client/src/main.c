@@ -984,6 +984,8 @@ static void app_server_connect(void)
     // Initialize server configuration structure.
     memset(&m_server_conf[m_server_instance], 0, sizeof(lwm2m_server_config_t));
     m_server_conf[m_server_instance].lifetime = lwm2m_server_lifetime_get(m_server_instance);
+    m_server_conf[m_server_instance].binding.p_val = "UQS";
+    m_server_conf[m_server_instance].binding.len = 3;
 
     // Set the short server id of the server in the config.
     m_server_conf[m_server_instance].short_server_id = lwm2m_server_short_server_id_get(m_server_instance);
