@@ -70,10 +70,10 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
             break;
 
         case APP_STATE_BS_CONNECT:
+        case APP_STATE_BS_CONNECT_WAIT:
             *blink = (DK_LED1_MSK | DK_LED2_MSK);
             break;
 
-        case APP_STATE_BS_CONNECT_WAIT:
         case APP_STATE_BS_CONNECT_RETRY_WAIT:
             *blink = (DK_LED2_MSK | DK_LED4_MSK);
             break;
@@ -99,10 +99,10 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
             break;
 
         case APP_STATE_SERVER_CONNECT:
+        case APP_STATE_SERVER_CONNECT_WAIT:
             *blink = (DK_LED1_MSK | DK_LED3_MSK);
             break;
 
-        case APP_STATE_SERVER_CONNECT_WAIT:
         case APP_STATE_SERVER_CONNECT_RETRY_WAIT:
             *blink = (DK_LED3_MSK | DK_LED4_MSK);
             break;
