@@ -45,6 +45,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <common.h>
 #include <main.h>
 
+#define APP_NON_BLOCKING_SOCKETS        0 // Use NON_BLOCKING sockets support and poll() to check status
 #define APP_MOTIVE_NO_REBOOT            1 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_CONTABO                 0
@@ -926,7 +927,11 @@ static void app_bootstrap_connect(void)
             .addr         = &local_addr,
             .setting      = &setting,
             .protocol     = IPPROTO_DTLS_1_2,
+#if APP_NON_BLOCKING_SOCKETS
             .non_blocking = true
+#else
+            .non_blocking = false
+#endif
         };
 
         // NOTE: This method initiates a DTLS handshake and may block for a some seconds.
@@ -1016,7 +1021,11 @@ static void app_server_connect(void)
             .addr         = &local_addr,
             .setting      = &setting,
             .protocol     = IPPROTO_DTLS_1_2,
+#if APP_NON_BLOCKING_SOCKETS
             .non_blocking = true
+#else
+            .non_blocking = false
+#endif
         };
 
         // NOTE: This method initiates a DTLS handshake and may block for some seconds.
@@ -1170,6 +1179,7 @@ static void app_wait_state_update(struct k_work *work)
     }
 }
 
+#if APP_NON_BLOCKING_SOCKETS
 static bool app_coap_socket_poll(void)
 {
     struct pollfd fds[1+LWM2M_MAX_SERVERS];
@@ -1256,12 +1266,17 @@ static bool app_coap_socket_poll(void)
 
     return data_ready;
 }
+#endif
 
 static void app_lwm2m_process(void)
 {
+#if APP_NON_BLOCKING_SOCKETS
     if (app_coap_socket_poll()) {
         coap_input();
     }
+#else
+    coap_input();
+#endif
 
     switch (m_app_state)
     {
