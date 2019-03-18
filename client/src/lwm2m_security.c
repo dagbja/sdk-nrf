@@ -357,24 +357,16 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
         m_instance_security[instance_id].proto.object_id   = p_object->object_id;
         m_instance_security[instance_id].proto.callback    = security_instance_callback;
 
-        if (lwm2m_instance_storage_security_store(instance_id) == 0)
-        {
-            // No ACL object for security objects.
-            ((lwm2m_instance_t *)&m_instance_security[instance_id])->acl.id = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
+        // No ACL object for security objects.
+        ((lwm2m_instance_t *)&m_instance_security[instance_id])->acl.id = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
 
-            // Cast the instance to its prototype and add it to the CoAP handler to become a
-            // public instance. We can only have one so we delete the first if any.
-            (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_security[instance_id]);
+        // Cast the instance to its prototype and add it to the CoAP handler to become a
+        // public instance. We can only have one so we delete the first if any.
+        (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_security[instance_id]);
 
-            (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_security[instance_id]);
+        (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_security[instance_id]);
 
-            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-        }
-        else
-        {
-            // URI was too long to be copied.
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-        }
+        (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
     }
     else
     {

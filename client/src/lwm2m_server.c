@@ -408,24 +408,17 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
         m_instance_server[instance_id].proto.object_id   = p_object->object_id;
         m_instance_server[instance_id].proto.callback    = server_instance_callback;
 
-        if (lwm2m_instance_storage_server_store(instance_id) == 0)
-        {
-            // Cast the instance to its prototype and add it.
-            (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_server[instance_id]);
-            (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[instance_id]);
+        // Cast the instance to its prototype and add it.
+        (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_server[instance_id]);
+        (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[instance_id]);
 
-            // Initialize ACL on the instance
-            // The owner (second parameter) is set to LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID.
-            // This will grant the Bootstrap server full permission to this instance.
-            (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[instance_id],
-                                            LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
+        // Initialize ACL on the instance
+        // The owner (second parameter) is set to LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID.
+        // This will grant the Bootstrap server full permission to this instance.
+        (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[instance_id],
+                                         LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
 
-            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-        }
-        else
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-        }
+        (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
     }
     else
     {
