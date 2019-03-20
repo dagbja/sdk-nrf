@@ -57,7 +57,7 @@ typedef struct __attribute__((__packed__))
 typedef struct __attribute__((__packed__))
 {
     uint8_t  boostrap_server;
-    uint16_t client_hold_off_time;
+    int32_t client_hold_off_time;
     uint16_t short_server_id;
 
     // Offsets into data post static sized values.
@@ -69,10 +69,10 @@ typedef struct __attribute__((__packed__))
 typedef struct __attribute__((__packed__))
 {
     uint16_t short_server_id;
-    uint16_t lifetime;
-    uint16_t default_min_period;
-    uint16_t default_max_period;
-    uint8_t disable_timeout;
+    int32_t lifetime;
+    int32_t default_min_period;
+    int32_t default_max_period;
+    int32_t disable_timeout;
     uint8_t notif_storing;
 
     // Offsets into data post static sized values.
