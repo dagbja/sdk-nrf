@@ -46,6 +46,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <main.h>
 
 #define APP_NON_BLOCKING_SOCKETS        0 // Use NON_BLOCKING sockets support and poll() to check status
+#define APP_SMS_SUPPORT                 0 // To indicate SMS support. This affects how we get the /1/0/8 request
 #define APP_MOTIVE_NO_REBOOT            1 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_CONTABO                 0
@@ -984,8 +985,11 @@ static void app_server_connect(void)
     // Initialize server configuration structure.
     memset(&m_server_conf[m_server_instance], 0, sizeof(lwm2m_server_config_t));
     m_server_conf[m_server_instance].lifetime = lwm2m_server_lifetime_get(m_server_instance);
+
+#if APP_SMS_SUPPORT
     m_server_conf[m_server_instance].binding.p_val = "UQS";
     m_server_conf[m_server_instance].binding.len = 3;
+#endif
 
     // Set the short server id of the server in the config.
     m_server_conf[m_server_instance].short_server_id = lwm2m_server_short_server_id_get(m_server_instance);
