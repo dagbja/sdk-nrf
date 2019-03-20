@@ -301,8 +301,13 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         shell_print(shell, "Bootstrap completed [%s]", (app_family_type_get(0) == AF_INET6) ? "IPv6" : "IPv4");
     }
 
-    if (app_server_instance() == 3) {
-        shell_print(shell, "Server 1 registered [%s]", (app_family_type_get(1) == AF_INET6) ? "IPv6" : "IPv4");
+    uint16_t current_instance = app_server_instance();
+    for (int i = 1; i < current_instance; i++) {
+        uint8_t uri_len = 0;
+        (void)lwm2m_security_server_uri_get(i, &uri_len);
+        if (uri_len > 0) {
+            shell_print(shell, "Server %d registered [%s]", i, (app_family_type_get(i) == AF_INET6) ? "IPv6" : "IPv4");
+        }
     }
 
     switch(app_state_get())

@@ -574,13 +574,18 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             lwm2m_server_registered_set(m_server_instance, true);
 
             uint8_t uri_len = 0;
-            (void)lwm2m_security_server_uri_get(3, &uri_len);
-            if ((m_server_instance == 1) && (uri_len > 0)) {
-                m_app_state = APP_STATE_SERVER_CONNECT;
-                m_server_instance = 3;
+            for (int i = m_server_instance+1; i < 1+LWM2M_MAX_SERVERS; i++) {
+                // Only connect to servers having a URI.
+                (void)lwm2m_security_server_uri_get(i, &uri_len);
+                if (uri_len > 0) {
+                    m_app_state = APP_STATE_SERVER_CONNECT;
+                    m_server_instance = i;
+                    break;
+                }
             }
-            else
-            {
+
+            if (uri_len == 0) {
+                // No more servers to connect
                 m_app_state = APP_STATE_SERVER_REGISTERED;
             }
         }
