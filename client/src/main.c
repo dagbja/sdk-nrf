@@ -1198,6 +1198,7 @@ static bool app_coap_socket_poll(void)
 {
     struct pollfd fds[1+LWM2M_MAX_SERVERS];
     int nfds = 0;
+    int ret = 0;
 
     // Find active sockets
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
@@ -1215,10 +1216,15 @@ static bool app_coap_socket_poll(void)
         }
     }
 
-    int ret = poll(fds, nfds, K_FOREVER);
+    if (nfds > 0) {
+        ret = poll(fds, nfds, 1000);
+    } else {
+        // No active sockets to poll.
+        k_sleep(1000);
+    }
 
     if (ret == 0) {
-        // Timeout should not happen when using K_FOREVER
+        // Timeout; nothing more to check.
         return false;
     } else if (ret < 0) {
         printk("poll error: %d", errno);
