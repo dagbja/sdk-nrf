@@ -603,10 +603,19 @@ void lwm2m_notification(lwm2m_notification_type_t type,
         // We have successfully deregistered current server instance.
         lwm2m_server_registered_set(m_server_instance, false);
 
-        if (m_server_instance == 3) {
-            m_app_state = APP_STATE_SERVER_DEREGISTER;
-            m_server_instance = 1;
-        } else {
+        uint8_t uri_len = 0;
+        for (int i = m_server_instance-1; i > 0; i--) {
+            // Only disconnect from servers having a URI.
+            (void)lwm2m_security_server_uri_get(i, &uri_len);
+            if (uri_len > 0) {
+                m_app_state = APP_STATE_SERVER_DEREGISTER;
+                m_server_instance = i;
+                break;
+            }
+        }
+
+        if (uri_len == 0) {
+            // No more servers to disconnect
             m_app_state = APP_STATE_DISCONNECT;
         }
     }
