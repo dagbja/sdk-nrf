@@ -745,7 +745,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
 
             lwm2m_security_server_uri_set(0, BOOTSTRAP_URI, strlen(BOOTSTRAP_URI));
             lwm2m_security_is_bootstrap_server_set(0, true);
-            lwm2m_security_bootstrapped_set(0, 0);
+            lwm2m_security_bootstrapped_set(0, false);
 
             acl.access[0] = rwde_access;
             acl.server[0] = 102;
@@ -1470,7 +1470,7 @@ static void app_connection_update(struct k_work *work)
 {
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
         if (work == (struct k_work *)&connection_update_work[i]) {
-            if (lwm2m_server_registered_get(i) || lwm2m_security_bootstrapped_get(i)) {
+            if (lwm2m_server_registered_get(i)) {
                 app_server_update(i);
             }
             break;
