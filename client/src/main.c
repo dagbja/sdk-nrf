@@ -617,6 +617,8 @@ uint32_t lwm2m_handler_error(uint16_t           short_server_id,
                              coap_message_t   * p_request,
                              uint32_t           err_code)
 {
+    uint32_t retval = 0;
+
     // LWM2M will send an answer to the server based on the error code.
     switch (err_code)
     {
@@ -634,10 +636,11 @@ uint32_t lwm2m_handler_error(uint16_t           short_server_id,
 
         default:
             // Pass error to lower layer which will send out INTERNAL_SERVER_ERROR.
+            retval = err_code;
             break;
     }
 
-    return err_code;
+    return retval;
 }
 
 /**@brief Callback function for the named bootstrap complete object. */
