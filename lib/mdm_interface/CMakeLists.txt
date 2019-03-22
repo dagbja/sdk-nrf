@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
 #
 
-zephyr_sources(
+zephyr_sources_ifdef(CONFIG_MDM_INTERFACE
     src/lwm2m_at_interface.c
 )
 
