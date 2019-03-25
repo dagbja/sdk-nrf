@@ -944,12 +944,7 @@ static void app_bootstrap_connect(void)
         {
             .addr         = &local_addr,
             .setting      = &setting,
-            .protocol     = IPPROTO_DTLS_1_2,
-#if APP_NON_BLOCKING_SOCKETS
-            .non_blocking = true
-#else
-            .non_blocking = false
-#endif
+            .protocol     = IPPROTO_DTLS_1_2
         };
 
         // NOTE: This method initiates a DTLS handshake and may block for a some seconds.
@@ -1043,12 +1038,7 @@ static void app_server_connect(void)
         {
             .addr         = &local_addr,
             .setting      = &setting,
-            .protocol     = IPPROTO_DTLS_1_2,
-#if APP_NON_BLOCKING_SOCKETS
-            .non_blocking = true
-#else
-            .non_blocking = false
-#endif
+            .protocol     = IPPROTO_DTLS_1_2
         };
 
         // NOTE: This method initiates a DTLS handshake and may block for some seconds.
