@@ -11,7 +11,6 @@
 #define APP_MAX_AT_READ_LENGTH          256
 #define APP_MAX_AT_WRITE_LENGTH         256
 
-
 int at_read_imei_and_msisdn(char *p_imei, int imei_len, char *p_msisdn, int msisdn_len)
 {
     char write_buffer[APP_MAX_AT_WRITE_LENGTH];
@@ -85,6 +84,54 @@ int at_read_imei_and_msisdn(char *p_imei, int imei_len, char *p_msisdn, int msis
     return retval;
 }
 
+int at_read_sim_iccid(char *p_iccid, int iccid_len)
+{
+    char write_buffer[APP_MAX_AT_WRITE_LENGTH];
+    char read_buffer[APP_MAX_AT_READ_LENGTH];
+
+    int at_socket_fd;
+    int length;
+    int retval = 0;
+
+    if (iccid_len < 20) {
+        return EINVAL;
+    }
+
+    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
+    if (at_socket_fd < 0) {
+        printk("socket() failed\n");
+        return EIO;
+    }
+
+    // Read SIM ICCID
+    const char *at_crsm = "AT+CRSM=176,12258,0,0,10";
+    snprintf(write_buffer, APP_MAX_AT_WRITE_LENGTH, "%s", at_crsm);
+    length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
+
+    if (length == strlen(write_buffer)) {
+        memset(p_iccid, 0, iccid_len);
+        length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
+        if (length > 0) {
+            char * p_start = strstr(read_buffer, "\"");
+            if (p_start) {
+                char * p_end = strstr(p_start + 1, "\"");
+                if (p_end && (p_end - p_start - 1 >= 20)) {
+                    memcpy(p_iccid, p_end - 20, 20);
+                }
+            }
+        } else {
+            printk("recv(%s) failed\n", at_crsm);
+            retval = EIO;
+        }
+    } else {
+        printk("send(%s) failed\n", at_crsm);
+        retval = EIO;
+    }
+
+    close(at_socket_fd);
+
+    return retval;
+}
 
 int at_send_command(const char *at_command, bool do_logging)
 {

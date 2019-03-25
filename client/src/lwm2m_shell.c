@@ -14,6 +14,7 @@
 #include <lwm2m_instance_storage.h>
 #include <lwm2m_security.h>
 #include <lwm2m_server.h>
+#include <lwm2m_device.h>
 #include <at_interface.h>
 #include <main.h>
 
@@ -147,6 +148,14 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     } else {
         shell_print(shell, "  MSISDN         %s", app_msisdn_get());
     }
+
+    uint32_t iccid_len;
+    char * p_iccid = lwm2m_device_get_sim_iccid(&iccid_len);
+    char iccid[21];
+    memcpy(iccid, p_iccid, 20);
+    iccid[20] = 0;
+    shell_print(shell, "  SIM ICCID      %s", iccid);
+
     shell_print(shell, "  Logging        %s", app_debug_modem_logging_get());
 
     return 0;

@@ -14,6 +14,9 @@
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
 #include <common.h>
+#include <at_interface.h>
+
+#define VERIZON_RESOURCE 30000
 
 extern void app_request_reboot(void);
 extern void app_factory_reset(void);
@@ -22,10 +25,36 @@ extern void app_factory_reset(void);
 
 static lwm2m_object_t m_object_device;    /**< Device base object. */
 static lwm2m_device_t m_instance_device;  /**< Device object instance. */
+static lwm2m_string_t m_verizon_resources[2];
+
+static uint32_t tlv_device_verizon_encode(uint16_t instance_id, uint8_t * p_buffer, uint32_t * p_buffer_len)
+{
+    ARG_UNUSED(instance_id);
+
+    lwm2m_list_t list =
+    {
+        .type         = LWM2M_LIST_TYPE_STRING,
+        .val.p_string = m_verizon_resources,
+        .len          = 2,
+        .max_len      = ARRAY_SIZE(m_verizon_resources)
+    };
+
+    return lwm2m_tlv_list_encode(p_buffer, p_buffer_len, VERIZON_RESOURCE, &list);
+}
 
 static uint32_t tlv_device_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
 {
     return 0;
+}
+
+char * lwm2m_device_get_sim_iccid(uint32_t * iccid_len)
+{
+    if (iccid_len == NULL) {
+        return NULL;
+    }
+
+    *iccid_len = m_verizon_resources[0].len;
+    return m_verizon_resources[0].p_val;
 }
 
 /**@brief Callback function for device instances. */
@@ -68,15 +97,29 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
         uint8_t  buffer[200];
         uint32_t buffer_size = sizeof(buffer);
 
-        err_code = lwm2m_tlv_device_encode(buffer,
-                                           &buffer_size,
-                                           resource_id,
-                                           &m_instance_device);
-
-        if (err_code == ENOENT)
+        if (resource_id == VERIZON_RESOURCE)
         {
-            (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
-            return 0;
+            err_code = tlv_device_verizon_encode(instance_id, buffer, &buffer_size);
+        }
+        else
+        {
+            err_code = lwm2m_tlv_device_encode(buffer,
+                                               &buffer_size,
+                                               resource_id,
+                                               &m_instance_device);
+
+            if (err_code == ENOENT)
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
+                return 0;
+            }
+
+            if (resource_id == LWM2M_NAMED_OBJECT)
+            {
+                uint32_t added_size = sizeof(buffer) - buffer_size;
+                err_code = tlv_device_verizon_encode(instance_id, buffer + buffer_size, &added_size);
+                buffer_size += added_size;
+            }
         }
 
         if (err_code != 0)
@@ -237,6 +280,13 @@ void lwm2m_device_init(void)
     m_instance_device.memory_total = 128;
 
     m_instance_device.proto.callback = device_instance_callback;
+
+    // Verizon specific SIM ICCID and HomeOrRoaming
+    m_verizon_resources[0].len = 20;
+    m_verizon_resources[0].p_val = lwm2m_malloc(m_verizon_resources[0].len);
+    (void)at_read_sim_iccid(m_verizon_resources[0].p_val, m_verizon_resources[0].len);
+    char * home_or_roaming = "Home"; // TODO: Read from AT+CEREG?
+    (void)lwm2m_bytebuffer_to_string(home_or_roaming, strlen(home_or_roaming), &m_verizon_resources[1]);
 
     // Set bootstrap server as owner.
     (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_device,
