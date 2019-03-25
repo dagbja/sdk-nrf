@@ -41,6 +41,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <lwm2m_security.h>
 #include <lwm2m_firmware.h>
 #include <lwm2m_instance_storage.h>
+#include <lwm2m_retry_delay.h>
 #include <app_debug.h>
 #include <common.h>
 #include <main.h>
@@ -144,13 +145,6 @@ static volatile uint16_t    m_update_server;
 static char m_imei[16];
 static char m_msisdn[16];
 
-// TODO: different retries for different vendors?
-#if APP_USE_CONTABO
-static s32_t app_retry_delay[] = { 2, 4, 6, 8, 24*60 };
-#else
-static s32_t app_retry_delay[] = { 2*60, 4*60, 6*60, 8*60, 24*60*60 };
-#endif
-
 /* Structures for delayed work */
 static struct k_delayed_work state_update_work;
 
@@ -168,14 +162,6 @@ static struct sockaddr m_bs_remote_server;                                      
 
 static struct sockaddr m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
 static volatile uint32_t tick_count = 0;
-
-/**@brief Bootstrap values to store in app persistent storage. */
-typedef struct
-{
-    uint32_t retry_count;         /**< The number of unsuccessful registration retries to reach the server. */
-} server_settings_t;
-
-static server_settings_t     m_server_settings[1+LWM2M_MAX_SERVERS];
 
 void app_server_update(uint16_t instance_id);
 void app_factory_reset(void);
@@ -221,16 +207,6 @@ bool app_did_bootstrap(void)
 uint16_t app_server_instance(void)
 {
     return m_server_instance;
-}
-
-uint32_t app_server_retry_count(uint16_t instance_id)
-{
-    return m_server_settings[instance_id].retry_count;
-}
-
-int32_t app_retry_delay_get(uint16_t instance_id)
-{
-    return app_retry_delay[m_server_settings[instance_id].retry_count - 1];
 }
 
 sa_family_t app_family_type_get(uint16_t instance_id)
@@ -487,21 +463,6 @@ void app_request_reboot(void)
 /**@brief Helper function to handle a connect retry. */
 void app_handle_connect_retry(int instance_id, bool no_reply)
 {
-    if (instance_id == 0 && m_server_settings[instance_id].retry_count == sizeof(app_retry_delay) - 1)
-    {
-        // Bootstrap retry does not use the last retry value and does not continue before next power up.
-        m_app_state = APP_STATE_IP_INTERFACE_UP;
-        m_server_settings[instance_id].retry_count = 0;
-        APPL_LOG("Bootstrap procedure failed");
-        return;
-    }
-
-    if (m_server_settings[instance_id].retry_count == sizeof app_retry_delay)
-    {
-        // Retry counter wrap around
-        m_server_settings[instance_id].retry_count = 0;
-    }
-
     bool start_retry_delay = true;
 
     if (no_reply)
@@ -519,12 +480,17 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
 
     if (start_retry_delay)
     {
-        s32_t retry_delay = app_retry_delay[m_server_settings[instance_id].retry_count];
+        s32_t retry_delay = lwm2m_retry_delay_get(instance_id, true);
+
+        if (retry_delay == -1) {
+            APPL_LOG("Bootstrap procedure failed");
+            m_app_state = APP_STATE_IP_INTERFACE_UP;
+            lwm2m_retry_delay_reset(instance_id);
+            return;
+        }
 
         APPL_LOG("Retry delay for %d minutes (server %u)", retry_delay / 60, instance_id);
         k_delayed_work_submit(&state_update_work, retry_delay * 1000);
-
-        m_server_settings[instance_id].retry_count++;
     } else {
         k_delayed_work_submit(&state_update_work, 0);
     }
@@ -570,7 +536,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
         if (coap_code == COAP_CODE_201_CREATED || coap_code == COAP_CODE_204_CHANGED)
         {
             printk("Registered %d\n", m_server_instance);
-            m_server_settings[m_server_instance].retry_count = 0;
+            lwm2m_retry_delay_reset(m_server_instance);
             lwm2m_server_registered_set(m_server_instance, true);
 
             uint8_t uri_len = 0;
@@ -674,7 +640,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     m_lwm2m_transport[m_server_instance] = -1;
 
     m_app_state = APP_STATE_BOOTSTRAPPED;
-    m_server_settings[m_server_instance].retry_count = 0;
+    lwm2m_retry_delay_reset(m_server_instance);
 
     time_stamp = k_uptime_get();
 
@@ -742,8 +708,6 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
     lwm2m_instance_acl_t acl = {
         .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID
     };
-
-    memset(&m_server_settings[instance_id], 0, sizeof(m_server_settings[instance_id]));
 
     switch (instance_id)
     {

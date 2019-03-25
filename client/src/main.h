@@ -43,8 +43,6 @@ char *app_msisdn_get(void);
 void app_update_server(uint16_t update_server);
 bool app_did_bootstrap(void);
 uint16_t app_server_instance(void);
-uint32_t app_server_retry_count(uint16_t instance_id);
-int32_t app_retry_delay_get(uint16_t instance_id);
 sa_family_t app_family_type_get(uint16_t instance_id);
 int32_t app_state_update_delay(void);
 #endif // CONFIG_SHELL || CONFIG_DK_LIBRARY

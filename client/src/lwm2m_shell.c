@@ -15,6 +15,7 @@
 #include <lwm2m_security.h>
 #include <lwm2m_server.h>
 #include <lwm2m_device.h>
+#include <lwm2m_retry_delay.h>
 #include <at_interface.h>
 #include <main.h>
 
@@ -309,6 +310,7 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
 {
     char ip_version[] = "IPvX";
     ip_version[3] = (app_family_type_get(app_server_instance()) == AF_INET6) ? '6' : '4';
+    s32_t retry_delay;
 
     if (app_did_bootstrap()) {
         shell_print(shell, "Bootstrap completed [%s]", (app_family_type_get(0) == AF_INET6) ? "IPv6" : "IPv4");
@@ -338,10 +340,11 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Bootstrap connect wait [%s]", ip_version);
             break;
         case APP_STATE_BS_CONNECT_RETRY_WAIT:
-            if (app_server_retry_count(0) > 0) {
+            retry_delay = lwm2m_retry_delay_get(0, false);
+            if (retry_delay != -1) {
                 int32_t delay = app_state_update_delay() / 1000;
                 shell_print(shell, "Bootstrap connect delay (%d minutes - %d seconds left) [%s]",
-                            app_retry_delay_get(0) / 60, delay, ip_version);
+                            retry_delay / 60, delay, ip_version);
             } else {
                 shell_print(shell, "Bootstrap connect timed wait [%s]", ip_version);
             }
@@ -353,10 +356,11 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Bootstrap requested [%s]", ip_version);
             break;
         case APP_STATE_BOOTSTRAP_WAIT:
-            if (app_server_retry_count(0) > 0) {
+            retry_delay = lwm2m_retry_delay_get(0, false);
+            if (retry_delay != -1) {
                 int32_t delay = app_state_update_delay() / 1000;
                 shell_print(shell, "Bootstrap delay (%d minutes - %d seconds left) [%s]",
-                            app_retry_delay_get(0) / 60, delay, ip_version);
+                            retry_delay / 60, delay, ip_version);
             } else {
                 shell_print(shell, "Bootstrap wait [%s]", ip_version);
             }
@@ -374,10 +378,11 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Server %d connect wait [%s]", app_server_instance(), ip_version);
             break;
         case APP_STATE_SERVER_CONNECT_RETRY_WAIT:
-            if (app_server_retry_count(app_server_instance()) > 0) {
+            retry_delay = lwm2m_retry_delay_get(app_server_instance(), false);
+            if (retry_delay != -1) {
                 int32_t delay = app_state_update_delay() / 1000;
                 shell_print(shell, "Server %d connect delay (%d minutes - %d seconds left) [%s]",
-                            app_server_instance(), app_retry_delay_get(app_server_instance()) / 60, delay, ip_version);
+                            app_server_instance(), retry_delay / 60, delay, ip_version);
             } else {
                 shell_print(shell, "Server %d connect timed wait [%s]", app_server_instance(), ip_version);
             }
@@ -386,10 +391,11 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Server %d connected [%s]", app_server_instance(), ip_version);
             break;
         case APP_STATE_SERVER_REGISTER_WAIT:
-            if (app_server_retry_count(app_server_instance()) > 0) {
+            retry_delay = lwm2m_retry_delay_get(app_server_instance(), false);
+            if (retry_delay != -1) {
                 int32_t delay = app_state_update_delay() / 1000;
                 shell_print(shell, "Server %d register delay (%d minutes - %d seconds left) [%s]",
-                            app_server_instance(), app_retry_delay_get(app_server_instance()) / 60, delay, ip_version);
+                            app_server_instance(), retry_delay / 60, delay, ip_version);
             } else {
                 shell_print(shell, "Server %d register wait [%s]", app_server_instance(), ip_version);
             }
