@@ -53,16 +53,20 @@ static int cmd_config_print(const struct shell *shell, size_t argc, char **argv)
 {
     uint8_t uri_len = 0;
     // Buffer for the URI with null terminator
-    char terminated_uri[128] = {0};
+    char terminated_uri[128];
 
-    for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++)
-    {
+    for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++) {
         if (lwm2m_server_short_server_id_get(i)) {
             lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(i);
+            char * server_uri = lwm2m_security_server_uri_get(i, &uri_len);
+            if (uri_len > 127) {
+                uri_len = 127;
+            }
+            memcpy(terminated_uri, server_uri, uri_len);
+            terminated_uri[uri_len] = '\0';
+
             shell_print(shell, "Instance %d", i);
             shell_print(shell, "  Short Server ID  %d", lwm2m_server_short_server_id_get(i));
-            char * server_uri = lwm2m_security_server_uri_get(i, &uri_len);
-            memcpy(terminated_uri, server_uri, uri_len <= 127 ? uri_len : 127);
             shell_print(shell, "  Server URI       %s", terminated_uri);
             shell_print(shell, "  Lifetime         %lld", lwm2m_server_lifetime_get(i));
             shell_print(shell, "  Owner            %d", p_instance->acl.owner);
