@@ -927,8 +927,8 @@ static void app_bootstrap_connect(void)
         else
         {
             m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
-            // Check for no IPv6 support (EINVAL) and no response (ENETUNREACH)
-            if (err_code == EIO && (errno == EINVAL || errno == ENETUNREACH)) {
+            // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
+            if (err_code == EIO && (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH)) {
                 app_handle_connect_retry(m_server_instance, true);
             } else {
                 app_handle_connect_retry(m_server_instance, false);
@@ -1021,8 +1021,8 @@ static void app_server_connect(void)
         else
         {
             m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
-            // Check for no IPv6 support (EINVAL) and no response (ENETUNREACH)
-            if (err_code == EIO && (errno == EINVAL || errno == ENETUNREACH)) {
+            // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
+            if (err_code == EIO && (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH)) {
                 app_handle_connect_retry(m_server_instance, true);
             } else {
                 app_handle_connect_retry(m_server_instance, false);
