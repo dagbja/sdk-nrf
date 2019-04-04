@@ -40,7 +40,7 @@ manifest:
       revision: nrf91-flash-on-master
     - name: fw-nrfconnect-nrf
       path: nrf
-      revision: d5accb9fa32efe4dc0a8f51663160af6f0721caa
+      revision: b95410c398d334050ef029eebf159e43905423d1
     - name: nrfxlib
       path: nrfxlib
       revision: d98b59bdff2b533f5afb7bdad229eaeb4a931882
