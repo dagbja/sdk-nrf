@@ -27,6 +27,6 @@ int32_t app_debug_msisdn_set(const char * msisdn);
 
 const char * app_debug_modem_logging_get(void);
 int32_t app_debug_modem_logging_set(const char * modem_logging);
-void app_debug_modem_logging_enable(void);
+void app_debug_modem_logging_enable(bool modem_initialized);
 
 #endif // APP_DEBUG_H__

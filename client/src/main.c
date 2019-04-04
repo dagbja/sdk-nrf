@@ -1477,7 +1477,7 @@ int main(void)
     app_debug_init();
 
     // Enable FIDO logging before establing LTE link.
-    app_debug_modem_logging_enable();
+    app_debug_modem_logging_enable(false);
 
     // Establish LTE link.
     lte_lc_init_and_connect();
@@ -1495,7 +1495,7 @@ int main(void)
     app_lwm2m_create_objects();
 
     // Enable fidoless logging after enabling LTE link.
-    app_debug_modem_logging_enable();
+    app_debug_modem_logging_enable(true);
 
     app_work_init();
 
