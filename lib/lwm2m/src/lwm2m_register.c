@@ -93,7 +93,7 @@ static uint32_t internal_server_config_set(coap_message_t * msg, lwm2m_server_co
     {
         if (p_config->msisdn > 0)
         {
-            int retval = snprintf(buffer, sizeof(buffer), "sms=%llu", p_config->msisdn);
+            int retval = snprintf(buffer, sizeof(buffer), "sms=%010llu", p_config->msisdn);
             if (retval < 0)
             {
                 err_code = EINVAL;

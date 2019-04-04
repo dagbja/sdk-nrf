@@ -19,12 +19,18 @@ static debug_settings_t m_debug_settings;
 
 void app_debug_init(void)
 {
-    lwm2m_debug_settings_load(&m_debug_settings);
+    int ret = lwm2m_debug_settings_load(&m_debug_settings);
+
+    if (ret != sizeof m_debug_settings) {
+        app_debug_flag_set(DEBUG_FLAG_DISABLE_PSM);
+    }
 }
 
 void app_debug_clear(void)
 {
     memset(&m_debug_settings, 0, sizeof(m_debug_settings));
+    app_debug_flag_set(DEBUG_FLAG_DISABLE_PSM);
+
     lwm2m_debug_settings_store(&m_debug_settings);
 }
 
@@ -50,6 +56,25 @@ int32_t app_debug_msisdn_set(const char * msisdn)
 {
     memset(m_debug_settings.msisdn, 0, sizeof(m_debug_settings.msisdn));
     strncpy(m_debug_settings.msisdn, msisdn, sizeof(m_debug_settings.msisdn) - 1);
+
+    return lwm2m_debug_settings_store(&m_debug_settings);
+}
+
+bool app_debug_flag_is_set(uint32_t flag)
+{
+    return ((m_debug_settings.flags & flag) == flag);
+}
+
+int32_t app_debug_flag_set(uint32_t flag)
+{
+    m_debug_settings.flags |= flag;
+
+    return lwm2m_debug_settings_store(&m_debug_settings);
+}
+
+int32_t app_debug_flag_clear(uint32_t flag)
+{
+    m_debug_settings.flags &= ~flag;
 
     return lwm2m_debug_settings_store(&m_debug_settings);
 }

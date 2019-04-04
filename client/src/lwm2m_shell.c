@@ -170,6 +170,8 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
 
     shell_print(shell, "  SIM ICCID      %s", iccid);
     shell_print(shell, "  Logging        %s", app_debug_modem_logging_get());
+    shell_print(shell, "  Disable PSM    %s", app_debug_flag_is_set(DEBUG_FLAG_DISABLE_PSM) ? "Yes" : "No");
+    shell_print(shell, "  SMS Support    %s", app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT) ? "Yes" : "No");
 
     return 0;
 }
@@ -259,6 +261,60 @@ static int cmd_debug_logging(const struct shell *shell, size_t argc, char **argv
     return 0;
 }
 
+
+static int cmd_debug_disable_psm(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s <value>", argv[0]);
+        shell_print(shell, " 0 = don't disable");
+        shell_print(shell, " 1 = disable");
+        return 0;
+    }
+
+    int disable_psm = atoi(argv[1]);
+
+    if (disable_psm != 0 && disable_psm != 1) {
+        shell_print(shell, "invalid value, must be 0 or 1");
+        return 0;
+    }
+
+    if (disable_psm) {
+        app_debug_flag_set(DEBUG_FLAG_DISABLE_PSM);
+    } else {
+        app_debug_flag_clear(DEBUG_FLAG_DISABLE_PSM);
+    }
+
+    shell_print(shell, "Set disable PSM: %d", disable_psm);
+
+    return 0;
+}
+
+static int cmd_debug_sms_support(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s <value>", argv[0]);
+        shell_print(shell, " 0 = disable");
+        shell_print(shell, " 1 = enable");
+        return 0;
+    }
+
+    int sms_support = atoi(argv[1]);
+
+    if (sms_support != 0 && sms_support != 1) {
+        shell_print(shell, "invalid value, must be 0 or 1");
+        return 0;
+    }
+
+    if (sms_support) {
+        app_debug_flag_set(DEBUG_FLAG_SMS_SUPPORT);
+    } else {
+        app_debug_flag_clear(DEBUG_FLAG_SMS_SUPPORT);
+    }
+
+    shell_print(shell, "Set SMS support: %d", sms_support);
+
+    return 0;
+}
 
 static int cmd_lwm2m_register(const struct shell *shell, size_t argc, char **argv)
 {
@@ -462,6 +518,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(imei, NULL, "Set static IMEI", cmd_debug_imei),
     SHELL_CMD(msisdn, NULL, "Set static MSISDN", cmd_debug_msisdn),
     SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
+    SHELL_CMD(disable_psm, NULL, "Disable PSM", cmd_debug_disable_psm),
+    SHELL_CMD(sms_support, NULL, "Set SMS Support", cmd_debug_sms_support),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );
 
