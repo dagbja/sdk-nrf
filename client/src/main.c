@@ -89,13 +89,11 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
 
-#define APPL_LOG  LOG_DBG
-
 #if CONFIG_DK_LIBRARY
 #define APP_ERROR_CHECK(error_code) \
     do { \
         if (error_code != 0) { \
-            APPL_LOG("Error: %lu", error_code); \
+            LOG_ERR("Error: %lu", error_code); \
             leds_error_loop(); \
         } \
     } while (0)
@@ -103,7 +101,7 @@ static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
     do { \
         const uint32_t local_value = (boolean_value); \
         if (!local_value) { \
-            APPL_LOG("BOOL check failure"); \
+            LOG_ERR("BOOL check failure"); \
             leds_error_loop(); \
         } \
     } while (0)
@@ -111,7 +109,7 @@ static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
 #define APP_ERROR_CHECK(error_code) \
     do { \
         if (error_code != 0) { \
-            APPL_LOG("Error: %lu", error_code); \
+            LOG_ERR("Error: %lu", error_code); \
             while (1); \
         } \
     } while (0)
@@ -119,7 +117,7 @@ static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
     do { \
         const uint32_t local_value = (boolean_value); \
         if (!local_value) { \
-            APPL_LOG("BOOL check failure"); \
+            LOG_ERR("BOOL check failure"); \
             while (1); \
         } \
     } while (0)
@@ -298,7 +296,7 @@ static void app_initialize_imei_msisdn(void)
     if (len > 0) {
         if (strlen(p_msisdn) > 0 && strcmp(p_msisdn, last_used_msisdn) != 0) {
             // MSISDN has changed, factory reset and initiate bootstrap.
-            APPL_LOG("Detected changed MSISDN: %s -> %s", log_strdup(last_used_msisdn), log_strdup(p_msisdn));
+            LOG_INF("Detected changed MSISDN: %s -> %s", log_strdup(last_used_msisdn), log_strdup(p_msisdn));
             app_factory_reset();
             lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
             provision_bs_psk = true;
@@ -363,7 +361,7 @@ static const char * app_uri_get(char * server_uri, uint8_t uri_len, uint16_t * p
         *p_port = 5683;
         *p_secure = false;
     } else {
-        APPL_LOG("Invalid server URI: %s", log_strdup(server_uri));
+        LOG_ERR("Invalid server URI: %s", log_strdup(server_uri));
         return NULL;
     }
 
@@ -394,7 +392,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
         return EINVAL;
     }
 
-    APPL_LOG("Doing DNS lookup using %s", (m_family_type[instance_id] == AF_INET6) ? "IPv6" : "IPv4");
+    LOG_INF("Doing DNS lookup using %s", (m_family_type[instance_id] == AF_INET6) ? "IPv6" : "IPv4");
     struct addrinfo hints = {
         .ai_family = m_family_type[instance_id],
         .ai_socktype = SOCK_DGRAM
@@ -404,7 +402,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     int ret_val = getaddrinfo(hostname, NULL, &hints, &result);
 
     if (ret_val != 0) {
-        APPL_LOG("Failed to lookup \"%s\": %d (%d)", log_strdup(hostname), ret_val, errno);
+        LOG_ERR("Failed to lookup \"%s\": %d (%d)", log_strdup(hostname), ret_val, errno);
         return errno;
     }
 
@@ -417,7 +415,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     }
 
     freeaddrinfo(result);
-    APPL_LOG("DNS done");
+    LOG_INF("DNS done");
 
     return 0;
 }
@@ -472,7 +470,7 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
         if (m_family_type[instance_id] == AF_INET)
         {
             // No retry delay when IPv6 to IPv4 fallback
-            APPL_LOG("IPv6 to IPv4 fallback");
+            LOG_INF("IPv6 to IPv4 fallback");
             start_retry_delay = false;
         }
     }
@@ -482,13 +480,13 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
         s32_t retry_delay = lwm2m_retry_delay_get(instance_id, true);
 
         if (retry_delay == -1) {
-            APPL_LOG("Bootstrap procedure failed");
+            LOG_ERR("Bootstrap procedure failed");
             m_app_state = APP_STATE_IP_INTERFACE_UP;
             lwm2m_retry_delay_reset(instance_id);
             return;
         }
 
-        APPL_LOG("Retry delay for %d minutes (server %u)", retry_delay / 60, instance_id);
+        LOG_INF("Retry delay for %d minutes (server %u)", retry_delay / 60, instance_id);
         k_delayed_work_submit(&state_update_work, retry_delay * 1000);
     } else {
         k_delayed_work_submit(&state_update_work, 0);
@@ -503,7 +501,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
 {
     #if CONFIG_LOG
         static char *str_type[] = { "Bootstrap", "Register", "Update", "Deregister" };
-        APPL_LOG("Got LWM2M notifcation %s  CoAP %d.%02d  err:%lu", str_type[type], coap_code >> 5, coap_code & 0x1f, err_code);
+        LOG_INF("Got LWM2M notifcation %s  CoAP %d.%02d  err:%lu", str_type[type], coap_code >> 5, coap_code & 0x1f, err_code);
     #endif
 
     if (type == LWM2M_NOTIFCATION_TYPE_BOOTSTRAP)
@@ -511,7 +509,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
         if (coap_code == COAP_CODE_204_CHANGED)
         {
             m_app_state = APP_STATE_BOOTSTRAPPING;
-            APPL_LOG("Bootstrap timeout set to 20 seconds");
+            LOG_INF("Bootstrap timeout set to 20 seconds");
             k_delayed_work_submit(&state_update_work, 20 * 1000);
         }
         else if (coap_code == 0 || coap_code == COAP_CODE_403_FORBIDDEN)
@@ -534,7 +532,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
 #endif
         if (coap_code == COAP_CODE_201_CREATED || coap_code == COAP_CODE_204_CHANGED)
         {
-            printk("Registered %d\n", m_server_instance);
+            LOG_INF("Registered %d", m_server_instance);
             lwm2m_retry_delay_reset(m_server_instance);
             lwm2m_server_registered_set(m_server_instance, true);
 
@@ -626,7 +624,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     s64_t time_stamp;
     s64_t milliseconds_spent;
 
-    APPL_LOG("Bootstrap done, timeout cancelled");
+    LOG_INF("Bootstrap done, timeout cancelled");
     k_delayed_work_cancel(&state_update_work);
 
     (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
@@ -654,7 +652,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     misc_data.bootstrapped = 1;
     (void)lwm2m_instance_storage_misc_data_store(&misc_data);
 
-    APPL_LOG("Store bootstrap settings");
+    LOG_INF("Store bootstrap settings");
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
         lwm2m_instance_storage_security_store(i);
         lwm2m_instance_storage_server_store(i);
@@ -667,7 +665,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 #else
     m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
     s32_t hold_off_time = (lwm2m_server_client_hold_off_timer_get(m_server_instance) * 1000) - milliseconds_spent;
-    APPL_LOG("Client holdoff timer: sleeping %d milliseconds...", hold_off_time);
+    LOG_INF("Client holdoff timer: sleeping %d milliseconds...", hold_off_time);
     k_delayed_work_submit(&state_update_work, hold_off_time);
 #endif
 
@@ -887,7 +885,7 @@ static void app_bootstrap_connect(void)
 
     if (secure == true)
     {
-        APPL_LOG("SECURE session (bootstrap)");
+        LOG_DBG("SECURE session (bootstrap)");
 
         struct sockaddr local_addr;
         app_init_sockaddr_in(&local_addr, m_bs_remote_server.sa_family, LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT);
@@ -912,6 +910,7 @@ static void app_bootstrap_connect(void)
 
         // NOTE: This method initiates a DTLS handshake and may block for a some seconds.
         err_code = coap_security_setup(&local_port, &m_bs_remote_server);
+        LOG_INF("coap_security_setup(%d): %ld (%d)", m_server_instance, err_code, errno);
 
         if (err_code == 0)
         {
@@ -936,7 +935,7 @@ static void app_bootstrap_connect(void)
     }
     else
     {
-        APPL_LOG("NON-SECURE session (bootstrap)");
+        LOG_DBG("NON-SECURE session (bootstrap)");
         m_app_state = APP_STATE_BS_CONNECTED;
     }
 }
@@ -990,7 +989,7 @@ static void app_server_connect(void)
 
     if (secure == true)
     {
-        APPL_LOG("SECURE session (register)");
+        LOG_DBG("SECURE session (register)");
 
         // TODO: Check if this has to be static.
         struct sockaddr local_addr;
@@ -1016,6 +1015,7 @@ static void app_server_connect(void)
 
         // NOTE: This method initiates a DTLS handshake and may block for some seconds.
         err_code = coap_security_setup(&local_port, &m_remote_server[m_server_instance]);
+        LOG_INF("coap_security_setup(%d): %ld (%d)", m_server_instance, err_code, errno);
 
         if (err_code == 0)
         {
@@ -1040,7 +1040,7 @@ static void app_server_connect(void)
     }
     else
     {
-        APPL_LOG("NON-SECURE session (register)");
+        LOG_DBG("NON-SECURE session (register)");
         m_app_state = APP_STATE_SERVER_CONNECTED;
     }
 }
@@ -1242,8 +1242,8 @@ static bool app_coap_socket_poll(void)
             // NOTE: This works because we are only connecting to one server at a time.
             m_lwm2m_transport[m_server_instance] = -1;
 
-            // Check for no IPv6 support (EINVAL) and no response (ENETUNREACH)
-            if (error == EINVAL || error == ENETUNREACH) {
+            // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
+            if (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH) {
                 app_handle_connect_retry(m_server_instance, true);
             } else {
                 app_handle_connect_retry(m_server_instance, false);
@@ -1274,37 +1274,37 @@ static void app_lwm2m_process(void)
     {
         case APP_STATE_BS_CONNECT:
         {
-            APPL_LOG("app_bootstrap_connect");
+            LOG_INF("app_bootstrap_connect");
             app_bootstrap_connect();
             break;
         }
         case APP_STATE_BS_CONNECTED:
         {
-            APPL_LOG("app_bootstrap");
+            LOG_INF("app_bootstrap");
             app_bootstrap();
             break;
         }
         case APP_STATE_SERVER_CONNECT:
         {
-            APPL_LOG("app_server_connect, \"%s server\"", (m_server_instance == 1) ? "DM" : "Repository");
+            LOG_INF("app_server_connect, \"%s server\"", (m_server_instance == 1) ? "DM" : "Repository");
             app_server_connect();
             break;
         }
         case APP_STATE_SERVER_CONNECTED:
         {
-            APPL_LOG("app_server_register");
+            LOG_INF("app_server_register");
             app_server_register();
             break;
         }
         case APP_STATE_SERVER_DEREGISTER:
         {
-            APPL_LOG("app_server_deregister");
+            LOG_INF("app_server_deregister");
             app_server_deregister(m_server_instance);
             break;
         }
         case APP_STATE_DISCONNECT:
         {
-            APPL_LOG("app_disconnect");
+            LOG_INF("app_disconnect");
             app_disconnect();
             break;
         }
@@ -1314,7 +1314,7 @@ static void app_lwm2m_process(void)
             {
                 if (lwm2m_server_registered_get(m_update_server))
                 {
-                    APPL_LOG("app_server_update");
+                    LOG_INF("app_server_update");
                     app_server_update(m_update_server);
                 }
                 app_update_server(0);
@@ -1394,10 +1394,8 @@ static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len
 
 static void app_provision_secret_keys(void)
 {
-    APPL_LOG(">> %s", __func__);
-
     lte_lc_offline();
-    APPL_LOG("Offline mode");
+    LOG_DBG("Offline mode");
 
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
@@ -1419,12 +1417,12 @@ static void app_provision_secret_keys(void)
             (void)hostname;
 
             if (secure) {
-                APPL_LOG("Provisioning key for %s, short-id: %u", log_strdup(server_uri_val), lwm2m_server_short_server_id_get(i));
+                LOG_DBG("Provisioning key for %s, short-id: %u", log_strdup(server_uri_val), lwm2m_server_short_server_id_get(i));
                 app_provision_psk(APP_SEC_TAG_OFFSET + i, p_identity, identity_len, p_psk, psk_len);
             }
         }
     }
-    APPL_LOG("Wrote secret keys");
+    LOG_INF("Wrote secret keys");
 
     lte_lc_normal();
 
@@ -1432,7 +1430,7 @@ static void app_provision_secret_keys(void)
     // The delay will make TX available after CID again set.
     k_sleep(K_MSEC(2000));
 
-    APPL_LOG("Normal mode");
+    LOG_DBG("Normal mode");
 }
 
 /**@brief Handle server lifetime.
