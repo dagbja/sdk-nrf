@@ -243,6 +243,11 @@ static int cmd_debug_logging(const struct shell *shell, size_t argc, char **argv
 {
     if (argc != 2) {
         shell_print(shell, "%s <value>", argv[0]);
+        shell_print(shell, " 0 = disable");
+        shell_print(shell, " 1 = fidoless generic");
+        shell_print(shell, " 2 = fido");
+        shell_print(shell, " 3 = fidoless \"lwm2m\"");
+        shell_print(shell, " 4 = fidoless IP only");
         return 0;
     }
 
@@ -255,6 +260,7 @@ static int cmd_debug_logging(const struct shell *shell, size_t argc, char **argv
     }
 
     app_debug_modem_logging_set(logging);
+    app_debug_modem_logging_enable();
 
     shell_print(shell, "Set logging value: %s", logging);
 

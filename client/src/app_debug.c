@@ -126,26 +126,28 @@ static void modem_trace_enable(void)
 }
 
 
-void app_debug_modem_logging_enable(bool modem_initialized)
+// fidoless modem trace options:
+//   1,0 = disable
+//   1,1 = coredump only
+//   1,2 = generic (and coredump)
+//   1,3 = lwm2m   (and coredump)
+//   1,4 = ip only (and coredump)
+void app_debug_modem_logging_enable(void)
 {
-    if (modem_initialized) {
-        if (strcmp(m_debug_settings.modem_logging, "1") == 0) {
-            // 1,0 = disable
-            // 1,1 = coredump only
-            // 1,2 = generic (and coredump)
-            // 1,3 = lwm2m   (and coredump)
-            // 1,4 = ip only (and coredump)
-            at_send_command("AT%XMODEMTRACE=1,2", false);
-            at_send_command("AT%XMODEMTRACE=1,3", false);
-            at_send_command("AT%XMODEMTRACE=1,4", false);
-        } else if (strlen(m_debug_settings.modem_logging) == 64) {
-            char at_command[128];
-            sprintf(at_command, "AT%%XMODEMTRACE=2,,3,%s", m_debug_settings.modem_logging);
-            at_send_command(at_command, false);
-        }
-    } else {
-        if (strcmp(m_debug_settings.modem_logging, "2") == 0) {
-            modem_trace_enable();
-        }
+    if ((m_debug_settings.modem_logging[0] == 0) ||
+        (strcmp(m_debug_settings.modem_logging, "0") == 0)) {
+        at_send_command("AT%XMODEMTRACE=1,0", false);
+    } else if (strcmp(m_debug_settings.modem_logging, "1") == 0) {
+        at_send_command("AT%XMODEMTRACE=1,2", false);
+    } else if (strcmp(m_debug_settings.modem_logging, "2") == 0) {
+        modem_trace_enable();
+    } else if (strcmp(m_debug_settings.modem_logging, "3") == 0) {
+        at_send_command("AT%XMODEMTRACE=1,3", false);
+    } else if (strcmp(m_debug_settings.modem_logging, "4") == 0) {
+        at_send_command("AT%XMODEMTRACE=1,4", false);
+    } else if (strlen(m_debug_settings.modem_logging) == 64) {
+        char at_command[128];
+        sprintf(at_command, "AT%%XMODEMTRACE=2,,3,%s", m_debug_settings.modem_logging);
+        at_send_command(at_command, false);
     }
 }

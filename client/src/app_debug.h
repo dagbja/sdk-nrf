@@ -35,6 +35,6 @@ int32_t app_debug_flag_clear(uint32_t flag);
 
 const char * app_debug_modem_logging_get(void);
 int32_t app_debug_modem_logging_set(const char * modem_logging);
-void app_debug_modem_logging_enable(bool modem_initialized);
+void app_debug_modem_logging_enable(void);
 
 #endif // APP_DEBUG_H__

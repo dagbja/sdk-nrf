@@ -1483,8 +1483,8 @@ int main(void)
     // Initialize debug settings from flash.
     app_debug_init();
 
-    // Enable FIDO logging before establing LTE link.
-    app_debug_modem_logging_enable(false);
+    // Enable logging before establing LTE link.
+    app_debug_modem_logging_enable();
 
     // Establish LTE link.
     if (app_debug_flag_is_set(DEBUG_FLAG_DISABLE_PSM)) {
@@ -1503,9 +1503,6 @@ int main(void)
 
     // Create LwM2M factory bootstraped objects.
     app_lwm2m_create_objects();
-
-    // Enable fidoless logging after enabling LTE link.
-    app_debug_modem_logging_enable(true);
 
     app_work_init();
 
