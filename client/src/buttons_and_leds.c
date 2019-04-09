@@ -90,6 +90,7 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
             break;
 
         case APP_STATE_BOOTSTRAPPING:
+        case APP_STATE_BOOTSTRAP_TIMEDOUT:
             *on = (DK_LED1_MSK | DK_LED2_MSK);
             *blink = DK_LED4_MSK;
             break;

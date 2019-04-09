@@ -1144,9 +1144,7 @@ static void app_wait_state_update(struct k_work *work)
 
         case APP_STATE_BOOTSTRAPPING:
             // Timeout waiting for bootstrap to finish
-            app_disconnect();
-            m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
-            app_handle_connect_retry(0, false);
+            m_app_state = APP_STATE_BOOTSTRAP_TIMEDOUT;
             break;
 
         case APP_STATE_SERVER_CONNECT_RETRY_WAIT:
@@ -1276,6 +1274,14 @@ static void app_lwm2m_process(void)
         {
             LOG_INF("app_bootstrap_connect");
             app_bootstrap_connect();
+            break;
+        }
+        case APP_STATE_BOOTSTRAP_TIMEDOUT:
+        {
+            LOG_INF("app_handle_connect_retry");
+            app_disconnect();
+            m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
+            app_handle_connect_retry(0, false);
             break;
         }
         case APP_STATE_BS_CONNECTED:
