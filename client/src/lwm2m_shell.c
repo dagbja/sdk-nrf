@@ -404,7 +404,7 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Disconnected");
             break;
         case APP_STATE_BS_CONNECT:
-            shell_print(shell, "Bootstrap connect [%s]", ip_version);
+            shell_print(shell, "Bootstrap connecting [%s]", ip_version);
             break;
         case APP_STATE_BS_CONNECT_WAIT:
             shell_print(shell, "Bootstrap connect wait [%s]", ip_version);
@@ -442,7 +442,7 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Bootstrapped [%s]", ip_version);
             break;
         case APP_STATE_SERVER_CONNECT:
-            shell_print(shell, "Server %d connect [%s]", app_server_instance(), ip_version);
+            shell_print(shell, "Server %d connecting [%s]", app_server_instance(), ip_version);
             break;
         case APP_STATE_SERVER_CONNECT_WAIT:
             shell_print(shell, "Server %d connect wait [%s]", app_server_instance(), ip_version);

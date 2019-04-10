@@ -18,20 +18,22 @@ s32_t lwm2m_retry_delay_get(int instance_id, bool next_delay)
 {
     s32_t retry_delay;
 
-    if (instance_id == 0 && m_retry_count[instance_id] == ARRAY_SIZE(m_retry_delay) - 1) {
-         // Bootstrap retry does not use the last retry value and does not continue before next power up.
-         return -1;
-    } else if (instance_id >= 1+LWM2M_MAX_SERVERS) {
+    if (instance_id < 0 || instance_id >= 1+LWM2M_MAX_SERVERS) {
         // Illegal instance_id.
         return -1;
     }
 
-    if (m_retry_count[instance_id] == ARRAY_SIZE(m_retry_delay)) {
-        // Retry counter wrap around.
-        m_retry_count[instance_id] = 0;
-    }
-
     if (next_delay) {
+        if (instance_id == 0 && m_retry_count[instance_id] == ARRAY_SIZE(m_retry_delay) - 1) {
+            // Bootstrap retry does not use the last retry value and does not continue before next power up.
+            return -1;
+        }
+
+        if (m_retry_count[instance_id] == ARRAY_SIZE(m_retry_delay)) {
+            // Retry counter wrap around.
+            m_retry_count[instance_id] = 0;
+        }
+
         // Fetch next retry delay.
         retry_delay = m_retry_delay[m_retry_count[instance_id]];
         m_retry_count[instance_id]++;

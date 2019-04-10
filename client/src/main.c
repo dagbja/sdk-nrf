@@ -46,7 +46,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <common.h>
 #include <main.h>
 
-#define APP_NON_BLOCKING_SOCKETS        0 // Use NON_BLOCKING sockets support and poll() to check status
+#define APP_USE_SOCKET_POLL             0 // Use socket poll() to check status
 #define APP_MOTIVE_NO_REBOOT            1 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_CONTABO                 0
@@ -501,7 +501,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
 {
     #if CONFIG_LOG
         static char *str_type[] = { "Bootstrap", "Register", "Update", "Deregister" };
-        LOG_INF("Got LWM2M notifcation %s  CoAP %d.%02d  err:%lu", str_type[type], coap_code >> 5, coap_code & 0x1f, err_code);
+        LOG_INF("Got LWM2M notification %s  CoAP %d.%02d  err:%lu", str_type[type], coap_code >> 5, coap_code & 0x1f, err_code);
     #endif
 
     if (type == LWM2M_NOTIFCATION_TYPE_BOOTSTRAP)
@@ -1163,7 +1163,7 @@ static void app_wait_state_update(struct k_work *work)
     }
 }
 
-#if APP_NON_BLOCKING_SOCKETS
+#if APP_USE_SOCKET_POLL
 static bool app_coap_socket_poll(void)
 {
     struct pollfd fds[1+LWM2M_MAX_SERVERS];
@@ -1260,7 +1260,7 @@ static bool app_coap_socket_poll(void)
 
 static void app_lwm2m_process(void)
 {
-#if APP_NON_BLOCKING_SOCKETS
+#if APP_USE_SOCKET_POLL
     if (app_coap_socket_poll()) {
         coap_input();
     }
