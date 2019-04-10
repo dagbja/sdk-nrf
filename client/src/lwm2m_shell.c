@@ -482,6 +482,9 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         case APP_STATE_DISCONNECT:
             shell_print(shell, "Disconnect");
             break;
+        case APP_STATE_SHUTDOWN:
+            shell_print(shell, "Shutdown");
+            break;
         default:
             shell_print(shell, "Unknown state: %d", app_state_get());
             break;
@@ -503,6 +506,14 @@ static int cmd_factory_reset(const struct shell *shell, size_t argc, char **argv
 static int cmd_reboot(const struct shell *shell, size_t argc, char **argv)
 {
     app_system_reset();
+
+    return 0;
+}
+
+
+static int cmd_shutdown(const struct shell *shell, size_t argc, char **argv)
+{
+    app_system_shutdown();
 
     return 0;
 }
@@ -544,5 +555,6 @@ SHELL_CMD_REGISTER(config, &sub_config, "Instance configuration", NULL);
 SHELL_CMD_REGISTER(debug, &sub_debug, "Debug configuration", NULL);
 SHELL_CMD_REGISTER(lwm2m, &sub_lwm2m, "LwM2M operations", NULL);
 SHELL_CMD_REGISTER(reboot, NULL, "Reboot", cmd_reboot);
+SHELL_CMD_REGISTER(shutdown, NULL, "Shutdown", cmd_shutdown);
 
 #endif // CONFIG_SHELL

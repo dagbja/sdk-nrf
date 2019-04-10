@@ -128,6 +128,10 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
             *on = DK_LED3_MSK;
             *blink = DK_LED1_MSK;
             break;
+
+        case APP_STATE_SHUTDOWN:
+            *blink = DK_LED4_MSK;
+            break;
     }
 }
 

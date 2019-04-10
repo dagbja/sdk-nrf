@@ -244,8 +244,20 @@ void app_system_reset(void)
 {
     app_disconnect();
 
-    lte_lc_offline();
+    lte_lc_power_off();
     NVIC_SystemReset();
+}
+
+void app_system_shutdown(void)
+{
+    app_disconnect();
+
+    lte_lc_power_off();
+
+    m_app_state = APP_STATE_SHUTDOWN;
+    m_server_instance = 0;
+
+    LOG_INF("LTE link down");
 }
 
 static char * app_client_imei_msisdn(void)

@@ -32,7 +32,8 @@ typedef enum
     APP_STATE_SERVER_REGISTERED,
     APP_STATE_SERVER_DEREGISTER,
     APP_STATE_SERVER_DEREGISTERING,
-    APP_STATE_DISCONNECT
+    APP_STATE_DISCONNECT,
+    APP_STATE_SHUTDOWN
 } app_state_t;
 
 #if (CONFIG_SHELL || CONFIG_DK_LIBRARY)
@@ -50,5 +51,6 @@ int32_t app_state_update_delay(void);
 
 void app_factory_reset(void);
 void app_system_reset(void);
+void app_system_shutdown(void);
 
 #endif // MAIN_H__
