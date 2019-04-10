@@ -68,7 +68,8 @@ int at_read_imei_and_msisdn(char *p_imei, int imei_len, char *p_msisdn, int msis
             }
             if (!p_msisdn[0]) {
                 // SIM has no number
-                memcpy(p_msisdn, "0000000000", 10);
+                // FIXME: For debug purpose use the last 10 digits of IMEI
+                memcpy(p_msisdn, &p_imei[5], 10);
             }
         } else {
             printk("recv(%s) failed\n", at_cnum);
