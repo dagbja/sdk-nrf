@@ -9,12 +9,17 @@ targeted for Zephyr on a nrf9160_pca10090 development kit.
 Switches and Buttons
 ********************
 
-The switches are currently unused.
-
 The buttons are used to control the behaviour of the client as follows:
 
-* Button 1: Update server if registered. Register server if not registered.
-* Button 2: Deregister server if registered. Reset if if not registered.
+* Switch 1 is currently unused.
+
+* Switch 2 in left position controls LwM2M registration:
+** Button 1: Update server if registered. Register server if not registered.
+** Button 2: Deregister server if registered. Reset if if not registered.
+
+* Switch 2 in right position controls system functions:
+** Button 1: Factory reset and reboot.
+** Button 2: System shutdown.
 
 
 LED states

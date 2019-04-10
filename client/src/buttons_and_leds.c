@@ -25,7 +25,13 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
 
     if (buttons & 0x01) // Button 1 has changed
     {
-        if (app_state == APP_STATE_IP_INTERFACE_UP)
+        if (!(buttons & 0x08)) // Switch 2 in right position
+        {
+            printk("Factory reset!\n");
+            app_factory_reset();
+            app_system_reset();
+        }
+        else if (app_state == APP_STATE_IP_INTERFACE_UP)
         {
             if (lwm2m_security_bootstrapped_get(0))
             {
@@ -43,7 +49,12 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
     }
     else if (buttons & 0x02) // Button 2 has changed
     {
-        if (app_state == APP_STATE_SERVER_REGISTERED)
+        if (!(buttons & 0x08)) // Switch 2 in right position
+        {
+            printk("System shutdown!\n");
+            app_system_shutdown();
+        }
+        else if (app_state == APP_STATE_SERVER_REGISTERED)
         {
             app_state = APP_STATE_SERVER_DEREGISTER;
         }
