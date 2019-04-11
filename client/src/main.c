@@ -161,7 +161,6 @@ static struct sockaddr m_remote_server[1+LWM2M_MAX_SERVERS];                    
 static volatile uint32_t tick_count = 0;
 
 void app_server_update(uint16_t instance_id);
-void app_factory_reset(void);
 static void app_server_deregister(uint16_t instance_id);
 static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
 static void app_provision_secret_keys(void);
@@ -240,24 +239,34 @@ void bsd_irrecoverable_error_handler(uint32_t error)
     while (true);
 }
 
-void app_system_reset(void)
-{
-    app_disconnect();
-
-    lte_lc_power_off();
-    NVIC_SystemReset();
-}
-
 void app_system_shutdown(void)
 {
     app_disconnect();
-
     lte_lc_power_off();
 
     m_app_state = APP_STATE_SHUTDOWN;
     m_server_instance = 0;
 
     LOG_INF("LTE link down");
+}
+
+void app_system_reset(void)
+{
+    app_system_shutdown();
+    NVIC_SystemReset();
+}
+
+void app_request_reboot(void)
+{
+    app_disconnect();
+
+#if APP_MOTIVE_NO_REBOOT
+    m_app_state = APP_STATE_SERVER_CONNECT;
+    m_server_instance = 1;
+#else
+    lte_lc_offline();
+    NVIC_SystemReset();
+#endif
 }
 
 static char * app_client_imei_msisdn(void)
@@ -309,7 +318,7 @@ static void app_initialize_imei_msisdn(void)
         if (strlen(p_msisdn) > 0 && strcmp(p_msisdn, last_used_msisdn) != 0) {
             // MSISDN has changed, factory reset and initiate bootstrap.
             LOG_INF("Detected changed MSISDN: %s -> %s", log_strdup(last_used_msisdn), log_strdup(p_msisdn));
-            app_factory_reset();
+            app_bootstrap_reset();
             lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
             provision_bs_psk = true;
         }
@@ -454,19 +463,6 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_serv
     }
 
     return err_code;
-}
-
-void app_request_reboot(void)
-{
-    app_disconnect();
-
-#if APP_MOTIVE_NO_REBOOT
-    m_app_state = APP_STATE_SERVER_CONNECT;
-    m_server_instance = 1;
-#else
-    lte_lc_offline();
-    NVIC_SystemReset();
-#endif
 }
 
 /**@brief Helper function to handle a connect retry. */
@@ -780,7 +776,20 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
         default:
             break;
     }
+}
 
+void app_bootstrap_reset(void)
+{
+    lwm2m_security_bootstrapped_set(0, false);
+    lwm2m_instance_storage_security_store(0);
+    lwm2m_instance_storage_misc_data_delete();
+
+    for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
+        lwm2m_instance_storage_security_delete(i);
+        lwm2m_instance_storage_server_delete(i);
+        // Set server short_id to 0 to disable
+        lwm2m_server_short_server_id_set(i, 0);
+    }
 }
 
 void app_factory_reset(void)
@@ -813,6 +822,12 @@ static void app_load_flash_objects(void)
         {
             // Instance not loaded from flash, init factory defaults
             app_factory_bootstrap_server_object(i);
+
+            if (lwm2m_server_short_server_id_get(i) > 0)
+            {
+                lwm2m_instance_storage_security_store(i);
+                lwm2m_instance_storage_server_store(i);
+            }
         }
     }
 

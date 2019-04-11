@@ -27,8 +27,8 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
     {
         if (!(buttons & 0x08)) // Switch 2 in right position
         {
-            printk("Factory reset!\n");
-            app_factory_reset();
+            printk("Reset bootstrap!\n");
+            app_bootstrap_reset();
             app_system_reset();
         }
         else if (app_state == APP_STATE_IP_INTERFACE_UP)

@@ -19,9 +19,6 @@
 
 #define VERIZON_RESOURCE 30000
 
-extern void app_request_reboot(void);
-extern void app_factory_reset(void);
-
 #define APP_MOTIVE_FAKE_POWER_SOURCES   1 // To pass MotiveBridge power source tests (4.10, 4.11 and 4.12)
 
 static lwm2m_object_t m_object_device;    /**< Device base object. */

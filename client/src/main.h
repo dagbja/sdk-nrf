@@ -49,8 +49,10 @@ sa_family_t app_family_type_get(uint16_t instance_id);
 int32_t app_state_update_delay(void);
 #endif // CONFIG_SHELL || CONFIG_DK_LIBRARY
 
+void app_bootstrap_reset(void);
 void app_factory_reset(void);
-void app_system_reset(void);
 void app_system_shutdown(void);
+void app_system_reset(void);
+void app_request_reboot(void);
 
 #endif // MAIN_H__

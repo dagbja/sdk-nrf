@@ -35,16 +35,9 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_config_clear(const struct shell *shell, size_t argc, char **argv)
 {
-    lwm2m_security_bootstrapped_set(0, false);
-    lwm2m_instance_storage_security_store(0);
-    lwm2m_instance_storage_misc_data_delete();
-
-    for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
-        lwm2m_instance_storage_security_delete(i);
-        lwm2m_instance_storage_server_delete(i);
-    }
-
+    app_bootstrap_reset();
     shell_print(shell, "Deleted all bootstrapped values");
+
     return 0;
 }
 

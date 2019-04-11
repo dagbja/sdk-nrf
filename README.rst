@@ -18,7 +18,7 @@ The buttons are used to control the behaviour of the client as follows:
 ** Button 2: Deregister server if registered. Reset if if not registered.
 
 * Switch 2 in right position controls system functions:
-** Button 1: Factory reset and reboot.
+** Button 1: Reset bootstrap objects and reboot.
 ** Button 2: System shutdown.
 
 
