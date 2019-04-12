@@ -419,12 +419,29 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
         .ai_socktype = SOCK_DGRAM
     };
     struct addrinfo *result;
+    int ret_val = -1;
+    int cnt = 1;
 
-    int ret_val = getaddrinfo(hostname, NULL, &hints, &result);
+    // TODO:
+    //  getaddrinfo() currently returns a mix of GAI error codes and NRF error codes.
+    //  60 = NRF_ETIMEDOUT and may also indicate an error from the DNS query response.
+    //  22 = NRF_EINVAL
 
-    if (ret_val != 0) {
-        LOG_ERR("Failed to lookup \"%s\": %d (%d)", log_strdup(hostname), ret_val, errno);
-        return errno;
+    while (ret_val != 0 && ret_val != 60 && cnt <= 5) {
+        ret_val = getaddrinfo(hostname, NULL, &hints, &result);
+        if (ret_val != 0) {
+            LOG_ERR("Failed to lookup \"%s\": %d", log_strdup(hostname), ret_val);
+        }
+        if (ret_val != 0 && ret_val != 60 && cnt < 5) {
+            k_sleep(K_SECONDS(cnt));
+        }
+        cnt++;
+    }
+
+    if (ret_val == 60) {
+        return ETIMEDOUT;
+    } else if (ret_val != 0) {
+        return EINVAL;
     }
 
     app_init_sockaddr_in(addr, result->ai_family, port);
@@ -904,11 +921,19 @@ static void app_bootstrap_connect(void)
 
     // Save the remote address of the bootstrap server.
     uint8_t uri_len = 0;
-    (void)app_lwm2m_parse_uri_and_save_remote(LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
-                                              lwm2m_security_server_uri_get(0, &uri_len),
-                                              uri_len,
-                                              &secure,
-                                              &m_bs_remote_server);
+    err_code = app_lwm2m_parse_uri_and_save_remote(LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
+                                                   lwm2m_security_server_uri_get(0, &uri_len),
+                                                   uri_len,
+                                                   &secure,
+                                                   &m_bs_remote_server);
+    if (err_code != 0) {
+        if (err_code == EINVAL) {
+            app_handle_connect_retry(m_server_instance, false);
+        } else {
+            app_handle_connect_retry(m_server_instance, true);
+        }
+        return;
+    }
 
     if (secure == true)
     {
@@ -1010,7 +1035,11 @@ static void app_server_connect(void)
                                       &m_remote_server[m_server_instance], &secure, m_server_instance);
     if (err_code != 0)
     {
-        app_handle_connect_retry(m_server_instance, true);
+        if (err_code == EINVAL) {
+            app_handle_connect_retry(m_server_instance, false);
+        } else {
+            app_handle_connect_retry(m_server_instance, true);
+        }
         return;
     }
 
