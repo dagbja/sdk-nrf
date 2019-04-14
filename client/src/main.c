@@ -797,8 +797,17 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
 
 void app_bootstrap_reset(void)
 {
-    lwm2m_security_bootstrapped_set(0, false);
-    lwm2m_instance_storage_security_store(0);
+    if (lwm2m_security_short_server_id_get(0) == 0) {
+        // Server object not loaded yet
+        lwm2m_instance_storage_security_load(0);
+    }
+
+    if (lwm2m_security_bootstrapped_get(0)) {
+        // Security object exists and bootstrap is done
+        lwm2m_security_bootstrapped_set(0, false);
+        lwm2m_instance_storage_security_store(0);
+    }
+
     lwm2m_instance_storage_misc_data_delete();
 
     for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
@@ -905,6 +914,9 @@ static void app_lwm2m_setup(void)
 
     // Add firmware support.
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_firmware_get_object());
+
+    // Initialize IMEI and MSISDN.
+    app_initialize_imei_msisdn();
 
     // Set client ID.
     char * p_ep_id = app_client_imei_msisdn();
@@ -1553,9 +1565,6 @@ int main(void)
         lte_lc_psm_req(false);
     }
     lte_lc_init_and_connect();
-
-    // Initialize IMEI and MSISDN.
-    app_initialize_imei_msisdn();
 
     // Initialize CoAP.
     app_coap_init();
