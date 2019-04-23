@@ -29,6 +29,8 @@ manifest:
       url-base: https://github.com/NordicPlayground
     - name: lemrey
       url-base: https://github.com/lemrey
+    - name: stig-bjorlykke
+      url-base: https://github.com/stig-bjorlykke
 
   # The list of external projects for the nRF Connect SDK.
   #
@@ -40,10 +42,11 @@ manifest:
       revision: nrf91-flash-on-master
     - name: fw-nrfconnect-nrf
       path: nrf
-      revision: b95410c398d334050ef029eebf159e43905423d1
+      remote: stig-bjorlykke
+      revision: 1b618409970b42d541acff965525a623dcc1ee6f
     - name: nrfxlib
       path: nrfxlib
-      revision: d98b59bdff2b533f5afb7bdad229eaeb4a931882
+      revision: 201142c8164e745fc31c8ed75b7623bbd106df01
 
   self:
     path: lwm2m

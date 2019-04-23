@@ -161,6 +161,7 @@ static struct sockaddr m_remote_server[1+LWM2M_MAX_SERVERS];                    
 static volatile uint32_t tick_count = 0;
 
 void app_server_update(uint16_t instance_id);
+static void app_misc_data_set_bootstrapped(uint8_t bootstrapped);
 static void app_server_deregister(uint16_t instance_id);
 static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
 static void app_provision_secret_keys(void);
@@ -672,10 +673,8 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     m_did_bootstrap = true;
     m_server_instance = 1;
 
-    // Clean bootstrap, should trigger a new misc_data.
-    lwm2m_instance_storage_misc_data_t misc_data;
-    misc_data.bootstrapped = 1;
-    (void)lwm2m_instance_storage_misc_data_store(&misc_data);
+    // Clean bootstrap.
+    app_misc_data_set_bootstrapped(1);
 
     LOG_INF("Store bootstrap settings");
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
@@ -795,6 +794,14 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
     }
 }
 
+static void app_misc_data_set_bootstrapped(uint8_t bootstrapped)
+{
+    lwm2m_instance_storage_misc_data_t misc_data = { 0 };
+    lwm2m_instance_storage_misc_data_load(&misc_data);
+    misc_data.bootstrapped = bootstrapped;
+    lwm2m_instance_storage_misc_data_store(&misc_data);
+}
+
 void app_bootstrap_reset(void)
 {
     if (lwm2m_security_short_server_id_get(0) == 0) {
@@ -808,7 +815,7 @@ void app_bootstrap_reset(void)
         lwm2m_instance_storage_security_store(0);
     }
 
-    lwm2m_instance_storage_misc_data_delete();
+    app_misc_data_set_bootstrapped(0);
 
     for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
         lwm2m_instance_storage_security_delete(i);
@@ -820,7 +827,7 @@ void app_bootstrap_reset(void)
 
 void app_factory_reset(void)
 {
-    lwm2m_instance_storage_misc_data_delete();
+    app_misc_data_set_bootstrapped(0);
 
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
@@ -1427,8 +1434,15 @@ static void app_coap_init(void)
     coap_transport_init_t port_list;
     port_list.port_table = &local_port_list[0];
 
-    err_code = coap_init(17, &port_list, k_malloc, k_free);
+    // Fetch last used CoAP Message ID
+    lwm2m_instance_storage_misc_data_t misc_data = { 0 };
+    lwm2m_instance_storage_misc_data_load(&misc_data);
+
+    err_code = coap_init(misc_data.coap_initial_message_id, &port_list, k_malloc, k_free);
     APP_ERROR_CHECK(err_code);
+
+    misc_data.coap_initial_message_id += 100;
+    (void)lwm2m_instance_storage_misc_data_store(&misc_data);
 
     m_coap_transport = local_port_list[0].transport;
     ARG_UNUSED(m_coap_transport);
