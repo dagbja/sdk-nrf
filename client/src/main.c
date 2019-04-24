@@ -430,9 +430,6 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
 
     while (ret_val != 0 && ret_val != 60 && cnt <= 5) {
         ret_val = getaddrinfo(hostname, NULL, &hints, &result);
-        if (ret_val != 0) {
-            LOG_ERR("Failed to lookup \"%s\": %d", log_strdup(hostname), ret_val);
-        }
         if (ret_val != 0 && ret_val != 60 && cnt < 5) {
             k_sleep(K_SECONDS(cnt));
         }
@@ -440,8 +437,10 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     }
 
     if (ret_val == 60) {
+        LOG_WRN("No %s address found for \"%s\"", (m_family_type[instance_id] == AF_INET6) ? "IPv6" : "IPv4", log_strdup(hostname));
         return ETIMEDOUT;
     } else if (ret_val != 0) {
+        LOG_ERR("Failed to lookup \"%s\": %d", log_strdup(hostname), ret_val);
         return EINVAL;
     }
 
