@@ -557,7 +557,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
 #endif
         if (coap_code == COAP_CODE_201_CREATED || coap_code == COAP_CODE_204_CHANGED)
         {
-            LOG_INF("Registered %d", m_server_instance);
+            LOG_INF("Registered (server %u)", m_server_instance);
             lwm2m_retry_delay_reset(m_server_instance);
             lwm2m_server_registered_set(m_server_instance, true);
 
@@ -978,12 +978,12 @@ static void app_bootstrap_connect(void)
             .protocol     = IPPROTO_DTLS_1_2
         };
 
-        // NOTE: This method initiates a DTLS handshake and may block for a some seconds.
+        LOG_INF("Setup secure DTLS session (server %u)", m_server_instance);
         err_code = coap_security_setup(&local_port, &m_bs_remote_server);
-        LOG_INF("coap_security_setup(%d): %ld (%d)", m_server_instance, err_code, errno);
 
         if (err_code == 0)
         {
+            LOG_INF("Connected");
             m_app_state = APP_STATE_BS_CONNECTED;
             m_lwm2m_transport[m_server_instance] = local_port.transport;
         }
@@ -994,6 +994,7 @@ static void app_bootstrap_connect(void)
         }
         else
         {
+            LOG_INF("Connection failed: %ld (%d)", err_code, errno);
             m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
             // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
             if (err_code == EIO && (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH)) {
@@ -1087,12 +1088,12 @@ static void app_server_connect(void)
             .protocol     = IPPROTO_DTLS_1_2
         };
 
-        // NOTE: This method initiates a DTLS handshake and may block for some seconds.
+        LOG_INF("Setup secure DTLS session (server %u)", m_server_instance);
         err_code = coap_security_setup(&local_port, &m_remote_server[m_server_instance]);
-        LOG_INF("coap_security_setup(%d): %ld (%d)", m_server_instance, err_code, errno);
 
         if (err_code == 0)
         {
+            LOG_INF("Connected");
             m_app_state = APP_STATE_SERVER_CONNECTED;
             m_lwm2m_transport[m_server_instance] = local_port.transport;
         }
@@ -1103,6 +1104,7 @@ static void app_server_connect(void)
         }
         else
         {
+            LOG_INF("Connection failed: %ld (%d)", err_code, errno);
             m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
             // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
             if (err_code == EIO && (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH)) {
@@ -1286,8 +1288,10 @@ static bool app_coap_socket_poll(void)
         if ((fds[i].revents & POLLOUT) == POLLOUT) {
             // Writing is now possible.
             if (m_app_state == APP_STATE_BS_CONNECT_WAIT) {
+                LOG_INF("Connected");
                 m_app_state = APP_STATE_BS_CONNECTED;
             } else if (m_app_state == APP_STATE_SERVER_CONNECT_WAIT) {
+                LOG_INF("Connected");
                 m_app_state = APP_STATE_SERVER_CONNECTED;
             }
         }
@@ -1313,6 +1317,8 @@ static bool app_coap_socket_poll(void)
 
             // NOTE: This works because we are only connecting to one server at a time.
             m_lwm2m_transport[m_server_instance] = -1;
+
+            LOG_INF("Connection failed (%d)", errno);
 
             // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
             if (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH) {
@@ -1366,19 +1372,19 @@ static void app_lwm2m_process(void)
         }
         case APP_STATE_SERVER_CONNECT:
         {
-            LOG_INF("app_server_connect, \"%s server\"", (m_server_instance == 1) ? "DM" : "Repository");
+            LOG_INF("app_server_connect (server %u)", m_server_instance);
             app_server_connect();
             break;
         }
         case APP_STATE_SERVER_CONNECTED:
         {
-            LOG_INF("app_server_register");
+            LOG_INF("app_server_register (server %u)", m_server_instance);
             app_server_register();
             break;
         }
         case APP_STATE_SERVER_DEREGISTER:
         {
-            LOG_INF("app_server_deregister");
+            LOG_INF("app_server_deregister (server %u)", m_server_instance);
             app_server_deregister(m_server_instance);
             break;
         }
@@ -1394,7 +1400,7 @@ static void app_lwm2m_process(void)
             {
                 if (lwm2m_server_registered_get(m_update_server))
                 {
-                    LOG_INF("app_server_update");
+                    LOG_INF("app_server_update (server %u)", m_update_server);
                     app_server_update(m_update_server);
                 }
                 app_update_server(0);
