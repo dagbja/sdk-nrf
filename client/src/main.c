@@ -1318,10 +1318,10 @@ static bool app_coap_socket_poll(void)
             // NOTE: This works because we are only connecting to one server at a time.
             m_lwm2m_transport[m_server_instance] = -1;
 
-            LOG_INF("Connection failed (%d)", errno);
+            LOG_INF("Connection failed (%d)", error);
 
             // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
-            if (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH) {
+            if (error == EINVAL || error == EOPNOTSUPP || error == ENETUNREACH) {
                 app_handle_connect_retry(m_server_instance, true);
             } else {
                 app_handle_connect_retry(m_server_instance, false);
