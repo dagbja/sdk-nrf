@@ -524,10 +524,10 @@ void lwm2m_notification(lwm2m_notification_type_t type,
                         uint8_t                   coap_code,
                         uint32_t                  err_code)
 {
-    #if CONFIG_LOG
-        static char *str_type[] = { "Bootstrap", "Register", "Update", "Deregister" };
-        LOG_INF("Got LWM2M notification %s  CoAP %d.%02d  err:%lu", str_type[type], coap_code >> 5, coap_code & 0x1f, err_code);
-    #endif
+#if CONFIG_LOG
+    static char *str_type[] = { "Bootstrap", "Register", "Update", "Deregister" };
+    LOG_INF("Got LWM2M notification %s  CoAP %d.%02d  err:%lu", str_type[type], coap_code >> 5, coap_code & 0x1f, err_code);
+#endif
 
     if (type == LWM2M_NOTIFCATION_TYPE_BOOTSTRAP)
     {
@@ -563,12 +563,14 @@ void lwm2m_notification(lwm2m_notification_type_t type,
 
             uint8_t uri_len = 0;
             for (int i = m_server_instance+1; i < 1+LWM2M_MAX_SERVERS; i++) {
-                // Only connect to servers having a URI.
-                (void)lwm2m_security_server_uri_get(i, &uri_len);
-                if (uri_len > 0) {
-                    m_app_state = APP_STATE_SERVER_CONNECT;
-                    m_server_instance = i;
-                    break;
+                if (m_lwm2m_transport[i] == -1) {
+                    // Only connect to unconnected servers having a URI.
+                    (void)lwm2m_security_server_uri_get(i, &uri_len);
+                    if (uri_len > 0) {
+                        m_app_state = APP_STATE_SERVER_CONNECT;
+                        m_server_instance = i;
+                        break;
+                    }
                 }
             }
 
@@ -585,6 +587,27 @@ void lwm2m_notification(lwm2m_notification_type_t type,
     }
     else if (type == LWM2M_NOTIFCATION_TYPE_UPDATE)
     {
+        if (coap_code == 0 && p_remote) {
+            // No response from update request
+            uint16_t short_server_id = 0;
+            if (lwm2m_remote_short_server_id_find(&short_server_id, p_remote) == 0) {
+                for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+                    if (lwm2m_server_short_server_id_get(i) == short_server_id) {
+                        if (m_lwm2m_transport[i] != -1) {
+                            LOG_INF("Reconnect (server %d)", i);
+                            err_code = coap_security_destroy(m_lwm2m_transport[i]);
+                            ARG_UNUSED(err_code);
+
+                            m_lwm2m_transport[i] = -1;
+
+                            m_app_state = APP_STATE_SERVER_CONNECT;
+                            m_server_instance = i;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
     }
     else if (type == LWM2M_NOTIFCATION_TYPE_DEREGISTER)
     {
@@ -593,17 +616,19 @@ void lwm2m_notification(lwm2m_notification_type_t type,
 
         uint8_t uri_len = 0;
         for (int i = m_server_instance-1; i > 0; i--) {
-            // Only disconnect from servers having a URI.
-            (void)lwm2m_security_server_uri_get(i, &uri_len);
-            if (uri_len > 0) {
-                m_app_state = APP_STATE_SERVER_DEREGISTER;
-                m_server_instance = i;
-                break;
+            if (m_lwm2m_transport[i] != -1) {
+                // Only deregister from connected servers having a URI.
+                (void)lwm2m_security_server_uri_get(i, &uri_len);
+                if (uri_len > 0) {
+                    m_app_state = APP_STATE_SERVER_DEREGISTER;
+                    m_server_instance = i;
+                    break;
+                }
             }
         }
 
         if (uri_len == 0) {
-            // No more servers to disconnect
+            // No more servers to deregister
             m_app_state = APP_STATE_DISCONNECT;
         }
     }

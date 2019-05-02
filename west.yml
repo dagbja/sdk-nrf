@@ -43,7 +43,7 @@ manifest:
     - name: fw-nrfconnect-nrf
       path: nrf
       remote: stig-bjorlykke
-      revision: 1b618409970b42d541acff965525a623dcc1ee6f
+      revision: 2386307ec98520f87b599c4f2d39e86ccd7abc11
     - name: nrfxlib
       path: nrfxlib
       revision: 201142c8164e745fc31c8ed75b7623bbd106df01
