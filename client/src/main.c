@@ -471,23 +471,23 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
 
     // TODO:
     //  getaddrinfo() currently returns a mix of GAI error codes and NRF error codes.
-    //  60 = NRF_ETIMEDOUT and may also indicate an error from the DNS query response.
-    //  22 = NRF_EINVAL
+    //  22 = NRF_EINVAL is invalid argument, but may also indicate no address found in the DNS query response.
+    //  60 = NRF_ETIMEDOUT is a timeout waiting for DNS query response.
 
-    while (ret_val != 0 && ret_val != 60 && cnt <= 5) {
+    while (ret_val != 0 && ret_val != 22 && ret_val != 60 && cnt <= 5) {
         ret_val = getaddrinfo(hostname, NULL, &hints, &result);
-        if (ret_val != 0 && ret_val != 60 && cnt < 5) {
+        if (ret_val != 0 && ret_val != 22 && ret_val != 60 && cnt < 5) {
             k_sleep(K_SECONDS(cnt));
         }
         cnt++;
     }
 
-    if (ret_val == 60) {
+    if (ret_val == 22 || ret_val == 60) {
         LOG_WRN("No %s address found for \"%s\"", (m_family_type[instance_id] == AF_INET6) ? "IPv6" : "IPv4", log_strdup(hostname));
-        return ETIMEDOUT;
+        return EINVAL;
     } else if (ret_val != 0) {
         LOG_ERR("Failed to lookup \"%s\": %d", log_strdup(hostname), ret_val);
-        return EINVAL;
+        return ret_val;
     }
 
     app_init_sockaddr_in(addr, result->ai_family, port);
@@ -1021,10 +1021,11 @@ static void app_bootstrap_connect(void)
                                                    &secure,
                                                    &m_bs_remote_server);
     if (err_code != 0) {
+        m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
         if (err_code == EINVAL) {
-            app_handle_connect_retry(m_server_instance, false);
-        } else {
             app_handle_connect_retry(m_server_instance, true);
+        } else {
+            app_handle_connect_retry(m_server_instance, false);
         }
         return;
     }
@@ -1130,10 +1131,11 @@ static void app_server_connect(void)
                                       &m_remote_server[m_server_instance], &secure, m_server_instance);
     if (err_code != 0)
     {
+        m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
         if (err_code == EINVAL) {
-            app_handle_connect_retry(m_server_instance, false);
-        } else {
             app_handle_connect_retry(m_server_instance, true);
+        } else {
+            app_handle_connect_retry(m_server_instance, false);
         }
         return;
     }
