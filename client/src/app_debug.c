@@ -140,6 +140,7 @@ void app_debug_modem_logging_enable(void)
     } else if (strcmp(m_debug_settings.modem_logging, "1") == 0) {
         at_send_command("AT%XMODEMTRACE=1,2", false);
     } else if (strcmp(m_debug_settings.modem_logging, "2") == 0) {
+        at_send_command("AT%XMODEMTRACE=1,1", false);
         modem_trace_enable();
     } else if (strcmp(m_debug_settings.modem_logging, "3") == 0) {
         at_send_command("AT%XMODEMTRACE=1,3", false);
