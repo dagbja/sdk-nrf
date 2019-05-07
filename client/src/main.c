@@ -396,6 +396,52 @@ static const char * app_uri_get(char * server_uri, uint8_t uri_len, uint16_t * p
     return hostname;
 }
 
+static void app_printable_ip_address(struct sockaddr * addr, char * ip_buffer, size_t ip_buffer_len)
+{
+    switch (addr->sa_family) {
+    case AF_INET:
+    {
+        u32_t val = ((struct sockaddr_in *)addr)->sin_addr.s_addr;
+        snprintf(ip_buffer, ip_buffer_len, "%u.%u.%u.%u",
+                ((uint8_t *)&val)[0], ((uint8_t *)&val)[1], ((uint8_t *)&val)[2], ((uint8_t *)&val)[3]);
+        break;
+    }
+
+    case AF_INET6:
+    {
+        size_t pos = 0;
+        bool elided = false;
+
+        // Poor man's elided IPv6 address print.
+        for (u8_t i = 0; i < 16; i += 2) {
+            u16_t val = (((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[i] << 8) +
+                        (((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[i+1]);
+
+            if (elided || val != 0) {
+                if (pos >= 2 && ip_buffer[pos-2] == ':' && ip_buffer[pos-1] == ':') {
+                    elided = true;
+                }
+                pos += snprintf(&ip_buffer[pos], ip_buffer_len - pos, "%x", val);
+            }
+
+            if (pos >= 2 && (ip_buffer[pos-2] != ':' || ip_buffer[pos-1] != ':')) {
+                pos += snprintf(&ip_buffer[pos], ip_buffer_len - pos, ":");
+            }
+        }
+
+        if (pos >= 1 && ip_buffer[pos-1] == ':') {
+            // Remove trailing ':'
+            ip_buffer[pos-1] = '\0';
+        }
+        break;
+    }
+
+    default:
+        snprintf(ip_buffer, ip_buffer_len, "Unknown family: %d", addr->sa_family);
+        break;
+    }
+}
+
 static uint32_t app_resolve_server_uri(char            * server_uri,
                                        uint8_t           uri_len,
                                        struct sockaddr * addr,
@@ -453,7 +499,12 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     }
 
     freeaddrinfo(result);
-    LOG_INF("DNS done");
+
+#if CONFIG_LOG
+    char ip_buffer[64];
+    app_printable_ip_address(addr, ip_buffer, sizeof(ip_buffer));
+    LOG_INF("DNS result: %s", log_strdup(ip_buffer));
+#endif
 
     return 0;
 }
