@@ -156,7 +156,7 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     char iccid[21];
     if (p_iccid) {
         memcpy(iccid, p_iccid, 20);
-        iccid[20] = 0;
+        iccid[iccid_len] = 0;
     } else {
         iccid[0] = 0;
     }

@@ -282,7 +282,7 @@ void lwm2m_device_init(void)
     // Verizon specific SIM ICCID and HomeOrRoaming
     m_verizon_resources[0].len = 20;
     m_verizon_resources[0].p_val = lwm2m_malloc(m_verizon_resources[0].len);
-    (void)at_read_sim_iccid(m_verizon_resources[0].p_val, m_verizon_resources[0].len);
+    (void)at_read_sim_iccid(m_verizon_resources[0].p_val, &m_verizon_resources[0].len);
     char * home_or_roaming = "Home"; // TODO: Read from AT+CEREG?
     (void)lwm2m_bytebuffer_to_string(home_or_roaming, strlen(home_or_roaming), &m_verizon_resources[1]);
 
