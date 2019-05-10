@@ -17,7 +17,7 @@
 
 west:
   url: https://github.com/zephyrproject-rtos/west
-  revision: master
+  revision: v0.5.8
 
 manifest:
   defaults:
@@ -27,8 +27,6 @@ manifest:
       # nRF Connect SDK base URL.
     - name: ncs
       url-base: https://github.com/NordicPlayground
-    - name: lemrey
-      url-base: https://github.com/lemrey
     - name: stig-bjorlykke
       url-base: https://github.com/stig-bjorlykke
 
@@ -38,15 +36,14 @@ manifest:
     - name: fw-nrfconnect-zephyr
       path: zephyr
       west-commands: scripts/west-commands.yml
-      remote: lemrey
-      revision: nrf91-flash-on-master
+      revision: v1.14.99-ncs1
     - name: fw-nrfconnect-nrf
       path: nrf
       remote: stig-bjorlykke
-      revision: 2386307ec98520f87b599c4f2d39e86ccd7abc11
+      revision: coap-improvements
     - name: nrfxlib
       path: nrfxlib
-      revision: 201142c8164e745fc31c8ed75b7623bbd106df01
+      revision: v0.4.0
 
   self:
     path: lwm2m
