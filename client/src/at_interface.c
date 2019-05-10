@@ -165,10 +165,6 @@ int at_send_command(const char *at_command, bool do_logging)
         return EIO;
     }
 
-    if (do_logging) {
-        printk("send: %s\n", at_command);
-    }
-
     snprintf(write_buffer, APP_MAX_AT_WRITE_LENGTH, "%s", at_command);
     length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
 
@@ -176,7 +172,7 @@ int at_send_command(const char *at_command, bool do_logging)
         length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
         if (length > 0) {
             if (do_logging) {
-                printk("recv: %s\n", read_buffer);
+                printk("%s", read_buffer);
             }
         } else {
             printk("recv() failed\n");
