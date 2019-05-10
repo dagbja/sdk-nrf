@@ -379,11 +379,10 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         shell_print(shell, "Bootstrap completed [%s]", (app_family_type_get(0) == AF_INET6) ? "IPv6" : "IPv4");
     }
 
-    uint16_t current_instance = app_server_instance();
-    for (int i = 1; i < current_instance; i++) {
+    for (int i = 1; i < (1+LWM2M_MAX_SERVERS); i++) {
         uint8_t uri_len = 0;
         (void)lwm2m_security_server_uri_get(i, &uri_len);
-        if (uri_len > 0) {
+        if ((uri_len > 0) && lwm2m_server_registered_get(i)) {
             shell_print(shell, "Server %d registered [%s]", i, (app_family_type_get(i) == AF_INET6) ? "IPv6" : "IPv4");
         }
     }
@@ -464,7 +463,7 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             }
             break;
         case APP_STATE_SERVER_REGISTERED:
-            shell_print(shell, "Server %d registered [%s]", app_server_instance(), ip_version);
+            // Already printed above
             break;
         case APP_STATE_SERVER_DEREGISTER:
             shell_print(shell, "Server %d deregister", app_server_instance());
