@@ -29,6 +29,8 @@ manifest:
       url-base: https://github.com/NordicPlayground
     - name: stig-bjorlykke
       url-base: https://github.com/stig-bjorlykke
+    - name: gbakke
+      url-base: https://github.com/gbakke
 
   # The list of external projects for the nRF Connect SDK.
   #
@@ -43,7 +45,8 @@ manifest:
       revision: coap-improvements
     - name: nrfxlib
       path: nrfxlib
-      revision: v0.4.0
+      remote: gbakke
+      revision: apn_cont
 
   self:
     path: lwm2m
