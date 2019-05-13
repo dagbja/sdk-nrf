@@ -21,6 +21,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <nrf.h>
 #include <at_interface.h>
 #include <sms_receive.h>
+#include <pdn_management.h>
 
 #if CONFIG_DK_LIBRARY
 #include <buttons_and_leds.h>
@@ -86,7 +87,8 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
                                          0x0a, 0x91, 0xe7, 0x47} /**< Pre-shared key used for bootstrap server in hex format. */
 #endif
 
-static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
+static char m_app_bootstrap_psk[]  = APP_BOOTSTRAP_SEC_PSK;
+static int  m_app_admin_apn_handle = -1;
 
 #if CONFIG_DK_LIBRARY
 #define APP_ERROR_CHECK(error_code) \
@@ -263,6 +265,10 @@ void app_request_reboot(void)
     m_app_state = APP_STATE_SERVER_CONNECT;
     m_server_instance = 1;
 #else
+    if (m_app_admin_apn_handle != -1) {
+        app_teardown_admin_pdn();
+    }
+
     lte_lc_offline();
     NVIC_SystemReset();
 #endif
@@ -290,6 +296,26 @@ static char * app_client_imei_msisdn(void)
     }
 
     return client_id;
+}
+
+/**@brief Setup ADMIN PDN connection */
+static void app_setup_admin_pdn(void) {
+    // Set up APN for DM server after bootstrap.
+    uint8_t class_apn_len = 0;
+    char * apn_name = lwm2m_conn_mon_class2_apn_get(0, &class_apn_len);
+    char apn_name_zero_terminated[64];
+    memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
+    apn_name_zero_terminated[class_apn_len] = '\0';
+
+    m_app_admin_apn_handle = pdn_init_and_connect(apn_name_zero_terminated);
+    APP_ERROR_CHECK_BOOL(m_app_admin_apn_handle >= 0);
+    LOG_INF("APN set up: %s", apn_name_zero_terminated);
+}
+
+/**@brief Tear down ADMIN PDN connection. */
+static void app_teardown_admin_pdn(void) {
+    pdn_disconnect(m_app_admin_apn_handle);
+    m_app_admin_apn_handle = -1;
 }
 
 /**@brief Initialize IMEI and MSISDN to use.
@@ -327,10 +353,16 @@ static void app_initialize_imei_msisdn(void)
     }
 
     if (provision_bs_psk) {
+        app_teardown_admin_pdn();
+
         char * p_identity = app_client_imei_msisdn();
+
         lte_lc_offline();
         app_provision_psk(APP_BOOTSTRAP_SEC_TAG, p_identity, strlen(p_identity), m_app_bootstrap_psk, sizeof(m_app_bootstrap_psk));
-        lte_lc_normal();
+
+        lte_lc_init_and_connect();
+
+        app_setup_admin_pdn();
     }
 }
 
@@ -444,7 +476,8 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
                                        uint8_t           uri_len,
                                        struct sockaddr * addr,
                                        bool            * secure,
-                                       uint16_t          instance_id)
+                                       sa_family_t       family_type,
+                                       int               pdn_handle)
 {
     // Create a string copy to null-terminate hostname within the server_uri.
     char * p_server_uri_val = k_malloc(uri_len + 1);
@@ -459,11 +492,34 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
         return EINVAL;
     }
 
-    LOG_INF("Doing DNS lookup using %s", (m_family_type[instance_id] == AF_INET6) ? "IPv6" : "IPv4");
     struct addrinfo hints = {
-        .ai_family = m_family_type[instance_id],
+        .ai_family = family_type,
         .ai_socktype = SOCK_DGRAM
     };
+
+    // Structures that might be pointed to by APN hints.
+    struct addrinfo apn_hints;
+    char apn_name_zero_terminated[64];
+
+    if (pdn_handle > -1)
+    {
+        uint8_t class_apn_len = 0;
+        char * apn_name = lwm2m_conn_mon_class2_apn_get(0, &class_apn_len);
+        memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
+        apn_name_zero_terminated[class_apn_len] = '\0';
+
+        apn_hints.ai_family    = AF_LTE;
+        apn_hints.ai_socktype  = SOCK_MGMT;
+        apn_hints.ai_protocol  = NPROTO_PDN;
+        apn_hints.ai_canonname = apn_name_zero_terminated;
+
+        hints.ai_next = &apn_hints;
+    }
+
+    LOG_INF("Doing DNS lookup using %s on %s",
+            (family_type == AF_INET6) ? "IPv6" : "IPv4",
+            (pdn_handle > -1) ? apn_name_zero_terminated : "DEFAULT");
+
     struct addrinfo *result;
     int ret_val = -1;
     int cnt = 1;
@@ -482,7 +538,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     }
 
     if (ret_val == 22 || ret_val == 60) {
-        LOG_WRN("No %s address found for \"%s\"", (m_family_type[instance_id] == AF_INET6) ? "IPv6" : "IPv4", log_strdup(hostname));
+        LOG_WRN("No %s address found for \"%s\"", (family_type == AF_INET6) ? "IPv6" : "IPv4", log_strdup(hostname));
         k_free (p_server_uri_val);
         return EINVAL;
     } else if (ret_val != 0) {
@@ -516,12 +572,13 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_serv
                                                     char            * server_uri,
                                                     uint8_t           uri_len,
                                                     bool            * secure,
-                                                    struct sockaddr * p_remote)
+                                                    struct sockaddr * p_remote,
+                                                    int               pdn_handle)
 {
     uint32_t err_code;
 
     // Use DNS to lookup the IP
-    err_code = app_resolve_server_uri(server_uri, uri_len, p_remote, secure, 0);
+    err_code = app_resolve_server_uri(server_uri, uri_len, p_remote, secure, m_family_type[0], pdn_handle);
 
     if (err_code == 0)
     {
@@ -1037,7 +1094,8 @@ static void app_bootstrap_connect(void)
                                                    p_server_uri,
                                                    uri_len,
                                                    &secure,
-                                                   &m_bs_remote_server);
+                                                   &m_bs_remote_server,
+                                                   m_app_admin_apn_handle);
     if (err_code != 0) {
         m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
         if (err_code == EINVAL) {
@@ -1066,11 +1124,18 @@ static void app_bootstrap_connect(void)
             .sec_tag_list  = sec_tag_list
         };
 
+        uint8_t class_apn_len = 0;
+        char * apn_name = lwm2m_conn_mon_class2_apn_get(0, &class_apn_len);
+        char apn_name_zero_terminated[64];
+        memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
+        apn_name_zero_terminated[class_apn_len] = '\0';
+
         coap_local_t local_port =
         {
             .addr         = &local_addr,
             .setting      = &setting,
-            .protocol     = IPPROTO_DTLS_1_2
+            .protocol     = IPPROTO_DTLS_1_2,
+            .interface    = apn_name_zero_terminated
         };
 
         LOG_INF("Setup secure DTLS session (server %u)", m_server_instance);
@@ -1146,8 +1211,12 @@ static void app_server_connect(void)
 
     uint8_t uri_len = 0;
     char * p_server_uri = lwm2m_security_server_uri_get(m_server_instance, &uri_len);
-    err_code = app_resolve_server_uri(p_server_uri, uri_len, &m_remote_server[m_server_instance],
-                                      &secure, m_server_instance);
+    err_code = app_resolve_server_uri(p_server_uri,
+                                      uri_len,
+                                      &m_remote_server[m_server_instance],
+                                      &secure,
+                                      m_family_type[m_server_instance],
+                                      (m_server_instance == 1) ? m_app_admin_apn_handle : -1);
     if (err_code != 0)
     {
         m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
@@ -1184,6 +1253,17 @@ static void app_server_connect(void)
             .setting      = &setting,
             .protocol     = IPPROTO_DTLS_1_2
         };
+        char apn_name_zero_terminated[64];
+
+        if (m_server_instance == 1)
+        {
+            uint8_t class_apn_len = 0;
+            char * apn_name = lwm2m_conn_mon_class2_apn_get(0, &class_apn_len);
+            memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
+            apn_name_zero_terminated[class_apn_len] = '\0';
+            local_port.interface = apn_name_zero_terminated;
+        }
+
 
         LOG_INF("Setup secure DTLS session (server %u)", m_server_instance);
         err_code = coap_security_setup(&local_port, &m_remote_server[m_server_instance]);
@@ -1575,6 +1655,8 @@ static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len
 
 static void app_provision_secret_keys(void)
 {
+    app_teardown_admin_pdn();
+
     lte_lc_offline();
     LOG_DBG("Offline mode");
 
@@ -1609,7 +1691,7 @@ static void app_provision_secret_keys(void)
     }
     LOG_INF("Wrote secret keys");
 
-    lte_lc_normal();
+    lte_lc_init_and_connect();
 
     // THIS IS A HACK. Temporary solution to give a delay to recover Non-DTLS sockets from CFUN=4.
     // The delay will make TX available after CID again set.
@@ -1675,6 +1757,7 @@ int main(void)
     if (app_debug_flag_is_set(DEBUG_FLAG_DISABLE_PSM)) {
         lte_lc_psm_req(false);
     }
+
     lte_lc_init_and_connect();
 
     if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
@@ -1690,6 +1773,10 @@ int main(void)
 
     // Create LwM2M factory bootstraped objects.
     app_lwm2m_create_objects();
+
+    if (app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT) == 0) {
+        app_setup_admin_pdn();
+    }
 
     app_work_init();
 

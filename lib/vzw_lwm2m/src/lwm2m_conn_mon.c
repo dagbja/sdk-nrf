@@ -13,17 +13,229 @@
 #include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
 
+#include "lwm2m_conn_mon.h"
+
 #include <net/coap_option.h>
 #include <net/coap_observe_api.h>
 #include <net/coap_message.h>
 
 #include <common.h>
 
+#include "nrf_apn_class.h"
+
 #define VERIZON_RESOURCE 30000
 
-static lwm2m_object_t                  m_object_conn_mon;   /**< Connectivity Monitoring base object. */
-static lwm2m_connectivity_monitoring_t m_instance_conn_mon; /**< Connectivity Monitoring object instance. */
-static lwm2m_string_t                  m_apn[4];            /**< Verizon specific APN names. */
+static lwm2m_object_t                  m_object_conn_mon;        /**< Connectivity Monitoring base object. */
+static lwm2m_connectivity_monitoring_t m_instance_conn_mon;      /**< Connectivity Monitoring object instance. */
+static vzw_conn_mon_class_apn_t        m_vzw_conn_mon_class_apn; /**< Verizon specific APN names. */
+
+static char m_apn_class_scratch_buffer[64];
+
+// Verizon specific resources.
+
+char * lwm2m_conn_mon_class2_apn_get(uint16_t instance_id, uint8_t * p_len)
+{
+    // Check for updated value.
+    uint16_t apn_class_len = sizeof(m_apn_class_scratch_buffer);
+
+    int retval = nrf_apn_class_read(2, m_apn_class_scratch_buffer, &apn_class_len);
+
+    if (retval == 0)
+    {
+        // Check if length or value has changed.
+        if ((m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_2].len != apn_class_len) ||
+            (strncmp(m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_2].p_val, m_apn_class_scratch_buffer, apn_class_len)))
+        {
+            // If changed, update the cached value, and notify new value.
+            if (lwm2m_bytebuffer_to_string(m_apn_class_scratch_buffer, apn_class_len, &m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_2]) != 0)
+            {
+                LWM2M_ERR("Could not set local cached CLASS2 APN");
+            }
+            else
+            {
+                // TODO: Value is different from previous value, shut down all sockets on the APN and attach the APN then create sockets again.
+                // TODO: Value is different from previous value, do a notification.
+                // lwm2m_conn_mon_notify_resource(LWM2M_CONN_MON_30000_CLASS_APN_2);
+            }
+        }
+    }
+
+    *p_len = m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_2].len;
+    return m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_2].p_val;
+}
+
+char * lwm2m_conn_mon_class3_apn_get(uint16_t instance_id, uint8_t * p_len)
+{
+    // Check for updated value.
+    uint16_t apn_class_len = sizeof(m_apn_class_scratch_buffer);
+
+    int retval = nrf_apn_class_read(3, m_apn_class_scratch_buffer, &apn_class_len);
+
+    if (retval == 0)
+    {
+        // Check if length or value has changed.
+        if ((m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_3].len != apn_class_len) ||
+            (strncmp(m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_3].p_val, m_apn_class_scratch_buffer, apn_class_len)))
+        {
+            // If changed, update the cached value, and notify new value.
+            if (lwm2m_bytebuffer_to_string(m_apn_class_scratch_buffer, apn_class_len, &m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_3]) != 0)
+            {
+                LWM2M_ERR("Could not set local cached CLASS3 APN");
+            }
+            else
+            {
+                // TODO: Value is different from previous value, shut down all sockets on the APN and attach the APN then create sockets again.
+                // TODO: Value is different from previous value, do a notification.
+                // lwm2m_conn_mon_notify_resource(LWM2M_CONN_MON_30000_CLASS_APN_3);
+            }
+        }
+    }
+
+    *p_len = m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_3].len;
+    return m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_3].p_val;
+}
+
+void lwm2m_conn_mon_class3_apn_set(uint16_t instance_id, char * p_value, uint8_t len)
+{
+    // Check if length or value has changed.
+    if ((m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_3].len != len) ||
+        (strncmp(m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_3].p_val, m_apn_class_scratch_buffer, len)))
+    {
+        // Update the network setting.
+        int retval = nrf_apn_class_update(3, p_value, len);
+
+        // Update the cached value.
+        if (retval == 0)
+        {
+            if (lwm2m_bytebuffer_to_string(m_apn_class_scratch_buffer, len, &m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_3]) != 0)
+            {
+                LWM2M_ERR("Could not set local cached CLASS6 APN");
+            }
+            else
+            {
+                // TODO: Value is different from previous value, shut down all sockets on the APN and attach the APN then create sockets again.
+                // TODO: Value is different from previous value, do a notification.
+                // lwm2m_conn_mon_notify_resource(LWM2M_CONN_MON_30000_CLASS_APN_3);
+            }
+        }
+    }
+}
+
+char * lwm2m_conn_mon_class6_apn_get(uint16_t instance_id, uint8_t * p_len)
+{
+// Check for updated value.
+    uint16_t apn_class_len = sizeof(m_apn_class_scratch_buffer);
+
+    int retval = nrf_apn_class_read(6, m_apn_class_scratch_buffer, &apn_class_len);
+
+    if (retval == 0)
+    {
+        // Check if length or value has changed.
+        if ((m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_6].len != apn_class_len) ||
+            (strncmp(m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_6].p_val, m_apn_class_scratch_buffer, apn_class_len)))
+        {
+            // If changed, update the cached value, and notify new value.
+            if (lwm2m_bytebuffer_to_string(m_apn_class_scratch_buffer, apn_class_len, &m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_6]) != 0)
+            {
+                LWM2M_ERR("Could not set local cached CLASS6 APN");
+            }
+            else
+            {
+                // TODO: Value is different from previous value, shut down all sockets on the APN and attach the APN then create sockets again.
+                // TODO: Value is different from previous value, do a notification.
+                // lwm2m_conn_mon_notify_resource(LWM2M_CONN_MON_30000_CLASS_APN_6);
+            }
+        }
+    }
+
+    *p_len = m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_6].len;
+    return m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_6].p_val;
+}
+
+void lwm2m_conn_mon_class6_apn_set(uint16_t instance_id, char * p_value, uint8_t len)
+{
+    // Check if length or value has changed.
+    if ((m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_6].len != len) ||
+        (strncmp(m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_6].p_val, m_apn_class_scratch_buffer, len)))
+    {
+        // Update the network setting.
+        int retval = nrf_apn_class_update(6, p_value, len);
+
+        // Update the cached value.
+        if (retval == 0)
+        {
+            if (lwm2m_bytebuffer_to_string(m_apn_class_scratch_buffer, len, &m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_6]) != 0)
+            {
+                LWM2M_ERR("Could not set local cached CLASS6 APN");
+            }
+            else
+            {
+                // TODO: Value is different from previous value, shut down all sockets on the APN and attach the APN then create sockets again.
+                // TODO: Value is different from previous value, do a notification.
+                // lwm2m_conn_mon_notify_resource(LWM2M_CONN_MON_30000_CLASS_APN_6);
+            }
+        }
+    }
+}
+
+char * lwm2m_conn_mon_class7_apn_get(uint16_t instance_id, uint8_t * p_len)
+{
+    // Check for updated value.
+    uint16_t apn_class_len = sizeof(m_apn_class_scratch_buffer);
+
+    int retval = nrf_apn_class_read(7, m_apn_class_scratch_buffer, &apn_class_len);
+
+    if (retval == 0)
+    {
+        // Check if length or value has changed.
+        if ((m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_7].len != apn_class_len) ||
+            (strncmp(m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_7].p_val, m_apn_class_scratch_buffer, apn_class_len)))
+        {
+            // If changed, update the cached value, and notify new value.
+            if (lwm2m_bytebuffer_to_string(m_apn_class_scratch_buffer, apn_class_len, &m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_7]) != 0)
+            {
+                LWM2M_ERR("Could not set local cached CLASS7 APN");
+            }
+            else
+            {
+                // TODO: Value is different from previous value, shut down all sockets on the APN and attach the APN then create sockets again.
+                // TODO: Value is different from previous value, do a notification.
+                // lwm2m_conn_mon_notify_resource(LWM2M_CONN_MON_30000_CLASS_APN_7);
+            }
+        }
+    }
+
+    *p_len = m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_7].len;
+    return m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_7].p_val;
+}
+
+void lwm2m_conn_mon_class7_apn_set(uint16_t instance_id, char * p_value, uint8_t len)
+{
+    // Check if length or value has changed.
+    if ((m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_7].len != len) ||
+        (strncmp(m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_7].p_val, m_apn_class_scratch_buffer, len)))
+    {
+        // Update the network setting.
+        int retval = nrf_apn_class_update(7, p_value, len);
+
+        // Update the cached value.
+        if (retval == 0)
+        {
+            if (lwm2m_bytebuffer_to_string(m_apn_class_scratch_buffer, len, &m_vzw_conn_mon_class_apn.class_apn[LWM2M_CONN_MON_30000_CLASS_APN_7]) != 0)
+            {
+                LWM2M_ERR("Could not set local cached CLASS7 APN");
+            }
+            else
+            {
+                // TODO: Value is different from previous value, shut down all sockets on the APN and attach the APN then create sockets again.
+                // TODO: Value is different from previous value, do a notification.
+                // lwm2m_conn_mon_notify_resource(LWM2M_CONN_MON_30000_CLASS_APN_7);
+            }
+        }
+    }
+}
+
+// LWM2M core resources.
 
 lwm2m_connectivity_monitoring_t * lwm2m_conn_mon_get_instance(uint16_t instance_id)
 {
@@ -39,12 +251,19 @@ static uint32_t tlv_conn_mon_verizon_encode(uint16_t instance_id, uint8_t * p_bu
 {
     ARG_UNUSED(instance_id);
 
+    // Refresh list of APN Class.
+    uint8_t len = 0;
+    (void)lwm2m_conn_mon_class2_apn_get(instance_id, &len);
+    (void)lwm2m_conn_mon_class3_apn_get(instance_id, &len);
+    (void)lwm2m_conn_mon_class6_apn_get(instance_id, &len);
+    (void)lwm2m_conn_mon_class7_apn_get(instance_id, &len);
+
     lwm2m_list_t list =
     {
         .type         = LWM2M_LIST_TYPE_STRING,
-        .val.p_string = m_apn,
-        .len          = 3,
-        .max_len      = ARRAY_SIZE(m_apn)
+        .val.p_string = m_vzw_conn_mon_class_apn.class_apn,
+        .len          = 4,
+        .max_len      = ARRAY_SIZE(m_vzw_conn_mon_class_apn.class_apn)
     };
 
     return lwm2m_tlv_list_encode(p_buffer, p_buffer_len, VERIZON_RESOURCE, &list);
@@ -81,7 +300,7 @@ uint32_t tlv_conn_mon_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
             {
                 err_code = lwm2m_bytebuffer_to_string((char *)tlv.value,
                                                       tlv.length,
-                                                      &m_apn[tlv.id]);
+                                                      &m_vzw_conn_mon_class_apn.class_apn[tlv.id]);
                 break;
             }
 
@@ -160,6 +379,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
         }
         else
         {
+
             err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
                                                                 &buffer_size,
                                                                 resource_id,
@@ -328,15 +548,6 @@ void lwm2m_conn_mon_init(void)
     m_instance_conn_mon.smcc = 1;
 
     m_instance_conn_mon.proto.callback = conn_mon_instance_callback;
-
-    char * class2_apn = "VZWADMIN";
-    (void)lwm2m_bytebuffer_to_string(class2_apn, strlen(class2_apn), &m_apn[0]);
-    char * class3_apn = "VZWINTERNET";
-    (void)lwm2m_bytebuffer_to_string(class3_apn, strlen(class3_apn), &m_apn[1]);
-    char * class6_apn = "VZWCLASS6";
-    (void)lwm2m_bytebuffer_to_string(class6_apn, strlen(class6_apn), &m_apn[2]);
-    char * class7_apn = "VZWIOTTS";
-    (void)lwm2m_bytebuffer_to_string(class7_apn, strlen(class7_apn), &m_apn[3]);
 
     // Set bootstrap server as owner.
     (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_conn_mon,
