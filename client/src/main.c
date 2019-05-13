@@ -569,6 +569,19 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
     }
 }
 
+static void app_restart_lifetime_timer(uint8_t instance_id)
+{
+#if (APP_USE_CONTABO != 1)
+    s32_t timeout = (s32_t)(lwm2m_server_lifetime_get(instance_id) * 1000);
+    if (timeout <= 0) {
+        // FIXME: Lifetime timer too big for Zephyr, set to maximum possible value for now
+        timeout = INT32_MAX;
+    }
+
+    k_delayed_work_submit(&connection_update_work[instance_id], timeout);
+#endif
+}
+
 /**@brief LWM2M notification handler. */
 void lwm2m_notification(lwm2m_notification_type_t type,
                         struct sockaddr *         p_remote,
@@ -601,11 +614,8 @@ void lwm2m_notification(lwm2m_notification_type_t type,
     }
     else if (type == LWM2M_NOTIFCATION_TYPE_REGISTER)
     {
-#if (APP_USE_CONTABO != 1)
-        // Start lifetime timer
-        k_delayed_work_submit(&connection_update_work[m_server_instance],
-                              lwm2m_server_lifetime_get(m_server_instance) * 1000);
-#endif
+        app_restart_lifetime_timer(m_server_instance);
+
         if (coap_code == COAP_CODE_201_CREATED || coap_code == COAP_CODE_204_CHANGED)
         {
             LOG_INF("Registered (server %u)", m_server_instance);
@@ -1239,16 +1249,7 @@ void app_server_update(uint16_t instance_id)
                             m_lwm2m_transport[instance_id]);
     ARG_UNUSED(err_code);
 
-    // Restart lifetime timer
-#if (APP_USE_CONTABO != 1)
-    s32_t timeout = (s32_t)(lwm2m_server_lifetime_get(instance_id) * 1000);
-    if (timeout <= 0) {
-        // FIXME: Lifetime timer too big for Zephyr, set to maximum possible value for now
-        timeout = INT32_MAX;
-    }
-
-    k_delayed_work_submit(&connection_update_work[instance_id], timeout);
-#endif
+    app_restart_lifetime_timer(instance_id);
 }
 
 static void app_server_deregister(uint16_t instance_id)
