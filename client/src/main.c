@@ -137,7 +137,7 @@ static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS
 static volatile app_state_t m_app_state = APP_STATE_IDLE;                                     /**< Application state. Should be one of @ref app_state_t. */
 static volatile uint16_t    m_server_instance;                                                /**< Server instance handled. */
 static volatile bool        m_did_bootstrap;
-static volatile uint16_t    m_update_server;
+static volatile bool        app_server_update_requested[1+LWM2M_MAX_SERVERS];
 
 static char m_imei[16];
 static char m_msisdn[16];
@@ -160,7 +160,6 @@ static struct sockaddr m_bs_remote_server;                                      
 static struct sockaddr m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
 static volatile uint32_t tick_count = 0;
 
-void app_server_update(uint16_t instance_id);
 static void app_misc_data_set_bootstrapped(uint8_t bootstrapped);
 static void app_server_deregister(uint16_t instance_id);
 static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
@@ -170,9 +169,9 @@ static void app_wait_state_update(struct k_work *work);
 static const char * app_uri_get(char * server_uri, uint8_t uri_len, uint16_t * p_port, bool * p_secure);
 
 /** Functions available from shell access */
-void app_update_server(uint16_t update_server)
+void app_request_server_update(uint16_t instance_id)
 {
-    m_update_server = update_server;
+    app_server_update_requested[instance_id] = true;
 }
 
 #if (CONFIG_SHELL || CONFIG_DK_LIBRARY)
@@ -1475,14 +1474,14 @@ static void app_lwm2m_process(void)
         }
         default:
         {
-            if (m_update_server > 0)
-            {
-                if (lwm2m_server_registered_get(m_update_server))
-                {
-                    LOG_INF("app_server_update (server %u)", m_update_server);
-                    app_server_update(m_update_server);
+            for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+                if (app_server_update_requested[i]) {
+                    if (lwm2m_server_registered_get(i)) {
+                        LOG_INF("app_server_update (server %u)", i);
+                        app_server_update(i);
+                    }
+                    app_server_update_requested[i] = false;
                 }
-                app_update_server(0);
             }
             break;
         }
@@ -1613,7 +1612,7 @@ static void app_connection_update(struct k_work *work)
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
         if (work == (struct k_work *)&connection_update_work[i]) {
             if (lwm2m_server_registered_get(i)) {
-                app_server_update(i);
+                app_request_server_update(i);
             }
             break;
         }

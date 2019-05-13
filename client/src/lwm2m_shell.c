@@ -121,7 +121,7 @@ static int cmd_config_lifetime(const struct shell *shell, size_t argc, char **ar
     if (lifetime != lwm2m_server_lifetime_get(instance_id)) {
         if (instance_id == 1 || instance_id == 3) {
             // Lifetime changed, send update server
-            app_update_server(instance_id);
+            app_request_server_update(instance_id);
         }
 
         lwm2m_server_lifetime_set(instance_id, lifetime);
@@ -348,7 +348,7 @@ static int cmd_lwm2m_update(const struct shell *shell, size_t argc, char **argv)
     }
 
     if (app_state_get() == APP_STATE_SERVER_REGISTERED) {
-        app_update_server(instance_id);
+        app_request_server_update(instance_id);
     } else {
         shell_print(shell, "Not registered");
     }
