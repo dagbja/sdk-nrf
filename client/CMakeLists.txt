@@ -22,6 +22,7 @@ target_sources(app PRIVATE src/lwm2m_instance_storage.c)
 target_sources(app PRIVATE src/common.c)
 target_sources(app PRIVATE src/lwm2m_shell.c)
 target_sources(app PRIVATE src/lwm2m_retry_delay.c)
+target_sources(app PRIVATE src/sms_receive.c)
 
 zephyr_include_directories(src)
 

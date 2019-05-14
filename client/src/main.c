@@ -20,6 +20,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <nrf_inbuilt_key.h>
 #include <nrf.h>
 #include <at_interface.h>
+#include <sms_receive.h>
 
 #if CONFIG_DK_LIBRARY
 #include <buttons_and_leds.h>
@@ -1662,6 +1663,11 @@ int main(void)
         lte_lc_psm_req(false);
     }
     lte_lc_init_and_connect();
+
+    if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
+        // Start SMS receive thread
+        sms_receive_thread_start();
+    }
 
     // Initialize CoAP.
     app_coap_init();

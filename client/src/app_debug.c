@@ -23,6 +23,7 @@ void app_debug_init(void)
 
     if (ret != sizeof m_debug_settings) {
         app_debug_flag_set(DEBUG_FLAG_DISABLE_PSM);
+        app_debug_flag_set(DEBUG_FLAG_SMS_SUPPORT);
     }
 }
 

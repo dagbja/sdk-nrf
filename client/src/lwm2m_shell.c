@@ -17,6 +17,7 @@
 #include <lwm2m_device.h>
 #include <lwm2m_retry_delay.h>
 #include <at_interface.h>
+#include <sms_receive.h>
 #include <main.h>
 
 
@@ -166,6 +167,10 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "  Disable PSM    %s", app_debug_flag_is_set(DEBUG_FLAG_DISABLE_PSM) ? "Yes" : "No");
     shell_print(shell, "  SMS Support    %s", app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT) ? "Yes" : "No");
 
+    if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
+        shell_print(shell, "  SMS Counter    %u", sms_receive_counter());
+    }
+
     return 0;
 }
 
@@ -306,6 +311,7 @@ static int cmd_debug_sms_support(const struct shell *shell, size_t argc, char **
 
     if (sms_support) {
         app_debug_flag_set(DEBUG_FLAG_SMS_SUPPORT);
+        sms_receive_thread_start();
     } else {
         app_debug_flag_clear(DEBUG_FLAG_SMS_SUPPORT);
     }
