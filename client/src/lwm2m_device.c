@@ -233,7 +233,7 @@ void lwm2m_device_init(void)
 
     m_instance_device.manufacturer.p_val = "Nordic Semiconductor";
     m_instance_device.manufacturer.len = strlen(m_instance_device.manufacturer.p_val);
-    m_instance_device.model_number.p_val = "nRF91";
+    m_instance_device.model_number.p_val = "nRF9160";
     m_instance_device.model_number.len = strlen(m_instance_device.model_number.p_val);
     m_instance_device.serial_number.p_val = app_imei_get();
     m_instance_device.serial_number.len = strlen(m_instance_device.serial_number.p_val);
