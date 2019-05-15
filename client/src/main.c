@@ -1641,7 +1641,7 @@ static void app_lwm2m_observer_process(void)
  */
 int main(void)
 {
-    printk("\n\nInitializing LTE link, please wait...\n");
+    LOG_INF("Initializing LTE link");
 
     // Initialize Non-volatile Storage.
     lwm2m_instance_storage_init();
