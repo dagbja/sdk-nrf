@@ -15,18 +15,18 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <net/socket.h>
 #include <main.h>
 
-#define APP_MAX_AT_READ_LENGTH          256
-#define APP_MAX_AT_WRITE_LENGTH         256
+#define APP_MAX_AT_READ_LENGTH 256
 
 static K_THREAD_STACK_ARRAY_DEFINE(sms_stack, 1, 1024);
 static struct k_thread sms_thread;
 static uint32_t receive_count = 0;
 
+static const char at_cnmi[] = "AT+CNMI=3,2,0,1";  // Selects how new messages are indicated
+static const char at_cnma[] = "AT+CNMA=1";        // Send new message ACK in PDU mode
+
 static void sms_receive(void *id, void *unused1, void *unused2)
 {
-    char write_buffer[APP_MAX_AT_WRITE_LENGTH];
     char read_buffer[APP_MAX_AT_READ_LENGTH];
-
     int at_socket_fd;
     int length;
 
@@ -36,19 +36,15 @@ static void sms_receive(void *id, void *unused1, void *unused2)
         return;
     }
 
-    const char *at_cnmi = "AT+CNMI=3,2,0,1";  // Selects how new messages are indicated
-    const char *at_cnma = "AT+CNMA=1";        // Send new message ACK in PDU mode
-
     LOG_INF("Initializing SMS receiver");
-    snprintf(write_buffer, APP_MAX_AT_WRITE_LENGTH, "%s", at_cnmi);
-    length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
+    length = send(at_socket_fd, at_cnmi, sizeof(at_cnmi) - 1, 0);
 
     while (true) {
         length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
 
         if (length > 12 && strncmp(read_buffer, "+CMT:", 5) == 0) {
             // Send ACK
-            send(at_socket_fd, at_cnma, strlen(at_cnma), 0);
+            send(at_socket_fd, at_cnma, sizeof(at_cnma) - 1, 0);
             receive_count++;
 
             // Manually decode the last bytes to get CoAP URI (ignore trailing \r\n)
