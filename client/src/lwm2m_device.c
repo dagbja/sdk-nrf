@@ -19,8 +19,6 @@
 
 #define VERIZON_RESOURCE 30000
 
-#define APP_MOTIVE_FAKE_POWER_SOURCES   1 // To pass MotiveBridge power source tests (4.10, 4.11 and 4.12)
-
 static lwm2m_object_t m_object_device;    /**< Device base object. */
 static lwm2m_device_t m_instance_device;  /**< Device object instance. */
 static lwm2m_string_t m_verizon_resources[2];
@@ -242,21 +240,15 @@ void lwm2m_device_init(void)
     m_instance_device.firmware_version.p_val = "1.0";
     m_instance_device.firmware_version.len = strlen(m_instance_device.firmware_version.p_val);
 
-#if APP_MOTIVE_FAKE_POWER_SOURCES
     m_instance_device.avail_power_sources.len = 2;
     m_instance_device.avail_power_sources.val.p_uint8[0] = 0; // DC power
     m_instance_device.avail_power_sources.val.p_uint8[1] = 2; // External Battery
     m_instance_device.power_source_voltage.len = 2;
-    m_instance_device.power_source_voltage.val.p_int32[0] = 5108;
-    m_instance_device.power_source_voltage.val.p_int32[1] = 5242;
+    m_instance_device.power_source_voltage.val.p_int32[0] = 0;
+    m_instance_device.power_source_voltage.val.p_int32[1] = 0;
     m_instance_device.power_source_current.len = 2;
-    m_instance_device.power_source_current.val.p_int32[0] = 42;
+    m_instance_device.power_source_current.val.p_int32[0] = 0;
     m_instance_device.power_source_current.val.p_int32[1] = 0;
-#else
-    m_instance_device.avail_power_sources.len = 0;
-    m_instance_device.power_source_voltage.len = 0;
-    m_instance_device.power_source_current.len = 0;
-#endif
 
     m_instance_device.battery_level = 0;
     m_instance_device.memory_free = 64;
