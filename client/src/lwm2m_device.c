@@ -189,7 +189,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
 
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
 
-                app_request_reboot();
+                app_system_reset();
                 break;
             }
 
