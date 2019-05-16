@@ -4,7 +4,17 @@
 # SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
 #
 
-zephyr_sources_ifdef(CONFIG_NRF_LWM2M
+zephyr_library_named(nrf_lwm2m)
+
+if(!CONFIG_NRF_LWM2M_INCLUDE_DEBUG_INFORMATION)
+zephyr_library_cc_option(
+    -g0
+)
+endif()
+
+zephyr_include_directories(include)
+
+zephyr_library_sources(
     src/lwm2m.c
     src/lwm2m_acl.c
     src/lwm2m_bootstrap.c
@@ -15,7 +25,4 @@ zephyr_sources_ifdef(CONFIG_NRF_LWM2M
     src/lwm2m_register.c
     src/lwm2m_remote.c
     src/lwm2m_tlv.c
-)
-
-zephyr_include_directories(include)
-
+    )
