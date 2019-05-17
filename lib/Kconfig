@@ -5,3 +5,4 @@
 #
 
 rsource "lwm2m/Kconfig"
+rsource "vzw_lwm2m/Kconfig"
