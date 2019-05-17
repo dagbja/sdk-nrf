@@ -20,17 +20,7 @@
 #include <net/coap_api.h>
 #include <net/coap_observe_api.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#define LWM2M_COAP_HANDLER_MAX_INSTANCES CONFIG_NRF_LWM2M_COAP_HANDLER_MAX_INSTANCES
-#define LWM2M_COAP_HANDLER_MAX_OBJECTS   CONFIG_NRF_LWM2M_COAP_HANDLER_MAX_OBJECTS
-#define LWM2M_MAX_SERVERS                CONFIG_NRF_LWM2M_MAX_SERVERS
-#define LWM2M_REGISTER_MAX_LOCATION_LEN  CONFIG_NRF_LWM2M_REGISTER_MAX_LOCATION_LEN
-#define LWM2M_CONNECTIVITY_MONITORING_MAX_NETWORK_BEARERS CONFIG_NRF_LWM2M_CONNECTIVITY_MONITORING_MAX_NETWORK_BEARERS
-#define LWM2M_CONNECTIVITY_MONITORING_MAX_IP_ADDRESSES CONFIG_NRF_LWM2M_CONNECTIVITY_MONITORING_MAX_IP_ADDRESSES
-#define LWM2M_CONNECTIVITY_MONITORING_MAX_APNS CONFIG_NRF_LWM2M_CONNECTIVITY_MONITORING_MAX_APNS
+#include <lwm2m_cfg.h>
 
 #define USE_SHORT_SMS 0
 /**@addtogroup LWM2M_opcodes Types
@@ -155,7 +145,7 @@ typedef struct
 #define LWM2M_PERMISSION_EXECUTE      0x04  /**< Bit mask for LWM2M execute permission. */
 #define LWM2M_PERMISSION_DELETE       0x08  /**< Bit mask for LWM2M delete permission. */
 #define LWM2M_PERMISSION_CREATE       0x10  /**< Bit mask for LWM2M create permission. */
-#define LWM2M_PERMISSION_OBSERVE      0x40 
+#define LWM2M_PERMISSION_OBSERVE      0x40  /**< Bit mask for LWM2M observe permission. */
 
 #define LWM2M_OPERATION_CODE_NONE     0x00                     /**< Bit mask for LWM2M no operation. */
 #define LWM2M_OPERATION_CODE_READ     LWM2M_PERMISSION_READ    /**< Bit mask for LWM2M read operation. */
