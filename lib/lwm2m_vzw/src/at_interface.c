@@ -14,6 +14,8 @@
 #include <at_cmd.h>
 #include <at_cmd_parser.h>
 #include <at_params.h>
+#include <lwm2m_api.h>
+#include <lwm2m_objects.h>
 
 /* For logging API. */
 #include <lwm2m.h>
@@ -21,6 +23,11 @@
 // FIXME: remove this and move to KConfig
 #define APP_MAX_AT_READ_LENGTH          CONFIG_AT_CMD_RESPONSE_MAX_LEN
 #define APP_MAX_AT_WRITE_LENGTH         256
+
+/** Cumulative days per month in a year
+ *  Leap days are taken into account in the formula calculating the time since Epoch.
+ *  */
+static int cum_ydays[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
 
 /**
  * @brief The array index is the CID number.
@@ -46,8 +53,7 @@ static const at_notif_handler at_handlers[] = {
     sms_receiver_notif_parse ///< Parse received SMS events.
 };
 
-
-static int at_send_command_and_parse_params(const char * p_at_command, struct at_param_list * p_param_list, int param_count)
+static int at_send_command_and_parse_params(const char * p_at_command, struct at_param_list * p_param_list)
 {
     char read_buffer[APP_MAX_AT_READ_LENGTH];
 
@@ -55,19 +61,60 @@ static int at_send_command_and_parse_params(const char * p_at_command, struct at
 
     retval = at_cmd_write(p_at_command, read_buffer, APP_MAX_AT_READ_LENGTH, NULL);
 
-    if (!retval) {
+    if (retval == 0) {
         char * p_start = read_buffer;
         char * p_command_end = strstr(read_buffer, ":");
         if (p_command_end) {
             p_start = p_command_end+1;
         }
-        if (at_parser_params_from_str(p_start, p_param_list))
+        retval = at_parser_params_from_str(p_start, p_param_list);
+        if (retval != 0)
         {
             LWM2M_ERR("at_parser (%s) failed", p_at_command);
             retval = EINVAL;
         }
     } else {
         LWM2M_ERR("at_cmd_write failed: %d", (int)retval);
+    }
+
+    return retval;
+}
+
+static int at_response_param_to_lwm2m_string(const char * p_at_command, lwm2m_string_t *p_string)
+{
+    int retval = 0;
+    struct at_param_list params;
+
+    char read_buf[APP_MAX_AT_READ_LENGTH];
+
+    params.params = NULL;
+    if (at_params_list_init(&params, 1) == 0)
+    {
+        if (at_send_command_and_parse_params(p_at_command, &params) == 0)
+        {
+            retval = at_params_string_get(&params, 0, read_buf, sizeof(read_buf));
+            if (retval >= 0)
+            {
+                (void)lwm2m_bytebuffer_to_string(read_buf, retval, p_string);
+            }
+            else
+            {
+                LWM2M_ERR("parse failed: no string param found");
+                retval = -EINVAL;
+            }
+        }
+        else
+        {
+            LWM2M_ERR("at_send_command_and_parse_params failed");
+            retval = -EIO;
+        }
+
+        at_params_list_free(&params);
+    }
+    else
+    {
+        LWM2M_ERR("at_params_list_init failed");
+        retval = -EINVAL;
     }
 
     return retval;
@@ -112,6 +159,39 @@ static int at_cgev_handler(char *notif)
 
     // Not a CGEV event.
     return -1;
+}
+
+static void cclk_reponse_convert(const char* p_read_buf, int32_t * p_time, int32_t * p_utc_offset)
+{
+    // Seconds since Epoch approximation
+    char *p_end;
+    int tmp_year = 2000 + (int32_t)strtol(p_read_buf, &p_end, 10);
+    int year = tmp_year - 1900;
+    int mon = (int32_t)strtol(p_end+1, &p_end, 10) - 1;
+    int mday = (int32_t)strtol(p_end+1, &p_end, 10);
+    int hour = (int32_t)strtol(p_end+1, &p_end, 10);
+    int min = (int32_t)strtol(p_end+1, &p_end, 10);
+    int sec = (int32_t)strtol(p_end+1, &p_end, 10);
+
+    if ((mon > 11) || (mon < 0))
+    {
+        mon = 0;
+    }
+
+    int yday = mday - 1 + cum_ydays[mon];
+
+     /*
+     * The Open Group Base Specifications Issue 7, 2018 edition
+     * IEEE Std 1003.1-2017: 4.16 Seconds Since the Epoch
+     *
+     * http://http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_16
+     */
+    *p_time = sec + min*60 + hour*3600 + yday*86400 +
+            (year-70)*31536000 + ((year-69)/4)*86400 -
+            ((year-1)/100)*86400 + ((year+299)/400)*86400;
+
+    // UTC offset as 15 min units
+    *p_utc_offset = (int32_t)strtol(p_end, &p_end, 10);
 }
 
 int mdm_interface_init(void)
@@ -238,7 +318,7 @@ int at_apn_setup_wait_for_ipv6(char * apn)
     {
         LWM2M_TRC("CID %d found", cid_number);
 
-        while(cid_ipv6_table[cid_number] == false) {
+        while (cid_ipv6_table[cid_number] == false) {
             // TODO: Add a timeout to not wait forever in case IPv6 is not available on that CID.
             k_sleep(100);
         }
@@ -455,16 +535,16 @@ int at_read_operator_id(uint32_t  *p_operator_id)
     }
     else
     {
-        if (!at_send_command_and_parse_params(at_operid, &operid_params, 1))
+        if (at_send_command_and_parse_params(at_operid, &operid_params) == 0)
         {
-            if (at_params_short_get(&operid_params, 0, &operator_id))
+            if (at_params_short_get(&operid_params, 0, &operator_id) == 0)
             {
-                LWM2M_ERR("operator id parse failed: get short failed");
-                retval = EINVAL;
+                *p_operator_id = (uint32_t)operator_id;
             }
             else
             {
-                *p_operator_id = (uint32_t)operator_id;
+                LWM2M_ERR("operator id parse failed: get short failed");
+                retval = EINVAL;
             }
         }
         else
@@ -472,7 +552,301 @@ int at_read_operator_id(uint32_t  *p_operator_id)
             LWM2M_ERR("parse operator id failed");
             retval = EIO;
         }
+
         at_params_list_free(&operid_params);
+    }
+
+    return retval;
+}
+
+int at_read_net_reg_stat(uint32_t * p_net_stat)
+{
+    int retval = 0;
+    struct at_param_list cereg_params;
+
+    // Read network registration status
+    const char *at_cereg = "AT+CEREG?";
+
+    cereg_params.params = NULL;
+    retval = at_params_list_init(&cereg_params,2);
+    if (retval == 0)
+    {
+        if (at_send_command_and_parse_params(at_cereg, &cereg_params) == 0)
+        {
+            u16_t net_stat;
+            if (at_params_short_get(&cereg_params, 1, &net_stat) == 0)
+            {
+                *p_net_stat = (uint32_t)net_stat;
+            }
+            else
+            {
+                LWM2M_ERR("net stat parsing failed: no short param found");
+                retval = -EINVAL;
+            }
+        }
+        else
+        {
+            LWM2M_ERR("reading cereg failed\n");
+            retval = -EINVAL;
+        }
+
+        at_params_list_free(&cereg_params);
+    }
+    else
+    {
+        LWM2M_ERR("cereg params_list_init failed");
+        retval = EINVAL;
+    }
+
+    return retval;
+}
+
+int at_read_manufacturer(lwm2m_string_t *p_manufacturer_id)
+{
+    int retval = 0;
+
+    // Read manufacturer identification
+    const char *at_cgmi = "AT+CGMI";
+
+    retval = at_response_param_to_lwm2m_string(at_cgmi, p_manufacturer_id);
+
+    return retval;
+}
+
+int at_read_model_number(lwm2m_string_t *p_model_number)
+{
+    int retval = 0;
+
+    // Read model number
+    const char *at_cgmm = "AT+CGMM";
+
+    retval = at_response_param_to_lwm2m_string(at_cgmm, p_model_number);
+
+    return retval;
+}
+
+int at_read_radio_signal_strength(int32_t * p_signal_strength)
+{
+    int retval = 0;
+    struct at_param_list cesq_params;
+
+    // Read network registration status
+    const char *at_cesq = "AT+CESQ";
+
+    *p_signal_strength = 0;
+
+    cesq_params.params = NULL;
+
+    retval = at_params_list_init(&cesq_params,6);
+    if (retval == 0)
+    {
+        if (at_send_command_and_parse_params(at_cesq, &cesq_params) == 0)
+        {
+            u16_t rsrp;
+            if (at_params_short_get(&cesq_params, 5, &rsrp) == 0)
+            {
+                if (rsrp != 255)
+                {
+                    /*
+                     * 3GPP TS 136.133: SI-RSRP measurement report mapping
+                     *  Reported value   Measured quantity value   Unit
+                     *   CSI_RSRP_00        CSI_RSRP < -140        dBm
+                     *   CSI_RSRP_01    -140 =< CSI_RSRP < -139    dBm
+                     *   CSI_RSRP_02    -139 =< CSI_RSRP < -138    dBm
+                     *   ...
+                     *   ...
+                     *   ...
+                     *   CSI_RSRP_95     -46 =< CSI_RSRP < -45     dBm
+                     *   CSI_RSRP_96     -45 =< CSI_RSRP < -44     dBm
+                     *   CSI_RSRP_97     -44 =< CSI_RSRP           dBm
+                     */
+                    *p_signal_strength = -141 + rsrp;
+                }
+                else
+                {
+                    // 255 == Not known or not detectable
+                    retval = -EINVAL;
+                }
+            }
+            else
+            {
+                LWM2M_ERR("signal strength parse failed");
+                retval = -EINVAL;
+            }
+        }
+        else
+        {
+            LWM2M_ERR("reading cesq failed");
+            retval = -EIO;
+        }
+
+        at_params_list_free(&cesq_params);
+    }
+    else
+    {
+        LWM2M_ERR("cesq_params init failed");
+        retval = EINVAL;
+    }
+
+    return retval;
+}
+
+int at_read_cell_id(uint32_t * p_cell_id)
+{
+    int retval = 0;
+    struct at_param_list cereg_params;
+    char ci_buf[9];
+
+    // Read network registration status
+    const char *at_cereg = "AT+CEREG?";
+
+    *p_cell_id = 0;
+
+    cereg_params.params = NULL;
+
+    retval = at_params_list_init(&cereg_params, 4);
+    if (retval == 0)
+    {
+        if (at_send_command_and_parse_params(at_cereg, &cereg_params) == 0)
+        {
+            retval = at_params_string_get(&cereg_params, 3, ci_buf, 8);
+            if (retval == 8)
+            {
+                ci_buf[8] = '\0'; // Null termination
+                *p_cell_id = (uint32_t)strtol(ci_buf, NULL, 16);
+            }
+            else
+            {
+                LWM2M_ERR("cell_id parse failed: no string param found");
+                retval = -EINVAL;
+            }
+        }
+        else
+        {
+            LWM2M_ERR("reading cell id failed");
+            retval = -EIO;
+        }
+        at_params_list_free(&cereg_params);
+    }
+    else
+    {
+        LWM2M_ERR("cereg_params list_init failed");
+        retval = EINVAL;
+    }
+
+    return retval;
+}
+
+int at_read_smnc_smcc(int32_t * p_smnc, int32_t *p_smcc)
+{
+    int retval = 0;
+    struct at_param_list cops_params;
+    char oper_buf[8];
+
+    // Read network information
+    const char *at_cops = "AT+COPS?";
+
+    *p_smnc = 0;
+    *p_smcc = 0;
+
+    cops_params.params = NULL;
+
+    retval = at_params_list_init(&cops_params, 4);
+    if (retval == 0)
+    {
+        if (at_send_command_and_parse_params(at_cops, &cops_params) == 0)
+        {
+            retval = at_params_string_get(&cops_params, 2, oper_buf, sizeof(oper_buf));
+            if (retval >= 0)
+            {
+                    if (retval < sizeof(oper_buf)-1)
+                    {
+                        // SMNC is first 3 characters, SMNN the following characters
+                        oper_buf[retval] = '\0'; // Null termination of SMCC
+                        *p_smcc = (int32_t)strtol(&oper_buf[3], NULL, 0);
+                        oper_buf[3] = '\0'; // Null termination of SMNC
+                        *p_smnc = (int32_t)strtol(oper_buf, NULL, 0);
+                    }
+                    else
+                    {
+                        LWM2M_ERR("incorrect cops oper field length");
+                        retval = -EINVAL;
+                    }
+            }
+            else
+            {
+                LWM2M_ERR("cops parse failed: no string param found");
+                retval = -EINVAL;
+            }
+        }
+        else
+        {
+            LWM2M_ERR("reading smnc & smcc failed");
+            retval = -EIO;
+        }
+        at_params_list_free(&cops_params);
+    }
+    else
+    {
+        LWM2M_ERR("cops_params list_init failed");
+        retval = EINVAL;
+    }
+
+    return retval;
+}
+
+int at_read_time(int32_t * p_time, int32_t * p_utc_offset)
+{
+    int retval = 0;
+    struct at_param_list cclk_params;
+    char read_buf[APP_MAX_AT_READ_LENGTH];
+
+    // Read modem time
+    const char *at_cclk = "AT+CCLK?";
+
+    *p_time = 0;
+    *p_utc_offset = 0;
+
+    cclk_params.params = NULL;
+
+    retval = at_params_list_init(&cclk_params, 1);
+    if (retval)
+    {
+        LWM2M_ERR("cclk_params list_init failed");
+        retval = EINVAL;
+    }
+    else
+    {
+        if (at_send_command_and_parse_params(at_cclk, &cclk_params) == 0)
+        {
+            retval = at_params_string_get(&cclk_params, 0, read_buf, sizeof(read_buf));
+            if (retval >= 0)
+            {
+                if (retval < sizeof(read_buf))
+                {
+                    // Zero termination
+                    read_buf[retval] = '\0';
+
+                    cclk_reponse_convert(read_buf, p_time, p_utc_offset);
+                }
+                else
+                {
+                    LWM2M_ERR("cclk response too long");
+                    retval = -EINVAL;
+                }
+            }
+            else
+            {
+                LWM2M_ERR("cclk parse failed: no string param found");
+                retval = -EINVAL;
+            }
+        }
+        else
+        {
+            LWM2M_ERR("reading time failed");
+            retval = -EIO;
+        }
+        at_params_list_free(&cclk_params);
     }
 
     return retval;

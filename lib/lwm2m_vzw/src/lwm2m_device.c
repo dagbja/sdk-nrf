@@ -5,6 +5,7 @@
  */
 
 #include <stdint.h>
+#include <stdio.h>
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
@@ -18,8 +19,11 @@
 #include <lwm2m_vzw_main.h>
 #include <dfusock.h>
 #include <nrf_socket.h>
+#include <lwm2m_carrier.h>
 
 #define VERIZON_RESOURCE 30000
+
+#define MAX_TIMEZONE_LEN 64
 
 static lwm2m_object_t m_object_device;    /**< Device base object. */
 static lwm2m_device_t m_instance_device;  /**< Device object instance. */
@@ -43,6 +47,47 @@ static uint32_t tlv_device_verizon_encode(uint16_t instance_id, uint8_t * p_buff
 static uint32_t tlv_device_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
 {
     return 0;
+}
+
+/**@brief Update time related resources from modem. */
+static void lwm2m_current_time_update()
+{
+    int32_t utc_offset_15min;
+
+    (void)at_read_time(&m_instance_device.current_time, &utc_offset_15min);
+
+    char string_buf[MAX_TIMEZONE_LEN];
+    snprintf(string_buf, sizeof(string_buf), "%+03d:%02d", (int)utc_offset_15min / 4, (int)(abs(utc_offset_15min) % 4) * 15);
+    (void)lwm2m_bytebuffer_to_string(string_buf, strlen(string_buf), &m_instance_device.utc_offset);
+
+    // Give offset in minutes west of GMT
+    const char * p_tz_string = lwm2m_carrier_timezone((-15 * utc_offset_15min), 0);
+
+    if (p_tz_string == NULL)
+    {
+        if (utc_offset_15min != 0)
+        {
+            // This simple conversion will loose the timezones containing +-15 +-30min offsets
+            snprintf(string_buf, sizeof(string_buf), "Etc/GMT%+d", (int)-utc_offset_15min / 4);
+        }
+        else
+        {
+            snprintf(string_buf, sizeof(string_buf), "Etc/GMT");
+        }
+    }
+    else
+    {
+        strncpy(string_buf, p_tz_string, sizeof(string_buf));
+    }
+
+    (void)lwm2m_bytebuffer_to_string(string_buf, strlen(string_buf),&m_instance_device.timezone);
+}
+
+const char * __WEAK lwm2m_carrier_timezone(int32_t tz_offset, int32_t dst)
+{
+    ARG_UNUSED(tz_offset);
+    ARG_UNUSED(dst);
+    return NULL;
 }
 
 char * lwm2m_device_get_sim_iccid(uint32_t * iccid_len)
@@ -101,6 +146,19 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
         }
         else
         {
+            // Update requested resource
+            switch (resource_id)
+            {
+                case LWM2M_DEVICE_CURRENT_TIME:
+                case LWM2M_DEVICE_UTC_OFFSET:
+                case LWM2M_DEVICE_TIMEZONE:
+                case LWM2M_NAMED_OBJECT:
+                    lwm2m_current_time_update();
+                    break;
+                default:
+                    break;
+            }
+
             err_code = lwm2m_tlv_device_encode(buffer,
                                                &buffer_size,
                                                resource_id,
@@ -232,10 +290,8 @@ void lwm2m_device_init(void)
 
     m_object_device.object_id = LWM2M_OBJ_DEVICE;
 
-    m_instance_device.manufacturer.p_val = "Nordic Semiconductor";
-    m_instance_device.manufacturer.len = strlen(m_instance_device.manufacturer.p_val);
-    m_instance_device.model_number.p_val = "nRF9160";
-    m_instance_device.model_number.len = strlen(m_instance_device.model_number.p_val);
+    (void)at_read_manufacturer(&m_instance_device.manufacturer);
+    (void)at_read_model_number(&m_instance_device.model_number);
     m_instance_device.serial_number.p_val = lwm2m_imei_get();
     m_instance_device.serial_number.len = strlen(m_instance_device.serial_number.p_val);
 
@@ -276,11 +332,9 @@ void lwm2m_device_init(void)
     m_instance_device.memory_free = 64;
     m_instance_device.error_code.len = 1;
     m_instance_device.error_code.val.p_int32[0] = 0; // No error
-    m_instance_device.current_time = 1546300800; // Tue Jan 01 00:00:00 CEST 2019
-    char * utc_offset = "+02:00";
-    (void)lwm2m_bytebuffer_to_string(utc_offset, strlen(utc_offset), &m_instance_device.utc_offset);
-    char * timezone = "Europe/Oslo";
-    (void)lwm2m_bytebuffer_to_string(timezone, strlen(timezone),&m_instance_device.timezone);
+
+    lwm2m_current_time_update();
+
     (void)lwm2m_bytebuffer_to_string("UQS", 3, &m_instance_device.supported_bindings);
     m_instance_device.device_type.p_val = "Smart Device";
     m_instance_device.device_type.len = strlen(m_instance_device.device_type.p_val);
@@ -297,8 +351,22 @@ void lwm2m_device_init(void)
     m_verizon_resources[0].len = 20;
     m_verizon_resources[0].p_val = lwm2m_os_malloc(m_verizon_resources[0].len);
     (void)at_read_sim_iccid(m_verizon_resources[0].p_val, &m_verizon_resources[0].len);
-    char * home_or_roaming = "Home"; // TODO: Read from AT+CEREG?
-    (void)lwm2m_bytebuffer_to_string(home_or_roaming, strlen(home_or_roaming), &m_verizon_resources[1]);
+    uint32_t net_stat = '0';
+    (void)at_read_net_reg_stat(&net_stat);
+    if (net_stat == 1)
+    {
+        char * home_or_roaming = "Home";
+        (void)lwm2m_bytebuffer_to_string(home_or_roaming, strlen(home_or_roaming), &m_verizon_resources[1]);
+    }
+    else if (net_stat == 5)
+    {
+        char * home_or_roaming = "Roam";
+        (void)lwm2m_bytebuffer_to_string(home_or_roaming, strlen(home_or_roaming), &m_verizon_resources[1]);
+    }
+    else
+    {
+        // TODO what if not registered to network, is this even possible at this stage?
+    }
 
     // Set bootstrap server as owner.
     (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_device,

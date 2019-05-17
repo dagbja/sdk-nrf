@@ -15,6 +15,7 @@
 #include <coap_message.h>
 #include <common.h>
 #include <nrf_apn_class.h>
+#include <at_interface.h>
 
 #define VERIZON_RESOURCE 30000
 
@@ -289,6 +290,27 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
         }
         else
         {
+            switch (resource_id)
+            {
+                case LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH:
+                    (void)at_read_radio_signal_strength(&m_instance_conn_mon.radio_signal_strength);
+                    break;
+                case LWM2M_CONN_MON_CELL_ID:
+                    (void)at_read_cell_id(&m_instance_conn_mon.cell_id);
+                    break;
+                case LWM2M_CONN_MON_SMNC:
+                case LWM2M_CONN_MON_SMCC:
+                    (void)at_read_smnc_smcc(&m_instance_conn_mon.smnc, &m_instance_conn_mon.smcc);
+                    break;
+                case LWM2M_NAMED_OBJECT:
+                    (void)at_read_radio_signal_strength(&m_instance_conn_mon.radio_signal_strength);
+                    (void)at_read_cell_id(&m_instance_conn_mon.cell_id);
+                    (void)at_read_smnc_smcc(&m_instance_conn_mon.smnc, &m_instance_conn_mon.smcc);
+                    break;
+                default:
+                    break;
+            }
+
             err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
                                                                 &buffer_size,
                                                                 resource_id,
@@ -406,6 +428,9 @@ void lwm2m_conn_mon_observer_process(void)
     while (coap_observe_server_next_get(&p_observer, p_observer, (coap_resource_t *)&m_instance_conn_mon) == 0)
     {
         LWM2M_TRC("Observer found");
+
+        (void)at_read_radio_signal_strength(&m_instance_conn_mon.radio_signal_strength);
+
         uint8_t  buffer[200];
         uint32_t buffer_size = sizeof(buffer);
         uint32_t err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
@@ -416,8 +441,6 @@ void lwm2m_conn_mon_observer_process(void)
         {
             LWM2M_ERR("Could not encode LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH, error code: %lu", err_code);
         }
-
-        m_instance_conn_mon.radio_signal_strength += 1;
 
         err_code =  lwm2m_notify(buffer,
                                 buffer_size,
@@ -443,7 +466,7 @@ void lwm2m_conn_mon_init(void)
     m_instance_conn_mon.available_network_bearer.len = 2;
     m_instance_conn_mon.available_network_bearer.val.p_int32[0] = 5;
     m_instance_conn_mon.available_network_bearer.val.p_int32[1] = 6;
-    m_instance_conn_mon.radio_signal_strength = 42;
+    (void)at_read_radio_signal_strength(&m_instance_conn_mon.radio_signal_strength);
     m_instance_conn_mon.link_quality = 100;
     m_instance_conn_mon.ip_addresses.len = 1;
     char * ip_address = "192.168.0.0";
@@ -452,9 +475,8 @@ void lwm2m_conn_mon_init(void)
     m_instance_conn_mon.apn.len = 1;
     char * apn = "VZWADMIN";
     (void)lwm2m_bytebuffer_to_string(apn, strlen(apn), &m_instance_conn_mon.apn.val.p_string[0]);
-    m_instance_conn_mon.cell_id = 0;
-    m_instance_conn_mon.smnc = 1;
-    m_instance_conn_mon.smcc = 1;
+    (void)at_read_cell_id(&m_instance_conn_mon.cell_id);
+    (void)at_read_smnc_smcc(&m_instance_conn_mon.smnc, &m_instance_conn_mon.smcc);
 
     m_instance_conn_mon.proto.callback = conn_mon_instance_callback;
 

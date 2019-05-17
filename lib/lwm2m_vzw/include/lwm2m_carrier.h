@@ -24,4 +24,18 @@ void lwm2m_carrier_event_handler(const lwm2m_carrier_event_t * event);
 int lwm2m_carrier_init(void);
 void lwm2m_carrier_run(void);
 
+/**
+ * @brief Timezone function that returns a timezone string based on the offset to GMT.
+ *
+ * @note  It can be overwritten by the application.
+ *        Defaults to Etc/GMT+-X format
+ *
+ * @param[in] tz_offset Offset as the number of minutes west of GMT
+ * @param[in] dst       Daylight saving in minutes included in the tz_offset.
+ *
+ * @return  Pointer to the null terminated timezone string.
+ *          In case no valid timezone found, NULL pointer can be returned.
+ */
+extern const char * lwm2m_carrier_timezone(int32_t tz_offset, int32_t dst);
+
 #endif // LWM2M_CARRIER_H__

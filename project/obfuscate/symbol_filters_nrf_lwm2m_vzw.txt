@@ -10,6 +10,7 @@
 ^lwm2m_carrier_event_handler$
 ^lwm2m_carrier_init$
 ^lwm2m_carrier_run$
+^lwm2m_carrier_timezone$
 
 # lwm2m_os.h
 ^lwm2m_os_free$
