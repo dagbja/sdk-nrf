@@ -70,8 +70,6 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #define BOOTSTRAP_URI                   "coaps://xvzwcdpii.xdev.motive.com:5684"              /**< Server URI to the bootstrap server when using security (DTLS). */
 #endif
 
-#define SECURITY_SERVER_URI_SIZE_MAX    64                                                    /**< Max size of server URIs. */
-
 #define APP_SEC_TAG_OFFSET              25
 
 #define APP_BOOTSTRAP_SEC_TAG           APP_SEC_TAG_OFFSET                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
@@ -167,7 +165,7 @@ static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len
 static void app_provision_secret_keys(void);
 static void app_disconnect(void);
 static void app_wait_state_update(struct k_work *work);
-static const char * app_uri_get(char * server_uri, uint8_t uri_len, uint16_t * p_port, bool * p_secure);
+static const char * app_uri_get(char * p_server_uri, uint16_t * p_port, bool * p_secure);
 
 /** Functions available from shell access */
 void app_request_server_update(uint16_t instance_id)
@@ -371,7 +369,7 @@ static void app_init_sockaddr_in(struct sockaddr *addr, sa_family_t ai_family, u
     }
 }
 
-static const char * app_uri_get(char * server_uri, uint8_t uri_len, uint16_t * p_port, bool * p_secure) {
+static const char * app_uri_get(char * server_uri, uint16_t * p_port, bool * p_secure) {
     const char *hostname;
 
     if (strncmp(server_uri, "coaps://", 8) == 0) {
@@ -449,14 +447,15 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
                                        uint16_t          instance_id)
 {
     // Create a string copy to null-terminate hostname within the server_uri.
-    char server_uri_val[SECURITY_SERVER_URI_SIZE_MAX];
-    strncpy(server_uri_val, server_uri, uri_len);
-    server_uri_val[uri_len] = 0;
+    char * p_server_uri_val = k_malloc(uri_len + 1);
+    strncpy(p_server_uri_val, server_uri, uri_len);
+    p_server_uri_val[uri_len] = 0;
 
     uint16_t port;
-    const char *hostname = app_uri_get(server_uri_val, uri_len, &port, secure);
+    const char *hostname = app_uri_get(p_server_uri_val, &port, secure);
 
     if (hostname == NULL) {
+        k_free (p_server_uri_val);
         return EINVAL;
     }
 
@@ -484,9 +483,11 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
 
     if (ret_val == 22 || ret_val == 60) {
         LOG_WRN("No %s address found for \"%s\"", (m_family_type[instance_id] == AF_INET6) ? "IPv6" : "IPv4", log_strdup(hostname));
+        k_free (p_server_uri_val);
         return EINVAL;
     } else if (ret_val != 0) {
         LOG_ERR("Failed to lookup \"%s\": %d", log_strdup(hostname), ret_val);
+        k_free (p_server_uri_val);
         return ret_val;
     }
 
@@ -499,6 +500,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     }
 
     freeaddrinfo(result);
+    k_free (p_server_uri_val);
 
 #if CONFIG_LOG
     char ip_buffer[64];
@@ -1580,19 +1582,22 @@ static void app_provision_secret_keys(void)
 
         if ((identity_len > 0) && (psk_len >0))
         {
-            static char server_uri_val[SECURITY_SERVER_URI_SIZE_MAX];
             uint8_t uri_len; // Will be filled by server_uri query.
             char * p_server_uri = lwm2m_security_server_uri_get(i, &uri_len);
-            strncpy(server_uri_val, p_server_uri, uri_len);
-            server_uri_val[uri_len] = 0;
+            char * p_server_uri_val = k_malloc(uri_len + 1);
+
+            strncpy(p_server_uri_val, p_server_uri, uri_len);
+            p_server_uri_val[uri_len] = 0;
 
             bool secure = false;
             uint16_t port = 0;
-            const char * hostname = app_uri_get(server_uri_val, uri_len, &port, &secure);
-            (void)hostname;
+            const char * hostname = app_uri_get(p_server_uri_val, &port, &secure);
+            ARG_UNUSED(hostname);
+
+            k_free(p_server_uri_val);
 
             if (secure) {
-                LOG_DBG("Provisioning key for %s, short-id: %u", log_strdup(server_uri_val), lwm2m_server_short_server_id_get(i));
+                LOG_DBG("Provisioning key for %s, short-id: %u", log_strdup(p_server_uri_val), lwm2m_server_short_server_id_get(i));
                 app_provision_psk(APP_SEC_TAG_OFFSET + i, p_identity, identity_len, p_psk, psk_len);
             }
         }
