@@ -1025,8 +1025,9 @@ static void app_bootstrap_connect(void)
 
     // Save the remote address of the bootstrap server.
     uint8_t uri_len = 0;
+    char * p_server_uri = lwm2m_security_server_uri_get(m_server_instance, &uri_len);
     err_code = app_lwm2m_parse_uri_and_save_remote(LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
-                                                   lwm2m_security_server_uri_get(0, &uri_len),
+                                                   p_server_uri,
                                                    uri_len,
                                                    &secure,
                                                    &m_bs_remote_server);
@@ -1137,8 +1138,9 @@ static void app_server_connect(void)
     m_server_conf[m_server_instance].short_server_id = lwm2m_server_short_server_id_get(m_server_instance);
 
     uint8_t uri_len = 0;
-    err_code = app_resolve_server_uri(lwm2m_security_server_uri_get(m_server_instance, &uri_len), uri_len,
-                                      &m_remote_server[m_server_instance], &secure, m_server_instance);
+    char * p_server_uri = lwm2m_security_server_uri_get(m_server_instance, &uri_len);
+    err_code = app_resolve_server_uri(p_server_uri, uri_len, &m_remote_server[m_server_instance],
+                                      &secure, m_server_instance);
     if (err_code != 0)
     {
         m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
@@ -1580,7 +1582,8 @@ static void app_provision_secret_keys(void)
         {
             static char server_uri_val[SECURITY_SERVER_URI_SIZE_MAX];
             uint8_t uri_len; // Will be filled by server_uri query.
-            strncpy(server_uri_val, (char *)lwm2m_security_server_uri_get(i, &uri_len), uri_len);
+            char * p_server_uri = lwm2m_security_server_uri_get(i, &uri_len);
+            strncpy(server_uri_val, p_server_uri, uri_len);
             server_uri_val[uri_len] = 0;
 
             bool secure = false;
