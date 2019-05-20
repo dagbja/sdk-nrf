@@ -90,7 +90,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
 
     if (op_code == LWM2M_OPERATION_CODE_READ)
     {
-        uint8_t  buffer[200];
+        uint8_t  buffer[300];
         uint32_t buffer_size = sizeof(buffer);
 
         if (resource_id == VERIZON_RESOURCE)
@@ -237,8 +237,11 @@ void lwm2m_device_init(void)
     m_instance_device.model_number.len = strlen(m_instance_device.model_number.p_val);
     m_instance_device.serial_number.p_val = app_imei_get();
     m_instance_device.serial_number.len = strlen(m_instance_device.serial_number.p_val);
-    m_instance_device.firmware_version.p_val = "1.0";
-    m_instance_device.firmware_version.len = strlen(m_instance_device.firmware_version.p_val);
+
+    m_instance_device.firmware_version.len = 80; // Should be ok for now
+    m_instance_device.firmware_version.p_val = lwm2m_malloc(m_instance_device.firmware_version.len);
+    (void)at_read_firmware_version(m_instance_device.firmware_version.p_val,
+                                   &m_instance_device.firmware_version.len);
 
     m_instance_device.avail_power_sources.len = 2;
     m_instance_device.avail_power_sources.val.p_uint8[0] = 0; // DC power

@@ -150,6 +150,50 @@ int at_read_sim_iccid(char *p_iccid, uint32_t * p_iccid_len)
     return retval;
 }
 
+int at_read_firmware_version(char *p_fw_version, uint32_t *p_fw_version_len)
+{
+    char read_buffer[APP_MAX_AT_READ_LENGTH];
+
+    int at_socket_fd;
+    int length;
+    int retval = 0;
+
+    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
+    if (at_socket_fd < 0) {
+        printk("socket() failed\n");
+        return EIO;
+    }
+
+    // Read Modem version
+    const char at_cgmr[] = "AT+CGMR";
+    length = send(at_socket_fd, at_cgmr, sizeof(at_cgmr) - 1, 0);
+
+    if (length == sizeof(at_cgmr) - 1) {
+        length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
+        if (length > 0) {
+            char * p_end = strstr(read_buffer, "\r");
+            if (p_end) {
+                uint32_t len = (uint32_t)(p_end - read_buffer);
+                memcpy(p_fw_version, read_buffer, len);
+                p_fw_version[len] = '\0';
+                *p_fw_version_len = len;
+            } else {
+                retval = EINVAL;
+            }
+        } else {
+            printk("recv(%s) failed\n", at_cgmr);
+            retval = EIO;
+        }
+    } else {
+        printk("send(%s) failed\n", at_cgmr);
+        retval = EIO;
+    }
+
+    close(at_socket_fd);
+
+    return retval;
+}
+
 int at_send_command(const char *at_command, bool do_logging)
 {
     char write_buffer[APP_MAX_AT_WRITE_LENGTH];
