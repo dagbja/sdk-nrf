@@ -152,7 +152,7 @@ static struct k_delayed_work connection_update_work[1+LWM2M_MAX_SERVERS];
 
 /* Resolved server addresses */
 #if APP_USE_CONTABO
-static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET, AF_INET, 0, AF_INET };  /**< Current IP versions, start using IPv6. */
+static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET, AF_INET, 0, AF_INET };     /**< Current IP versions, start using IPv6. */
 #else
 static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET6, AF_INET6, 0, AF_INET6 };  /**< Current IP versions, start using IPv6. */
 #endif
@@ -307,9 +307,9 @@ static void app_setup_admin_pdn(void) {
     memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
     apn_name_zero_terminated[class_apn_len] = '\0';
 
-    m_app_admin_apn_handle = pdn_init_and_connect(apn_name_zero_terminated);
-    APP_ERROR_CHECK_BOOL(m_app_admin_apn_handle >= 0);
-    LOG_INF("APN set up: %s", apn_name_zero_terminated);
+    m_app_admin_apn_handle = at_apn_setup_wait_for_ipv6(apn_name_zero_terminated);
+
+    LOG_INF("APN set up: %s", log_strdup(apn_name_zero_terminated));
 }
 
 /**@brief Tear down ADMIN PDN connection. */
@@ -353,16 +353,12 @@ static void app_initialize_imei_msisdn(void)
     }
 
     if (provision_bs_psk) {
-        app_teardown_admin_pdn();
-
         char * p_identity = app_client_imei_msisdn();
 
         lte_lc_offline();
         app_provision_psk(APP_BOOTSTRAP_SEC_TAG, p_identity, strlen(p_identity), m_app_bootstrap_psk, sizeof(m_app_bootstrap_psk));
 
         lte_lc_init_and_connect();
-
-        app_setup_admin_pdn();
     }
 }
 
@@ -518,7 +514,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
 
     LOG_INF("Doing DNS lookup using %s on %s",
             (family_type == AF_INET6) ? "IPv6" : "IPv4",
-            (pdn_handle > -1) ? apn_name_zero_terminated : "DEFAULT");
+            (pdn_handle > -1) ? log_strdup(apn_name_zero_terminated) : "DEFAULT");
 
     struct addrinfo *result;
     int ret_val = -1;
@@ -600,7 +596,7 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
     if (no_reply)
     {
         // Fallback to the other IP version
-        m_family_type[instance_id] = (m_family_type[instance_id] == AF_INET6) ? AF_INET : AF_INET6;
+        m_family_type[instance_id] = (m_family_type[instance_id] == AF_INET6) ? AF_INET6 : AF_INET6;
 
         if (m_family_type[instance_id] == AF_INET)
         {
@@ -1124,21 +1120,30 @@ static void app_bootstrap_connect(void)
             .sec_tag_list  = sec_tag_list
         };
 
-        uint8_t class_apn_len = 0;
-        char * apn_name = lwm2m_conn_mon_class2_apn_get(0, &class_apn_len);
-        char apn_name_zero_terminated[64];
-        memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
-        apn_name_zero_terminated[class_apn_len] = '\0';
 
         coap_local_t local_port =
         {
             .addr         = &local_addr,
             .setting      = &setting,
             .protocol     = IPPROTO_DTLS_1_2,
-            .interface    = apn_name_zero_terminated
+            .interface    = NULL
         };
 
-        LOG_INF("Setup secure DTLS session (server %u)", m_server_instance);
+        char apn_name_zero_terminated[64];
+        if (m_app_admin_apn_handle != -1)
+        {
+            uint8_t class_apn_len = 0;
+            char * apn_name = lwm2m_conn_mon_class2_apn_get(0, &class_apn_len);
+            memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
+            apn_name_zero_terminated[class_apn_len] = '\0';
+
+            local_port.interface = apn_name_zero_terminated;
+        }
+
+        LOG_INF("Setup secure DTLS session (server %u) (APN %s)",
+                m_server_instance, 
+                (m_app_admin_apn_handle != -1) ? log_strdup(apn_name_zero_terminated) : "DEFAULT");
+
         err_code = coap_security_setup(&local_port, &m_bs_remote_server);
 
         if (err_code == 0)
@@ -1251,21 +1256,25 @@ static void app_server_connect(void)
         {
             .addr         = &local_addr,
             .setting      = &setting,
-            .protocol     = IPPROTO_DTLS_1_2
+            .protocol     = IPPROTO_DTLS_1_2,
+            .interface    = NULL
         };
-        char apn_name_zero_terminated[64];
 
-        if (m_server_instance == 1)
+        char apn_name_zero_terminated[64];
+        if ((m_server_instance == 1) && (m_app_admin_apn_handle != -1))
         {
             uint8_t class_apn_len = 0;
             char * apn_name = lwm2m_conn_mon_class2_apn_get(0, &class_apn_len);
             memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
             apn_name_zero_terminated[class_apn_len] = '\0';
+
             local_port.interface = apn_name_zero_terminated;
         }
 
+        LOG_INF("Setup secure DTLS session (server %u) (APN %s)",
+                m_server_instance,
+                (m_app_admin_apn_handle != -1) ? log_strdup(apn_name_zero_terminated) : "DEFAULT");
 
-        LOG_INF("Setup secure DTLS session (server %u)", m_server_instance);
         err_code = coap_security_setup(&local_port, &m_remote_server[m_server_instance]);
 
         if (err_code == 0)
@@ -1655,7 +1664,10 @@ static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len
 
 static void app_provision_secret_keys(void)
 {
-    app_teardown_admin_pdn();
+    if (m_app_admin_apn_handle != -1)
+    {
+        app_teardown_admin_pdn();
+    }
 
     lte_lc_offline();
     LOG_DBG("Offline mode");
@@ -1692,6 +1704,10 @@ static void app_provision_secret_keys(void)
     LOG_INF("Wrote secret keys");
 
     lte_lc_init_and_connect();
+
+    if (app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT)) {
+        app_setup_admin_pdn();
+    }
 
     // THIS IS A HACK. Temporary solution to give a delay to recover Non-DTLS sockets from CFUN=4.
     // The delay will make TX available after CID again set.
@@ -1774,8 +1790,11 @@ int main(void)
     // Create LwM2M factory bootstraped objects.
     app_lwm2m_create_objects();
 
-    if (app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT) == 0) {
+    if (app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT)) {
+        LOG_INF("PDN support enabled");
         app_setup_admin_pdn();
+    } else {
+        LOG_INF("PDN support disabled");
     }
 
     app_work_init();
