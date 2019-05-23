@@ -10,5 +10,9 @@ config NRF_LWM2M_VZW
 	help
 	  "Enable Verizon LwM2M library"
 
+config NRF_LWM2M_VZW_STANDALONE_LIBRARY
+	bool "Compile VZW LWM2M as a standalone library"
+
 config NRF_LWM2M_VZW_INCLUDE_DEBUG_INFORMATION
 	bool "Include debug information in the output library"
+	depends on NRF_LWM2M_VZW_STANDALONE_LIBRARY

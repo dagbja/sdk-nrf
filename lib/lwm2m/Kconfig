@@ -10,8 +10,12 @@ config NRF_LWM2M
 	help
 	  "Enable LwM2M library"
 
+config NRF_LWM2M_STANDALONE_LIBRARY
+	bool "Compile LWM2M as a standalone library"
+
 config NRF_LWM2M_INCLUDE_DEBUG_INFORMATION
 	bool "Include debug information in the output library"
+	depends on NRF_LWM2M_STANDALONE_LIBRARY
 
 config NRF_LWM2M_LOG_LEVEL
 	int "Log level for LwM2M"

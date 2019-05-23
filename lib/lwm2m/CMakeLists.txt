@@ -6,7 +6,16 @@
 
 zephyr_library_named(nrf_lwm2m)
 
-if(!CONFIG_NRF_LWM2M_INCLUDE_DEBUG_INFORMATION)
+if (CONFIG_NRF_LWM2M_STANDALONE_LIBRARY)
+zephyr_library_cc_option(
+    -nostdlib
+    -nodefaultlibs
+    -nostartfiles
+    -lnosys
+)
+endif()
+
+if (NOT CONFIG_NRF_LWM2M_INCLUDE_DEBUG_INFORMATION)
 zephyr_library_cc_option(
     -g0
 )
