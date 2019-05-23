@@ -776,7 +776,12 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 #else
     m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
     s32_t hold_off_time = (lwm2m_server_client_hold_off_timer_get(m_server_instance) * 1000) - milliseconds_spent;
-    LOG_INF("Client holdoff timer: sleeping %d milliseconds...", hold_off_time);
+    if (hold_off_time > 0) {
+        LOG_INF("Client holdoff timer: sleeping %d milliseconds...", hold_off_time);
+    } else {
+        // Already used the holdoff timer, just continue
+        hold_off_time = 0;
+    }
     k_delayed_work_submit(&state_update_work, hold_off_time);
 #endif
 
