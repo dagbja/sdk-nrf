@@ -5,8 +5,9 @@ output_dir="output"
 cpu_variant="cortex-m33"
 
 declare -a lib_variants=("hard-float"
-			 "soft-float"
-			 "softfp-float")
+#			 "soft-float"
+#			 "softfp-float"
+			)
 
 declare -a lib_names=("nrf_lwm2m"
 		      "nrf_lwm2m_vzw")
@@ -23,14 +24,19 @@ declare -a api_headers_nrf_lwm2m=("lwm2m_cfg.h"
 				  "lwm2m_objects_plain_text.h"
 				  "lwm2m.h")
 
-declare -a api_headers_nrf_lwm2m_vzw=("common.h"
-				      "lwm2m_conn_mon.h"
-				      "lwm2m_device.h"
-				      "lwm2m_firmware.h"
-				      "lwm2m_instance_storage.h"
-				      "lwm2m_retry_delay.h"
-				      "lwm2m_security.h"
-				      "lwm2m_server.h")
+declare -a api_headers_nrf_lwm2m_vzw=(
+				#       "app_debug.h"
+				#       "at_interface.h"
+				#       "common.h"
+				#       "lwm2m_conn_mon.h"
+				#       "lwm2m_vzw_main.h"
+				#       "lwm2m_device.h"
+				#       "lwm2m_firmware.h"
+				#       "lwm2m_instance_storage.h"
+				#       "lwm2m_retry_delay.h"
+				#       "lwm2m_security.h"
+				#       "lwm2m_server.h"
+				      )
 
 rm -rf $project_dir/$output_dir
 

@@ -9,8 +9,6 @@ cmake_minimum_required(VERSION 3.8.2)
 include($ENV{ZEPHYR_BASE}/cmake/app/boilerplate.cmake NO_POLICY_SCOPE)
 project(NONE)
 
-target_sources(app PRIVATE src/app_debug.c)
-target_sources(app PRIVATE src/at_interface.c)
 target_sources(app PRIVATE src/buttons_and_leds.c)
 target_sources(app PRIVATE src/lwm2m_shell.c)
 target_sources(app PRIVATE src/sms_receive.c)

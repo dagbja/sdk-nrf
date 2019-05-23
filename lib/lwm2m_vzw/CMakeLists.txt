@@ -18,8 +18,11 @@ zephyr_include_directories(include)
 zephyr_library_include_directories(../../client/src)
 
 zephyr_library_sources(
+    src/app_debug.c
+    src/at_interface.c
     src/common.c
     src/lwm2m_conn_mon.c
+    src/lwm2m_vzw_main.c
     src/lwm2m_device.c
     src/lwm2m_firmware.c
     src/lwm2m_instance_storage.c
