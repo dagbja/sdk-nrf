@@ -38,6 +38,35 @@ declare -a api_headers_nrf_lwm2m_vzw=(
 				#       "lwm2m_server.h"
 				      )
 
+function obfuscate {
+	# $1 library name
+	# $2 cpu variant
+	# $3 float variant
+	target_dir=$project_dir/$output_dir/$1/lib/$2/$3
+	script_dir=$project_dir/obfuscate
+	name=lib$1.a
+	obfuscated_name=lib$1_obfuscated.a
+	relinked_name=lib$1_relinked.a
+	mapping_name=lib$1_mapping.txt
+
+	python $script_dir/obfuscate_symbols.py \
+	--input_archive $target_dir/$name \
+	--output_archive $target_dir/$obfuscated_name \
+	--relinked_archive $target_dir/$relinked_name \
+	--mapping_file $target_dir/$mapping_name \
+	--symbol_rename_regex_file $script_dir/symbol_filters_$1.txt \
+	--section_filter_file $script_dir/section_filters_$1.txt \
+	--temp_directory $target_dir/tmp
+
+	# Cleanup
+	rm -rf $target_dir/$name
+	rm -rf $target_dir/$relinked_name
+	rm -rf $target_dir/$mapping_name
+	rm -rf $target_dir/tmp
+
+	mv $target_dir/$obfuscated_name $target_dir/$name
+}
+
 rm -rf $project_dir/$output_dir
 
 # Build and copy libraries
@@ -88,3 +117,10 @@ do
 		sed -i "s/$conf/$val/g" $target_file
 	fi
 done < "$autoconf_file"
+
+# Obfuscate the Verizon LWM2M library
+
+for i in "${lib_variants[@]}"
+do
+	obfuscate "nrf_lwm2m_vzw" $cpu_variant $i
+done

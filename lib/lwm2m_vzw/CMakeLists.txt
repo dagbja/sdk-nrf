@@ -18,6 +18,8 @@ endif()
 if (NOT CONFIG_NRF_LWM2M_VZW_INCLUDE_DEBUG_INFORMATION)
 zephyr_library_cc_option(
     -g0
+    -fno-function-sections
+    -fno-data-sections
 )
 endif()
 

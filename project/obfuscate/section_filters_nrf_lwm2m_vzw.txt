@@ -1,0 +1,2 @@
+# This file lists sections that will be filtered out
+.arm_vfe_header
