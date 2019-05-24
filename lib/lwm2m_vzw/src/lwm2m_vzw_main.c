@@ -518,7 +518,7 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
 {
     bool start_retry_delay = true;
 
-    if (no_reply)
+    if (no_reply && !app_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6))
     {
         // Fallback to the other IP version
         m_family_type[instance_id] = (m_family_type[instance_id] == AF_INET6) ? AF_INET : AF_INET6;
@@ -1737,6 +1737,12 @@ int lwm2m_vzw_init(void)
     }
 
     lte_lc_init_and_connect();
+
+    if (app_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6)) {
+        for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+            m_family_type[i] = AF_INET;
+        }
+    }
 
     // Initialize CoAP.
     app_coap_init();

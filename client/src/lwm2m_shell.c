@@ -162,6 +162,7 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "  Logging        %s", app_debug_modem_logging_get());
     shell_print(shell, "  Disable PSM    %s", app_debug_flag_is_set(DEBUG_FLAG_DISABLE_PSM) ? "Yes" : "No");
     shell_print(shell, "  PDN Support    %s", app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT) ? "Yes" : "No");
+    shell_print(shell, "  IPv6 enabled   %s", app_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6) ? "No" : "Yes");
     shell_print(shell, "  SMS Support    %s", app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT) ? "Yes" : "No");
 
     if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
@@ -286,6 +287,33 @@ static int cmd_debug_pdn_support(const struct shell *shell, size_t argc, char **
     }
 
     shell_print(shell, "Set PDN support: %d", pdn_support);
+
+    return 0;
+}
+
+static int cmd_debug_ipv6_enabled(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s <value>", argv[0]);
+        shell_print(shell, " 0 = disable");
+        shell_print(shell, " 1 = enable");
+        return 0;
+    }
+
+    int enable_ipv6 = atoi(argv[1]);
+
+    if (enable_ipv6 != 0 && enable_ipv6 != 1) {
+        shell_print(shell, "invalid value, must be 0 or 1");
+        return 0;
+    }
+
+    if (enable_ipv6) {
+        app_debug_flag_clear(DEBUG_FLAG_DISABLE_IPv6);
+    } else {
+        app_debug_flag_set(DEBUG_FLAG_DISABLE_IPv6);
+    }
+
+    shell_print(shell, "Set IPv6 enabled: %d", enable_ipv6);
 
     return 0;
 }
@@ -531,6 +559,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
     SHELL_CMD(disable_psm, NULL, "Disable PSM", cmd_debug_disable_psm),
     SHELL_CMD(pdn_support, NULL, "Set PDN Support", cmd_debug_pdn_support),
+    SHELL_CMD(ipv6_enable, NULL, "Set IPv6 enabled", cmd_debug_ipv6_enabled),
     SHELL_CMD(sms_support, NULL, "Set SMS Support", cmd_debug_sms_support),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );
