@@ -1137,7 +1137,7 @@ static void app_bootstrap_connect(void)
 
         LOG_INF("Setup secure DTLS session (server %u) (APN %s)",
                 m_server_instance,
-                (m_app_admin_apn_handle != -1) ? log_strdup(apn_name_zero_terminated) : "default");
+                (local_port.interface) ? log_strdup(apn_name_zero_terminated) : "default");
 
         err_code = coap_security_setup(&local_port, &m_bs_remote_server);
 
@@ -1274,7 +1274,7 @@ static void app_server_connect(void)
 
         LOG_INF("Setup secure DTLS session (server %u) (APN %s)",
                 m_server_instance,
-                (m_app_admin_apn_handle != -1) ? log_strdup(apn_name_zero_terminated) : "default");
+                (local_port.interface) ? log_strdup(apn_name_zero_terminated) : "default");
 
         err_code = coap_security_setup(&local_port, &m_remote_server[m_server_instance]);
 
@@ -1341,12 +1341,21 @@ static void app_server_register(void)
 
 void app_server_update(uint16_t instance_id)
 {
-    uint32_t err_code;
+    if ((m_lwm2m_transport[instance_id] != -1) &&
+        ((m_app_state == APP_STATE_SERVER_REGISTERED) ||
+         (instance_id != m_server_instance)))
+    {
+        uint32_t err_code;
 
-    err_code = lwm2m_update((struct sockaddr *)&m_remote_server[instance_id],
-                            &m_server_conf[instance_id],
-                            m_lwm2m_transport[instance_id]);
-    ARG_UNUSED(err_code);
+        err_code = lwm2m_update((struct sockaddr *)&m_remote_server[instance_id],
+                                &m_server_conf[instance_id],
+                                m_lwm2m_transport[instance_id]);
+        ARG_UNUSED(err_code);
+    }
+    else
+    {
+        LOG_WRN("Unable to do server update (server %u)", instance_id);
+    }
 
     app_restart_lifetime_timer(instance_id);
 }
