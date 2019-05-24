@@ -267,7 +267,7 @@ void lwm2m_device_init(void)
     m_instance_device.device_type.len = strlen(m_instance_device.device_type.p_val);
     m_instance_device.hardware_version.p_val = "1.0";
     m_instance_device.hardware_version.len = strlen(m_instance_device.hardware_version.p_val);
-    m_instance_device.software_version.p_val = "1.0";
+    m_instance_device.software_version.p_val = "LWM2M_0.4.0";
     m_instance_device.software_version.len = strlen(m_instance_device.software_version.p_val);
     m_instance_device.battery_status = 5;
     m_instance_device.memory_total = 128;
