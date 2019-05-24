@@ -58,6 +58,30 @@ static int8_t class_apn_index(uint8_t apn_class)
     return apn_index;
 }
 
+static int8_t index_apn_class(uint8_t apn_index)
+{
+    int8_t apn_class = -1;
+
+    switch (apn_index) {
+    case LWM2M_CONN_MON_30000_CLASS_APN_2:
+        apn_class = 2;
+        break;
+    case LWM2M_CONN_MON_30000_CLASS_APN_3:
+        apn_class = 3;
+        break;
+    case LWM2M_CONN_MON_30000_CLASS_APN_6:
+        apn_class = 6;
+        break;
+    case LWM2M_CONN_MON_30000_CLASS_APN_7:
+        apn_class = 7;
+        break;
+    default:
+        break;
+    }
+
+    return apn_class;
+}
+
 char * lwm2m_conn_mon_class_apn_get(uint8_t apn_class, uint8_t * p_len)
 {
     // Check for updated value.
@@ -193,9 +217,8 @@ uint32_t tlv_conn_mon_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
             case 2: // Class 6 APN for Enterprise
             case 3: // Class 7 APN for Thingspace
             {
-                err_code = lwm2m_bytebuffer_to_string((char *)tlv.value,
-                                                      tlv.length,
-                                                      &m_vzw_conn_mon_class_apn.class_apn[tlv.id]);
+                uint8_t apn_class = index_apn_class(tlv.id);
+                lwm2m_conn_mon_class_apn_set(apn_class, (char *)tlv.value, tlv.length);
                 break;
             }
 
