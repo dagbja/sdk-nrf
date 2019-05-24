@@ -33,7 +33,8 @@ int at_apn_setup_wait_for_ipv6(char * apn)
     }
 
     // Subscribe to CGEV
-    int sent_cgev_length = send(at_socket_cgev_fd, "AT+CGEREP=1\r\n", sizeof("AT+CGEREP=1\r\n"), 0);
+    const char at_cgerep[] = "AT+CGEREP=1\r\n";
+    int sent_cgev_length = send(at_socket_cgev_fd, at_cgerep, sizeof(at_cgerep), 0);
     if (sent_cgev_length == -1)
     {
         // Should still be -1.
@@ -68,7 +69,7 @@ int at_apn_setup_wait_for_ipv6(char * apn)
 
         // Loop through possible CID to and lookup the APN.
         for (; cid_number < 12; cid_number++) {
-            snprintf(write_buffer, sizeof(write_buffer), "AT+CGCONTRDP=%u\r\n",  cid_number);
+            snprintf(write_buffer, sizeof(write_buffer), "AT+CGCONTRDP=%u\r\n", cid_number);
             int sent_length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
             if (sent_length == -1)
             {

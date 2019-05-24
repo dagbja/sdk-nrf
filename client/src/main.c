@@ -299,21 +299,24 @@ static char * app_client_imei_msisdn(void)
 }
 
 /**@brief Setup ADMIN PDN connection */
-static void app_setup_admin_pdn(void) {
-    // Set up APN for DM server after bootstrap.
+static void app_setup_admin_pdn(void)
+{
+    // Set up APN for Bootstrap and DM server.
     uint8_t class_apn_len = 0;
-    char * apn_name = lwm2m_conn_mon_class2_apn_get(0, &class_apn_len);
+    char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
     char apn_name_zero_terminated[64];
+
     memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
     apn_name_zero_terminated[class_apn_len] = '\0';
 
     m_app_admin_apn_handle = at_apn_setup_wait_for_ipv6(apn_name_zero_terminated);
 
-    LOG_INF("APN set up: %s", log_strdup(apn_name_zero_terminated));
+    LOG_INF("APN setup: %s", log_strdup(apn_name_zero_terminated));
 }
 
 /**@brief Tear down ADMIN PDN connection. */
-static void app_teardown_admin_pdn(void) {
+static void app_teardown_admin_pdn(void)
+{
     pdn_disconnect(m_app_admin_apn_handle);
     m_app_admin_apn_handle = -1;
 }
@@ -357,7 +360,6 @@ static void app_initialize_imei_msisdn(void)
 
         lte_lc_offline();
         app_provision_psk(APP_BOOTSTRAP_SEC_TAG, p_identity, strlen(p_identity), m_app_bootstrap_psk, sizeof(m_app_bootstrap_psk));
-
         lte_lc_init_and_connect();
     }
 }
@@ -500,7 +502,8 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     if (pdn_handle > -1)
     {
         uint8_t class_apn_len = 0;
-        char * apn_name = lwm2m_conn_mon_class2_apn_get(0, &class_apn_len);
+        char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
+
         memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
         apn_name_zero_terminated[class_apn_len] = '\0';
 
@@ -512,9 +515,9 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
         hints.ai_next = &apn_hints;
     }
 
-    LOG_INF("Doing DNS lookup using %s on %s",
+    LOG_INF("Doing DNS lookup using %s (APN %s)",
             (family_type == AF_INET6) ? "IPv6" : "IPv4",
-            (pdn_handle > -1) ? log_strdup(apn_name_zero_terminated) : "DEFAULT");
+            (pdn_handle > -1) ? log_strdup(apn_name_zero_terminated) : "default");
 
     struct addrinfo *result;
     int ret_val = -1;
@@ -568,13 +571,12 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_serv
                                                     char            * server_uri,
                                                     uint8_t           uri_len,
                                                     bool            * secure,
-                                                    struct sockaddr * p_remote,
-                                                    int               pdn_handle)
+                                                    struct sockaddr * p_remote)
 {
     uint32_t err_code;
 
     // Use DNS to lookup the IP
-    err_code = app_resolve_server_uri(server_uri, uri_len, p_remote, secure, m_family_type[0], pdn_handle);
+    err_code = app_resolve_server_uri(server_uri, uri_len, p_remote, secure, m_family_type[0], m_app_admin_apn_handle);
 
     if (err_code == 0)
     {
@@ -596,7 +598,7 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
     if (no_reply)
     {
         // Fallback to the other IP version
-        m_family_type[instance_id] = (m_family_type[instance_id] == AF_INET6) ? AF_INET6 : AF_INET6;
+        m_family_type[instance_id] = (m_family_type[instance_id] == AF_INET6) ? AF_INET : AF_INET6;
 
         if (m_family_type[instance_id] == AF_INET)
         {
@@ -1090,8 +1092,7 @@ static void app_bootstrap_connect(void)
                                                    p_server_uri,
                                                    uri_len,
                                                    &secure,
-                                                   &m_bs_remote_server,
-                                                   m_app_admin_apn_handle);
+                                                   &m_bs_remote_server);
     if (err_code != 0) {
         m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
         if (err_code == EINVAL) {
@@ -1120,20 +1121,19 @@ static void app_bootstrap_connect(void)
             .sec_tag_list  = sec_tag_list
         };
 
-
         coap_local_t local_port =
         {
             .addr         = &local_addr,
             .setting      = &setting,
-            .protocol     = IPPROTO_DTLS_1_2,
-            .interface    = NULL
+            .protocol     = IPPROTO_DTLS_1_2
         };
 
         char apn_name_zero_terminated[64];
         if (m_app_admin_apn_handle != -1)
         {
             uint8_t class_apn_len = 0;
-            char * apn_name = lwm2m_conn_mon_class2_apn_get(0, &class_apn_len);
+            char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
+
             memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
             apn_name_zero_terminated[class_apn_len] = '\0';
 
@@ -1141,8 +1141,8 @@ static void app_bootstrap_connect(void)
         }
 
         LOG_INF("Setup secure DTLS session (server %u) (APN %s)",
-                m_server_instance, 
-                (m_app_admin_apn_handle != -1) ? log_strdup(apn_name_zero_terminated) : "DEFAULT");
+                m_server_instance,
+                (m_app_admin_apn_handle != -1) ? log_strdup(apn_name_zero_terminated) : "default");
 
         err_code = coap_security_setup(&local_port, &m_bs_remote_server);
 
@@ -1216,12 +1216,18 @@ static void app_server_connect(void)
 
     uint8_t uri_len = 0;
     char * p_server_uri = lwm2m_security_server_uri_get(m_server_instance, &uri_len);
+    int apn_handle = -1;
+
+    if (m_server_instance == 1) {
+        apn_handle = m_app_admin_apn_handle;
+    }
+
     err_code = app_resolve_server_uri(p_server_uri,
                                       uri_len,
                                       &m_remote_server[m_server_instance],
                                       &secure,
                                       m_family_type[m_server_instance],
-                                      (m_server_instance == 1) ? m_app_admin_apn_handle : -1);
+                                      apn_handle);
     if (err_code != 0)
     {
         m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
@@ -1256,15 +1262,15 @@ static void app_server_connect(void)
         {
             .addr         = &local_addr,
             .setting      = &setting,
-            .protocol     = IPPROTO_DTLS_1_2,
-            .interface    = NULL
+            .protocol     = IPPROTO_DTLS_1_2
         };
 
         char apn_name_zero_terminated[64];
         if ((m_server_instance == 1) && (m_app_admin_apn_handle != -1))
         {
             uint8_t class_apn_len = 0;
-            char * apn_name = lwm2m_conn_mon_class2_apn_get(0, &class_apn_len);
+            char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
+
             memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
             apn_name_zero_terminated[class_apn_len] = '\0';
 
@@ -1273,7 +1279,7 @@ static void app_server_connect(void)
 
         LOG_INF("Setup secure DTLS session (server %u) (APN %s)",
                 m_server_instance,
-                (m_app_admin_apn_handle != -1) ? log_strdup(apn_name_zero_terminated) : "DEFAULT");
+                (m_app_admin_apn_handle != -1) ? log_strdup(apn_name_zero_terminated) : "default");
 
         err_code = coap_security_setup(&local_port, &m_remote_server[m_server_instance]);
 

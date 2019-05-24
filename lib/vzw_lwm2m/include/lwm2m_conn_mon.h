@@ -20,19 +20,9 @@ typedef struct
 
 // Verizon specific resources.
 
-char * lwm2m_conn_mon_class2_apn_get(uint16_t instance_id, uint8_t * p_len);
+char * lwm2m_conn_mon_class_apn_get(uint8_t apn_class, uint8_t * p_len);
 
-char * lwm2m_conn_mon_class3_apn_get(uint16_t instance_id, uint8_t * p_len);
-
-void lwm2m_conn_mon_class3_apn_set(uint16_t instance_id, char * p_value, uint8_t len);
-
-char * lwm2m_conn_mon_class6_apn_get(uint16_t instance_id, uint8_t * p_len);
-
-void lwm2m_conn_mon_class6_apn_set(uint16_t instance_id, char * p_value, uint8_t len);
-
-char * lwm2m_conn_mon_class7_apn_get(uint16_t instance_id, uint8_t * p_len);
-
-void lwm2m_conn_mon_class7_apn_set(uint16_t instance_id, char * p_value, uint8_t len);
+void lwm2m_conn_mon_class_apn_set(uint8_t apn_class, char * p_value, uint8_t len);
 
 
 // LWM2M core resources.
