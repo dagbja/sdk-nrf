@@ -69,6 +69,8 @@
                                          0x0a, 0x91, 0xe7, 0x47} /**< Pre-shared key used for bootstrap server in hex format. */
 #endif
 
+#define APP_OPERATOR_ID_VZW             1                                                   /**< Operator id for Verizon SIM. */
+
 static char m_app_bootstrap_psk[]  = APP_BOOTSTRAP_SEC_PSK;
 
 #define APP_ERROR_CHECK(error_code)                                            \
@@ -107,6 +109,8 @@ static volatile bool        m_did_bootstrap;
 
 static char m_imei[16];
 static char m_msisdn[16];
+static uint32_t m_operator_id;
+
 
 /* Structures for timers */
 static void *state_update_timer;
@@ -210,17 +214,20 @@ void app_system_reset(void)
 /**@brief Setup ADMIN PDN connection */
 static void app_setup_admin_pdn(uint16_t instance_id)
 {
-    if (app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT)) {
-        // Set up APN for Bootstrap and DM server.
-        uint8_t class_apn_len = 0;
-        char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
-        char apn_name_zero_terminated[64];
+    if (m_operator_id == APP_OPERATOR_ID_VZW)
+    {
+        if (app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT)) {
+            // Set up APN for Bootstrap and DM server.
+            uint8_t class_apn_len = 0;
+            char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
+            char apn_name_zero_terminated[64];
 
-        memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
-        apn_name_zero_terminated[class_apn_len] = '\0';
+            memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
+            apn_name_zero_terminated[class_apn_len] = '\0';
 
-        LWM2M_INF("APN setup: %s", lwm2m_os_log_strdup(apn_name_zero_terminated));
-        m_admin_pdn_handle[instance_id] = at_apn_setup_wait_for_ipv6(apn_name_zero_terminated);
+            LWM2M_INF("APN setup: %s", lwm2m_os_log_strdup(apn_name_zero_terminated));
+            m_admin_pdn_handle[instance_id] = at_apn_setup_wait_for_ipv6(apn_name_zero_terminated);
+        }
     }
 }
 
@@ -1160,18 +1167,22 @@ static void app_server_connect(uint16_t instance_id)
     memset(&m_server_conf[instance_id], 0, sizeof(lwm2m_server_config_t));
     m_server_conf[instance_id].lifetime = lwm2m_server_lifetime_get(instance_id);
 
-    if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
-        m_server_conf[instance_id].binding.p_val = "UQS";
-        m_server_conf[instance_id].binding.len = 3;
 
-        if (instance_id) {
-            char *endptr;
-            const char * p_msisdn = app_debug_msisdn_get();
-            if (!p_msisdn || p_msisdn[0] == 0) {
-                p_msisdn = m_msisdn;
+    if (m_operator_id == APP_OPERATOR_ID_VZW)
+    {
+        if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
+            m_server_conf[instance_id].binding.p_val = "UQS";
+            m_server_conf[instance_id].binding.len = 3;
+
+            if (instance_id) {
+                char *endptr;
+                const char * p_msisdn = app_debug_msisdn_get();
+                if (!p_msisdn || p_msisdn[0] == 0) {
+                    p_msisdn = m_msisdn;
+                }
+
+                m_server_conf[instance_id].msisdn = strtoull(p_msisdn, &endptr, 10);
             }
-
-            m_server_conf[instance_id].msisdn = strtoull(p_msisdn, &endptr, 10);
         }
     }
 
@@ -1826,9 +1837,15 @@ int lwm2m_carrier_init(void)
     // AT notifications are now process by the Modem AT interface.
     mdm_interface_init();
 
-    if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
-        //Enable SMS.
-        sms_receiver_init();
+    // Check operator ID
+    at_read_operator_id(&m_operator_id);
+
+    if (m_operator_id == APP_OPERATOR_ID_VZW)
+    {
+        if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
+            //Enable SMS.
+            sms_receiver_init();
+        }
     }
 
     if (app_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6)) {
@@ -1846,8 +1863,15 @@ int lwm2m_carrier_init(void)
     // Create LwM2M factory bootstraped objects.
     app_lwm2m_create_objects();
 
-    if (app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT)) {
-        LWM2M_INF("PDN support enabled");
+    if (m_operator_id == APP_OPERATOR_ID_VZW)
+    {
+        if (app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT)) {
+            LWM2M_INF("PDN support enabled");
+        }
+        else
+        {
+            LWM2M_INF("PDN support disabled");
+        }
     } else {
         LWM2M_INF("PDN support disabled");
     }

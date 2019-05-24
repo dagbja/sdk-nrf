@@ -12,6 +12,8 @@
 #include <pdn_management.h>
 #include <sms_receive.h>
 #include <at_cmd.h>
+#include <at_cmd_parser.h>
+#include <at_params.h>
 
 /* For logging API. */
 #include <lwm2m.h>
@@ -19,6 +21,32 @@
 // FIXME: remove this and move to KConfig
 #define APP_MAX_AT_READ_LENGTH          CONFIG_AT_CMD_RESPONSE_MAX_LEN
 #define APP_MAX_AT_WRITE_LENGTH         256
+
+static int at_send_command_and_parse_params(const char * p_at_command, struct at_param_list * p_param_list, int param_count)
+{
+    char read_buffer[APP_MAX_AT_READ_LENGTH];
+
+    int retval = 0;
+
+    retval = at_cmd_write(p_at_command, read_buffer, APP_MAX_AT_READ_LENGTH, NULL);
+
+    if (!retval) {
+        char * p_start = read_buffer;
+        char * p_command_end = strstr(read_buffer, ":");
+        if (p_command_end) {
+            p_start = p_command_end+1;
+        }
+        if (at_parser_params_from_str(p_start, p_param_list))
+        {
+            LWM2M_ERR("at_parser (%s) failed", p_at_command);
+            retval = EINVAL;
+        }
+    } else {
+        LWM2M_ERR("at_cmd_write failed: %d", (int)retval);
+    }
+
+    return retval;
+}
 
 
 static void at_response_handler(char *response)
@@ -374,6 +402,48 @@ int at_read_firmware_version(char *p_fw_version, uint32_t *p_fw_version_len)
     }
 
     close(at_socket_fd);
+
+    return retval;
+}
+
+int at_read_operator_id(uint32_t  *p_operator_id)
+{
+    int retval = 0;
+    struct at_param_list operid_params;
+    uint16_t operator_id;
+
+    *p_operator_id = 0;
+
+    // Read network registration status
+    const char *at_operid = "AT%XOPERID";
+
+    operid_params.params = NULL;
+    if (at_params_list_init(&operid_params, 1))
+    {
+        LWM2M_ERR("operid_params list init failed");
+        retval = EINVAL;
+    }
+    else
+    {
+        if (!at_send_command_and_parse_params(at_operid, &operid_params, 1))
+        {
+            if (at_params_short_get(&operid_params, 0, &operator_id))
+            {
+                LWM2M_ERR("operator id parse failed: get short failed");
+                retval = EINVAL;
+            }
+            else
+            {
+                *p_operator_id = (uint32_t)operator_id;
+            }
+        }
+        else
+        {
+            LWM2M_ERR("parse operator id failed");
+            retval = EIO;
+        }
+        at_params_list_free(&operid_params);
+    }
 
     return retval;
 }
