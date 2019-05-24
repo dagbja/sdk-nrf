@@ -49,7 +49,6 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <main.h>
 
 #define APP_USE_SOCKET_POLL             0 // Use socket poll() to check status
-#define APP_MOTIVE_NO_REBOOT            1 // To pass MotiveBridge test 5.10 "Persistency Throughout Device Reboot"
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_CONTABO                 0
 
@@ -161,6 +160,7 @@ static struct sockaddr m_bs_remote_server;                                      
 static struct sockaddr m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
 static volatile uint32_t tick_count = 0;
 
+static void app_teardown_admin_pdn(void);
 static void app_misc_data_set_bootstrapped(uint8_t bootstrapped);
 static void app_server_deregister(uint16_t instance_id);
 static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
@@ -261,17 +261,12 @@ void app_request_reboot(void)
 {
     app_disconnect();
 
-#if APP_MOTIVE_NO_REBOOT
-    m_app_state = APP_STATE_SERVER_CONNECT;
-    m_server_instance = 1;
-#else
     if (m_app_admin_apn_handle != -1) {
         app_teardown_admin_pdn();
     }
 
     lte_lc_offline();
     NVIC_SystemReset();
-#endif
 }
 
 static char * app_client_imei_msisdn(void)
