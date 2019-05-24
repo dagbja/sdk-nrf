@@ -265,7 +265,7 @@ void app_request_reboot(void)
         app_teardown_admin_pdn();
     }
 
-    lte_lc_offline();
+    lte_lc_power_off();
     NVIC_SystemReset();
 }
 
