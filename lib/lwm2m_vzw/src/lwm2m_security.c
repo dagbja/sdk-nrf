@@ -194,7 +194,7 @@ static uint32_t tlv_security_resource_decode(uint16_t instance_id, lwm2m_tlv_t *
 #if 0
             err_code = ENOENT;
 #else
-            printk("Unhandled security resource: %i", p_tlv->id);
+            LWM2M_ERR("Unhandled security resource: %i", p_tlv->id);
 #endif
             break;
     }

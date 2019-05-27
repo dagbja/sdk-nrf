@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#include <zephyr.h>
 #include <stdio.h>
 #include <net/socket.h>
 #include <pdn_management.h>
+
+/* For logging API. */
+#include <lwm2m.h>
 
 #define APP_MAX_AT_READ_LENGTH          256
 #define APP_MAX_AT_WRITE_LENGTH         256
@@ -29,7 +31,7 @@ int at_apn_setup_wait_for_ipv6(char * apn)
 
     at_socket_cgev_fd = socket(AF_LTE, 0, NPROTO_AT);
     if (at_socket_cgev_fd < 0) {
-        printk("socket() failed\n");
+        LWM2M_ERR("socket() failed\n");
     }
 
     // Subscribe to CGEV
@@ -38,7 +40,7 @@ int at_apn_setup_wait_for_ipv6(char * apn)
     if (sent_cgev_length == -1)
     {
         // Should still be -1.
-        printk("IPv6 APN failed sending CGEREP=1\n");
+        LWM2M_ERR("IPv6 APN failed sending CGEREP=1\n");
         return -1;
     }
 
@@ -51,7 +53,7 @@ int at_apn_setup_wait_for_ipv6(char * apn)
     // Check if subscription went OK.
     if ((received_cgev_length <= 0) || strstr(read_buffer, "OK\r\n") == NULL)
     {
-        printk("IPv6 APN CGERRP response not ok: %s\n", read_buffer);
+        LWM2M_ERR("IPv6 APN CGERRP response not ok: %s\n", read_buffer);
         return -1;
     }
 
@@ -64,7 +66,7 @@ int at_apn_setup_wait_for_ipv6(char * apn)
     {
         at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
         if (at_socket_fd < 0) {
-            printk("socket() failed\n");
+            LWM2M_ERR("socket() failed\n");
         }
 
         // Loop through possible CID to and lookup the APN.
@@ -158,7 +160,7 @@ int at_read_imei_and_msisdn(char *p_imei, int imei_len, char *p_msisdn, int msis
 
     at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
     if (at_socket_fd < 0) {
-        printk("socket() failed\n");
+        LWM2M_ERR("socket() failed\n");
         return EIO;
     }
 
@@ -173,11 +175,11 @@ int at_read_imei_and_msisdn(char *p_imei, int imei_len, char *p_msisdn, int msis
         if (length > 0) {
             memcpy(p_imei, read_buffer, 15);
         } else {
-            printk("recv(%s) failed\n", at_cgsn);
+            LWM2M_ERR("recv(%s) failed\n", at_cgsn);
             retval = EIO;
         }
     } else {
-        printk("send(%s) failed\n", at_cgsn);
+        LWM2M_ERR("send(%s) failed\n", at_cgsn);
         retval = EIO;
     }
 
@@ -204,11 +206,11 @@ int at_read_imei_and_msisdn(char *p_imei, int imei_len, char *p_msisdn, int msis
                 memcpy(p_msisdn, &p_imei[5], 10);
             }
         } else {
-            printk("recv(%s) failed\n", at_cnum);
+            LWM2M_ERR("recv(%s) failed\n", at_cnum);
             retval = EIO;
         }
     } else {
-        printk("send(%s) failed\n", at_cnum);
+        LWM2M_ERR("send(%s) failed\n", at_cnum);
         retval = EIO;
     }
 
@@ -249,7 +251,7 @@ int at_read_sim_iccid(char *p_iccid, uint32_t * p_iccid_len)
 
     at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
     if (at_socket_fd < 0) {
-        printk("socket() failed\n");
+        LWM2M_ERR("socket() failed\n");
         return EIO;
     }
 
@@ -269,11 +271,11 @@ int at_read_sim_iccid(char *p_iccid, uint32_t * p_iccid_len)
                 }
             }
         } else {
-            printk("recv(%s) failed\n", at_crsm);
+            LWM2M_ERR("recv(%s) failed\n", at_crsm);
             retval = EIO;
         }
     } else {
-        printk("send(%s) failed\n", at_crsm);
+        LWM2M_ERR("send(%s) failed\n", at_crsm);
         retval = EIO;
     }
 
@@ -292,7 +294,7 @@ int at_read_firmware_version(char *p_fw_version, uint32_t *p_fw_version_len)
 
     at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
     if (at_socket_fd < 0) {
-        printk("socket() failed\n");
+        LWM2M_ERR("socket() failed\n");
         return EIO;
     }
 
@@ -313,11 +315,11 @@ int at_read_firmware_version(char *p_fw_version, uint32_t *p_fw_version_len)
                 retval = EINVAL;
             }
         } else {
-            printk("recv(%s) failed\n", at_cgmr);
+            LWM2M_ERR("recv(%s) failed\n", at_cgmr);
             retval = EIO;
         }
     } else {
-        printk("send(%s) failed\n", at_cgmr);
+        LWM2M_ERR("send(%s) failed\n", at_cgmr);
         retval = EIO;
     }
 
@@ -337,7 +339,7 @@ int at_send_command(const char *at_command, bool do_logging)
 
     at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
     if (at_socket_fd < 0) {
-        printk("socket() failed\n");
+        LWM2M_ERR("socket() failed\n");
         return EIO;
     }
 
@@ -348,14 +350,14 @@ int at_send_command(const char *at_command, bool do_logging)
         length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
         if (length > 0) {
             if (do_logging) {
-                printk("%s", read_buffer);
+                LWM2M_INF("%s", read_buffer);
             }
         } else {
-            printk("recv() failed\n");
+            LWM2M_ERR("recv() failed\n");
             retval = EIO;
         }
     } else {
-        printk("send() failed\n");
+        LWM2M_ERR("send() failed\n");
         retval = EIO;
     }
 

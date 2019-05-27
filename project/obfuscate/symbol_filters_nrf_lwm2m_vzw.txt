@@ -10,6 +10,22 @@
 ^lwm2m_vzw_init$
 ^lwm2m_vzw_run$
 
+# lwm2m_os.h
+^lwm2m_os_malloc$
+^lwm2m_os_free$
+^lwm2m_os_uptime_get$
+^lwm2m_os_sleep$
+^lwm2m_os_storage_init$
+^lwm2m_os_storage_delete$
+^lwm2m_os_storage_read$
+^lwm2m_os_storage_write$
+^lwm2m_os_timer_get$
+^lwm2m_os_timer_release$
+^lwm2m_os_timer_start$
+^lwm2m_os_timer_cancel$
+^lwm2m_os_timer_remaining$
+^lwm2m_os_log$
+
 # Callbacks
 ^lwm2m_coap_handler_root$
 ^lwm2m_notification$
@@ -56,12 +72,30 @@
 ^lwm2m_server_short_server_id_get$
 
 # External symbols we should not modify
+
+# stdlib
 ^__aeabi_uldivmod$
-^__errno$
-^__log_const_start$
 ^__memcpy_chk$
 ^__sprintf_chk$
 ^atoi$
+^memcpy$
+^memset$
+^snprintf$
+^sprintf$
+^strchr$
+^strcmp$
+^strcpy$
+^strlen$
+^strncmp$
+^strncpy$
+^strstr$
+^strtoull$
+
+# zephyr
+^__errno$
+^socket_ops$
+
+# coap
 ^coap_init$
 ^coap_input$
 ^coap_message_ct_mask_get$
@@ -70,37 +104,8 @@
 ^coap_security_destroy$
 ^coap_security_setup$
 ^coap_time_tick$
-^k_delayed_work_cancel$
-^k_delayed_work_init$
-^k_delayed_work_submit$
-^k_delayed_work_submit_to_queue$
-^k_free$
-^k_malloc$
-^k_sys_work_q$
-^log_0$
-^log_1$
-^log_2$
-^log_const_LWM2M_LOG_MODULE_NAME$
-^log_const_lwm2m_conn_mon$
-^log_const_lwm2m_vzw_main$
-^log_const_lwm2m_device$
-^log_const_lwm2m_firmware$
-^log_const_lwm2m_security$
-^log_const_lwm2m_server$
-^log_dynamic_LWM2M_LOG_MODULE_NAME$
-^log_dynamic_lwm2m_conn_mon$
-^log_dynamic_lwm2m_vzw_main$
-^log_dynamic_lwm2m_device$
-^log_dynamic_lwm2m_firmware$
-^log_dynamic_lwm2m_security$
-^log_dynamic_lwm2m_server$
-^log_n$
-^log_strdup$
-^lte_lc_init_and_connect$
-^lte_lc_normal$
-^lte_lc_offline$
-^lte_lc_power_off$
-^lte_lc_psm_req$
+
+# lwm2m
 ^lwm2m_acl_init$
 ^lwm2m_acl_permissions_add$
 ^lwm2m_acl_permissions_check$
@@ -146,30 +151,15 @@
 ^lwm2m_tlv_server_decode$
 ^lwm2m_tlv_server_encode$
 ^lwm2m_update$
-^memcpy$
-^memset$
+
+# others
+^lte_lc_init_and_connect$
+^lte_lc_normal$
+^lte_lc_offline$
+^lte_lc_power_off$
+^lte_lc_psm_req$
 ^nrf_apn_class_read$
 ^nrf_apn_class_update$
 ^nrf_inbuilt_key_write$
-^nvs_delete$
-^nvs_init$
-^nvs_read$
-^nvs_write$
 ^pdn_disconnect$
 ^pdn_init_and_connect$
-^printk$
-^snprintf$
-^socket.constprop.2$
-^socket_ops$
-^sprintf$
-^strchr$
-^strcmp$
-^strcpy$
-^strlen$
-^strncmp$
-^strncpy$
-^strstr$
-^strtoull$
-^z_impl_k_sleep$
-^z_impl_k_uptime_get$
-^z_timeout_remaining$

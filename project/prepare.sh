@@ -58,6 +58,7 @@ declare -a api_headers_nrf_lwm2m_vzw=(
 				#       "lwm2m_device.h"
 				#       "lwm2m_firmware.h"
 				#       "lwm2m_instance_storage.h"
+				#       "lwm2m_os.h"
 				#       "lwm2m_retry_delay.h"
 				#       "lwm2m_security.h"
 				#       "lwm2m_server.h"

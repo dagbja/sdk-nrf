@@ -15,14 +15,11 @@
 #ifndef LWM2M_H__
 #define LWM2M_H__
 
-#include <logging/log.h>
-#define LOG_LEVEL CONFIG_NRF_LWM2M_LOG_LEVEL
-LOG_MODULE_REGISTER(LWM2M_LOG_MODULE_NAME);
-
-#include <zephyr.h>
-#include <zephyr/types.h>
 #include <stdint.h>
 #include <stdbool.h>
+
+#include <lwm2m_os.h>
+
 #include <coap_message.h>
 #include <coap_codes.h>
 #include <coap_observe_api.h>
@@ -31,8 +28,10 @@ LOG_MODULE_REGISTER(LWM2M_LOG_MODULE_NAME);
 extern "C" {
 #endif
 
-#define LWM2M_TRC(...) LOG_DBG(__VA_ARGS__) /**< Used for getting trace of execution in the module. */
-#define LWM2M_ERR(...) LOG_ERR(__VA_ARGS__) /**< Used for logging errors in the module. */
+#define LWM2M_TRC(...) lwm2m_os_log(LWM2M_LOG_LEVEL_TRC, __VA_ARGS__) /**< Used for getting trace of execution in the module. */
+#define LWM2M_INF(...) lwm2m_os_log(LWM2M_LOG_LEVEL_INF, __VA_ARGS__) /**< Used for logging informations in the module. */
+#define LWM2M_WRN(...) lwm2m_os_log(LWM2M_LOG_LEVEL_WRN, __VA_ARGS__) /**< Used for logging warnings in the module. */
+#define LWM2M_ERR(...) lwm2m_os_log(LWM2M_LOG_LEVEL_ERR, __VA_ARGS__) /**< Used for logging errors in the module. */
 
 #define LWM2M_ENTRY() LWM2M_TRC(">> %s", __func__)
 #define LWM2M_EXIT() LWM2M_TRC("<< %s", __func__)

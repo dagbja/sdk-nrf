@@ -37,4 +37,10 @@ zephyr_library_sources(
     src/lwm2m_retry_delay.c
     src/lwm2m_security.c
     src/lwm2m_server.c
-    )
+)
+
+if (NOT CONFIG_NRF_LWM2M_VZW_STANDALONE_LIBRARY)
+zephyr_library_sources(
+    src/lwm2m_os.c
+)
+endif()

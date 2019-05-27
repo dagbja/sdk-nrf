@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#include <zephyr.h>
 #include <lwm2m_api.h>
 #include <lwm2m_retry_delay.h>
 

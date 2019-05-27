@@ -14,6 +14,8 @@ target_sources(app PRIVATE ../client/src/lwm2m_shell.c)
 target_sources(app PRIVATE ../client/src/main.c)
 target_sources(app PRIVATE ../client/src/sms_receive.c)
 
+target_sources(app PRIVATE ../lib/lwm2m_vzw/src/lwm2m_os.c)
+
 zephyr_include_directories(../client/src)
 
 # TODO We keep the lwm2m_vzw headers internal for now

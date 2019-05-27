@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <stddef.h>
-#include <zephyr.h>
-#include <nvs/nvs.h>
+
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
@@ -15,16 +14,7 @@
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_firmware.h>
 
-/* NVS-related defines */
-#define NVS_SECTOR_SIZE    DT_FLASH_ERASE_BLOCK_SIZE    /* Multiple of FLASH_PAGE_SIZE */
-#define NVS_SECTOR_COUNT   3                            /* At least 2 sectors */
-#define NVS_STORAGE_OFFSET DT_FLASH_AREA_STORAGE_OFFSET /* Start address of the filesystem in flash */
-
-static struct nvs_fs fs = {
-    .sector_size  = NVS_SECTOR_SIZE,
-    .sector_count = NVS_SECTOR_COUNT,
-    .offset       = NVS_STORAGE_OFFSET,
-};
+#include <lwm2m_os.h>
 
 #define LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET   0xFFFF
 
@@ -104,12 +94,7 @@ typedef struct __attribute__((__packed__))
 
 int32_t lwm2m_instance_storage_init(void)
 {
-    int rc = nvs_init(&fs, DT_FLASH_DEV_NAME);
-    if (rc)
-    {
-        return -1;
-    }
-    return 0;
+    return lwm2m_os_storage_init();
 }
 
 int32_t lwm2m_instance_storage_deinit(void)
@@ -167,7 +152,7 @@ int32_t lwm2m_instance_storage_all_objects_delete(void)
 
 int32_t lwm2m_instance_storage_misc_data_load(lwm2m_instance_storage_misc_data_t * p_value)
 {
-    ssize_t read_count = nvs_read(&fs, LWM2M_INSTANCE_STORAGE_MISC_DATA, p_value, sizeof(lwm2m_instance_storage_misc_data_t));
+    ssize_t read_count = lwm2m_os_storage_read(LWM2M_INSTANCE_STORAGE_MISC_DATA, p_value, sizeof(lwm2m_instance_storage_misc_data_t));
     if (read_count != sizeof(lwm2m_instance_storage_misc_data_t))
     {
         return -1;
@@ -177,13 +162,13 @@ int32_t lwm2m_instance_storage_misc_data_load(lwm2m_instance_storage_misc_data_t
 
 int32_t lwm2m_instance_storage_misc_data_store(lwm2m_instance_storage_misc_data_t * p_value)
 {
-    nvs_write(&fs, LWM2M_INSTANCE_STORAGE_MISC_DATA, p_value, sizeof(lwm2m_instance_storage_misc_data_t));
+    lwm2m_os_storage_write(LWM2M_INSTANCE_STORAGE_MISC_DATA, p_value, sizeof(lwm2m_instance_storage_misc_data_t));
     return 0;
 }
 
 int32_t lwm2m_instance_storage_misc_data_delete(void)
 {
-    nvs_delete(&fs, LWM2M_INSTANCE_STORAGE_MISC_DATA);
+    lwm2m_os_storage_delete(LWM2M_INSTANCE_STORAGE_MISC_DATA);
     return 0;
 }
 
@@ -193,7 +178,7 @@ int32_t lwm2m_instance_storage_security_load(uint16_t instance_id)
 
     // Peek file size.
     char peak_buffer[1];
-    ssize_t read_count = nvs_read(&fs, id, peak_buffer, 1);
+    ssize_t read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
 
     if (read_count <= 0) {
         return -read_count;
@@ -201,7 +186,7 @@ int32_t lwm2m_instance_storage_security_load(uint16_t instance_id)
 
     // Read full entry.
     uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
-    read_count = nvs_read(&fs, id, p_scratch_buffer, read_count);
+    read_count = lwm2m_os_storage_read(id, p_scratch_buffer, read_count);
     (void)read_count;
 
     storage_security_t * p_storage_security = (storage_security_t *)p_scratch_buffer;
@@ -284,7 +269,7 @@ int32_t lwm2m_instance_storage_security_store(uint16_t instance_id)
         memcpy(&p_scratch_buffer[temp_storage.offset_carrier_specific], &data_carrier_specific, sizeof(vzw_bootstrap_security_settings_t));
     }
 
-    nvs_write(&fs, id, p_scratch_buffer, total_entry_len);
+    lwm2m_os_storage_write(id, p_scratch_buffer, total_entry_len);
 
     lwm2m_free(p_scratch_buffer);
 
@@ -294,7 +279,7 @@ int32_t lwm2m_instance_storage_security_store(uint16_t instance_id)
 int32_t lwm2m_instance_storage_security_delete(uint16_t instance_id)
 {
     u16_t id = LWM2M_INSTANCE_STORAGE_BASE_SECURITY + instance_id;
-    nvs_delete(&fs, id);
+    lwm2m_os_storage_delete(id);
     return 0;
 }
 
@@ -304,7 +289,7 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
 
     // Peek file size.
     char peak_buffer[1];
-    ssize_t read_count = nvs_read(&fs, id, peak_buffer, 1);
+    ssize_t read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
 
     if (read_count <= 0) {
         return -read_count;
@@ -312,7 +297,7 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
 
     // Read full entry.
     uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
-    read_count = nvs_read(&fs, id, p_scratch_buffer, read_count);
+    read_count = lwm2m_os_storage_read(id, p_scratch_buffer, read_count);
     (void)read_count;
 
     storage_server_t * p_storage_server = (storage_server_t *)p_scratch_buffer;
@@ -411,7 +396,7 @@ int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
         memcpy(&p_scratch_buffer[temp_storage.offset_carrier_specific], &data_carrier_specific, sizeof(vzw_server_settings_t));
     }
 
-    nvs_write(&fs, id, p_scratch_buffer, total_entry_len);
+    lwm2m_os_storage_write(id, p_scratch_buffer, total_entry_len);
 
     lwm2m_free(p_scratch_buffer);
 
@@ -421,7 +406,7 @@ int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
 int32_t lwm2m_instance_storage_server_delete(uint16_t instance_id)
 {
     u16_t id = LWM2M_INSTANCE_STORAGE_BASE_SERVER + instance_id;
-    nvs_delete(&fs, id);
+    lwm2m_os_storage_delete(id);
     return 0;
 }
 
@@ -431,7 +416,7 @@ int32_t lwm2m_instance_storage_device_load(uint16_t instance_id)
 
     // Peek file size.
     char peak_buffer[1];
-    ssize_t read_count = nvs_read(&fs, id, peak_buffer, 1);
+    ssize_t read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
 
     if (read_count <= 0) {
         return -read_count;
@@ -439,7 +424,7 @@ int32_t lwm2m_instance_storage_device_load(uint16_t instance_id)
 
     // Read full entry.
     uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
-    read_count = nvs_read(&fs, id, p_scratch_buffer, read_count);
+    read_count = lwm2m_os_storage_read(id, p_scratch_buffer, read_count);
     (void)read_count;
 
     storage_device_t * p_storage_device = (storage_device_t *)p_scratch_buffer;
@@ -491,7 +476,7 @@ int32_t lwm2m_instance_storage_device_store(uint16_t instance_id)
     memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_device_t));
     memcpy(&p_scratch_buffer[temp_storage.offset_acl], p_acl, sizeof(lwm2m_instance_acl_t));
 
-    nvs_write(&fs, id, p_scratch_buffer, total_entry_len);
+    lwm2m_os_storage_write(id, p_scratch_buffer, total_entry_len);
 
     lwm2m_free(p_scratch_buffer);
 
@@ -501,7 +486,7 @@ int32_t lwm2m_instance_storage_device_store(uint16_t instance_id)
 int32_t lwm2m_instance_storage_device_delete(uint16_t instance_id)
 {
     u16_t id = LWM2M_INSTANCE_STORAGE_DEVICE + instance_id;
-    nvs_delete(&fs, id);
+    lwm2m_os_storage_delete(id);
     return 0;
 }
 
@@ -511,7 +496,7 @@ int32_t lwm2m_instance_storage_conn_mon_load(uint16_t instance_id)
 
     // Peek file size.
     char peak_buffer[1];
-    ssize_t read_count = nvs_read(&fs, id, peak_buffer, 1);
+    ssize_t read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
 
     if (read_count <= 0) {
         return -read_count;
@@ -519,7 +504,7 @@ int32_t lwm2m_instance_storage_conn_mon_load(uint16_t instance_id)
 
     // Read full entry.
     uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
-    read_count = nvs_read(&fs, id, p_scratch_buffer, read_count);
+    read_count = lwm2m_os_storage_read(id, p_scratch_buffer, read_count);
     (void)read_count;
 
     storage_conn_mon_t * p_storage_conn_mon = (storage_conn_mon_t *)p_scratch_buffer;
@@ -571,7 +556,7 @@ int32_t lwm2m_instance_storage_conn_mon_store(uint16_t instance_id)
     memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_conn_mon_t));
     memcpy(&p_scratch_buffer[temp_storage.offset_acl], p_acl, sizeof(lwm2m_instance_acl_t));
 
-    nvs_write(&fs, id, p_scratch_buffer, total_entry_len);
+    lwm2m_os_storage_write(id, p_scratch_buffer, total_entry_len);
 
     lwm2m_free(p_scratch_buffer);
 
@@ -581,7 +566,7 @@ int32_t lwm2m_instance_storage_conn_mon_store(uint16_t instance_id)
 int32_t lwm2m_instance_storage_conn_mon_delete(uint16_t instance_id)
 {
     u16_t id = LWM2M_INSTANCE_STORAGE_CONN_MON + instance_id;
-    nvs_delete(&fs, id);
+    lwm2m_os_storage_delete(id);
     return 0;
 }
 
@@ -591,7 +576,7 @@ int32_t lwm2m_instance_storage_firmware_load(uint16_t instance_id)
 
     // Peek file size.
     char peak_buffer[1];
-    ssize_t read_count = nvs_read(&fs, id, peak_buffer, 1);
+    ssize_t read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
 
     if (read_count <= 0) {
         return -read_count;
@@ -599,7 +584,7 @@ int32_t lwm2m_instance_storage_firmware_load(uint16_t instance_id)
 
     // Read full entry.
     uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
-    read_count = nvs_read(&fs, id, p_scratch_buffer, read_count);
+    read_count = lwm2m_os_storage_read(id, p_scratch_buffer, read_count);
     (void)read_count;
 
     storage_firmware_t * p_storage_firmware = (storage_firmware_t *)p_scratch_buffer;
@@ -651,7 +636,7 @@ int32_t lwm2m_instance_storage_firmware_store(uint16_t instance_id)
     memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_firmware_t));
     memcpy(&p_scratch_buffer[temp_storage.offset_acl], p_acl, sizeof(lwm2m_instance_acl_t));
 
-    nvs_write(&fs, id, p_scratch_buffer, total_entry_len);
+    lwm2m_os_storage_write(id, p_scratch_buffer, total_entry_len);
 
     lwm2m_free(p_scratch_buffer);
 
@@ -662,26 +647,26 @@ int32_t lwm2m_instance_storage_firmware_delete(uint16_t instance_id)
 {
     // Only one instance for now.
     u16_t id = LWM2M_INSTANCE_STORAGE_FIRMWARE;
-    nvs_delete(&fs, id);
+    lwm2m_os_storage_delete(id);
     return 0;
 }
 
 int32_t lwm2m_last_used_msisdn_get(char * p_msisdn, uint8_t max_len)
 {
-    return nvs_read(&fs, LWM2M_INSTANCE_STORAGE_MSISDN, p_msisdn, max_len);
+    return lwm2m_os_storage_read(LWM2M_INSTANCE_STORAGE_MSISDN, p_msisdn, max_len);
 }
 
 int32_t lwm2m_last_used_msisdn_set(const char * p_msisdn, uint8_t len)
 {
-    return nvs_write(&fs, LWM2M_INSTANCE_STORAGE_MSISDN, p_msisdn, len);
+    return lwm2m_os_storage_write(LWM2M_INSTANCE_STORAGE_MSISDN, p_msisdn, len);
 }
 
 int32_t lwm2m_debug_settings_load(debug_settings_t * debug_settings)
 {
-    return nvs_read(&fs, LWM2M_INSTANCE_STORAGE_DEBUG_SETTINGS, debug_settings, sizeof(*debug_settings));
+    return lwm2m_os_storage_read(LWM2M_INSTANCE_STORAGE_DEBUG_SETTINGS, debug_settings, sizeof(*debug_settings));
 }
 
 int32_t lwm2m_debug_settings_store(const debug_settings_t * debug_settings)
 {
-    return nvs_write(&fs, LWM2M_INSTANCE_STORAGE_DEBUG_SETTINGS, debug_settings, sizeof(*debug_settings));
+    return lwm2m_os_storage_write(LWM2M_INSTANCE_STORAGE_DEBUG_SETTINGS, debug_settings, sizeof(*debug_settings));
 }

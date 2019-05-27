@@ -6,7 +6,6 @@
 
 #define LWM2M_LOG_MODULE_NAME lwm2m_debug
 
-#include <zephyr.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>

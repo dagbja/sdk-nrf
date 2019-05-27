@@ -78,7 +78,9 @@ static const char m_operation_desc[8][9] = {
 //#endif
 
 /** Mutex used by LwM2M implementation. */
+/* Mutex disabled for now.
 struct k_mutex m_lwm2m_mutex;
+*/
 
 static lwm2m_object_t   * m_objects[LWM2M_COAP_HANDLER_MAX_OBJECTS];
 static lwm2m_instance_t * m_instances[LWM2M_COAP_HANDLER_MAX_INSTANCES];
@@ -1567,7 +1569,9 @@ uint32_t lwm2m_init(lwm2m_alloc_t alloc_fn, lwm2m_free_t free_fn)
         return EINVAL;
     }
 
+/* Disable mutex for now.
     k_mutex_init(&m_lwm2m_mutex);
+*/
 
     LWM2M_MUTEX_LOCK();
 

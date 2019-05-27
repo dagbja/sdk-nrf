@@ -223,7 +223,7 @@ uint32_t tlv_server_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
 #if 0
             err_code = ENOENT;
 #else
-            printk("Unhandled server resource: %i", p_tlv->id);
+            LWM2M_ERR("Unhandled server resource: %i", p_tlv->id);
 #endif
             break;
     }

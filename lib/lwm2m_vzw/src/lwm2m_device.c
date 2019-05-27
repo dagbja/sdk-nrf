@@ -13,6 +13,7 @@
 #include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
+#include <lwm2m_os.h>
 #include <common.h>
 #include <at_interface.h>
 #include <lwm2m_vzw_main.h>
@@ -184,7 +185,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
 
                 // FIXME: This sleep is needed to ensure the response is sent before closing the socket.
-                k_sleep(1000);
+                lwm2m_os_sleep(1000);
 
                 app_system_reset();
                 break;
