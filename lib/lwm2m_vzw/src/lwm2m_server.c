@@ -22,6 +22,7 @@
 
 #include <common.h>
 
+extern void app_server_disable(uint16_t instance_id);
 extern void app_server_update(uint16_t instance_id);
 
 #define VERIZON_RESOURCE 30000
@@ -354,8 +355,9 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
         {
             case LWM2M_SERVER_DISABLE:
             {
-                // TODO: Disconnect, wait disable_timeout seconds and reconnect.
-                (void)lwm2m_respond_with_code(COAP_CODE_501_NOT_IMPLEMENTED, p_request);
+                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+
+                app_server_disable(instance_id);
                 break;
             }
 
