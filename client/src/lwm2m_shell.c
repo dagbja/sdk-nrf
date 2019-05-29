@@ -111,7 +111,7 @@ static int cmd_config_lifetime(const struct shell *shell, size_t argc, char **ar
     }
 
     int instance_id = atoi(argv[1]);
-    time_t lifetime = (time_t) atoi(argv[2]);
+    lwm2m_time_t lifetime = (lwm2m_time_t) atoi(argv[2]);
 
     if (instance_id < 0 || instance_id >= (1+LWM2M_MAX_SERVERS))
     {

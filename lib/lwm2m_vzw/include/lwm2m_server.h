@@ -24,21 +24,21 @@ uint32_t lwm2m_server_client_hold_off_timer_get(uint16_t instance_id);
 void lwm2m_server_client_hold_off_timer_set(uint16_t instance_id, uint32_t value);
 
 // LWM2M core resources.
-time_t lwm2m_server_lifetime_get(uint16_t instance_id);
+lwm2m_time_t lwm2m_server_lifetime_get(uint16_t instance_id);
 
-void lwm2m_server_lifetime_set(uint16_t instance_id, time_t value);
+void lwm2m_server_lifetime_set(uint16_t instance_id, lwm2m_time_t value);
 
-time_t lwm2m_server_min_period_get(uint16_t instance_id);
+lwm2m_time_t lwm2m_server_min_period_get(uint16_t instance_id);
 
-void lwm2m_server_min_period_set(uint16_t instance_id, time_t value);
+void lwm2m_server_min_period_set(uint16_t instance_id, lwm2m_time_t value);
 
-time_t lwm2m_server_max_period_get(uint16_t instance_id);
+lwm2m_time_t lwm2m_server_max_period_get(uint16_t instance_id);
 
-void lwm2m_server_max_period_set(uint16_t instance_id, time_t value);
+void lwm2m_server_max_period_set(uint16_t instance_id, lwm2m_time_t value);
 
-time_t lwm2m_server_disable_timeout_get(uint16_t instance_id);
+lwm2m_time_t lwm2m_server_disable_timeout_get(uint16_t instance_id);
 
-void lwm2m_server_disable_timeout_set(uint16_t instance_id, time_t value);
+void lwm2m_server_disable_timeout_set(uint16_t instance_id, lwm2m_time_t value);
 
 bool lwm2m_server_notif_storing_get(uint16_t instance_id);
 
