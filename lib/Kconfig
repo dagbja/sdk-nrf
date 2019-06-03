@@ -4,5 +4,6 @@
 # SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
 #
 
+rsource "coap/Kconfig"
 rsource "lwm2m/Kconfig"
 rsource "vzw_lwm2m/Kconfig"

@@ -6,7 +6,7 @@
 
 config NRF_VZW_LWM2M
 	bool "Nordic LwM2M library support"
-	select NRF_COAP_LIB
+	select NRF_LWM2M
 	help
 	  "Enable Verizon LwM2M library"
 

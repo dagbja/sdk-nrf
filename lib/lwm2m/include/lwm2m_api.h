@@ -17,8 +17,8 @@
 #include <stdint.h>
 
 #include <net/socket.h>
-#include <net/coap_api.h>
-#include <net/coap_observe_api.h>
+#include <coap_api.h>
+#include <coap_observe_api.h>
 
 #include <lwm2m_cfg.h>
 

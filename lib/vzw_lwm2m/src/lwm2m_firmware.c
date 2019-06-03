@@ -12,9 +12,9 @@
 #include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
 
-#include <net/coap_option.h>
-#include <net/coap_observe_api.h>
-#include <net/coap_message.h>
+#include <coap_option.h>
+#include <coap_observe_api.h>
+#include <coap_message.h>
 
 #include <common.h>
 
@@ -204,7 +204,7 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
         }
         else if ((mask & COAP_CT_MASK_PLAIN_TEXT) || (mask & COAP_CT_MASK_APP_OCTET_STREAM))
         {
-/*        
+/*
             err_code = lwm2m_plain_text_firmware_decode(&m_instance_firmware,
                                                       resource_id,
                                                       p_request->payload,

@@ -17,9 +17,9 @@
 #include <lwm2m_security.h>
 #include <lwm2m_instance_storage.h>
 
-#include <net/coap_option.h>
-#include <net/coap_observe_api.h>
-#include <net/coap_message.h>
+#include <coap_option.h>
+#include <coap_observe_api.h>
+#include <coap_message.h>
 
 #include <common.h>
 

@@ -10,7 +10,7 @@
 
 #include <lwm2m.h>
 #include <lwm2m_api.h>
-#include <net/coap_api.h>
+#include <coap_api.h>
 
 static uint32_t m_observer_sequence_num = 0;
 

@@ -14,7 +14,7 @@
 #include <lwm2m_api.h>
 #include <lwm2m_register.h>
 #include <lwm2m_remote.h>
-#include <net/coap_api.h>
+#include <coap_api.h>
 
 #define LWM2M_REGISTER_URI_PATH "rd"
 #define TOKEN_START 0xAE1C
