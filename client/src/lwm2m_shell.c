@@ -18,7 +18,7 @@
 #include <lwm2m_retry_delay.h>
 #include <at_interface.h>
 #include <sms_receive.h>
-#include <main.h>
+#include <lwm2m_vzw_main.h>
 
 
 static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)

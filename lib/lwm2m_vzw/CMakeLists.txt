@@ -25,9 +25,6 @@ endif()
 
 zephyr_include_directories(include)
 
-# TODO Temporary solution until some app interface is defined
-zephyr_library_include_directories(../../client/src)
-
 zephyr_library_sources(
     src/app_debug.c
     src/at_interface.c

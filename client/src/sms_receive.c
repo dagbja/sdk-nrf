@@ -13,7 +13,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <stdio.h>
 #include <stdint.h>
 #include <net/socket.h>
-#include <main.h>
+#include <lwm2m_vzw_main.h>
 
 #define APP_MAX_AT_READ_LENGTH 256
 

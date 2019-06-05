@@ -11,8 +11,8 @@
 #endif
 
 #include <app_debug.h>
-#include <lwm2m_vzw_main.h>
 #include <sms_receive.h>
+#include <lwm2m_vzw_main.h>
 
 K_SEM_DEFINE(lwm2m_vzw_sem, 0, 1);
 

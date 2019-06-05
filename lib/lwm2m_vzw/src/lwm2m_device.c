@@ -15,7 +15,7 @@
 #include <lwm2m_objects_plain_text.h>
 #include <common.h>
 #include <at_interface.h>
-#include <main.h>
+#include <lwm2m_vzw_main.h>
 
 #define VERIZON_RESOURCE 30000
 

@@ -9,7 +9,7 @@
 #include <zephyr.h>
 #include <dk_buttons_and_leds.h>
 #include <lwm2m_security.h>
-#include <main.h>
+#include <lwm2m_vzw_main.h>
 
 /**< Interval in milliseconds between each time status LEDs are updated. */
 #define APP_LEDS_UPDATE_INTERVAL 500

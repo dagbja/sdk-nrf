@@ -24,11 +24,8 @@
 #include <at_interface.h>
 #include <logging/log.h>
 #include <lte_lc.h>
-#include <main.h>
 #include <nrf_inbuilt_key.h>
 #include <pdn_management.h>
-
-#include <buttons_and_leds.h>
 
 LOG_MODULE_REGISTER(lwm2m_vzw_main);
 
@@ -78,7 +75,7 @@ static int  m_app_admin_apn_handle = -1;
     do { \
         if (error_code != 0) { \
             LOG_ERR("Error: %lu", error_code); \
-            leds_error_loop(); \
+            while (1); \
         } \
     } while (0)
 #define APP_ERROR_CHECK_BOOL(boolean_value) \
@@ -86,7 +83,7 @@ static int  m_app_admin_apn_handle = -1;
         const uint32_t local_value = (boolean_value); \
         if (!local_value) { \
             LOG_ERR("BOOL check failure"); \
-            leds_error_loop(); \
+            while (1); \
         } \
     } while (0)
 #else
@@ -159,7 +156,6 @@ void app_request_server_update(uint16_t instance_id)
     app_server_update_requested[instance_id] = true;
 }
 
-#if (CONFIG_SHELL || CONFIG_DK_LIBRARY)
 app_state_t app_state_get(void)
 {
     return m_app_state;
@@ -199,7 +195,6 @@ int32_t app_state_update_delay(void)
 {
     return k_delayed_work_remaining_get(&state_update_work);
 }
-#endif // CONFIG_SHELL || CONFIG_DK_LIBRARY
 
 void app_system_shutdown(void)
 {
