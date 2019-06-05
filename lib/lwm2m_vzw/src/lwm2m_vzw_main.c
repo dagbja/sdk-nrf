@@ -203,7 +203,6 @@ void app_system_shutdown(void)
     lte_lc_power_off();
 
     m_app_state = APP_STATE_SHUTDOWN;
-    m_server_instance = 0;
 
     LOG_INF("LTE link down");
 }
@@ -782,7 +781,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     app_server_disconnect(0);
 
     m_app_state = APP_STATE_BOOTSTRAPPED;
-    lwm2m_retry_delay_reset(m_server_instance);
+    lwm2m_retry_delay_reset(0);
 
     time_stamp = k_uptime_get();
 
@@ -807,7 +806,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     m_app_state = APP_STATE_SERVER_CONNECT;
 #else
     m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
-    s32_t hold_off_time = (lwm2m_server_client_hold_off_timer_get(m_server_instance) * 1000) - milliseconds_spent;
+    s32_t hold_off_time = (lwm2m_server_client_hold_off_timer_get(0) * 1000) - milliseconds_spent;
     if (hold_off_time > 0) {
         LOG_INF("Client holdoff timer: sleeping %d milliseconds...", hold_off_time);
     } else {
@@ -1064,7 +1063,7 @@ static void app_bootstrap_connect(void)
 
     // Save the remote address of the bootstrap server.
     uint8_t uri_len = 0;
-    char * p_server_uri = lwm2m_security_server_uri_get(m_server_instance, &uri_len);
+    char * p_server_uri = lwm2m_security_server_uri_get(0, &uri_len);
     err_code = app_lwm2m_parse_uri_and_save_remote(LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
                                                    p_server_uri,
                                                    uri_len,
@@ -1073,9 +1072,9 @@ static void app_bootstrap_connect(void)
     if (err_code != 0) {
         m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
         if (err_code == EINVAL) {
-            app_handle_connect_retry(m_server_instance, true);
+            app_handle_connect_retry(0, true);
         } else {
-            app_handle_connect_retry(m_server_instance, false);
+            app_handle_connect_retry(0, false);
         }
         return;
     }
@@ -1117,8 +1116,7 @@ static void app_bootstrap_connect(void)
             local_port.interface = apn_name_zero_terminated;
         }
 
-        LOG_INF("Setup secure DTLS session (server %u) (APN %s)",
-                m_server_instance,
+        LOG_INF("Setup secure DTLS session (server 0) (APN %s)",
                 (local_port.interface) ? log_strdup(apn_name_zero_terminated) : "default");
 
         err_code = coap_security_setup(&local_port, &m_bs_remote_server);
@@ -1127,12 +1125,12 @@ static void app_bootstrap_connect(void)
         {
             LOG_INF("Connected");
             m_app_state = APP_STATE_BS_CONNECTED;
-            m_lwm2m_transport[m_server_instance] = local_port.transport;
+            m_lwm2m_transport[0] = local_port.transport;
         }
         else if (err_code == EINPROGRESS)
         {
             m_app_state = APP_STATE_BS_CONNECT_WAIT;
-            m_lwm2m_transport[m_server_instance] = local_port.transport;
+            m_lwm2m_transport[0] = local_port.transport;
         }
         else
         {
@@ -1140,9 +1138,9 @@ static void app_bootstrap_connect(void)
             m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
             // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
             if (err_code == EIO && (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH)) {
-                app_handle_connect_retry(m_server_instance, true);
+                app_handle_connect_retry(0, true);
             } else {
-                app_handle_connect_retry(m_server_instance, false);
+                app_handle_connect_retry(0, false);
             }
         }
     }
@@ -1157,61 +1155,61 @@ static void app_bootstrap(void)
 {
     uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)&m_bs_remote_server,
                                         &m_client_id,
-                                        m_lwm2m_transport[m_server_instance]);
+                                        m_lwm2m_transport[0]);
     if (err_code == 0)
     {
         m_app_state = APP_STATE_BOOTSTRAP_REQUESTED;
     }
 }
 
-static void app_server_connect(void)
+static void app_server_connect(uint16_t instance_id)
 {
     uint32_t err_code;
     bool secure;
 
     // Initialize server configuration structure.
-    memset(&m_server_conf[m_server_instance], 0, sizeof(lwm2m_server_config_t));
-    m_server_conf[m_server_instance].lifetime = lwm2m_server_lifetime_get(m_server_instance);
+    memset(&m_server_conf[instance_id], 0, sizeof(lwm2m_server_config_t));
+    m_server_conf[instance_id].lifetime = lwm2m_server_lifetime_get(instance_id);
 
     if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
-        m_server_conf[m_server_instance].binding.p_val = "UQS";
-        m_server_conf[m_server_instance].binding.len = 3;
+        m_server_conf[instance_id].binding.p_val = "UQS";
+        m_server_conf[instance_id].binding.len = 3;
 
-        if (m_server_instance) {
+        if (instance_id) {
             char *endptr;
             const char * p_msisdn = app_debug_msisdn_get();
             if (!p_msisdn || p_msisdn[0] == 0) {
                 p_msisdn = m_msisdn;
             }
 
-            m_server_conf[m_server_instance].msisdn = strtoull(p_msisdn, &endptr, 10);
+            m_server_conf[instance_id].msisdn = strtoull(p_msisdn, &endptr, 10);
         }
     }
 
     // Set the short server id of the server in the config.
-    m_server_conf[m_server_instance].short_server_id = lwm2m_server_short_server_id_get(m_server_instance);
+    m_server_conf[instance_id].short_server_id = lwm2m_server_short_server_id_get(instance_id);
 
     uint8_t uri_len = 0;
-    char * p_server_uri = lwm2m_security_server_uri_get(m_server_instance, &uri_len);
+    char * p_server_uri = lwm2m_security_server_uri_get(instance_id, &uri_len);
     int apn_handle = -1;
 
-    if (m_server_instance == 1) {
+    if (instance_id == 1) {
         apn_handle = m_app_admin_apn_handle;
     }
 
     err_code = app_resolve_server_uri(p_server_uri,
                                       uri_len,
-                                      &m_remote_server[m_server_instance],
+                                      &m_remote_server[instance_id],
                                       &secure,
-                                      m_family_type[m_server_instance],
+                                      m_family_type[instance_id],
                                       apn_handle);
     if (err_code != 0)
     {
         m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
         if (err_code == EINVAL) {
-            app_handle_connect_retry(m_server_instance, true);
+            app_handle_connect_retry(instance_id, true);
         } else {
-            app_handle_connect_retry(m_server_instance, false);
+            app_handle_connect_retry(instance_id, false);
         }
         return;
     }
@@ -1222,11 +1220,11 @@ static void app_server_connect(void)
 
         // TODO: Check if this has to be static.
         struct sockaddr local_addr;
-        app_init_sockaddr_in(&local_addr, m_remote_server[m_server_instance].sa_family, LWM2M_LOCAL_CLIENT_PORT_OFFSET + m_server_instance);
+        app_init_sockaddr_in(&local_addr, m_remote_server[instance_id].sa_family, LWM2M_LOCAL_CLIENT_PORT_OFFSET + instance_id);
 
         #define SEC_TAG_COUNT 1
 
-        sec_tag_t sec_tag_list[SEC_TAG_COUNT] = { APP_SEC_TAG_OFFSET + m_server_instance };
+        sec_tag_t sec_tag_list[SEC_TAG_COUNT] = { APP_SEC_TAG_OFFSET + instance_id };
 
         coap_sec_config_t setting =
         {
@@ -1243,7 +1241,7 @@ static void app_server_connect(void)
         };
 
         char apn_name_zero_terminated[64];
-        if ((m_server_instance == 1) && (m_app_admin_apn_handle != -1))
+        if ((instance_id == 1) && (m_app_admin_apn_handle != -1))
         {
             uint8_t class_apn_len = 0;
             char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
@@ -1255,21 +1253,21 @@ static void app_server_connect(void)
         }
 
         LOG_INF("Setup secure DTLS session (server %u) (APN %s)",
-                m_server_instance,
+                instance_id,
                 (local_port.interface) ? log_strdup(apn_name_zero_terminated) : "default");
 
-        err_code = coap_security_setup(&local_port, &m_remote_server[m_server_instance]);
+        err_code = coap_security_setup(&local_port, &m_remote_server[instance_id]);
 
         if (err_code == 0)
         {
             LOG_INF("Connected");
             m_app_state = APP_STATE_SERVER_CONNECTED;
-            m_lwm2m_transport[m_server_instance] = local_port.transport;
+            m_lwm2m_transport[instance_id] = local_port.transport;
         }
         else if (err_code == EINPROGRESS)
         {
             m_app_state = APP_STATE_SERVER_CONNECT_WAIT;
-            m_lwm2m_transport[m_server_instance] = local_port.transport;
+            m_lwm2m_transport[instance_id] = local_port.transport;
         }
         else
         {
@@ -1277,9 +1275,9 @@ static void app_server_connect(void)
             m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
             // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
             if (err_code == EIO && (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH)) {
-                app_handle_connect_retry(m_server_instance, true);
+                app_handle_connect_retry(instance_id, true);
             } else {
-                app_handle_connect_retry(m_server_instance, false);
+                app_handle_connect_retry(instance_id, false);
             }
         }
     }
@@ -1290,7 +1288,7 @@ static void app_server_connect(void)
     }
 }
 
-static void app_server_register(void)
+static void app_server_register(uint16_t instance_id)
 {
     uint32_t err_code;
     uint32_t link_format_string_len = 0;
@@ -1308,10 +1306,10 @@ static void app_server_register(void)
         err_code = lwm2m_coap_handler_gen_link_format(p_link_format_string, (uint16_t *)&link_format_string_len);
         APP_ERROR_CHECK(err_code);
 
-        err_code = lwm2m_register((struct sockaddr *)&m_remote_server[m_server_instance],
+        err_code = lwm2m_register((struct sockaddr *)&m_remote_server[instance_id],
                                   &m_client_id,
-                                  &m_server_conf[m_server_instance],
-                                  m_lwm2m_transport[m_server_instance],
+                                  &m_server_conf[instance_id],
+                                  m_lwm2m_transport[instance_id],
                                   p_link_format_string,
                                   (uint16_t)link_format_string_len);
         APP_ERROR_CHECK(err_code);
@@ -1551,13 +1549,13 @@ static void app_lwm2m_process(void)
         case APP_STATE_SERVER_CONNECT:
         {
             LOG_INF("app_server_connect (server %u)", m_server_instance);
-            app_server_connect();
+            app_server_connect(m_server_instance);
             break;
         }
         case APP_STATE_SERVER_CONNECTED:
         {
             LOG_INF("app_server_register (server %u)", m_server_instance);
-            app_server_register();
+            app_server_register(m_server_instance);
             break;
         }
         case APP_STATE_SERVER_DEREGISTER:
@@ -1797,7 +1795,6 @@ int lwm2m_vzw_init(void)
     else
     {
         m_app_state = APP_STATE_BS_CONNECT;
-        m_server_instance = 0;
     }
 
     return 0;
