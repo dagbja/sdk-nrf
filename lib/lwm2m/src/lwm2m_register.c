@@ -419,6 +419,12 @@ void lwm2m_deregister_cb(u32_t status, void * p_arg, coap_message_t * p_message)
 
     LWM2M_TRC("status: %u, CoAP code: %u", status, coap_code);
 
+
+    lwm2m_notification(LWM2M_NOTIFCATION_TYPE_DEREGISTER,
+                       p_remote,
+                       coap_code,
+                       err_code);
+
     if (p_message)
     {
         LWM2M_MUTEX_LOCK();
@@ -434,11 +440,6 @@ void lwm2m_deregister_cb(u32_t status, void * p_arg, coap_message_t * p_message)
 
         LWM2M_MUTEX_UNLOCK();
     }
-
-    lwm2m_notification(LWM2M_NOTIFCATION_TYPE_DEREGISTER,
-                       p_remote,
-                       coap_code,
-                       err_code);
 }
 
 

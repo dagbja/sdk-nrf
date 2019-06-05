@@ -619,19 +619,47 @@ void lwm2m_notification(lwm2m_notification_type_t type,
         {
             // TODO: What to do here?
         }
+        return;
     }
-    else if (type == LWM2M_NOTIFCATION_TYPE_REGISTER)
+
+    uint16_t instance_id = 0xFFFF;
+    uint16_t short_server_id = 0;
+
+    if (p_remote == NULL) {
+        LOG_WRN("Remote address missing");
+        return;
+    }
+    else if (lwm2m_remote_short_server_id_find(&short_server_id, p_remote) != 0)
     {
-        app_restart_lifetime_timer(m_server_instance);
+        LOG_WRN("Remote address not found");
+        return;
+    }
+
+    // Find the server instance for the short server ID.
+    for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+        if (lwm2m_server_short_server_id_get(i) == short_server_id) {
+            instance_id = i;
+            break;
+        }
+    }
+
+    if (instance_id == 0xFFFF) {
+        LOG_WRN("Server instance for short server ID not found: %d", short_server_id);
+        return;
+    }
+
+    if (type == LWM2M_NOTIFCATION_TYPE_REGISTER)
+    {
+        app_restart_lifetime_timer(instance_id);
 
         if (coap_code == COAP_CODE_201_CREATED || coap_code == COAP_CODE_204_CHANGED)
         {
-            LOG_INF("Registered (server %u)", m_server_instance);
-            lwm2m_retry_delay_reset(m_server_instance);
-            lwm2m_server_registered_set(m_server_instance, true);
+            LOG_INF("Registered (server %u)", instance_id);
+            lwm2m_retry_delay_reset(instance_id);
+            lwm2m_server_registered_set(instance_id, true);
 
             uint8_t uri_len = 0;
-            for (int i = m_server_instance+1; i < 1+LWM2M_MAX_SERVERS; i++) {
+            for (int i = instance_id+1; i < 1+LWM2M_MAX_SERVERS; i++) {
                 if (m_lwm2m_transport[i] == -1) {
                     // Only connect to unconnected servers having a URI.
                     (void)lwm2m_security_server_uri_get(i, &uri_len);
@@ -646,35 +674,28 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             if (uri_len == 0) {
                 // No more servers to connect
                 m_app_state = APP_STATE_SERVER_REGISTERED;
+                m_server_instance = 3;
             }
         }
         else
         {
             m_app_state = APP_STATE_SERVER_REGISTER_WAIT;
-            app_handle_connect_retry(m_server_instance, false);
+            app_handle_connect_retry(instance_id, false);
         }
     }
     else if (type == LWM2M_NOTIFCATION_TYPE_UPDATE)
     {
         if (coap_code == 0 && p_remote) {
             // No response from update request
-            uint16_t short_server_id = 0;
-            if (lwm2m_remote_short_server_id_find(&short_server_id, p_remote) == 0) {
-                for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-                    if (lwm2m_server_short_server_id_get(i) == short_server_id) {
-                        if (m_lwm2m_transport[i] != -1) {
-                            LOG_INF("Reconnect (server %d)", i);
-                            err_code = coap_security_destroy(m_lwm2m_transport[i]);
-                            ARG_UNUSED(err_code);
+            if (m_lwm2m_transport[instance_id] != -1) {
+                LOG_INF("Reconnect (server %d)", instance_id);
+                err_code = coap_security_destroy(m_lwm2m_transport[instance_id]);
+                ARG_UNUSED(err_code);
 
-                            m_lwm2m_transport[i] = -1;
+                m_lwm2m_transport[instance_id] = -1;
 
-                            m_app_state = APP_STATE_SERVER_CONNECT;
-                            m_server_instance = i;
-                        }
-                        break;
-                    }
-                }
+                m_app_state = APP_STATE_SERVER_CONNECT;
+                m_server_instance = instance_id;
             }
         }
     }
