@@ -4,9 +4,9 @@
 # SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
 #
 
-zephyr_library_named(nrf_vzw_lwm2m)
+zephyr_library_named(nrf_lwm2m_vzw)
 
-if(!CONFIG_NRF_VZW_LWM2M_INCLUDE_DEBUG_INFORMATION)
+if(!CONFIG_NRF_LWM2M_VZW_INCLUDE_DEBUG_INFORMATION)
 zephyr_library_cc_option(
     -g0
 )

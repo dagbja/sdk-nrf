@@ -9,9 +9,9 @@ declare -a lib_variants=("hard-float"
 			 "softfp-float")
 
 declare -a lib_names=("nrf_lwm2m"
-		      "nrf_vzw_lwm2m")
+		      "nrf_lwm2m_vzw")
 declare -A lib_paths=([${lib_names[0]}]="lwm2m"
-		      [${lib_names[1]}]="vzw_lwm2m")
+		      [${lib_names[1]}]="lwm2m_vzw")
 
 declare -a api_headers_nrf_lwm2m=("lwm2m_cfg.h"
 				  "lwm2m_api.h"
@@ -23,7 +23,7 @@ declare -a api_headers_nrf_lwm2m=("lwm2m_cfg.h"
 				  "lwm2m_objects_plain_text.h"
 				  "lwm2m.h")
 
-declare -a api_headers_nrf_vzw_lwm2m=("common.h"
+declare -a api_headers_nrf_lwm2m_vzw=("common.h"
 				      "lwm2m_conn_mon.h"
 				      "lwm2m_device.h"
 				      "lwm2m_firmware.h"
@@ -63,11 +63,11 @@ do
 	cp $project_dir/../lib/lwm2m/include/$i $project_dir/$output_dir/nrf_lwm2m/include
 done
 
-mkdir -p $project_dir/$output_dir/nrf_vzw_lwm2m/include
+mkdir -p $project_dir/$output_dir/nrf_lwm2m_vzw/include
 
-for i in "${api_headers_nrf_vzw_lwm2m[@]}"
+for i in "${api_headers_nrf_lwm2m_vzw[@]}"
 do
-	cp $project_dir/../lib/vzw_lwm2m/include/$i $project_dir/$output_dir/nrf_vzw_lwm2m/include
+	cp $project_dir/../lib/lwm2m_vzw/include/$i $project_dir/$output_dir/nrf_lwm2m_vzw/include
 done
 
 # Replace Kconfig macros with acual values

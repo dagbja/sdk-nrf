@@ -6,4 +6,4 @@
 
 add_subdirectory_ifdef(CONFIG_NRF_COAP      coap)
 add_subdirectory_ifdef(CONFIG_NRF_LWM2M     lwm2m)
-add_subdirectory_ifdef(CONFIG_NRF_VZW_LWM2M vzw_lwm2m)
+add_subdirectory_ifdef(CONFIG_NRF_LWM2M_VZW lwm2m_vzw)

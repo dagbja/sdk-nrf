@@ -4,11 +4,11 @@
 # SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
 #
 
-config NRF_VZW_LWM2M
+config NRF_LWM2M_VZW
 	bool "Nordic LwM2M library support"
 	select NRF_LWM2M
 	help
 	  "Enable Verizon LwM2M library"
 
-config NRF_VZW_LWM2M_INCLUDE_DEBUG_INFORMATION
+config NRF_LWM2M_VZW_INCLUDE_DEBUG_INFORMATION
 	bool "Include debug information in the output library"
