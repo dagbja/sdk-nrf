@@ -1,8 +1,32 @@
 #!/usr/bin/env bash
 
+usage() { echo "Usage $0 [-d]" 1>&2; exit 1; }
+
+debug=false
+
+while getopts ":d" arg; do
+	case $arg in
+		d)	echo ""
+			echo "****************************************************"
+			echo "* Generating debug library. Do not make it public! *"
+			echo "****************************************************"
+			echo ""
+			debug=true
+			;;
+		h | *)
+			usage
+			;;
+	esac
+done
+
+project_file="prj.conf"
 project_dir="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 output_dir="output"
 cpu_variant="cortex-m33"
+
+if [ "$debug" = true ] ; then
+	project_file="$project_file overlay-debug.conf"
+fi
 
 declare -a lib_variants=("hard-float"
 #			 "soft-float"
@@ -11,6 +35,7 @@ declare -a lib_variants=("hard-float"
 
 declare -a lib_names=("nrf_lwm2m"
 		      "nrf_lwm2m_vzw")
+
 declare -A lib_paths=([${lib_names[0]}]="lwm2m"
 		      [${lib_names[1]}]="lwm2m_vzw")
 
@@ -78,7 +103,7 @@ do
 	mkdir $project_dir/build-$i
 	cd $project_dir/build-$i
 
-	cmake -GNinja -DBOARD=nrf9160_pca10090ns -DOVERLAY_CONFIG=overlay-$i.conf ..
+	cmake -GNinja -DBOARD=nrf9160_pca10090ns -DCONF_FILE="$project_file overlay-$i.conf" ..
 
 	for j in "${lib_names[@]}"
 	do
@@ -120,7 +145,9 @@ done < "$autoconf_file"
 
 # Obfuscate the Verizon LWM2M library
 
-for i in "${lib_variants[@]}"
-do
-	obfuscate "nrf_lwm2m_vzw" $cpu_variant $i
-done
+if [ "$debug" = false ] ; then
+	for i in "${lib_variants[@]}"
+	do
+		obfuscate "nrf_lwm2m_vzw" $cpu_variant $i
+	done
+fi
