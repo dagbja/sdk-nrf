@@ -137,15 +137,11 @@ static int cmd_config_lifetime(const struct shell *shell, size_t argc, char **ar
 
 static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
 {
-    const char * p_debug_imei = app_debug_imei_get();
     const char * p_debug_msisdn = app_debug_msisdn_get();
 
     shell_print(shell, "Debug configuration");
-    if (p_debug_imei && p_debug_imei[0]) {
-        shell_print(shell, "  IMEI           %s (static)", p_debug_imei);
-    } else {
-        shell_print(shell, "  IMEI           %s", app_imei_get());
-    }
+    shell_print(shell, "  IMEI           %s", app_imei_get());
+
     if (p_debug_msisdn && p_debug_msisdn[0]) {
         shell_print(shell, "  MSISDN         %s (static)", p_debug_msisdn);
     } else {
@@ -179,33 +175,6 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
 static int cmd_debug_reset(const struct shell *shell, size_t argc, char **argv)
 {
     app_debug_clear();
-
-    return 0;
-}
-
-
-static int cmd_debug_imei(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc != 2) {
-        shell_print(shell, "%s IMEI", argv[0]);
-        return 0;
-    }
-
-    char *imei = argv[1];
-    size_t imei_len = strlen(imei);
-
-    if (imei_len != 0 && imei_len != 15) {
-        shell_print(shell, "length of IMEI must be 15");
-        return 0;
-    }
-
-    app_debug_imei_set(imei);
-
-    if (imei_len) {
-        shell_print(shell, "Set static IMEI: %s", imei);
-    } else {
-        shell_print(shell, "Removed static IMEI");
-    }
 
     return 0;
 }
@@ -558,7 +527,6 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_config,
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(print, NULL, "Print configuration", cmd_debug_print),
     SHELL_CMD(reset, NULL, "Reset configuration", cmd_debug_reset),
-    SHELL_CMD(imei, NULL, "Set static IMEI", cmd_debug_imei),
     SHELL_CMD(msisdn, NULL, "Set static MSISDN", cmd_debug_msisdn),
     SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
     SHELL_CMD(disable_psm, NULL, "Disable PSM", cmd_debug_disable_psm),

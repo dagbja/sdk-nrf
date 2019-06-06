@@ -38,19 +38,6 @@ void app_debug_clear(void)
     lwm2m_debug_settings_store(&m_debug_settings);
 }
 
-const char * app_debug_imei_get(void)
-{
-    return m_debug_settings.imei;
-}
-
-int32_t app_debug_imei_set(const char * imei)
-{
-    memset(m_debug_settings.imei, 0, sizeof(m_debug_settings.imei));
-    strncpy(m_debug_settings.imei, imei, sizeof(m_debug_settings.imei) - 1);
-
-    return lwm2m_debug_settings_store(&m_debug_settings);
-}
-
 const char * app_debug_msisdn_get(void)
 {
     return m_debug_settings.msisdn;

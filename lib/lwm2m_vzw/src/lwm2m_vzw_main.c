@@ -200,6 +200,11 @@ int32_t app_state_update_delay(void)
 void app_system_shutdown(void)
 {
     app_disconnect();
+
+    if (m_app_admin_apn_handle != -1) {
+        app_teardown_admin_pdn();
+    }
+
     lte_lc_power_off();
 
     m_app_state = APP_STATE_SHUTDOWN;
@@ -211,42 +216,6 @@ void app_system_reset(void)
 {
     app_system_shutdown();
     NVIC_SystemReset();
-}
-
-void app_request_reboot(void)
-{
-    app_disconnect();
-
-    if (m_app_admin_apn_handle != -1) {
-        app_teardown_admin_pdn();
-    }
-
-    lte_lc_power_off();
-    NVIC_SystemReset();
-}
-
-static char * app_client_imei_msisdn(void)
-{
-    static char client_id[128];
-
-    if (client_id[0] == 0) {
-        const char * p_imei = m_imei;
-        const char * p_msisdn = m_msisdn;
-
-        const char * p_debug_imei = app_debug_imei_get();
-        if (p_debug_imei && p_debug_imei[0]) {
-            p_imei = p_debug_imei;
-        }
-
-        const char * p_debug_msisdn = app_debug_msisdn_get();
-        if (p_debug_msisdn && p_debug_msisdn[0]) {
-            p_msisdn = p_debug_msisdn;
-        }
-
-        snprintf(client_id, 128, "urn:imei-msisdn:%s-%s", p_imei, p_msisdn);
-    }
-
-    return client_id;
 }
 
 /**@brief Setup ADMIN PDN connection */
@@ -272,12 +241,13 @@ static void app_teardown_admin_pdn(void)
     m_app_admin_apn_handle = -1;
 }
 
-/**@brief Initialize IMEI and MSISDN to use.
+/**@brief Initialize IMEI and MSISDN to use in client id.
  *
  * Factory reset to start bootstrap if MSISDN is different than last start.
  */
-static void app_initialize_imei_msisdn(void)
+static char * app_initialize_client_id(void)
 {
+    static char client_id[128];
     bool provision_bs_psk = false;
 
     (void)at_read_imei_and_msisdn(m_imei, sizeof(m_imei), m_msisdn, sizeof(m_msisdn));
@@ -306,13 +276,15 @@ static void app_initialize_imei_msisdn(void)
         provision_bs_psk = true;
     }
 
-    if (provision_bs_psk) {
-        char * p_identity = app_client_imei_msisdn();
+    snprintf(client_id, 128, "urn:imei-msisdn:%s-%s", m_imei, p_msisdn);
 
+    if (provision_bs_psk) {
         lte_lc_offline();
-        app_provision_psk(APP_BOOTSTRAP_SEC_TAG, p_identity, strlen(p_identity), m_app_bootstrap_psk, sizeof(m_app_bootstrap_psk));
+        app_provision_psk(APP_BOOTSTRAP_SEC_TAG, client_id, strlen(client_id), m_app_bootstrap_psk, sizeof(m_app_bootstrap_psk));
         lte_lc_init_and_connect();
     }
+
+    return client_id;
 }
 
 /**@brief Application implementation of the root handler interface.
@@ -1045,11 +1017,8 @@ static void app_lwm2m_setup(void)
     // Add firmware support.
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_firmware_get_object());
 
-    // Initialize IMEI and MSISDN.
-    app_initialize_imei_msisdn();
-
-    // Set client ID.
-    char * p_ep_id = app_client_imei_msisdn();
+    // Initialize client ID.
+    char * p_ep_id = app_initialize_client_id();
 
     memcpy(&m_client_id.value.imei_msisdn[0], p_ep_id, strlen(p_ep_id));
     m_client_id.len  = strlen(p_ep_id);

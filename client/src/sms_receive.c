@@ -59,7 +59,7 @@ static void sms_receive(void *id, void *unused1, void *unused2)
             } else if (object == 3 && instance == 0 && resource == 4) {
                 // Device Reboot
                 LOG_INF("Device Reboot");
-                app_request_reboot();
+                app_system_reset();
             } else if (object == 3 && instance == 0 && resource == 5) {
                 // Device Factory Reset
                 LOG_INF("Device Factory Reset");

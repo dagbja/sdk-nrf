@@ -53,6 +53,5 @@ void app_bootstrap_reset(void);
 void app_factory_reset(void);
 void app_system_shutdown(void);
 void app_system_reset(void);
-void app_request_reboot(void);
 
 #endif // LWM2M_VZW_MAIN_H__

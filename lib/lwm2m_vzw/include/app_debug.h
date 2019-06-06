@@ -15,7 +15,7 @@
 
 /**@brief Configurable device values. */
 typedef struct {
-    char imei[16];                /**< Static configured IMEI to overwrite value from SIP, used for debugging. */
+    char dummy[16];               /**< Currently unused value, previous used for static configured IMEI. */
     char msisdn[16];              /**< Static configured MSISDN to overwrite value from SIM, used for debugging. */
     char modem_logging[65];       /**< Modem logging: 0=off, 1=fidoless, 2=fido, other=XMODEMTRACE bitmap */
     uint32_t flags;               /**< Flags to control application behaviour. */
@@ -23,9 +23,6 @@ typedef struct {
 
 void app_debug_init(void);
 void app_debug_clear(void);
-
-const char * app_debug_imei_get(void);
-int32_t app_debug_imei_set(const char * imei);
 
 const char * app_debug_msisdn_get(void);
 int32_t app_debug_msisdn_set(const char * msisdn);
