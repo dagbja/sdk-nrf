@@ -376,7 +376,7 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
 {
     char ip_version[] = "IPvX";
     ip_version[3] = (app_family_type_get(app_server_instance()) == AF_INET6) ? '6' : '4';
-    s32_t retry_delay;
+    int32_t retry_delay;
 
     if (app_did_bootstrap()) {
         shell_print(shell, "Bootstrap completed [%s]", (app_family_type_get(0) == AF_INET6) ? "IPv6" : "IPv4");

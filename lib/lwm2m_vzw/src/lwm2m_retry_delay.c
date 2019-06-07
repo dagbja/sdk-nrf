@@ -12,11 +12,11 @@ static uint8_t m_retry_count[1+LWM2M_MAX_SERVERS];
 
 // Verizon specific retry delays in seconds.
 // TODO: Add retry handling for other vendors than Verizon.
-static s32_t m_retry_delay[] = { 2*60, 4*60, 6*60, 8*60, 24*60*60 };
+static int32_t m_retry_delay[] = { 2*60, 4*60, 6*60, 8*60, 24*60*60 };
 
-s32_t lwm2m_retry_delay_get(int instance_id, bool next_delay)
+int32_t lwm2m_retry_delay_get(int instance_id, bool next_delay)
 {
-    s32_t retry_delay;
+    int32_t retry_delay;
 
     if (instance_id < 0 || instance_id >= 1+LWM2M_MAX_SERVERS) {
         // Illegal instance_id.

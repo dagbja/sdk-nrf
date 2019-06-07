@@ -533,7 +533,7 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
 
     if (start_retry_delay)
     {
-        s32_t retry_delay = lwm2m_retry_delay_get(instance_id, true);
+        int32_t retry_delay = lwm2m_retry_delay_get(instance_id, true);
 
         if (retry_delay == -1) {
             LOG_ERR("Bootstrap procedure failed");
@@ -542,7 +542,7 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
             return;
         }
 
-        LOG_INF("Retry delay for %d minutes (server %u)", retry_delay / 60, instance_id);
+        LOG_INF("Retry delay for %ld minutes (server %u)", retry_delay / 60, instance_id);
         k_delayed_work_submit(&state_update_work, retry_delay * 1000);
     } else {
         k_delayed_work_submit(&state_update_work, 0);
@@ -552,7 +552,7 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
 static void app_restart_lifetime_timer(uint8_t instance_id)
 {
 #if (APP_USE_CONTABO != 1)
-    s32_t timeout = (s32_t)(lwm2m_server_lifetime_get(instance_id) * 1000);
+    int32_t timeout = (int32_t)(lwm2m_server_lifetime_get(instance_id) * 1000);
     if (timeout <= 0) {
         // FIXME: Lifetime timer too big for Zephyr, set to maximum possible value for now
         timeout = INT32_MAX;
@@ -694,8 +694,8 @@ void lwm2m_notification(lwm2m_notification_type_t type,
         }
         else
         {
-            s32_t delay = (s32_t) lwm2m_server_disable_timeout_get(instance_id);
-            LOG_INF("Disable [%d seconds] (server %d)", delay, instance_id);
+            int32_t delay = (int32_t) lwm2m_server_disable_timeout_get(instance_id);
+            LOG_INF("Disable [%ld seconds] (server %d)", delay, instance_id);
             app_server_disconnect(instance_id);
 
             k_delayed_work_submit(&connection_update_work[instance_id], delay * 1000);
@@ -778,9 +778,9 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     m_app_state = APP_STATE_SERVER_CONNECT;
 #else
     m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
-    s32_t hold_off_time = (lwm2m_server_client_hold_off_timer_get(0) * 1000) - milliseconds_spent;
+    int32_t hold_off_time = (lwm2m_server_client_hold_off_timer_get(0) * 1000) - milliseconds_spent;
     if (hold_off_time > 0) {
-        LOG_INF("Client holdoff timer: sleeping %d milliseconds...", hold_off_time);
+        LOG_INF("Client holdoff timer: sleeping %ld milliseconds...", hold_off_time);
     } else {
         // Already used the holdoff timer, just continue
         hold_off_time = 0;

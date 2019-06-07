@@ -14,7 +14,7 @@
  *
  * @return Retry delay in seconds. -1 if no more retries.
  */
-s32_t lwm2m_retry_delay_get(int instance_id, bool next_delay);
+int32_t lwm2m_retry_delay_get(int instance_id, bool next_delay);
 
 /**@brief Reset retry delay counter.
  *
