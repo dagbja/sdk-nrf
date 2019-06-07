@@ -177,7 +177,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
         {
             case LWM2M_DEVICE_FACTORY_RESET:
             {
-                app_factory_reset();
+                lwm2m_factory_reset();
             }
             /* FALLTHROUGH */
 
@@ -188,7 +188,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
                 // FIXME: This sleep is needed to ensure the response is sent before closing the socket.
                 lwm2m_os_sleep(1000);
 
-                app_system_reset();
+                lwm2m_system_reset();
                 break;
             }
 
@@ -236,7 +236,7 @@ void lwm2m_device_init(void)
     m_instance_device.manufacturer.len = strlen(m_instance_device.manufacturer.p_val);
     m_instance_device.model_number.p_val = "nRF9160";
     m_instance_device.model_number.len = strlen(m_instance_device.model_number.p_val);
-    m_instance_device.serial_number.p_val = app_imei_get();
+    m_instance_device.serial_number.p_val = lwm2m_imei_get();
     m_instance_device.serial_number.len = strlen(m_instance_device.serial_number.p_val);
 
     m_instance_device.firmware_version.len = sizeof(nrf_dfu_fw_version_t);

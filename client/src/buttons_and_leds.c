@@ -21,30 +21,30 @@ static struct k_delayed_work leds_update_work;
 /**@brief Callback for button events from the DK buttons and LEDs library. */
 static void app_button_handler(u32_t buttons, u32_t has_changed)
 {
-    app_state_t app_state = app_state_get();
+    lwm2m_state_t app_state = lwm2m_state_get();
 
     if (buttons & 0x01) // Button 1 has changed
     {
         if (!(buttons & 0x08)) // Switch 2 in right position
         {
             printk("Reset bootstrap!\n");
-            app_bootstrap_reset();
-            app_system_reset();
+            lwm2m_bootstrap_reset();
+            lwm2m_system_reset();
         }
-        else if (app_state == APP_STATE_IP_INTERFACE_UP)
+        else if (app_state == LWM2M_STATE_IP_INTERFACE_UP)
         {
             if (lwm2m_security_bootstrapped_get(0))
             {
-                app_state_set(APP_STATE_SERVER_CONNECT);
+                lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT);
             }
             else
             {
-                app_state_set(APP_STATE_BS_CONNECT);
+                lwm2m_state_set(LWM2M_STATE_BS_CONNECT);
             }
         }
-        else if (app_state == APP_STATE_IDLE)
+        else if (app_state == LWM2M_STATE_IDLE)
         {
-            app_request_server_update(1, false);
+            lwm2m_request_server_update(1, false);
         }
     }
     else if (buttons & 0x02) // Button 2 has changed
@@ -52,15 +52,15 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
         if (!(buttons & 0x08)) // Switch 2 in right position
         {
             printk("System shutdown!\n");
-            app_system_shutdown();
+            lwm2m_system_shutdown();
         }
-        else if (app_state == APP_STATE_IDLE)
+        else if (app_state == LWM2M_STATE_IDLE)
         {
-            app_state = APP_STATE_SERVER_DEREGISTER;
+            app_state = LWM2M_STATE_SERVER_DEREGISTER;
         }
-        else if (app_state == APP_STATE_IP_INTERFACE_UP)
+        else if (app_state == LWM2M_STATE_IP_INTERFACE_UP)
         {
-            app_system_reset();
+            lwm2m_system_reset();
         }
     }
 }
@@ -70,81 +70,81 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
     *on = 0;
     *blink = 0;
 
-    switch (app_state_get())
+    switch (lwm2m_state_get())
     {
-        case APP_STATE_BOOTING:
+        case LWM2M_STATE_BOOTING:
             *blink = DK_LED1_MSK;
             break;
 
-        case APP_STATE_IP_INTERFACE_UP:
+        case LWM2M_STATE_IP_INTERFACE_UP:
             *on = DK_LED1_MSK;
             break;
 
-        case APP_STATE_BS_CONNECT:
-        case APP_STATE_BS_CONNECT_WAIT:
+        case LWM2M_STATE_BS_CONNECT:
+        case LWM2M_STATE_BS_CONNECT_WAIT:
             *blink = (DK_LED1_MSK | DK_LED2_MSK);
             break;
 
-        case APP_STATE_BS_CONNECT_RETRY_WAIT:
+        case LWM2M_STATE_BS_CONNECT_RETRY_WAIT:
             *blink = (DK_LED2_MSK | DK_LED4_MSK);
             break;
 
-        case APP_STATE_BS_CONNECTED:
-        case APP_STATE_BOOTSTRAP_REQUESTED:
+        case LWM2M_STATE_BS_CONNECTED:
+        case LWM2M_STATE_BOOTSTRAP_REQUESTED:
             *on = DK_LED1_MSK;
             *blink = DK_LED2_MSK;
             break;
 
-        case APP_STATE_BOOTSTRAP_WAIT:
+        case LWM2M_STATE_BOOTSTRAP_WAIT:
             *on = DK_LED1_MSK;
             *blink = (DK_LED2_MSK | DK_LED4_MSK);
             break;
 
-        case APP_STATE_BOOTSTRAPPING:
-        case APP_STATE_BOOTSTRAP_TIMEDOUT:
+        case LWM2M_STATE_BOOTSTRAPPING:
+        case LWM2M_STATE_BOOTSTRAP_TIMEDOUT:
             *on = (DK_LED1_MSK | DK_LED2_MSK);
             *blink = DK_LED4_MSK;
             break;
 
-        case APP_STATE_BOOTSTRAP_HOLDOFF:
+        case LWM2M_STATE_BOOTSTRAP_HOLDOFF:
             *on = (DK_LED1_MSK | DK_LED2_MSK);
             break;
 
-        case APP_STATE_SERVER_CONNECT:
-        case APP_STATE_SERVER_CONNECT_WAIT:
+        case LWM2M_STATE_SERVER_CONNECT:
+        case LWM2M_STATE_SERVER_CONNECT_WAIT:
             *blink = (DK_LED1_MSK | DK_LED3_MSK);
             break;
 
-        case APP_STATE_SERVER_CONNECT_RETRY_WAIT:
+        case LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT:
             *blink = (DK_LED3_MSK | DK_LED4_MSK);
             break;
 
-        case APP_STATE_SERVER_CONNECTED:
+        case LWM2M_STATE_SERVER_CONNECTED:
             *on = DK_LED1_MSK;
             *blink = DK_LED3_MSK;
             break;
 
-        case APP_STATE_SERVER_REGISTER_WAIT:
+        case LWM2M_STATE_SERVER_REGISTER_WAIT:
             *on = DK_LED1_MSK;
             *blink = (DK_LED3_MSK | DK_LED4_MSK);
             break;
 
-        case APP_STATE_IDLE:
+        case LWM2M_STATE_IDLE:
             *on = (DK_LED1_MSK | DK_LED3_MSK);
             break;
 
-        case APP_STATE_SERVER_DEREGISTER:
-        case APP_STATE_SERVER_DEREGISTERING:
-        case APP_STATE_DISCONNECT:
+        case LWM2M_STATE_SERVER_DEREGISTER:
+        case LWM2M_STATE_SERVER_DEREGISTERING:
+        case LWM2M_STATE_DISCONNECT:
             *on = DK_LED3_MSK;
             *blink = DK_LED1_MSK;
             break;
 
-        case APP_STATE_MODEM_FIRMWARE_UPDATE:
+        case LWM2M_STATE_MODEM_FIRMWARE_UPDATE:
             *blink = DK_LED1_MSK | DK_LED2_MSK | DK_LED3_MSK | DK_LED4_MSK;
             break;
 
-        case APP_STATE_SHUTDOWN:
+        case LWM2M_STATE_SHUTDOWN:
             *blink = DK_LED4_MSK;
             break;
     }
@@ -162,7 +162,7 @@ static void app_leds_update(struct k_work *work)
         /* Set led_on_mask to match current state. */
         app_leds_get_state(&led_on_mask, &led_blink_mask);
 
-        if (app_did_bootstrap())
+        if (lwm2m_did_bootstrap())
         {
             /* Only turn on LED2 if bootstrap was done. */
             led_on_mask |= DK_LED2_MSK;
@@ -196,7 +196,7 @@ static void check_buttons_pressed(void)
 
     // Check if button 1 pressed during startup
     if (button_state & 0x01) {
-        app_factory_reset();
+        lwm2m_factory_reset();
 
         printk("Factory reset!\n");
         k_delayed_work_cancel(&leds_update_work);

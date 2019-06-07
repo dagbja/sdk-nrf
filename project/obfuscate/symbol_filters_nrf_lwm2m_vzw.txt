@@ -35,7 +35,7 @@
 ^lwm2m_handler_error$
 
 # Other APIs that are needed for now
-^app_bootstrap_reset$
+^lwm2m_bootstrap_reset$
 ^app_debug_clear$
 ^app_debug_flag_clear$
 ^app_debug_flag_is_set$
@@ -47,19 +47,18 @@
 ^app_debug_modem_logging_set$
 ^app_debug_msisdn_get$
 ^app_debug_msisdn_set$
-^app_did_bootstrap$
-^app_factory_reset$
-^app_family_type_get$
-^app_imei_get$
-^app_msisdn_get$
-^app_request_reboot$
-^app_request_server_update$
-^app_server_instance$
-^app_state_get$
-^app_state_set$
-^app_state_update_delay$
-^app_system_reset$
-^app_system_shutdown$
+^lwm2m_did_bootstrap$
+^lwm2m_factory_reset$
+^lwm2m_family_type_get$
+^lwm2m_imei_get$
+^lwm2m_msisdn_get$
+^lwm2m_request_server_update$
+^lwm2m_server_instance$
+^lwm2m_state_get$
+^lwm2m_state_set$
+^lwm2m_state_update_delay$
+^lwm2m_system_reset$
+^lwm2m_system_shutdown$
 ^mdm_interface_at_write$
 ^lwm2m_device_get_sim_iccid$
 ^lwm2m_instance_storage_security_store$

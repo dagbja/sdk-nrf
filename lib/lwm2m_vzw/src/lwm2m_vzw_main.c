@@ -103,7 +103,7 @@ static coap_transport_handle_t             m_coap_transport = -1;               
 static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS];            /**< CoAP transport handles for the secure servers. Obtained on @coap_security_setup. */
 static int                                 m_admin_pdn_handle[1+LWM2M_MAX_SERVERS];           /**< PDN connection handle. */
 
-static volatile app_state_t m_app_state = APP_STATE_BOOTING;                             /**< Application state. Should be one of @ref app_state_t. */
+static volatile lwm2m_state_t m_app_state = LWM2M_STATE_BOOTING;                              /**< Application state. Should be one of @ref lwm2m_state_t. */
 static volatile uint16_t    m_server_instance;                                                /**< Server instance handled. */
 static volatile bool        m_did_bootstrap;
 
@@ -146,73 +146,73 @@ static const char * app_uri_get(char * p_server_uri, uint16_t * p_port, bool * p
 extern int cert_provision();
 
 /** Functions available from shell access */
-void app_request_server_update(uint16_t instance_id, bool reconnect)
+void lwm2m_request_server_update(uint16_t instance_id, bool reconnect)
 {
     if (m_lwm2m_transport[instance_id] != -1 || reconnect) {
         m_connection_update[instance_id].requested = true;
     }
 }
 
-app_state_t app_state_get(void)
+lwm2m_state_t lwm2m_state_get(void)
 {
     return m_app_state;
 }
 
-void app_state_set(app_state_t app_state)
+void lwm2m_state_set(lwm2m_state_t app_state)
 {
     m_app_state = app_state;
 }
 
-char *app_imei_get(void)
+char *lwm2m_imei_get(void)
 {
     return m_imei;
 }
 
-char *app_msisdn_get(void)
+char *lwm2m_msisdn_get(void)
 {
     return m_msisdn;
 }
 
-bool app_did_bootstrap(void)
+bool lwm2m_did_bootstrap(void)
 {
     return m_did_bootstrap;
 }
 
-uint16_t app_server_instance(void)
+uint16_t lwm2m_server_instance(void)
 {
     return m_server_instance;
 }
 
-sa_family_t app_family_type_get(uint16_t instance_id)
+sa_family_t lwm2m_family_type_get(uint16_t instance_id)
 {
     return m_family_type[instance_id];
 }
 
-int32_t app_state_update_delay(void)
+int32_t lwm2m_state_update_delay(void)
 {
     return lwm2m_os_timer_remaining(state_update_timer);
 }
 
-void app_system_shutdown(void)
+void lwm2m_system_shutdown(void)
 {
     app_disconnect();
 
     lte_lc_power_off();
     bsdlib_shutdown();
 
-    m_app_state = APP_STATE_SHUTDOWN;
+    m_app_state = LWM2M_STATE_SHUTDOWN;
 
     LWM2M_INF("LTE link down");
 }
 
-void app_system_reset(void)
+void lwm2m_system_reset(void)
 {
-    app_system_shutdown();
+    lwm2m_system_shutdown();
     lwm2m_os_sys_reset();
 }
 
 /**@brief Setup ADMIN PDN connection */
-static void app_setup_admin_pdn(uint16_t instance_id)
+static void lwm2m_setup_admin_pdn(uint16_t instance_id)
 {
     if (m_operator_id == APP_OPERATOR_ID_VZW)
     {
@@ -230,7 +230,7 @@ static void app_setup_admin_pdn(uint16_t instance_id)
 }
 
 /**@brief Disconnect ADMIN PDN connection. */
-static void app_disconnect_admin_pdn(uint16_t instance_id)
+static void lwm2m_disconnect_admin_pdn(uint16_t instance_id)
 {
     if (m_admin_pdn_handle[instance_id] != -1) {
         pdn_disconnect(m_admin_pdn_handle[instance_id]);
@@ -264,7 +264,7 @@ static char * app_initialize_client_id(void)
         if (strlen(p_msisdn) > 0 && strcmp(p_msisdn, last_used_msisdn) != 0) {
             // MSISDN has changed, factory reset and initiate bootstrap.
             LWM2M_INF("Detected changed MSISDN: %s -> %s", lwm2m_os_log_strdup(last_used_msisdn), lwm2m_os_log_strdup(p_msisdn));
-            app_bootstrap_reset();
+            lwm2m_bootstrap_reset();
             lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
             provision_bs_psk = true;
         }
@@ -532,7 +532,7 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
 
         if (retry_delay == -1) {
             LWM2M_ERR("Bootstrap procedure failed");
-            m_app_state = APP_STATE_IP_INTERFACE_UP;
+            m_app_state = LWM2M_STATE_IP_INTERFACE_UP;
             lwm2m_retry_delay_reset(instance_id);
             return;
         }
@@ -571,14 +571,14 @@ void lwm2m_notification(lwm2m_notification_type_t type,
     {
         if (coap_code == COAP_CODE_204_CHANGED)
         {
-            m_app_state = APP_STATE_BOOTSTRAPPING;
+            m_app_state = LWM2M_STATE_BOOTSTRAPPING;
             LWM2M_INF("Bootstrap timeout set to 20 seconds");
             lwm2m_os_timer_start(state_update_timer, 20 * 1000);
         }
         else if (coap_code == 0 || coap_code == COAP_CODE_403_FORBIDDEN)
         {
             // No response or received a 4.03 error.
-            m_app_state = APP_STATE_BOOTSTRAP_WAIT;
+            m_app_state = LWM2M_STATE_BOOTSTRAP_WAIT;
             app_handle_connect_retry(0, false);
         }
         else
@@ -588,7 +588,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
         return;
     }
 
-    uint16_t instance_id = 0xFFFF;
+    uint16_t instance_id = UINT16_MAX;
     uint16_t short_server_id = 0;
 
     if (p_remote == NULL) {
@@ -624,11 +624,11 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             lwm2m_retry_delay_reset(instance_id);
             lwm2m_server_registered_set(instance_id, true);
 
-            m_app_state = APP_STATE_IDLE;
+            m_app_state = LWM2M_STATE_IDLE;
         }
         else
         {
-            m_app_state = APP_STATE_SERVER_REGISTER_WAIT;
+            m_app_state = LWM2M_STATE_SERVER_REGISTER_WAIT;
             app_handle_connect_retry(instance_id, false);
         }
     }
@@ -638,11 +638,11 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             // No response from update request
             LWM2M_INF("Update timeout, reconnect (server %d)", instance_id);
             app_server_disconnect(instance_id);
-            app_request_server_update(instance_id, true);
-        } else if (m_app_state == APP_STATE_SERVER_REGISTER_WAIT) {
+            lwm2m_request_server_update(instance_id, true);
+        } else if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT) {
             // Update instead of register during connect
             LWM2M_INF("Update after connect (server %d)", instance_id);
-            m_app_state = APP_STATE_IDLE;
+            m_app_state = LWM2M_STATE_IDLE;
         }
 
     }
@@ -651,7 +651,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
         // We have successfully deregistered.
         lwm2m_server_registered_set(instance_id, false);
 
-        if (m_app_state == APP_STATE_SERVER_DEREGISTERING)
+        if (m_app_state == LWM2M_STATE_SERVER_DEREGISTERING)
         {
             LWM2M_INF("Deregistered (server %d)", instance_id);
             uint8_t uri_len = 0;
@@ -660,7 +660,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
                     // Only deregister from connected servers having a URI.
                     (void)lwm2m_security_server_uri_get(i, &uri_len);
                     if (uri_len > 0) {
-                        m_app_state = APP_STATE_SERVER_DEREGISTER;
+                        m_app_state = LWM2M_STATE_SERVER_DEREGISTER;
                         m_server_instance = i;
                         break;
                     }
@@ -669,7 +669,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
 
             if (uri_len == 0) {
                 // No more servers to deregister
-                m_app_state = APP_STATE_DISCONNECT;
+                m_app_state = LWM2M_STATE_DISCONNECT;
             }
         }
         else
@@ -734,7 +734,7 @@ static void app_connection_update(void *timer)
         return;
     }
 
-    app_request_server_update(connection_update_p->instance_id, connection_update_p->reconnect);
+    lwm2m_request_server_update(connection_update_p->instance_id, connection_update_p->reconnect);
 }
 
 void init_connection_update(void)
@@ -744,7 +744,7 @@ void init_connection_update(void)
         uint8_t uri_len = 0;
         (void)lwm2m_security_server_uri_get(i, &uri_len);
         if (uri_len > 0) {
-            app_request_server_update(i, true);
+            lwm2m_request_server_update(i, true);
             m_connection_update[i].timer = lwm2m_os_timer_get(app_connection_update);
             m_connection_update[i].instance_id = i;
             m_connection_update[i].reconnect = false;
@@ -792,10 +792,10 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     milliseconds_spent = lwm2m_os_uptime_get() - time_stamp;
 #if APP_USE_CONTABO
     // On contabo we want to jump directly to start connecting to servers when bootstrap is complete.
-    m_app_state = APP_STATE_SERVER_CONNECT;
+    m_app_state = LWM2M_STATE_SERVER_CONNECT;
     m_server_instance = 1;
 #else
-    m_app_state = APP_STATE_BOOTSTRAP_HOLDOFF;
+    m_app_state = LWM2M_STATE_BOOTSTRAP_HOLDOFF;
     int32_t hold_off_time = (lwm2m_server_client_hold_off_timer_get(0) * 1000) - milliseconds_spent;
     if (hold_off_time > 0) {
         LWM2M_INF("Client holdoff timer: sleeping %ld milliseconds...", hold_off_time);
@@ -915,7 +915,7 @@ static void app_misc_data_set_bootstrapped(uint8_t bootstrapped)
     lwm2m_instance_storage_misc_data_store(&misc_data);
 }
 
-void app_bootstrap_reset(void)
+void lwm2m_bootstrap_reset(void)
 {
     if (lwm2m_security_short_server_id_get(0) == 0) {
         // Server object not loaded yet
@@ -938,7 +938,7 @@ void app_bootstrap_reset(void)
     }
 }
 
-void app_factory_reset(void)
+void lwm2m_factory_reset(void)
 {
     app_misc_data_set_bootstrapped(0);
 
@@ -1049,7 +1049,7 @@ static void app_bootstrap_connect(void)
     uint32_t err_code;
     bool secure;
 
-    app_setup_admin_pdn(0);
+    lwm2m_setup_admin_pdn(0);
 
     // Save the remote address of the bootstrap server.
     uint8_t uri_len = 0;
@@ -1060,9 +1060,9 @@ static void app_bootstrap_connect(void)
                                                    &secure,
                                                    &m_bs_remote_server);
     if (err_code != 0) {
-        app_disconnect_admin_pdn(0);
+        lwm2m_disconnect_admin_pdn(0);
 
-        m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
+        m_app_state = LWM2M_STATE_BS_CONNECT_RETRY_WAIT;
         if (err_code == EINVAL) {
             app_handle_connect_retry(0, true);
         } else {
@@ -1116,20 +1116,20 @@ static void app_bootstrap_connect(void)
         if (err_code == 0)
         {
             LWM2M_INF("Connected");
-            m_app_state = APP_STATE_BS_CONNECTED;
+            m_app_state = LWM2M_STATE_BS_CONNECTED;
             m_lwm2m_transport[0] = local_port.transport;
         }
         else if (err_code == EINPROGRESS)
         {
-            m_app_state = APP_STATE_BS_CONNECT_WAIT;
+            m_app_state = LWM2M_STATE_BS_CONNECT_WAIT;
             m_lwm2m_transport[0] = local_port.transport;
         }
         else
         {
             LWM2M_INF("Connection failed: %ld (%d)", err_code, errno);
-            app_disconnect_admin_pdn(0);
+            lwm2m_disconnect_admin_pdn(0);
 
-            m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
+            m_app_state = LWM2M_STATE_BS_CONNECT_RETRY_WAIT;
             // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
             if (err_code == EIO && (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH)) {
                 app_handle_connect_retry(0, true);
@@ -1141,7 +1141,7 @@ static void app_bootstrap_connect(void)
     else
     {
         LWM2M_TRC("NON-SECURE session (bootstrap)");
-        m_app_state = APP_STATE_BS_CONNECTED;
+        m_app_state = LWM2M_STATE_BS_CONNECTED;
     }
 }
 
@@ -1152,7 +1152,7 @@ static void app_bootstrap(void)
                                         m_lwm2m_transport[0]);
     if (err_code == 0)
     {
-        m_app_state = APP_STATE_BOOTSTRAP_REQUESTED;
+        m_app_state = LWM2M_STATE_BOOTSTRAP_REQUESTED;
     }
 }
 
@@ -1189,7 +1189,7 @@ static void app_server_connect(uint16_t instance_id)
     char * p_server_uri = lwm2m_security_server_uri_get(instance_id, &uri_len);
 
     if (instance_id == 1) {
-        app_setup_admin_pdn(instance_id);
+        lwm2m_setup_admin_pdn(instance_id);
     }
 
     err_code = app_resolve_server_uri(p_server_uri,
@@ -1200,9 +1200,9 @@ static void app_server_connect(uint16_t instance_id)
                                       m_admin_pdn_handle[instance_id]);
     if (err_code != 0)
     {
-        app_disconnect_admin_pdn(instance_id);
+        lwm2m_disconnect_admin_pdn(instance_id);
 
-        m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
+        m_app_state = LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT;
         if (err_code == EINVAL) {
             app_handle_connect_retry(instance_id, true);
         } else {
@@ -1258,22 +1258,22 @@ static void app_server_connect(uint16_t instance_id)
         if (err_code == 0)
         {
             LWM2M_INF("Connected");
-            m_app_state = APP_STATE_SERVER_CONNECTED;
+            m_app_state = LWM2M_STATE_SERVER_CONNECTED;
             m_lwm2m_transport[instance_id] = local_port.transport;
         }
         else if (err_code == EINPROGRESS)
         {
-            m_app_state = APP_STATE_SERVER_CONNECT_WAIT;
+            m_app_state = LWM2M_STATE_SERVER_CONNECT_WAIT;
             m_lwm2m_transport[instance_id] = local_port.transport;
         }
         else
         {
             LWM2M_INF("Connection failed: %ld (%d)", err_code, errno);
             if (instance_id == 1) {
-                app_disconnect_admin_pdn(instance_id);
+                lwm2m_disconnect_admin_pdn(instance_id);
             }
 
-            m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
+            m_app_state = LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT;
             // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
             if (err_code == EIO && (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH)) {
                 app_handle_connect_retry(instance_id, true);
@@ -1285,7 +1285,7 @@ static void app_server_connect(uint16_t instance_id)
     else
     {
         LWM2M_TRC("NON-SECURE session (register)");
-        m_app_state = APP_STATE_SERVER_CONNECTED;
+        m_app_state = LWM2M_STATE_SERVER_CONNECTED;
     }
 }
 
@@ -1315,14 +1315,14 @@ static void app_server_register(uint16_t instance_id)
                                   (uint16_t)link_format_string_len);
         APP_ERROR_CHECK(err_code);
 
-        m_app_state = APP_STATE_SERVER_REGISTER_WAIT;
+        m_app_state = LWM2M_STATE_SERVER_REGISTER_WAIT;
         lwm2m_os_free(p_link_format_string);
     }
 }
 
 void app_server_update(uint16_t instance_id, bool connect_update)
 {
-    if ((m_app_state == APP_STATE_IDLE) ||
+    if ((m_app_state == LWM2M_STATE_IDLE) ||
         (connect_update) ||
         (instance_id != m_server_instance))
     {
@@ -1334,9 +1334,9 @@ void app_server_update(uint16_t instance_id, bool connect_update)
         if (err_code != 0) {
             LWM2M_INF("Update failed: %ld (%d), reconnect (server %d)", err_code, errno, instance_id);
             app_server_disconnect(instance_id);
-            app_request_server_update(instance_id, true);
+            lwm2m_request_server_update(instance_id, true);
         } else if (connect_update) {
-            m_app_state = APP_STATE_SERVER_REGISTER_WAIT;
+            m_app_state = LWM2M_STATE_SERVER_REGISTER_WAIT;
         }
     }
     else
@@ -1364,7 +1364,7 @@ static void app_server_deregister(uint16_t instance_id)
                                 m_lwm2m_transport[instance_id]);
     APP_ERROR_CHECK(err_code);
 
-    m_app_state = APP_STATE_SERVER_DEREGISTERING;
+    m_app_state = LWM2M_STATE_SERVER_DEREGISTERING;
 }
 
 static void app_server_disconnect(uint16_t instance_id)
@@ -1374,7 +1374,7 @@ static void app_server_disconnect(uint16_t instance_id)
         m_lwm2m_transport[instance_id] = -1;
     }
 
-    app_disconnect_admin_pdn(instance_id);
+    lwm2m_disconnect_admin_pdn(instance_id);
 }
 
 static void app_disconnect(void)
@@ -1384,7 +1384,7 @@ static void app_disconnect(void)
         app_server_disconnect(i);
     }
 
-    m_app_state = APP_STATE_IP_INTERFACE_UP;
+    m_app_state = LWM2M_STATE_IP_INTERFACE_UP;
 }
 
 static void app_wait_state_update(void *timer)
@@ -1393,34 +1393,34 @@ static void app_wait_state_update(void *timer)
 
     switch (m_app_state)
     {
-        case APP_STATE_BS_CONNECT_RETRY_WAIT:
+        case LWM2M_STATE_BS_CONNECT_RETRY_WAIT:
             // Timeout waiting for DTLS connection to bootstrap server
-            m_app_state = APP_STATE_BS_CONNECT;
+            m_app_state = LWM2M_STATE_BS_CONNECT;
             break;
 
-        case APP_STATE_BOOTSTRAP_WAIT:
+        case LWM2M_STATE_BOOTSTRAP_WAIT:
             // Timeout waiting for bootstrap ACK (CoAP)
-            m_app_state = APP_STATE_BS_CONNECTED;
+            m_app_state = LWM2M_STATE_BS_CONNECTED;
             break;
 
-        case APP_STATE_BOOTSTRAPPING:
+        case LWM2M_STATE_BOOTSTRAPPING:
             // Timeout waiting for bootstrap to finish
-            m_app_state = APP_STATE_BOOTSTRAP_TIMEDOUT;
+            m_app_state = LWM2M_STATE_BOOTSTRAP_TIMEDOUT;
             break;
 
-        case APP_STATE_BOOTSTRAP_HOLDOFF:
+        case LWM2M_STATE_BOOTSTRAP_HOLDOFF:
             // Client holdoff timer expired
-            m_app_state = APP_STATE_IDLE;
+            m_app_state = LWM2M_STATE_IDLE;
             break;
 
-        case APP_STATE_SERVER_CONNECT_RETRY_WAIT:
+        case LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT:
             // Timeout waiting for DTLS connection to registration server
-            m_app_state = APP_STATE_SERVER_CONNECT;
+            m_app_state = LWM2M_STATE_SERVER_CONNECT;
             break;
 
-        case APP_STATE_SERVER_REGISTER_WAIT:
+        case LWM2M_STATE_SERVER_REGISTER_WAIT:
             // Timeout waiting for registration ACK (CoAP)
-            m_app_state = APP_STATE_SERVER_CONNECTED;
+            m_app_state = LWM2M_STATE_SERVER_CONNECTED;
             break;
 
         default:
@@ -1444,8 +1444,8 @@ static bool app_coap_socket_poll(void)
 
             // Only check POLLOUT (writing possible) when waiting for connect()
             if ((i == m_server_instance) &&
-                ((m_app_state == APP_STATE_BS_CONNECT_WAIT) ||
-                 (m_app_state == APP_STATE_SERVER_CONNECT_WAIT))) {
+                ((m_app_state == LWM2M_STATE_BS_CONNECT_WAIT) ||
+                 (m_app_state == LWM2M_STATE_SERVER_CONNECT_WAIT))) {
                 fds[nfds].events |= POLLOUT;
             }
             nfds++;
@@ -1477,21 +1477,21 @@ static bool app_coap_socket_poll(void)
 
         if ((fds[i].revents & POLLOUT) == POLLOUT) {
             // Writing is now possible.
-            if (m_app_state == APP_STATE_BS_CONNECT_WAIT) {
+            if (m_app_state == LWM2M_STATE_BS_CONNECT_WAIT) {
                 LWM2M_INF("Connected");
-                m_app_state = APP_STATE_BS_CONNECTED;
-            } else if (m_app_state == APP_STATE_SERVER_CONNECT_WAIT) {
+                m_app_state = LWM2M_STATE_BS_CONNECTED;
+            } else if (m_app_state == LWM2M_STATE_SERVER_CONNECT_WAIT) {
                 LWM2M_INF("Connected");
-                m_app_state = APP_STATE_SERVER_CONNECTED;
+                m_app_state = LWM2M_STATE_SERVER_CONNECTED;
             }
         }
 
         if ((fds[i].revents & POLLERR) == POLLERR) {
             // Error condition.
-            if (m_app_state == APP_STATE_BS_CONNECT_WAIT) {
-                m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
-            } else if (m_app_state == APP_STATE_SERVER_CONNECT_WAIT) {
-                m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
+            if (m_app_state == LWM2M_STATE_BS_CONNECT_WAIT) {
+                m_app_state = LWM2M_STATE_BS_CONNECT_RETRY_WAIT;
+            } else if (m_app_state == LWM2M_STATE_SERVER_CONNECT_WAIT) {
+                m_app_state = LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT;
             } else {
                 // TODO handle?
                 LWM2M_ERR("POLLERR: %d", i);
@@ -1509,7 +1509,7 @@ static bool app_coap_socket_poll(void)
             m_lwm2m_transport[m_server_instance] = -1;
 
             LWM2M_INF("Connection failed (%d)", error);
-            app_disconnect_admin_pdn(m_server_instance);
+            lwm2m_disconnect_admin_pdn(m_server_instance);
 
             // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
             if (error == EINVAL || error == EOPNOTSUPP || error == ENETUNREACH) {
@@ -1534,8 +1534,8 @@ static void app_check_server_update(void)
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
         if (m_connection_update[i].requested) {
             if (m_lwm2m_transport[i] == -1) {
-                if (m_app_state == APP_STATE_IDLE) {
-                    m_app_state = APP_STATE_SERVER_CONNECT;
+                if (m_app_state == LWM2M_STATE_IDLE) {
+                    m_app_state = LWM2M_STATE_SERVER_CONNECT;
                     m_server_instance = i;
                     m_connection_update[i].requested = false;
                 }
@@ -1560,33 +1560,33 @@ static void app_lwm2m_process(void)
 
     switch (m_app_state)
     {
-        case APP_STATE_BS_CONNECT:
+        case LWM2M_STATE_BS_CONNECT:
         {
             LWM2M_INF("app_bootstrap_connect");
             app_bootstrap_connect();
             break;
         }
-        case APP_STATE_BOOTSTRAP_TIMEDOUT:
+        case LWM2M_STATE_BOOTSTRAP_TIMEDOUT:
         {
             LWM2M_INF("app_handle_connect_retry");
             app_disconnect();
-            m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
+            m_app_state = LWM2M_STATE_BS_CONNECT_RETRY_WAIT;
             app_handle_connect_retry(0, false);
             break;
         }
-        case APP_STATE_BS_CONNECTED:
+        case LWM2M_STATE_BS_CONNECTED:
         {
             LWM2M_INF("app_bootstrap");
             app_bootstrap();
             break;
         }
-        case APP_STATE_SERVER_CONNECT:
+        case LWM2M_STATE_SERVER_CONNECT:
         {
             LWM2M_INF("app_server_connect (server %u)", m_server_instance);
             app_server_connect(m_server_instance);
             break;
         }
-        case APP_STATE_SERVER_CONNECTED:
+        case LWM2M_STATE_SERVER_CONNECTED:
         {
             bool do_register = true;
 
@@ -1614,13 +1614,13 @@ static void app_lwm2m_process(void)
 
             break;
         }
-        case APP_STATE_SERVER_DEREGISTER:
+        case LWM2M_STATE_SERVER_DEREGISTER:
         {
             LWM2M_INF("app_server_deregister (server %u)", m_server_instance);
             app_server_deregister(m_server_instance);
             break;
         }
-        case APP_STATE_DISCONNECT:
+        case LWM2M_STATE_DISCONNECT:
         {
             LWM2M_INF("app_disconnect");
             app_disconnect();
@@ -1777,7 +1777,7 @@ int lwm2m_carrier_init(void)
     err = lwm2m_firmware_update_state_get(&mdfu);
     if (!err && mdfu == UPDATE_SCHEDULED) {
         printk("Update scheduled, please wait..\n");
-        app_state_set(APP_STATE_MODEM_FIRMWARE_UPDATE);
+        lwm2m_state_set(LWM2M_STATE_MODEM_FIRMWARE_UPDATE);
     }
 
     err = bsdlib_init();
@@ -1863,10 +1863,10 @@ int lwm2m_carrier_init(void)
     }
 
     if (lwm2m_security_bootstrapped_get(0)) {
-        m_app_state = APP_STATE_IDLE;
+        m_app_state = LWM2M_STATE_IDLE;
         init_connection_update();
     } else {
-        m_app_state = APP_STATE_BS_CONNECT;
+        m_app_state = LWM2M_STATE_BS_CONNECT;
     }
 
     return 0;

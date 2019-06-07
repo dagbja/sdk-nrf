@@ -34,7 +34,7 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_config_clear(const struct shell *shell, size_t argc, char **argv)
 {
-    app_bootstrap_reset();
+    lwm2m_bootstrap_reset();
     shell_print(shell, "Deleted all bootstrapped values");
 
     return 0;
@@ -86,13 +86,7 @@ static int cmd_config_uri(const struct shell *shell, size_t argc, char **argv)
         return 0;
     }
 
-    if (uri_len > SECURITY_SERVER_URI_SIZE_MAX)
-    {
-        shell_print(shell, "maximum URI length is %d", SECURITY_SERVER_URI_SIZE_MAX);
-        return 0;
-    }
-
-    lwm2m_security_server_uri_set(instance_id, uri, strlen(uri));
+    lwm2m_security_server_uri_set(instance_id, uri, uri_len);
     lwm2m_instance_storage_security_store(instance_id);
 
     shell_print(shell, "Set URI %d: %s", instance_id, uri);
@@ -120,7 +114,7 @@ static int cmd_config_lifetime(const struct shell *shell, size_t argc, char **ar
     if (lifetime != lwm2m_server_lifetime_get(instance_id)) {
         if (instance_id == 1 || instance_id == 3) {
             // Lifetime changed, send update server
-            app_request_server_update(instance_id, false);
+            lwm2m_request_server_update(instance_id, false);
         }
 
         lwm2m_server_lifetime_set(instance_id, lifetime);
@@ -138,12 +132,12 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     const char * p_debug_msisdn = app_debug_msisdn_get();
 
     shell_print(shell, "Debug configuration");
-    shell_print(shell, "  IMEI           %s", app_imei_get());
+    shell_print(shell, "  IMEI           %s", lwm2m_imei_get());
 
     if (p_debug_msisdn && p_debug_msisdn[0]) {
         shell_print(shell, "  MSISDN         %s (static)", p_debug_msisdn);
     } else {
-        shell_print(shell, "  MSISDN         %s", app_msisdn_get());
+        shell_print(shell, "  MSISDN         %s", lwm2m_msisdn_get());
     }
 
     uint32_t iccid_len;
@@ -314,13 +308,13 @@ static int cmd_debug_fallback_disabled(const struct shell *shell, size_t argc, c
 
 static int cmd_lwm2m_register(const struct shell *shell, size_t argc, char **argv)
 {
-    if (app_state_get() == APP_STATE_IP_INTERFACE_UP) {
+    if (lwm2m_state_get() == LWM2M_STATE_IP_INTERFACE_UP) {
         if (lwm2m_security_bootstrapped_get(0)) {
-            app_state_set(APP_STATE_SERVER_CONNECT);
+            lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT);
         } else {
-            app_state_set(APP_STATE_BS_CONNECT);
+            lwm2m_state_set(LWM2M_STATE_BS_CONNECT);
         }
-    } else if (app_state_get() == APP_STATE_IDLE) {
+    } else if (lwm2m_state_get() == LWM2M_STATE_IDLE) {
         shell_print(shell, "Already registered");
     } else {
         shell_print(shell, "Wrong state for registration");
@@ -344,8 +338,8 @@ static int cmd_lwm2m_update(const struct shell *shell, size_t argc, char **argv)
         }
     }
 
-    if (app_state_get() == APP_STATE_IDLE) {
-        app_request_server_update(instance_id, false);
+    if (lwm2m_state_get() == LWM2M_STATE_IDLE) {
+        lwm2m_request_server_update(instance_id, false);
     } else {
         shell_print(shell, "Not registered");
     }
@@ -356,8 +350,8 @@ static int cmd_lwm2m_update(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_lwm2m_deregister(const struct shell *shell, size_t argc, char **argv)
 {
-    if (app_state_get() == APP_STATE_IDLE) {
-        app_state_set(APP_STATE_SERVER_DEREGISTER);
+    if (lwm2m_state_get() == LWM2M_STATE_IDLE) {
+        lwm2m_state_set(LWM2M_STATE_SERVER_DEREGISTER);
     } else {
         shell_print(shell, "Not registered");
     }
@@ -369,113 +363,113 @@ static int cmd_lwm2m_deregister(const struct shell *shell, size_t argc, char **a
 static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
 {
     char ip_version[] = "IPvX";
-    ip_version[3] = (app_family_type_get(app_server_instance()) == AF_INET6) ? '6' : '4';
+    ip_version[3] = (lwm2m_family_type_get(lwm2m_server_instance()) == AF_INET6) ? '6' : '4';
     int32_t retry_delay;
 
-    if (app_did_bootstrap()) {
-        shell_print(shell, "Bootstrap completed [%s]", (app_family_type_get(0) == AF_INET6) ? "IPv6" : "IPv4");
+    if (lwm2m_did_bootstrap()) {
+        shell_print(shell, "Bootstrap completed [%s]", (lwm2m_family_type_get(0) == AF_INET6) ? "IPv6" : "IPv4");
     }
 
     for (int i = 1; i < (1+LWM2M_MAX_SERVERS); i++) {
         uint8_t uri_len = 0;
         (void)lwm2m_security_server_uri_get(i, &uri_len);
         if ((uri_len > 0) && lwm2m_server_registered_get(i)) {
-            shell_print(shell, "Server %d registered [%s]", i, (app_family_type_get(i) == AF_INET6) ? "IPv6" : "IPv4");
+            shell_print(shell, "Server %d registered [%s]", i, (lwm2m_family_type_get(i) == AF_INET6) ? "IPv6" : "IPv4");
         }
     }
 
-    switch(app_state_get())
+    switch(lwm2m_state_get())
     {
-        case APP_STATE_BOOTING:
+        case LWM2M_STATE_BOOTING:
             shell_print(shell, "Initializing");
             break;
-        case APP_STATE_IDLE:
+        case LWM2M_STATE_IDLE:
             // Already printed above
             break;
-        case APP_STATE_IP_INTERFACE_UP:
+        case LWM2M_STATE_IP_INTERFACE_UP:
             shell_print(shell, "Disconnected");
             break;
-        case APP_STATE_BS_CONNECT:
+        case LWM2M_STATE_BS_CONNECT:
             shell_print(shell, "Bootstrap connecting [%s]", ip_version);
             break;
-        case APP_STATE_BS_CONNECT_WAIT:
+        case LWM2M_STATE_BS_CONNECT_WAIT:
             shell_print(shell, "Bootstrap connect wait [%s]", ip_version);
             break;
-        case APP_STATE_BS_CONNECT_RETRY_WAIT:
+        case LWM2M_STATE_BS_CONNECT_RETRY_WAIT:
             retry_delay = lwm2m_retry_delay_get(0, false);
             if (retry_delay != -1) {
-                int32_t delay = app_state_update_delay() / 1000;
+                int32_t delay = lwm2m_state_update_delay() / 1000;
                 shell_print(shell, "Bootstrap connect delay (%d minutes - %d seconds left) [%s]",
                             retry_delay / 60, delay, ip_version);
             } else {
                 shell_print(shell, "Bootstrap connect timed wait [%s]", ip_version);
             }
             break;
-        case APP_STATE_BS_CONNECTED:
+        case LWM2M_STATE_BS_CONNECTED:
             shell_print(shell, "Bootstrap connected [%s]", ip_version);
             break;
-        case APP_STATE_BOOTSTRAP_REQUESTED:
+        case LWM2M_STATE_BOOTSTRAP_REQUESTED:
             shell_print(shell, "Bootstrap requested [%s]", ip_version);
             break;
-        case APP_STATE_BOOTSTRAP_WAIT:
+        case LWM2M_STATE_BOOTSTRAP_WAIT:
             retry_delay = lwm2m_retry_delay_get(0, false);
             if (retry_delay != -1) {
-                int32_t delay = app_state_update_delay() / 1000;
+                int32_t delay = lwm2m_state_update_delay() / 1000;
                 shell_print(shell, "Bootstrap delay (%d minutes - %d seconds left) [%s]",
                             retry_delay / 60, delay, ip_version);
             } else {
                 shell_print(shell, "Bootstrap wait [%s]", ip_version);
             }
             break;
-        case APP_STATE_BOOTSTRAPPING:
+        case LWM2M_STATE_BOOTSTRAPPING:
             shell_print(shell, "Bootstrapping [%s]", ip_version);
             break;
-        case APP_STATE_BOOTSTRAP_HOLDOFF:
+        case LWM2M_STATE_BOOTSTRAP_HOLDOFF:
             shell_print(shell, "Bootstrap holdoff [%s]", ip_version);
             break;
-        case APP_STATE_SERVER_CONNECT:
-            shell_print(shell, "Server %d connecting [%s]", app_server_instance(), ip_version);
+        case LWM2M_STATE_SERVER_CONNECT:
+            shell_print(shell, "Server %d connecting [%s]", lwm2m_server_instance(), ip_version);
             break;
-        case APP_STATE_SERVER_CONNECT_WAIT:
-            shell_print(shell, "Server %d connect wait [%s]", app_server_instance(), ip_version);
+        case LWM2M_STATE_SERVER_CONNECT_WAIT:
+            shell_print(shell, "Server %d connect wait [%s]", lwm2m_server_instance(), ip_version);
             break;
-        case APP_STATE_SERVER_CONNECT_RETRY_WAIT:
-            retry_delay = lwm2m_retry_delay_get(app_server_instance(), false);
+        case LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT:
+            retry_delay = lwm2m_retry_delay_get(lwm2m_server_instance(), false);
             if (retry_delay != -1) {
-                int32_t delay = app_state_update_delay() / 1000;
+                int32_t delay = lwm2m_state_update_delay() / 1000;
                 shell_print(shell, "Server %d connect delay (%d minutes - %d seconds left) [%s]",
-                            app_server_instance(), retry_delay / 60, delay, ip_version);
+                            lwm2m_server_instance(), retry_delay / 60, delay, ip_version);
             } else {
-                shell_print(shell, "Server %d connect timed wait [%s]", app_server_instance(), ip_version);
+                shell_print(shell, "Server %d connect timed wait [%s]", lwm2m_server_instance(), ip_version);
             }
             break;
-        case APP_STATE_SERVER_CONNECTED:
-            shell_print(shell, "Server %d connected [%s]", app_server_instance(), ip_version);
+        case LWM2M_STATE_SERVER_CONNECTED:
+            shell_print(shell, "Server %d connected [%s]", lwm2m_server_instance(), ip_version);
             break;
-        case APP_STATE_SERVER_REGISTER_WAIT:
-            retry_delay = lwm2m_retry_delay_get(app_server_instance(), false);
+        case LWM2M_STATE_SERVER_REGISTER_WAIT:
+            retry_delay = lwm2m_retry_delay_get(lwm2m_server_instance(), false);
             if (retry_delay != -1) {
-                int32_t delay = app_state_update_delay() / 1000;
+                int32_t delay = lwm2m_state_update_delay() / 1000;
                 shell_print(shell, "Server %d register delay (%d minutes - %d seconds left) [%s]",
-                            app_server_instance(), retry_delay / 60, delay, ip_version);
+                            lwm2m_server_instance(), retry_delay / 60, delay, ip_version);
             } else {
-                shell_print(shell, "Server %d register wait [%s]", app_server_instance(), ip_version);
+                shell_print(shell, "Server %d register wait [%s]", lwm2m_server_instance(), ip_version);
             }
             break;
-        case APP_STATE_SERVER_DEREGISTER:
-            shell_print(shell, "Server %d deregister", app_server_instance());
+        case LWM2M_STATE_SERVER_DEREGISTER:
+            shell_print(shell, "Server %d deregister", lwm2m_server_instance());
             break;
-        case APP_STATE_SERVER_DEREGISTERING:
-            shell_print(shell, "Server %d deregistering", app_server_instance());
+        case LWM2M_STATE_SERVER_DEREGISTERING:
+            shell_print(shell, "Server %d deregistering", lwm2m_server_instance());
             break;
-        case APP_STATE_DISCONNECT:
+        case LWM2M_STATE_DISCONNECT:
             shell_print(shell, "Disconnect");
             break;
-        case APP_STATE_SHUTDOWN:
+        case LWM2M_STATE_SHUTDOWN:
             shell_print(shell, "Shutdown");
             break;
         default:
-            shell_print(shell, "Unknown state: %d", app_state_get());
+            shell_print(shell, "Unknown state: %d", lwm2m_state_get());
             break;
     };
 
@@ -485,8 +479,8 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_factory_reset(const struct shell *shell, size_t argc, char **argv)
 {
-    app_factory_reset();
-    app_system_reset();
+    lwm2m_factory_reset();
+    lwm2m_system_reset();
 
     return 0;
 }
@@ -494,7 +488,7 @@ static int cmd_factory_reset(const struct shell *shell, size_t argc, char **argv
 
 static int cmd_reboot(const struct shell *shell, size_t argc, char **argv)
 {
-    app_system_reset();
+    lwm2m_system_reset();
 
     return 0;
 }
@@ -502,7 +496,7 @@ static int cmd_reboot(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_shutdown(const struct shell *shell, size_t argc, char **argv)
 {
-    app_system_shutdown();
+    lwm2m_system_shutdown();
 
     return 0;
 }

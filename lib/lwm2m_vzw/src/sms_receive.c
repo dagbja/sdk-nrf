@@ -58,16 +58,16 @@ void sms_receiver_notif_parse(char *notif)
         if (object == 1 && instance >= 0 && instance < 4 && resource == 8) {
             // Server Registration Update Trigger
             LOG_INF("Server Registration Update Trigger (server %u)", instance);
-            app_request_server_update(instance, false);
+            lwm2m_request_server_update(instance, false);
         } else if (object == 3 && instance == 0 && resource == 4) {
             // Device Reboot
             LOG_INF("Device Reboot");
-            app_system_reset();
+            lwm2m_system_reset();
         } else if (object == 3 && instance == 0 && resource == 5) {
             // Device Factory Reset
             LOG_INF("Device Factory Reset");
-            app_factory_reset();
-            app_system_reset();
+            lwm2m_factory_reset();
+            lwm2m_system_reset();
         } else {
             LOG_ERR("Execute /%d/%d/%d not handled", object, instance, resource);
         }
