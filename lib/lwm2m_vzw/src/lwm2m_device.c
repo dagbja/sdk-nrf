@@ -173,19 +173,18 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
     {
         switch (resource_id)
         {
+            case LWM2M_DEVICE_FACTORY_RESET:
+            {
+                app_factory_reset();
+            }
+            /* FALLTHROUGH */
+
             case LWM2M_DEVICE_REBOOT:
             {
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
 
-                app_system_reset();
-                break;
-            }
-
-            case LWM2M_DEVICE_FACTORY_RESET:
-            {
-                app_factory_reset();
-
-                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+                // FIXME: This sleep is needed to ensure the response is sent before closing the socket.
+                k_sleep(1000);
 
                 app_system_reset();
                 break;
