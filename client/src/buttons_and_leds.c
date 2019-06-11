@@ -42,7 +42,7 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
                 app_state_set(APP_STATE_BS_CONNECT);
             }
         }
-        else if (app_state == APP_STATE_SERVER_REGISTERED)
+        else if (app_state == APP_STATE_IDLE)
         {
             app_request_server_update(1);
         }
@@ -54,7 +54,7 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
             printk("System shutdown!\n");
             app_system_shutdown();
         }
-        else if (app_state == APP_STATE_SERVER_REGISTERED)
+        else if (app_state == APP_STATE_IDLE)
         {
             app_state = APP_STATE_SERVER_DEREGISTER;
         }
@@ -72,7 +72,7 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
 
     switch (app_state_get())
     {
-        case APP_STATE_IDLE:
+        case APP_STATE_BOOTING:
             *blink = DK_LED1_MSK;
             break;
 
@@ -106,7 +106,7 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
             *blink = DK_LED4_MSK;
             break;
 
-        case APP_STATE_BOOTSTRAPPED:
+        case APP_STATE_BOOTSTRAP_HOLDOFF:
             *on = (DK_LED1_MSK | DK_LED2_MSK);
             break;
 
@@ -129,7 +129,7 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
             *blink = (DK_LED3_MSK | DK_LED4_MSK);
             break;
 
-        case APP_STATE_SERVER_REGISTERED:
+        case APP_STATE_IDLE:
             *on = (DK_LED1_MSK | DK_LED3_MSK);
             break;
 

@@ -354,7 +354,7 @@ static int cmd_lwm2m_register(const struct shell *shell, size_t argc, char **arg
         } else {
             app_state_set(APP_STATE_BS_CONNECT);
         }
-    } else if (app_state_get() == APP_STATE_SERVER_REGISTERED) {
+    } else if (app_state_get() == APP_STATE_IDLE) {
         shell_print(shell, "Already registered");
     } else {
         shell_print(shell, "Wrong state for registration");
@@ -378,7 +378,7 @@ static int cmd_lwm2m_update(const struct shell *shell, size_t argc, char **argv)
         }
     }
 
-    if (app_state_get() == APP_STATE_SERVER_REGISTERED) {
+    if (app_state_get() == APP_STATE_IDLE) {
         app_request_server_update(instance_id);
     } else {
         shell_print(shell, "Not registered");
@@ -390,7 +390,7 @@ static int cmd_lwm2m_update(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_lwm2m_deregister(const struct shell *shell, size_t argc, char **argv)
 {
-    if (app_state_get() == APP_STATE_SERVER_REGISTERED) {
+    if (app_state_get() == APP_STATE_IDLE) {
         app_state_set(APP_STATE_SERVER_DEREGISTER);
     } else {
         shell_print(shell, "Not registered");
@@ -420,8 +420,11 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
 
     switch(app_state_get())
     {
+        case APP_STATE_BOOTING:
+            shell_print(shell, "Initializing");
+            break;
         case APP_STATE_IDLE:
-            shell_print(shell, "Idle");
+            // Already printed above
             break;
         case APP_STATE_IP_INTERFACE_UP:
             shell_print(shell, "Disconnected");
@@ -461,8 +464,8 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         case APP_STATE_BOOTSTRAPPING:
             shell_print(shell, "Bootstrapping [%s]", ip_version);
             break;
-        case APP_STATE_BOOTSTRAPPED:
-            shell_print(shell, "Bootstrapped [%s]", ip_version);
+        case APP_STATE_BOOTSTRAP_HOLDOFF:
+            shell_print(shell, "Bootstrap holdoff [%s]", ip_version);
             break;
         case APP_STATE_SERVER_CONNECT:
             shell_print(shell, "Server %d connecting [%s]", app_server_instance(), ip_version);
@@ -492,9 +495,6 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             } else {
                 shell_print(shell, "Server %d register wait [%s]", app_server_instance(), ip_version);
             }
-            break;
-        case APP_STATE_SERVER_REGISTERED:
-            // Already printed above
             break;
         case APP_STATE_SERVER_DEREGISTER:
             shell_print(shell, "Server %d deregister", app_server_instance());

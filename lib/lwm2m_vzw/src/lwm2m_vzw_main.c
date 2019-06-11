@@ -115,7 +115,7 @@ static char m_bootstrap_object_alias_name[] = "bs";                             
 static coap_transport_handle_t             m_coap_transport = -1;                             /**< CoAP transport handle for the non bootstrap server. */
 static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS];            /**< CoAP transport handles for the secure servers. Obtained on @coap_security_setup. */
 
-static volatile app_state_t m_app_state = APP_STATE_IDLE;                                     /**< Application state. Should be one of @ref app_state_t. */
+static volatile app_state_t m_app_state = APP_STATE_BOOTING;                             /**< Application state. Should be one of @ref app_state_t. */
 static volatile uint16_t    m_server_instance;                                                /**< Server instance handled. */
 static volatile bool        m_did_bootstrap;
 static volatile bool        app_server_update_requested[1+LWM2M_MAX_SERVERS];
@@ -626,24 +626,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             lwm2m_retry_delay_reset(instance_id);
             lwm2m_server_registered_set(instance_id, true);
 
-            uint8_t uri_len = 0;
-            for (int i = instance_id+1; i < 1+LWM2M_MAX_SERVERS; i++) {
-                if (m_lwm2m_transport[i] == -1) {
-                    // Only connect to unconnected servers having a URI.
-                    (void)lwm2m_security_server_uri_get(i, &uri_len);
-                    if (uri_len > 0) {
-                        m_app_state = APP_STATE_SERVER_CONNECT;
-                        m_server_instance = i;
-                        break;
-                    }
-                }
-            }
-
-            if (uri_len == 0) {
-                // No more servers to connect
-                m_app_state = APP_STATE_SERVER_REGISTERED;
-                m_server_instance = 3;
-            }
+            m_app_state = APP_STATE_IDLE;
         }
         else
         {
@@ -657,9 +640,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             // No response from update request
             LOG_INF("Reconnect (server %d)", instance_id);
             app_server_disconnect(instance_id);
-
-            m_app_state = APP_STATE_SERVER_CONNECT;
-            m_server_instance = instance_id;
+            app_request_server_update(instance_id);
         }
     }
     else if (type == LWM2M_NOTIFCATION_TYPE_DEREGISTER)
@@ -730,6 +711,18 @@ uint32_t lwm2m_handler_error(uint16_t           short_server_id,
     return retval;
 }
 
+void init_request_server_update(void)
+{
+    // Register all servers having a URI.
+    for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
+        uint8_t uri_len = 0;
+        (void)lwm2m_security_server_uri_get(i, &uri_len);
+        if (uri_len > 0) {
+            app_request_server_update(i);
+        }
+    }
+}
+
 /**@brief Callback function for the named bootstrap complete object. */
 uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
                                    uint16_t         instance_id,
@@ -747,8 +740,6 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 
     // Close connection to bootstrap server.
     app_server_disconnect(0);
-
-    m_app_state = APP_STATE_BOOTSTRAPPED;
     lwm2m_retry_delay_reset(0);
 
     time_stamp = k_uptime_get();
@@ -757,7 +748,6 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 
     lwm2m_security_bootstrapped_set(0, true);  // TODO: this should be set by bootstrap server when bootstrapped
     m_did_bootstrap = true;
-    m_server_instance = 1;
 
     // Clean bootstrap.
     app_misc_data_set_bootstrapped(1);
@@ -768,12 +758,15 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
         lwm2m_instance_storage_server_store(i);
     }
 
+    init_request_server_update();
+
     milliseconds_spent = k_uptime_delta(&time_stamp);
 #if APP_USE_CONTABO
     // On contabo we want to jump directly to start connecting to servers when bootstrap is complete.
     m_app_state = APP_STATE_SERVER_CONNECT;
+    m_server_instance = 1;
 #else
-    m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
+    m_app_state = APP_STATE_BOOTSTRAP_HOLDOFF;
     int32_t hold_off_time = (lwm2m_server_client_hold_off_timer_get(0) * 1000) - milliseconds_spent;
     if (hold_off_time > 0) {
         LOG_INF("Client holdoff timer: sleeping %ld milliseconds...", hold_off_time);
@@ -826,7 +819,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
         case 0: // Bootstrap server
         {
             lwm2m_server_short_server_id_set(0, 100);
-            lwm2m_server_client_hold_off_timer_set(0, 10);
+            lwm2m_server_client_hold_off_timer_set(0, 30);
 
             lwm2m_security_server_uri_set(0, BOOTSTRAP_URI, strlen(BOOTSTRAP_URI));
             lwm2m_security_is_bootstrap_server_set(0, true);
@@ -1286,9 +1279,8 @@ static void app_server_register(uint16_t instance_id)
 
 void app_server_update(uint16_t instance_id)
 {
-    if ((m_lwm2m_transport[instance_id] != -1) &&
-        ((m_app_state == APP_STATE_SERVER_REGISTERED) ||
-         (instance_id != m_server_instance)))
+    if ((m_app_state == APP_STATE_IDLE) ||
+        (instance_id != m_server_instance))
     {
         uint32_t err_code;
 
@@ -1362,6 +1354,11 @@ static void app_wait_state_update(struct k_work *work)
         case APP_STATE_BOOTSTRAPPING:
             // Timeout waiting for bootstrap to finish
             m_app_state = APP_STATE_BOOTSTRAP_TIMEDOUT;
+            break;
+
+        case APP_STATE_BOOTSTRAP_HOLDOFF:
+            // Client holdoff timer expired
+            m_app_state = APP_STATE_IDLE;
             break;
 
         case APP_STATE_SERVER_CONNECT_RETRY_WAIT:
@@ -1479,6 +1476,25 @@ static bool app_coap_socket_poll(void)
 }
 #endif
 
+static void app_check_server_update(void)
+{
+    for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+        if (app_server_update_requested[i]) {
+            if (m_lwm2m_transport[i] == -1) {
+                if (m_app_state == APP_STATE_IDLE) {
+                    m_app_state = APP_STATE_SERVER_CONNECT;
+                    m_server_instance = i;
+                    app_server_update_requested[i] = false;
+                }
+            } else if (lwm2m_server_registered_get(i)) {
+                LOG_INF("app_server_update (server %u)", i);
+                app_server_update(i);
+                app_server_update_requested[i] = false;
+            }
+        }
+    }
+}
+
 static void app_lwm2m_process(void)
 {
 #if APP_USE_SOCKET_POLL
@@ -1537,18 +1553,11 @@ static void app_lwm2m_process(void)
         }
         default:
         {
-            for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-                if (app_server_update_requested[i]) {
-                    if (lwm2m_server_registered_get(i)) {
-                        LOG_INF("app_server_update (server %u)", i);
-                        app_server_update(i);
-                    }
-                    app_server_update_requested[i] = false;
-                }
-            }
             break;
         }
     }
+
+    app_check_server_update();
 }
 
 static void app_coap_init(void)
@@ -1686,12 +1695,7 @@ static void app_connection_update(struct k_work *work)
 {
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
         if (work == (struct k_work *)&connection_update_work[i]) {
-            if (m_lwm2m_transport[i] == -1) {
-                m_app_state = APP_STATE_SERVER_CONNECT;
-                m_server_instance = i;
-            } else if (lwm2m_server_registered_get(i)) {
-                app_request_server_update(i);
-            }
+            app_request_server_update(i);
             break;
         }
     }
@@ -1754,13 +1758,10 @@ int lwm2m_vzw_init(void)
 
     app_work_init();
 
-    if (lwm2m_security_bootstrapped_get(0))
-    {
-        m_app_state = APP_STATE_SERVER_CONNECT;
-        m_server_instance = 1;
-    }
-    else
-    {
+    if (lwm2m_security_bootstrapped_get(0)) {
+        m_app_state = APP_STATE_IDLE;
+        init_request_server_update();
+    } else {
         m_app_state = APP_STATE_BS_CONNECT;
     }
 
