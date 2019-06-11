@@ -1,19 +1,9 @@
-# The west manifest file for the nRF Connect SDK (NCS).
+# The west manifest file for the Nordic LWM2M library and client application.
 #
 # The per-installation west configuration file specifies the location of this
 # manifest file. The "path" option in the [manifest] section of .west/config
 # defines the folder that contains west.yml. The path is relative to the folder
-# that contains .west.
-#
-# You can create your own manifest files and put them in any
-# repository you want, to create your own custom NCS installation.
-# For example, you could create a manifest file in your own
-# out-of-tree application directory, which would pull the nrf repository
-# in as an ordinary project.
-#
-# You can pass your manifest repositories to west init when creating a
-# new NCS installation. See the west documentation for more
-# information.
+# that contains .west. See the west documentation for more information.
 
 west:
   url: https://github.com/zephyrproject-rtos/west
@@ -27,26 +17,26 @@ manifest:
       # nRF Connect SDK base URL.
     - name: ncs
       url-base: https://github.com/NordicPlayground
-    - name: stig-bjorlykke
-      url-base: https://github.com/stig-bjorlykke
-    - name: gbakke
-      url-base: https://github.com/gbakke
+    - name: armmbed
+      url-base: https://github.com/ARMmbed
 
-  # The list of external projects for the nRF Connect SDK.
-  #
+  # The list of external projects for the Nordic LWM2M library and client.
   projects:
+    - name: fw-nrfconnect-nrf
+      path: nrf
+      revision: v1.0.0-rc1
     - name: fw-nrfconnect-zephyr
       path: zephyr
       west-commands: scripts/west-commands.yml
-      revision: v1.14.99-ncs1
-    - name: fw-nrfconnect-nrf
-      path: nrf
-      remote: stig-bjorlykke
-      revision: coap-improvements
+      # As in fw-nrfconnect-nrf v1.0.0-rc1
+      revision: 7e64ac737daead12d2dbdda5daec04188243a81c
     - name: nrfxlib
       path: nrfxlib
-      remote: gbakke
-      revision: apn_cont
+      # As in fw-nrfconnect-nrf v1.0.0-rc1 (bsdlib 0.3.1)
+      revision: be4d8e08958e4ad960f39be24cf2816ced008841
+    - name: mbedtls
+      revision: mbedtls-2.13.1
+      remote: armmbed
 
   self:
     path: lwm2m
