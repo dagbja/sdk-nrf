@@ -118,7 +118,6 @@ static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS
 static volatile app_state_t m_app_state = APP_STATE_BOOTING;                             /**< Application state. Should be one of @ref app_state_t. */
 static volatile uint16_t    m_server_instance;                                                /**< Server instance handled. */
 static volatile bool        m_did_bootstrap;
-static volatile bool        app_server_update_requested[1+LWM2M_MAX_SERVERS];
 
 static char m_imei[16];
 static char m_msisdn[16];
@@ -126,7 +125,13 @@ static char m_msisdn[16];
 /* Structures for delayed work */
 static struct k_delayed_work state_update_work;
 
-static struct k_delayed_work connection_update_work[1+LWM2M_MAX_SERVERS];
+struct connection_update_t {
+    struct k_delayed_work work;
+    uint16_t instance_id;
+    bool requested;
+};
+
+static struct connection_update_t m_connection_update[1+LWM2M_MAX_SERVERS];
 
 /* Resolved server addresses */
 #if APP_USE_CONTABO
@@ -152,7 +157,7 @@ static const char * app_uri_get(char * p_server_uri, uint16_t * p_port, bool * p
 /** Functions available from shell access */
 void app_request_server_update(uint16_t instance_id)
 {
-    app_server_update_requested[instance_id] = true;
+    m_connection_update[instance_id].requested = true;
 }
 
 app_state_t app_state_get(void)
@@ -555,7 +560,7 @@ static void app_restart_lifetime_timer(uint8_t instance_id)
         timeout = INT32_MAX;
     }
 
-    k_delayed_work_submit(&connection_update_work[instance_id], timeout);
+    k_delayed_work_submit(&m_connection_update[instance_id].work, timeout);
 }
 
 /**@brief LWM2M notification handler. */
@@ -675,7 +680,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             LOG_INF("Disable [%ld seconds] (server %d)", delay, instance_id);
             app_server_disconnect(instance_id);
 
-            k_delayed_work_submit(&connection_update_work[instance_id], delay * 1000);
+            k_delayed_work_submit(&m_connection_update[instance_id].work, delay * 1000);
         }
     }
 }
@@ -711,7 +716,15 @@ uint32_t lwm2m_handler_error(uint16_t           short_server_id,
     return retval;
 }
 
-void init_request_server_update(void)
+/**@brief Handle server lifetime.
+ */
+static void app_connection_update(struct k_work *work)
+{
+    struct connection_update_t * connection_update_p = (struct connection_update_t *) work;
+    app_request_server_update(connection_update_p->instance_id);
+}
+
+void init_connection_update(void)
 {
     // Register all servers having a URI.
     for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
@@ -719,6 +732,8 @@ void init_request_server_update(void)
         (void)lwm2m_security_server_uri_get(i, &uri_len);
         if (uri_len > 0) {
             app_request_server_update(i);
+            k_delayed_work_init(&m_connection_update[i].work, app_connection_update);
+            m_connection_update[i].instance_id = i;
         }
     }
 }
@@ -758,7 +773,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
         lwm2m_instance_storage_server_store(i);
     }
 
-    init_request_server_update();
+    init_connection_update();
 
     milliseconds_spent = k_uptime_delta(&time_stamp);
 #if APP_USE_CONTABO
@@ -1479,17 +1494,17 @@ static bool app_coap_socket_poll(void)
 static void app_check_server_update(void)
 {
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-        if (app_server_update_requested[i]) {
+        if (m_connection_update[i].requested) {
             if (m_lwm2m_transport[i] == -1) {
                 if (m_app_state == APP_STATE_IDLE) {
                     m_app_state = APP_STATE_SERVER_CONNECT;
                     m_server_instance = i;
-                    app_server_update_requested[i] = false;
+                    m_connection_update[i].requested = false;
                 }
             } else if (lwm2m_server_registered_get(i)) {
                 LOG_INF("app_server_update (server %u)", i);
                 app_server_update(i);
-                app_server_update_requested[i] = false;
+                m_connection_update[i].requested = false;
             }
         }
     }
@@ -1689,23 +1704,9 @@ static void app_provision_secret_keys(void)
     LOG_DBG("Normal mode");
 }
 
-/**@brief Handle server lifetime.
- */
-static void app_connection_update(struct k_work *work)
-{
-    for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-        if (work == (struct k_work *)&connection_update_work[i]) {
-            app_request_server_update(i);
-            break;
-        }
-    }
-}
-
 /**@brief Initializes and submits delayed work. */
 static void app_work_init(void)
 {
-    k_delayed_work_init(&connection_update_work[1], app_connection_update);
-    k_delayed_work_init(&connection_update_work[3], app_connection_update);
     k_delayed_work_init(&state_update_work, app_wait_state_update);
 }
 
@@ -1760,7 +1761,7 @@ int lwm2m_vzw_init(void)
 
     if (lwm2m_security_bootstrapped_get(0)) {
         m_app_state = APP_STATE_IDLE;
-        init_request_server_update();
+        init_connection_update();
     } else {
         m_app_state = APP_STATE_BS_CONNECT;
     }
