@@ -643,7 +643,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
     {
         if (coap_code == 0) {
             // No response from update request
-            LOG_INF("Reconnect (server %d)", instance_id);
+            LOG_INF("Update timeout, reconnect (server %d)", instance_id);
             app_server_disconnect(instance_id);
             app_request_server_update(instance_id);
         }
@@ -1302,7 +1302,11 @@ void app_server_update(uint16_t instance_id)
         err_code = lwm2m_update((struct sockaddr *)&m_remote_server[instance_id],
                                 &m_server_conf[instance_id],
                                 m_lwm2m_transport[instance_id]);
-        ARG_UNUSED(err_code);
+        if (err_code != 0) {
+            LOG_INF("Update failed: %ld (%d), reconnect (server %d)", err_code, errno, instance_id);
+            app_server_disconnect(instance_id);
+            app_request_server_update(instance_id);
+        }
     }
     else
     {
@@ -1503,8 +1507,8 @@ static void app_check_server_update(void)
                 }
             } else if (lwm2m_server_registered_get(i)) {
                 LOG_INF("app_server_update (server %u)", i);
-                app_server_update(i);
                 m_connection_update[i].requested = false;
+                app_server_update(i);
             }
         }
     }
