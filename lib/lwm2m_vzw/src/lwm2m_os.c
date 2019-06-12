@@ -19,8 +19,11 @@
 #include <pdn_management.h>
 #include <misc/reboot.h>
 #include <misc/util.h>
+#include <toolchain.h>
 #include <nvs/nvs.h>
 #include <logging/log.h>
+#include <errno.h>
+#include <nrf_errno.h>
 
 /* NVS-related defines */
 
@@ -636,4 +639,98 @@ void lwm2m_os_pdn_disconnect(int pdn_fd)
 int lwm2m_os_pdn_init_and_connect(const char *apn_name)
 {
 	return pdn_init_and_connect((char*)apn_name);
+}
+
+#ifndef ENOKEY
+#define ENOKEY 2001
+#endif
+
+#ifndef EKEYEXPIRED
+#define EKEYEXPIRED 2002
+#endif
+
+#ifndef EKEYREVOKED
+#define EKEYREVOKED 2003
+#endif
+
+#ifndef EKEYREJECTED
+#define EKEYREJECTED 2004
+#endif
+
+/* errno handling. */
+int lwm2m_os_errno(void)
+{
+	switch (errno) {
+	case EPERM:
+		return NRF_EPERM;
+	case ENOENT:
+		return NRF_ENOENT;
+	case EIO:
+		return NRF_EIO;
+	case ENOEXEC:
+		return NRF_ENOEXEC;
+	case EBADF:
+		return NRF_EBADF;
+	case ENOMEM:
+		return NRF_ENOMEM;
+	case EACCES:
+		return NRF_EACCES;
+	case EFAULT:
+		return NRF_EFAULT;
+	case EINVAL:
+		return NRF_EINVAL;
+	case EMFILE:
+		return NRF_EMFILE;
+	case EAGAIN:
+		return NRF_EAGAIN;
+	case EPROTOTYPE:
+		return NRF_EPROTOTYPE;
+	case ENOPROTOOPT:
+		return NRF_ENOPROTOOPT;
+	case EPROTONOSUPPORT:
+		return NRF_EPROTONOSUPPORT;
+	case ESOCKTNOSUPPORT:
+		return NRF_ESOCKTNOSUPPORT;
+	case EOPNOTSUPP:
+		return NRF_EOPNOTSUPP;
+	case EAFNOSUPPORT:
+		return NRF_EAFNOSUPPORT;
+	case EADDRINUSE:
+		return NRF_EADDRINUSE;
+	case ENETDOWN:
+		return NRF_ENETDOWN;
+	case ENETUNREACH:
+		return NRF_ENETUNREACH;
+	case ENETRESET:
+		return NRF_ENETRESET;
+	case ECONNRESET:
+		return NRF_ECONNRESET;
+	case EISCONN:
+		return NRF_EISCONN;
+	case ENOTCONN:
+		return NRF_ENOTCONN;
+	case ETIMEDOUT:
+		return NRF_ETIMEDOUT;
+	case ENOBUFS:
+		return NRF_ENOBUFS;
+	case EHOSTDOWN:
+		return NRF_EHOSTDOWN;
+	case EINPROGRESS:
+		return NRF_EINPROGRESS;
+	case ECANCELED:
+		return NRF_ECANCELED;
+	case ENOKEY:
+		return NRF_ENOKEY;
+	case EKEYEXPIRED:
+		return NRF_EKEYEXPIRED;
+	case EKEYREVOKED:
+		return NRF_EKEYREVOKED;
+	case EKEYREJECTED:
+		return NRF_EKEYREJECTED;
+	case EMSGSIZE:
+		return NRF_EMSGSIZE;
+	default:
+		__ASSERT(false, "Untranslated errno %d", errno);
+		return 0xDEADBEEF;
+	}
 }

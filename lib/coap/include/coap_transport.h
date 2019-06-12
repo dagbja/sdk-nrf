@@ -23,10 +23,9 @@
 #ifndef COAP_TRANSPORT_H__
 #define COAP_TRANSPORT_H__
 
-#include <stdint.h>
-
-#include <net/socket.h>
-#include <net/tls_credentials.h>
+#include <string.h>
+#include <zephyr.h>
+#include <nrf_socket.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -59,7 +58,7 @@ typedef struct {
 	u32_t sec_tag_count;
 
 	/** Indicates the list of security tags to be used for the session. */
-	sec_tag_t *sec_tag_list;
+	nrf_sec_tag_t *sec_tag_list;
 
 	/** Peer hostname for ceritificate verification.
 	 *  May be NULL to skip hostname verification.
@@ -70,7 +69,7 @@ typedef struct {
 /**@brief Local endpoint - address, port and associated transport (if any). */
 typedef struct {
 	/** Local address and port information. */
-	struct sockaddr *addr;
+	struct nrf_sockaddr *addr;
 
 	/** Protocol to be used, shall be one of IPPROTO_UDP or SPROTO_DTLS1v2.
 	 *  0 implies IPROTO_UDP.
@@ -128,7 +127,7 @@ u32_t coap_transport_init(coap_transport_init_t *param);
  *         indicates the reason for the failure is returned.
  */
 u32_t coap_transport_write(const coap_transport_handle_t handle,
-			   const struct sockaddr *remote, const u8_t *data,
+			   const struct nrf_sockaddr *remote, const u8_t *data,
 			   u16_t datalen);
 
 /**@brief Handles data received on a CoAP endpoint or port.
@@ -150,8 +149,8 @@ u32_t coap_transport_write(const coap_transport_handle_t handle,
  *
  */
 u32_t coap_transport_read(const coap_transport_handle_t handle,
-			  const struct sockaddr *remote,
-			  const struct sockaddr *local, u32_t result,
+			  const struct nrf_sockaddr *remote,
+			  const struct nrf_sockaddr *local, u32_t result,
 			  const u8_t *data, u16_t datalen);
 
 /**@brief Process loop to handle DTLS processing.

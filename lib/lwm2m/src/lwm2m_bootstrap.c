@@ -5,9 +5,7 @@
  */
 
 #include <string.h>
-#include <stdio.h>
 #include <stdint.h>
-#include <string.h>
 
 #include <lwm2m.h>
 #include <lwm2m_api.h>
@@ -47,7 +45,7 @@ static uint32_t internal_message_new(coap_message_t         ** pp_msg,
 /**@brief Function to be used as callback function upon a bootstrap request. */
 static void lwm2m_bootstrap_cb(uint32_t status, void * p_arg, coap_message_t * p_message)
 {
-    struct sockaddr *p_remote = NULL;
+    struct nrf_sockaddr *p_remote = NULL;
     uint8_t coap_code = 0;
 
     if (p_message)
@@ -73,7 +71,7 @@ uint32_t internal_lwm2m_bootstrap_init(void)
 }
 
 
-uint32_t lwm2m_bootstrap(struct sockaddr         * p_remote,
+uint32_t lwm2m_bootstrap(struct nrf_sockaddr     * p_remote,
                          lwm2m_client_identity_t * p_id,
                          coap_transport_handle_t   transport)
 {

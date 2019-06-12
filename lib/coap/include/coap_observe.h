@@ -68,7 +68,7 @@ u32_t internal_coap_observe_server_unregister(u32_t handle);
  * @retval ENOENT If observer was not found.
  */
 u32_t internal_coap_observe_server_search(u32_t *handle,
-					  struct sockaddr *observer_addr,
+					  struct nrf_sockaddr *observer_addr,
 					  coap_resource_t *resource);
 
 /**@brief Iterate through observers subscribing to a specific resource.

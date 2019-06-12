@@ -16,7 +16,7 @@
 
 #include <stdint.h>
 
-#include <net/socket.h>
+#include <coap_api.h>
 #include <coap_observe_api.h>
 
 #include <lwm2m_cfg.h>
@@ -272,7 +272,7 @@ struct lwm2m_instance_t
  *
  */
 void lwm2m_notification(lwm2m_notification_type_t   type,
-                        struct sockaddr           * p_remote,
+                        struct nrf_sockaddr       * p_remote,
                         uint8_t                     coap_code,
                         uint32_t                    err_code);
 
@@ -331,7 +331,7 @@ uint32_t lwm2m_init();
  * @retval NRF_SUCCESS    If bootstrap request to the LWM2M bootstrap server was sent successfully.
  * @retval NRF_ERROR_NULL If one of the parameters was a NULL pointer.
  */
-uint32_t lwm2m_bootstrap(struct sockaddr         * p_remote,
+uint32_t lwm2m_bootstrap(struct nrf_sockaddr     * p_remote,
                          lwm2m_client_identity_t * p_id,
                          coap_transport_handle_t   transport);
 
@@ -349,7 +349,7 @@ uint32_t lwm2m_bootstrap(struct sockaddr         * p_remote,
  *
  * @retval NRF_SUCCESS If registration request to the LWM2M server was sent out successfully.
  */
-uint32_t lwm2m_register(struct sockaddr         * p_remote,
+uint32_t lwm2m_register(struct nrf_sockaddr     * p_remote,
                         lwm2m_client_identity_t * p_id,
                         lwm2m_server_config_t   * p_config,
                         coap_transport_handle_t   transport,
@@ -365,7 +365,7 @@ uint32_t lwm2m_register(struct sockaddr         * p_remote,
  *
  * @retval NRF_SUCCESS If update request to the LWM2M server was sent out successfully.
  */
-uint32_t lwm2m_update(struct sockaddr         * p_remote,
+uint32_t lwm2m_update(struct nrf_sockaddr     * p_remote,
                       lwm2m_server_config_t   * p_config,
                       coap_transport_handle_t   transport);
 
@@ -377,7 +377,7 @@ uint32_t lwm2m_update(struct sockaddr         * p_remote,
  *
  * @retval NRF_SUCCESS If deregister request to the LWM2M server was sent out successfully.
  */
-uint32_t lwm2m_deregister(struct sockaddr * p_remote, coap_transport_handle_t transport);
+uint32_t lwm2m_deregister(struct nrf_sockaddr * p_remote, coap_transport_handle_t transport);
 
 /**@brief Add an instance to coap_handler in order to match requests to the given instance.
  *
@@ -486,8 +486,8 @@ uint32_t lwm2m_observe_register(uint8_t             * p_payload,
  * @retval ENOMEM If the observable resource could not be found in the list.
  * @retval EINVAL If one of the parameters is a NULL pointer.
  */
-uint32_t lwm2m_observe_unregister(struct sockaddr  * p_remote,
-                                  void             * p_resource);
+uint32_t lwm2m_observe_unregister(struct nrf_sockaddr  * p_remote,
+                                  void                 * p_resource);
 
 uint32_t lwm2m_notify(uint8_t         * p_payload,
                       uint16_t          payload_len,

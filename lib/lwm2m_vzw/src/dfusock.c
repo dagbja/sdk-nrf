@@ -7,8 +7,8 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <lwm2m.h>
-#include <net/socket.h>
 #include <nrf_socket.h>
+#include <zephyr.h> /* For __ASSERT_NO_MSG */
 
 static int dfusock = -1;
 
@@ -20,10 +20,10 @@ int dfusock_fragment_send(const void *buf, size_t len)
 
 	LWM2M_INF("Sending fragment (%u) to modem..", len);
 
-	sent = send(dfusock, buf, len, 0);
+	sent = nrf_send(dfusock, buf, len, 0);
 	if (sent < 0) {
-		LWM2M_ERR("Failed to send(), errno %d", errno);
-		return -errno;
+		LWM2M_ERR("Failed to nrf_send(), errno %d", lwm2m_os_errno());
+		return -lwm2m_os_errno();
 	}
 
 	return 0;
@@ -38,7 +38,7 @@ int dfusock_error_get(nrf_dfu_err_t *dfu_err)
 	err = nrf_getsockopt(dfusock, NRF_SOL_DFU, NRF_SO_DFU_ERROR,
 			     dfu_err, &len);
 	if (err) {
-		LWM2M_ERR("Unable to fetch modem error, errno %d", errno);
+		LWM2M_ERR("Unable to fetch modem error, errno %d", lwm2m_os_errno());
 	}
 
 	return err;
@@ -56,7 +56,7 @@ int dfusock_offset_get(uint32_t *off)
 			     &len);
 	if (err) {
 		/* LWM2M_ERR("Failed to retrieve offset, errno %d", errno); */
-		return -errno;
+		return -lwm2m_os_errno();
 	}
 
 	return 0;
@@ -72,8 +72,8 @@ int dfusock_offset_set(uint32_t off)
 			     len);
 	if (err) {
 		/* Fatal */
-		LWM2M_ERR("Failed to set offset, errno %d", errno);
-		return -errno;
+		LWM2M_ERR("Failed to set offset, errno %d", lwm2m_os_errno());
+		return -lwm2m_os_errno();
 	}
 
 	return 0;
@@ -91,8 +91,8 @@ int dfusock_version_get(uint8_t *buf, size_t len)
 			     &ver_len);
 	if (err) {
 		/* Fatal */
-		LWM2M_ERR("Failed to read firmware version, errno %d", errno);
-		return -errno;
+		LWM2M_ERR("Failed to read firmware version, errno %d", lwm2m_os_errno());
+		return -lwm2m_os_errno();
 	}
 
 	/* NULL terminate, if buffer is large enough */
@@ -111,8 +111,8 @@ int dfusock_firmware_delete(void)
 			     NULL, 0);
 	if (err) {
 		/* Fatal */
-		LWM2M_ERR("Failed to delete firmware, errno %d", errno);
-		return -errno;
+		LWM2M_ERR("Failed to delete firmware, errno %d", lwm2m_os_errno());
+		return -lwm2m_os_errno();
 	}
 
 	return 0;
@@ -125,8 +125,8 @@ int dfusock_firmware_update(void)
 	err = nrf_setsockopt(dfusock, NRF_SOL_DFU, NRF_SO_DFU_APPLY, NULL, 0);
 	if (err) {
 		/* Fatal */
-		LWM2M_ERR("Failed to apply firmware update, errno %d", errno);
-		return -errno;
+		LWM2M_ERR("Failed to apply firmware update, errno %d", lwm2m_os_errno());
+		return -lwm2m_os_errno();
 	}
 
 	return 0;
@@ -138,8 +138,8 @@ int dfusock_firmware_revert(void)
 
 	err = nrf_setsockopt(dfusock, NRF_SOL_DFU, NRF_SO_DFU_REVERT, NULL, 0);
 	if (err) {
-		LWM2M_ERR("Failed to rollaback firmware, errno %d", errno);
-		return -errno;
+		LWM2M_ERR("Failed to rollaback firmware, errno %d", lwm2m_os_errno());
+		return -lwm2m_os_errno();
 	}
 
 	return 0;
@@ -155,7 +155,7 @@ int dfusock_close(void)
 
 	err = nrf_close(dfusock);
 	if (err) {
-		LWM2M_ERR("Failed to close DFU socket, errno %d", errno);
+		LWM2M_ERR("Failed to close DFU socket, errno %d", lwm2m_os_errno());
 	}
 
 	dfusock = -1;

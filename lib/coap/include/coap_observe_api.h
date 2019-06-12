@@ -29,7 +29,7 @@ extern "C" {
  */
 typedef struct {
 	/** Remote address and port number. */
-	struct sockaddr *remote;
+	struct nrf_sockaddr *remote;
 
 	/** Message Token ID. */
 	u8_t token[8];
@@ -52,7 +52,7 @@ typedef struct {
  */
 typedef struct {
 	/** Remote address and port number. */
-	struct sockaddr *remote;
+	struct nrf_sockaddr *remote;
 
 	/** Message Token ID. */
 	u8_t token[8];
@@ -110,7 +110,7 @@ u32_t coap_observe_server_unregister(u32_t handle);
  * @retval EINVAL If one of the pointers are NULL.
  * @retval ENOENT If observer was not found.
  */
-u32_t coap_observe_server_search(u32_t *handle, struct sockaddr *observer_addr,
+u32_t coap_observe_server_search(u32_t *handle, struct nrf_sockaddr *observer_addr,
 				 coap_resource_t *resource);
 
 /**@brief Iterate through observers subscribing to a specific resource.

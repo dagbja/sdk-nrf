@@ -5,16 +5,16 @@
  */
 
 #include <stdint.h>
-#include <net/socket.h>
+#include <nrf_socket.h>
 
 #include <lwm2m_api.h>
 #include <lwm2m_acl.h>
 #include <lwm2m_remote.h>
 
 /**@brief Helper function to get the access from an instance and a remote. */
-uint32_t common_lwm2m_access_remote_get(uint16_t         * p_access,
-                                     lwm2m_instance_t * p_instance,
-                                     struct sockaddr  * p_remote)
+uint32_t common_lwm2m_access_remote_get(uint16_t            * p_access,
+                                        lwm2m_instance_t    * p_instance,
+                                        struct nrf_sockaddr * p_remote)
 {
     uint16_t short_server_id;
     uint32_t err_code = lwm2m_remote_short_server_id_find(&short_server_id, p_remote);

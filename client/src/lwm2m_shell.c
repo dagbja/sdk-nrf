@@ -6,23 +6,24 @@
 
 #if CONFIG_SHELL
 
+#include <stdio.h>
+#include <stdlib.h>
+
 #include <shell/shell.h>
 #include <fcntl.h>
 
 #include <lwm2m_api.h>
-#include <lwm2m_instance_storage.h>
 #include <lwm2m_security.h>
 #include <lwm2m_server.h>
 #include <lwm2m_device.h>
 #include <lwm2m_retry_delay.h>
+#include <lwm2m_instance_storage.h>
 #include <at_interface.h>
 #include <sms_receive.h>
 #include <lwm2m_vzw_main.h>
 #include <modem_logging.h>
 #include <lwm2m_carrier.h>
 #include <lwm2m_objects.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
 {
@@ -389,18 +390,18 @@ static int cmd_lwm2m_disconnect(const struct shell *shell, size_t argc, char **a
 static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
 {
     char ip_version[] = "IPvX";
-    ip_version[3] = (lwm2m_family_type_get(lwm2m_server_instance()) == AF_INET6) ? '6' : '4';
+    ip_version[3] = (lwm2m_family_type_get(lwm2m_server_instance()) == NRF_AF_INET6) ? '6' : '4';
     int32_t retry_delay;
 
     if (lwm2m_did_bootstrap()) {
-        shell_print(shell, "Bootstrap completed [%s]", (lwm2m_family_type_get(0) == AF_INET6) ? "IPv6" : "IPv4");
+        shell_print(shell, "Bootstrap completed [%s]", (lwm2m_family_type_get(0) == NRF_AF_INET6) ? "IPv6" : "IPv4");
     }
 
     for (int i = 1; i < (1+LWM2M_MAX_SERVERS); i++) {
         uint8_t uri_len = 0;
         (void)lwm2m_security_server_uri_get(i, &uri_len);
         if ((uri_len > 0) && lwm2m_server_registered_get(i)) {
-            shell_print(shell, "Server %d registered [%s]", i, (lwm2m_family_type_get(i) == AF_INET6) ? "IPv6" : "IPv4");
+            shell_print(shell, "Server %d registered [%s]", i, (lwm2m_family_type_get(i) == NRF_AF_INET6) ? "IPv6" : "IPv4");
         }
     }
 
@@ -697,7 +698,7 @@ static int cmd_device_memory_total_set(const struct shell *shell, size_t argc, c
         shell_print(shell, "memory_total <total memory in kB>");
         return 0;
     }
-    
+
     switch(lwm2m_carrier_memory_total_set(strtoul(argv[1], NULL, 10)))
     {
         case 0:

@@ -27,13 +27,13 @@ typedef struct {
 	int socket_fd;
 
 	/** Local endpoint - address and port. Provision for maximum size. */
-	struct sockaddr_in6 local;
+	struct nrf_sockaddr_in6 local;
 } transport_t;
 
 /**@brief Session information. */
 typedef struct {
 	/** Remote endpoint - address and port. Provision for maximum size. */
-	struct sockaddr_in6 remote;
+	struct nrf_sockaddr_in6 remote;
 
 	transport_t *local;
 	/** Local endpoint associated with the session. */
@@ -59,13 +59,13 @@ static session_t session_table[COAP_SESSION_COUNT];
  *
  * @param addr Address whose length is requested.
  *
- * @retval sizeof(sockaddr_in) for address family AF_INET, else,
- *         sizeof(sockaddr_in6).
+ * @retval sizeof(nrf_sockaddr_in) for address family NRF_AF_INET, else,
+ *         sizeof(nrf_sockaddr_in6).
  */
-static socklen_t address_length_get(struct sockaddr const *addr)
+static nrf_socklen_t address_length_get(struct nrf_sockaddr const *addr)
 {
-	return (addr->sa_family == AF_INET) ? sizeof(struct sockaddr_in) :
-					      sizeof(struct sockaddr_in6);
+	return (addr->sa_family == NRF_AF_INET) ? sizeof(struct nrf_sockaddr_in) :
+					      sizeof(struct nrf_sockaddr_in6);
 }
 
 #if (COAP_SESSION_COUNT > 0)
@@ -80,32 +80,32 @@ static socklen_t address_length_get(struct sockaddr const *addr)
  *
  * @retval true if the addresses match, else, false.
  */
-static bool address_compare(struct sockaddr const *addr1,
-			    struct sockaddr const *addr2)
+static bool address_compare(struct nrf_sockaddr const *addr1,
+			    struct nrf_sockaddr const *addr2)
 {
 	if (addr1->sa_family != addr2->sa_family) {
 		return false;
 	}
 
-	if (addr1->sa_family == AF_INET) {
-		const struct sockaddr_in *addr4_1 = (struct sockaddr_in *)addr1;
-		const struct sockaddr_in *addr4_2 = (struct sockaddr_in *)addr2;
+	if (addr1->sa_family == NRF_AF_INET) {
+		const struct nrf_sockaddr_in *addr4_1 = (struct nrf_sockaddr_in *)addr1;
+		const struct nrf_sockaddr_in *addr4_2 = (struct nrf_sockaddr_in *)addr2;
 
 		if (addr4_1->sin_port == addr4_2->sin_port) {
 			if (memcmp(&addr4_1->sin_addr, &addr4_2->sin_addr,
-				   sizeof(struct in_addr)) == 0) {
+				   sizeof(struct nrf_in_addr )) == 0) {
 				return true;
 			}
 		}
-	} else if (addr1->sa_family == AF_INET6) {
-		const struct sockaddr_in6 *addr6_1 =
-						(struct sockaddr_in6 *)addr1;
-		const struct sockaddr_in6 *addr6_2 =
-						(struct sockaddr_in6 *)addr2;
+	} else if (addr1->sa_family == NRF_AF_INET6) {
+		const struct nrf_sockaddr_in6 *addr6_1 =
+						(struct nrf_sockaddr_in6 *)addr1;
+		const struct nrf_sockaddr_in6 *addr6_2 =
+						(struct nrf_sockaddr_in6 *)addr2;
 
 		if (addr6_1->sin6_port == addr6_2->sin6_port) {
 			if (memcmp(&addr6_1->sin6_addr, &addr6_2->sin6_addr,
-				   sizeof(struct in6_addr)) == 0) {
+				   sizeof(struct nrf_in6_addr )) == 0) {
 				return true;
 			}
 		}
@@ -126,7 +126,7 @@ static bool address_compare(struct sockaddr const *addr1,
  */
 static void session_free(session_t *session)
 {
-	close(session->local->socket_fd);
+	nrf_close(session->local->socket_fd);
 	memset(session->local, 0, sizeof(transport_t));
 	memset(session, 0, sizeof(session_t));
 }
@@ -145,20 +145,20 @@ static void session_free(session_t *session)
  *
  * @retval A valid session if the procedure succeeds, else, NULL.
  */
-static session_t *session_find(const struct sockaddr *local,
-			       const struct sockaddr *remote)
+static session_t *session_find(const struct nrf_sockaddr *local,
+			       const struct nrf_sockaddr *remote)
 {
 	session_t *session;
 
 	for (int index = 0; index < COAP_SESSION_COUNT; index++) {
 		session = &session_table[index];
 		if (address_compare(remote,
-				    (struct sockaddr *)&session->remote)) {
+				    (struct nrf_sockaddr *)&session->remote)) {
 			/* Verify if the local endpoint, if any, match. */
 			if ((session->local != NULL) &&
 			    (address_compare(
 				local,
-				(struct sockaddr *)&session->local->local))) {
+				(struct nrf_sockaddr *)&session->local->local))) {
 				/* Session already exists. */
 				/* TODO: we do not compare if the security
 				 * parameters used are the same yet.
@@ -222,53 +222,53 @@ static coap_transport_handle_t socket_create_and_bind(u32_t index,
 	/* Request new socket creation. */
 	const int family = local->addr->sa_family;
 
-	int socket_fd = socket(family, SOCK_DGRAM, local->protocol);
+	int socket_fd = nrf_socket(family, NRF_SOCK_DGRAM, local->protocol);
 
-	socklen_t address_len = address_length_get(local->addr);
+	nrf_socklen_t address_len = address_length_get(local->addr);
 
 	if (socket_fd != -1) {
 		if (local->interface) {
 #ifdef CONFIG_BSD_LIBRARY
-			struct ifreq ifr;
+			struct nrf_ifreq ifr;
 
 			memset(&ifr, 0, sizeof(ifr));
 			memcpy(ifr.ifr_name, local->interface,
 			       strlen(local->interface));
 
-			int err = setsockopt(socket_fd, SOL_SOCKET,
-					     SO_BINDTODEVICE, (void *)&ifr,
+			int err = nrf_setsockopt(socket_fd, NRF_SOL_SOCKET,
+					     NRF_SO_BINDTODEVICE, (void *)&ifr,
 					     strlen(local->interface));
 
 			if (err == -1) {
-				(void)close(socket_fd);
+				(void)nrf_close(socket_fd);
 				return -1;
 			}
 #endif /* CONFIG_BSD_LIBRARY */
 		}
 
-		if (local->protocol == IPPROTO_DTLS_1_2) {
+		if (local->protocol == NRF_SPROTO_DTLS1v2) {
 			/* Set the security configuration for the socket. */
-			int err = setsockopt(socket_fd, SOL_TLS, TLS_DTLS_ROLE,
+			int err = nrf_setsockopt(socket_fd, NRF_SOL_SECURE, NRF_SO_SEC_ROLE,
 					     &local->setting->role,
 					     sizeof(int));
 			if (err == 0) {
-				err = setsockopt(socket_fd, SOL_TLS,
-						 TLS_SEC_TAG_LIST,
+				err = nrf_setsockopt(socket_fd, NRF_SOL_SECURE,
+						 NRF_SO_SEC_TAG_LIST,
 						 local->setting->sec_tag_list,
 						 (local->setting->sec_tag_count
-						 * sizeof(sec_tag_t)));
+						 * sizeof(nrf_sec_tag_t)));
 			}
 
 			if (err) {
 				/* Not all procedures succeeded with the socket
 				 * creation and initialization, hence free it.
 				 */
-				(void)close(socket_fd);
+				(void)nrf_close(socket_fd);
 				return -1;
 			}
 		}
 
-		int retval = bind(socket_fd, local->addr, address_len);
+		int retval = nrf_bind(socket_fd, local->addr, address_len);
 
 		if (retval != -1) {
 			memcpy(&port_table[index].local, local->addr,
@@ -278,7 +278,7 @@ static coap_transport_handle_t socket_create_and_bind(u32_t index,
 			/* Not all procedures succeeded with the socket creation
 			 * and initialization, hence free it.
 			 */
-			(void)close(socket_fd);
+			(void)nrf_close(socket_fd);
 			return -1;
 		}
 	}
@@ -305,7 +305,7 @@ u32_t coap_transport_init(coap_transport_init_t *param)
 		transport = socket_create_and_bind(index,
 						   &param->port_table[index]);
 		if (transport == -1) {
-			/* TODO: close any previous sockets? */
+			/* TODO: nrf_close any previous sockets? */
 			return EIO;
 		}
 
@@ -318,7 +318,7 @@ u32_t coap_transport_init(coap_transport_init_t *param)
 
 
 u32_t coap_transport_write(const coap_transport_handle_t transport,
-			   const struct sockaddr *remote, const u8_t *data,
+			   const struct nrf_sockaddr *remote, const u8_t *data,
 			   u16_t datalen)
 {
 	u32_t err_code = ENOENT;
@@ -337,12 +337,12 @@ u32_t coap_transport_write(const coap_transport_handle_t transport,
 
 #if (COAP_SESSION_COUNT > 0)
 		if (secure_endpoint_check(index)) {
-			retval = send(transport, data, datalen, 0);
+			retval = nrf_send(transport, data, datalen, 0);
 		} else
 #endif /* (COAP_SESSION_COUNT > 0) */
 		{
 			/* Send on UDP port. */
-			retval = sendto(transport, data, datalen, 0, remote,
+			retval = nrf_sendto(transport, data, datalen, 0, remote,
 					address_length_get(remote));
 		}
 
@@ -366,21 +366,21 @@ void coap_transport_process(void)
 }
 
 
-u32_t coap_security_setup(coap_local_t *local, struct sockaddr const *remote)
+u32_t coap_security_setup(coap_local_t *local, struct nrf_sockaddr const *remote)
 {
 	NULL_PARAM_CHECK(local);
 	NULL_PARAM_CHECK(remote);
 	NULL_PARAM_CHECK(local->addr);
 	NULL_PARAM_CHECK(local->setting);
 
-	if (local->protocol != IPPROTO_DTLS_1_2) {
+	if (local->protocol != NRF_SPROTO_DTLS1v2) {
 		return EINVAL;
 	}
-	if ((remote->sa_family != AF_INET) && (remote->sa_family != AF_INET6)) {
+	if ((remote->sa_family != NRF_AF_INET) && (remote->sa_family != NRF_AF_INET6)) {
 		return EINVAL;
 	}
-	if ((local->addr->sa_family != AF_INET)  &&
-	    (local->addr->sa_family != AF_INET6)) {
+	if ((local->addr->sa_family != NRF_AF_INET)  &&
+	    (local->addr->sa_family != NRF_AF_INET6)) {
 		return EINVAL;
 	}
 #if (COAP_SESSION_COUNT > 0)
@@ -418,7 +418,7 @@ u32_t coap_security_setup(coap_local_t *local, struct sockaddr const *remote)
 				session->local = &port_table[port_entry];
 
 				/* Initiate a connection. */
-				int err = connect(session->local->socket_fd,
+				int err = nrf_connect(session->local->socket_fd,
 						  remote,
 						  address_length_get(remote));
 
@@ -468,11 +468,11 @@ u32_t coap_security_destroy(coap_transport_handle_t transport)
 /*suppress "Symbol 'coap_transport_input(void)' previously defined" (WEAK) */
 void coap_transport_input(void)
 {
-	socklen_t address_length;
-	struct sockaddr_in remote4;
-	struct sockaddr_in remote6;
-	struct sockaddr *remote;
-	struct sockaddr *local;
+	nrf_socklen_t address_length;
+	struct nrf_sockaddr_in remote4;
+	struct nrf_sockaddr_in remote6;
+	struct nrf_sockaddr *remote;
+	struct nrf_sockaddr *local;
 	transport_t *port;
 
 	static u8_t read_mem[COAP_MESSAGE_DATA_MAX_SIZE];
@@ -483,8 +483,8 @@ void coap_transport_input(void)
 
 		port = &port_table[port_entry];
 
-		int bytes_read = recv(port->socket_fd, read_mem,
-				      COAP_MESSAGE_DATA_MAX_SIZE, MSG_DONTWAIT);
+		int bytes_read = nrf_recv(port->socket_fd, read_mem,
+				      COAP_MESSAGE_DATA_MAX_SIZE, NRF_MSG_DONTWAIT);
 
 		if (bytes_read >= 0) {
 			const session_t *session = &session_table[index];
@@ -492,8 +492,8 @@ void coap_transport_input(void)
 			/* Notify the CoAP module of received data. */
 			int retval = coap_transport_read(
 					port->socket_fd,
-					(struct sockaddr *)&session->remote,
-					(struct sockaddr *)&port->local,
+					(struct nrf_sockaddr *)&session->remote,
+					(struct nrf_sockaddr *)&port->local,
 					0, read_mem, (u16_t)bytes_read);
 
 			/* Nothing much to do if CoAP could not interpret the
@@ -506,20 +506,20 @@ void coap_transport_input(void)
 
 	for (u32_t index = 0; index < COAP_PORT_COUNT; index++) {
 		port = &port_table[index];
-		local = (struct sockaddr *)&port->local;
+		local = (struct nrf_sockaddr *)&port->local;
 
-		if ((local->sa_family) == AF_INET6) {
-			address_length = sizeof(struct sockaddr_in6);
-			remote = (struct sockaddr *)&remote6;
+		if ((local->sa_family) == NRF_AF_INET6) {
+			address_length = sizeof(struct nrf_sockaddr_in6);
+			remote = (struct nrf_sockaddr *)&remote6;
 		} else {
-			address_length = sizeof(struct sockaddr_in);
-			remote = (struct sockaddr *)&remote4;
+			address_length = sizeof(struct nrf_sockaddr_in);
+			remote = (struct nrf_sockaddr *)&remote4;
 		}
 
-		int bytes_read = recvfrom(port->socket_fd,
+		int bytes_read = nrf_recvfrom(port->socket_fd,
 					  read_mem,
 					  COAP_MESSAGE_DATA_MAX_SIZE,
-					  MSG_DONTWAIT,
+					  NRF_MSG_DONTWAIT,
 					  remote,
 					  &address_length);
 		if (bytes_read >= 0) {

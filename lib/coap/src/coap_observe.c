@@ -16,7 +16,7 @@
 
 typedef struct {
 	coap_observer_t observer;
-	struct sockaddr_in6 remote; /* Provision for maximum size. */
+	struct nrf_sockaddr_in6 remote; /* Provision for maximum size. */
 } internal_coap_observer_t;
 
 static internal_coap_observer_t observers[COAP_OBSERVE_MAX_NUM_OBSERVERS];
@@ -37,8 +37,8 @@ u32_t internal_coap_observe_server_register(u32_t *handle,
 	NULL_PARAM_MEMBER_CHECK(observer->remote);
 	NULL_PARAM_MEMBER_CHECK(observer->resource_of_interest);
 
-	if ((observer->remote->sa_family != AF_INET) &&
-	    (observer->remote->sa_family != AF_INET6)) {
+	if ((observer->remote->sa_family != NRF_AF_INET) &&
+	    (observer->remote->sa_family != NRF_AF_INET6)) {
 		return EINVAL;
 	}
 
@@ -56,7 +56,7 @@ u32_t internal_coap_observe_server_register(u32_t *handle,
 		memcpy(&observers[i].observer, observer,
 		       sizeof(coap_observer_t));
 		observers[i].observer.remote =
-					(struct sockaddr *)&observers[i].remote;
+					(struct nrf_sockaddr *)&observers[i].remote;
 		*handle = i;
 
 		COAP_EXIT();
@@ -69,15 +69,15 @@ u32_t internal_coap_observe_server_register(u32_t *handle,
 			memcpy(&(observers[i].observer), observer,
 			       sizeof(coap_observer_t));
 
-			if (observer->remote->sa_family == AF_INET6) {
+			if (observer->remote->sa_family == NRF_AF_INET6) {
 				memcpy(&(observers[i].remote), observer->remote,
-				       sizeof(struct sockaddr_in6));
+				       sizeof(struct nrf_sockaddr_in6));
 			} else {
 				memcpy(&(observers[i].remote), observer->remote,
-				       sizeof(struct sockaddr_in));
+				       sizeof(struct nrf_sockaddr_in));
 			}
 			observers[i].observer.remote =
-					(struct sockaddr *)&observers[i].remote;
+					(struct nrf_sockaddr *)&observers[i].remote;
 			*handle = i;
 
 			COAP_EXIT();
@@ -113,7 +113,7 @@ u32_t internal_coap_observe_server_unregister(u32_t handle)
 
 
 u32_t internal_coap_observe_server_search(u32_t *handle,
-					  struct sockaddr *observer_addr,
+					  struct nrf_sockaddr *observer_addr,
 					  coap_resource_t *resource)
 {
 	NULL_PARAM_CHECK(handle);
@@ -122,35 +122,35 @@ u32_t internal_coap_observe_server_search(u32_t *handle,
 
 	for (u32_t i = 0; i < COAP_OBSERVE_MAX_NUM_OBSERVERS; i++) {
 		if (observers[i].observer.resource_of_interest == resource) {
-			const struct sockaddr *remote =
-				(struct sockaddr *)&observers[i].remote;
-			const struct sockaddr_in6 *remote6 =
-				(struct sockaddr_in6 *)&observers[i].remote;
-			const struct sockaddr_in *remote4 =
-				(struct sockaddr_in *)&observers[i].remote;
+			const struct nrf_sockaddr *remote =
+				(struct nrf_sockaddr *)&observers[i].remote;
+			const struct nrf_sockaddr_in6 *remote6 =
+				(struct nrf_sockaddr_in6 *)&observers[i].remote;
+			const struct nrf_sockaddr_in *remote4 =
+				(struct nrf_sockaddr_in *)&observers[i].remote;
 
-			const struct sockaddr_in6 *observer_addr6 =
-					(struct sockaddr_in6 *)observer_addr;
-			const struct sockaddr_in *observer_addr4 =
-					(struct sockaddr_in *)observer_addr;
+			const struct nrf_sockaddr_in6 *observer_addr6 =
+					(struct nrf_sockaddr_in6 *)observer_addr;
+			const struct nrf_sockaddr_in *observer_addr4 =
+					(struct nrf_sockaddr_in *)observer_addr;
 
-			if ((remote->sa_family         == AF_INET6) &&
-			    (observer_addr->sa_family  == AF_INET6) &&
+			if ((remote->sa_family         == NRF_AF_INET6) &&
+			    (observer_addr->sa_family  == NRF_AF_INET6) &&
 			    (observer_addr6->sin6_port == remote6->sin6_port)) {
 				if (memcmp(observer_addr6->sin6_addr.s6_addr,
 					   remote6->sin6_addr.s6_addr,
-					   sizeof(struct in6_addr)) == 0) {
+					   sizeof(struct nrf_in6_addr)) == 0) {
 					*handle = i;
 					return 0;
 				}
 			}
 
-			if ((remote->sa_family        == AF_INET) &&
-			    (observer_addr->sa_family == AF_INET) &&
+			if ((remote->sa_family        == NRF_AF_INET) &&
+			    (observer_addr->sa_family == NRF_AF_INET) &&
 			    (observer_addr4->sin_port == remote4->sin_port)) {
 				if (memcmp(&observer_addr4->sin_addr,
 					   &remote4->sin_addr,
-					   sizeof(struct in_addr)) == 0) {
+					   sizeof(struct nrf_in_addr)) == 0) {
 					*handle = i;
 					return 0;
 				}
@@ -220,7 +220,7 @@ u32_t internal_coap_observe_server_get(u32_t handle, coap_observer_t **observer)
 
 typedef struct {
 	coap_observable_t observable;
-	struct sockaddr_in6 remote; /* Provision for the largest size. */
+	struct nrf_sockaddr_in6 remote; /* Provision for the largest size. */
 } internal_coap_observables_t;
 
 static internal_coap_observables_t
@@ -243,8 +243,8 @@ u32_t internal_coap_observe_client_register(u32_t *handle,
 	NULL_PARAM_MEMBER_CHECK(observable->remote);
 	NULL_PARAM_MEMBER_CHECK(observable->response_callback);
 
-	if ((observable->remote->sa_family != AF_INET)  &&
-	    (observable->remote->sa_family != AF_INET6)) {
+	if ((observable->remote->sa_family != NRF_AF_INET)  &&
+	    (observable->remote->sa_family != NRF_AF_INET6)) {
 		return EINVAL;
 	}
 
@@ -256,17 +256,17 @@ u32_t internal_coap_observe_client_register(u32_t *handle,
 			memcpy(&(observables[i].observable), observable,
 			       sizeof(coap_observable_t));
 
-			if (observable->remote->sa_family == AF_INET6) {
+			if (observable->remote->sa_family == NRF_AF_INET6) {
 				memcpy(&(observables[i].remote),
 				       observable->remote,
-				       sizeof(struct sockaddr_in6));
+				       sizeof(struct nrf_sockaddr_in6));
 			} else {
 				memcpy(&(observables[i].remote),
 				       observable->remote,
-				       sizeof(struct sockaddr_in));
+				       sizeof(struct nrf_sockaddr_in));
 			}
 			observables[i].observable.remote =
-				(struct sockaddr *)&observables[i].remote;
+				(struct nrf_sockaddr *)&observables[i].remote;
 			*handle = i;
 
 			COAP_EXIT();
@@ -624,7 +624,7 @@ u32_t coap_observe_server_unregister(u32_t handle)
 	return err_code;
 }
 
-u32_t coap_observe_server_search(u32_t *handle, struct sockaddr *observer_addr,
+u32_t coap_observe_server_search(u32_t *handle, struct nrf_sockaddr *observer_addr,
 				 coap_resource_t *resource)
 {
 	COAP_MUTEX_UNLOCK();

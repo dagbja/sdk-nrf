@@ -155,7 +155,7 @@ int32_t lwm2m_instance_storage_all_objects_delete(void)
 
 int32_t lwm2m_instance_storage_misc_data_load(lwm2m_instance_storage_misc_data_t * p_value)
 {
-    ssize_t read_count = lwm2m_os_storage_read(LWM2M_INSTANCE_STORAGE_MISC_DATA, p_value, sizeof(lwm2m_instance_storage_misc_data_t));
+    int read_count = lwm2m_os_storage_read(LWM2M_INSTANCE_STORAGE_MISC_DATA, p_value, sizeof(lwm2m_instance_storage_misc_data_t));
     if (read_count != sizeof(lwm2m_instance_storage_misc_data_t))
     {
         return -1;
@@ -181,7 +181,7 @@ int32_t lwm2m_instance_storage_security_load(uint16_t instance_id)
 
     // Peek file size.
     char peak_buffer[1];
-    ssize_t read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
+    int read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
 
     if (read_count <= 0) {
         return -read_count;
@@ -292,7 +292,7 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
 
     // Peek file size.
     char peak_buffer[1];
-    ssize_t read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
+    int read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
 
     if (read_count <= 0) {
         return -read_count;
@@ -467,7 +467,7 @@ int32_t lwm2m_instance_storage_device_load(uint16_t instance_id)
 
     // Peek file size.
     char peak_buffer[1];
-    ssize_t read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
+    int read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
 
     if (read_count <= 0) {
         return -read_count;
@@ -547,7 +547,7 @@ int32_t lwm2m_instance_storage_conn_mon_load(uint16_t instance_id)
 
     // Peek file size.
     char peak_buffer[1];
-    ssize_t read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
+    int read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
 
     if (read_count <= 0) {
         return -read_count;
@@ -627,7 +627,7 @@ int32_t lwm2m_instance_storage_firmware_load(uint16_t instance_id)
 
     // Peek file size.
     char peak_buffer[1];
-    ssize_t read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
+    int read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
 
     if (read_count <= 0) {
         return -read_count;

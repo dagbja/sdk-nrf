@@ -16,7 +16,7 @@
 #define LWM2M_REMOTE_H__
 
 #include <stdint.h>
-#include <net/socket.h>
+#include <nrf_socket.h>
 
 /**
  * @brief      Initialize this module.
@@ -36,7 +36,7 @@ uint32_t lwm2m_remote_init(void);
  * @return     NRF_SUCCESS      Registration succeeded.
  * @return     NRF_ERROR_NO_MEM The remote list is full.
  */
-uint32_t lwm2m_remote_register(uint16_t short_server_id, struct sockaddr * p_remote);
+uint32_t lwm2m_remote_register(uint16_t short_server_id, struct nrf_sockaddr * p_remote);
 
 /**
  * @brief      Deregister this short server id.
@@ -56,13 +56,13 @@ uint32_t lwm2m_remote_deregister(uint16_t short_server_id);
  * @param[in]  p_remote          The remote to look for.
  *
  * @return     NRF_SUCCESS         The short server id was retrieved.
- * @return     NRF_ERROR_NOT_FOUND The struct sockaddr was not found.
+ * @return     NRF_ERROR_NOT_FOUND The struct nrf_sockaddr was not found.
  */
 uint32_t lwm2m_remote_short_server_id_find(uint16_t       * p_short_server_id,
-                                           struct sockaddr * p_remote);
+                                           struct nrf_sockaddr * p_remote);
 
 /**
- * @brief      Find the struct sockaddr based on short_server_id.
+ * @brief      Find the struct nrf_sockaddr based on short_server_id.
  *
  * @param[out] pp_remote        The pointer to the remote found.
  * @param[in]  short_server_id  The short_server_id to look for.
@@ -70,7 +70,7 @@ uint32_t lwm2m_remote_short_server_id_find(uint16_t       * p_short_server_id,
  * @return     NRF_SUCCESS         The remote was retrieved.
  * @return     NRF_ERROR_NOT_FOUND The short_server_id was not found.
  */
-uint32_t lwm2m_short_server_id_remote_find(struct sockaddr ** pp_remote,
+uint32_t lwm2m_short_server_id_remote_find(struct nrf_sockaddr ** pp_remote,
                                            uint16_t          short_server_id);
 
 /**

@@ -66,10 +66,10 @@ typedef struct {
 	 */
 	coap_response_callback_t callback;
 
-	/** Destination address and port number to the remote. Used sockaddr_in6
+	/** Destination address and port number to the remote. Used nrf_sockaddr_in6
 	 *  to reserve memory for maximum possible address size.
 	 */
-	struct sockaddr_in6 remote;
+	struct nrf_sockaddr_in6 remote;
 } coap_queue_item_t;
 
 /**@brief Initialize the CoAP message queue.

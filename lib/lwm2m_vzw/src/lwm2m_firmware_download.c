@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include <nrf_socket.h>
+#include <nrf_errno.h>
 
 #include <lwm2m.h>
 #include <lwm2m_objects.h>
@@ -63,7 +64,7 @@ static int on_fragment(const struct lwm2m_os_download_evt *event)
 	 */
 	lwm2m_os_download_disconnect();
 
-	if (err == -ENOEXEC) {
+	if (err == -NRF_ENOEXEC) {
 		/* Let's fetch the RPC error reason. */
 		err = dfusock_error_get(&dfu_err);
 		if (!err && dfu_err == DFU_AREA_NOT_BLANK) {
@@ -195,7 +196,7 @@ static void download_task(void *w)
 
 	err = dfusock_offset_get(&off);
 	if (err) {
-		if (err == -ENOEXEC) {
+		if (err == -NRF_ENOEXEC) {
 			/* Operation is pending, wait until it has completed */
 			LWM2M_INF("Waiting for firmware to be deleted..");
 		} else {

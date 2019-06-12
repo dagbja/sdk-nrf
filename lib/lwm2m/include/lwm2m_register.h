@@ -16,7 +16,7 @@
 #define LWM2M_REGISTER_H__
 
 #include <stdint.h>
-#include <net/socket.h>
+#include <nrf_socket.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,7 +36,7 @@ uint32_t internal_lwm2m_register_init(void);
  *
  * @return     NRF_SUCCESS / NRF_NOT_FOUND
  */
-uint32_t internal_lwm2m_short_server_id_lookup(uint16_t * p_ssi, struct sockaddr * p_remote);
+uint32_t internal_lwm2m_short_server_id_lookup(uint16_t * p_ssi, struct nrf_sockaddr * p_remote);
 
 #ifdef __cplusplus
 }

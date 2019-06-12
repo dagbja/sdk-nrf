@@ -540,7 +540,7 @@ u32_t coap_message_payload_set(coap_message_t *message, void *payload,
 }
 
 u32_t coap_message_remote_addr_set(coap_message_t *message,
-				   struct sockaddr *address)
+				   struct nrf_sockaddr *address)
 {
 	message->remote = address;
 

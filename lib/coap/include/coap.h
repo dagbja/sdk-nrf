@@ -16,8 +16,6 @@
 #define COAP_H__
 
 #include <zephyr.h>
-#include <zephyr/types.h>
-#include <net/socket.h>
 
 #include <coap_api.h>
 

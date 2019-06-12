@@ -31,6 +31,7 @@
 ^lwm2m_carrier_utc_time_write$
 
 # lwm2m_os.h
+^lwm2m_os_errno$
 ^lwm2m_os_free$
 ^lwm2m_os_init$
 ^lwm2m_os_log$
@@ -121,13 +122,11 @@
 # External symbols we should not modify
 
 # stdlib
-^__aeabi_uldivmod$
-^__memcpy_chk$
-^__sprintf_chk$
 ^abs$
 ^atoi$
 ^memcmp$
 ^memcpy$
+^__memcpy_chk$
 ^memset$
 ^snprintf$
 ^sprintf$
@@ -141,14 +140,6 @@
 ^strtok$
 ^strtol$
 ^strtoull$
-
-# zephyr
-^__aeabi_ldivmod$
-^__errno$
-^__strncpy_chk$
-^printk$
-^socket_ops$
-^z_impl_k_uptime_get$
 
 # coap
 ^coap_init$
@@ -250,6 +241,11 @@
 ^nrf_inbuilt_key_exists$
 ^nrf_inbuilt_key_write$
 ^nrf_setsockopt$
+^nrf_freeaddrinfo$
+^nrf_getaddrinfo$
+^nrf_poll$
+^nrf_recv$
+^nrf_send$
 ^nrf_socket$
 ^pdn_disconnect$
 ^pdn_init_and_connect$

@@ -5,6 +5,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <lwm2m.h>
@@ -28,6 +29,7 @@
 #include <app_debug.h>
 #include <at_interface.h>
 #include <nrf_inbuilt_key.h>
+#include <nrf_errno.h>
 #include <sms_receive.h>
 
 #include <sha256.h>
@@ -166,13 +168,13 @@ static bool m_registration_ready;
 
 /* Resolved server addresses */
 #if APP_USE_CONTABO
-static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET, AF_INET, AF_INET, AF_INET };      /**< Current IP versions, start using IPv6. */
+static nrf_sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { NRF_AF_INET, NRF_AF_INET, NRF_AF_INET, NRF_AF_INET };     /**< Current IP versions, start using IPv6. */
 #else
-static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET6, AF_INET6, AF_INET6, AF_INET6 };  /**< Current IP versions, start using IPv6. */
+static nrf_sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { NRF_AF_INET6, NRF_AF_INET6, NRF_AF_INET6, NRF_AF_INET6 };  /**< Current IP versions, start using IPv6. */
 #endif
-static struct sockaddr m_bs_remote_server;                                                    /**< Remote bootstrap server address to connect to. */
+static struct nrf_sockaddr_in6 m_bs_remote_server;                                                    /**< Remote bootstrap server address to connect to. */
 
-static struct sockaddr m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
+static struct nrf_sockaddr_in6 m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
 static volatile uint32_t tick_count = 0;
 
 static void app_misc_data_set_bootstrapped(uint8_t bootstrapped);
@@ -401,7 +403,7 @@ void lwm2m_coap_con_interval_set(int64_t con_interval)
     m_coap_con_interval = con_interval;
 }
 
-sa_family_t lwm2m_family_type_get(uint16_t instance_id)
+nrf_sa_family_t lwm2m_family_type_get(uint16_t instance_id)
 {
     return m_family_type[instance_id];
 }
@@ -627,23 +629,25 @@ uint32_t lwm2m_coap_handler_root(uint8_t op_code, coap_message_t * p_request)
     return 0;
 }
 
-static void app_init_sockaddr_in(struct sockaddr *addr, sa_family_t ai_family, uint16_t port)
+static void app_init_sockaddr_in(struct nrf_sockaddr *addr, nrf_sa_family_t ai_family, uint16_t port)
 {
-    memset(addr, 0, sizeof(struct sockaddr));
+    memset(addr, 0, sizeof(struct nrf_sockaddr_in6));
 
-    if (ai_family == AF_INET)
+    if (ai_family == NRF_AF_INET)
     {
-        struct sockaddr_in *addr_in = (struct sockaddr_in *)addr;
+        struct nrf_sockaddr_in *addr_in = (struct nrf_sockaddr_in *)addr;
 
+        addr_in->sin_len = sizeof(struct nrf_sockaddr_in);
         addr_in->sin_family = ai_family;
-        addr_in->sin_port = htons(port);
+        addr_in->sin_port = nrf_htons(port);
     }
     else
     {
-        struct sockaddr_in6 *addr_in6 = (struct sockaddr_in6 *)addr;
+        struct nrf_sockaddr_in6 *addr_in6 = (struct nrf_sockaddr_in6 *)addr;
 
+        addr_in6->sin6_len = sizeof(struct nrf_sockaddr_in6);
         addr_in6->sin6_family = ai_family;
-        addr_in6->sin6_port = htons(port);
+        addr_in6->sin6_port = nrf_htons(port);
     }
 }
 
@@ -672,26 +676,26 @@ static const char * app_uri_get(char * server_uri, uint16_t * p_port, bool * p_s
     return hostname;
 }
 
-static void app_printable_ip_address(struct sockaddr * addr, char * ip_buffer, size_t ip_buffer_len)
+static void app_printable_ip_address(struct nrf_sockaddr * addr, char * ip_buffer, size_t ip_buffer_len)
 {
     switch (addr->sa_family) {
-    case AF_INET:
+    case NRF_AF_INET:
     {
-        uint32_t val = ((struct sockaddr_in *)addr)->sin_addr.s_addr;
+        uint32_t val = ((struct nrf_sockaddr_in *)addr)->sin_addr.s_addr;
         snprintf(ip_buffer, ip_buffer_len, "%u.%u.%u.%u",
                 ((uint8_t *)&val)[0], ((uint8_t *)&val)[1], ((uint8_t *)&val)[2], ((uint8_t *)&val)[3]);
         break;
     }
 
-    case AF_INET6:
+    case NRF_AF_INET6:
     {
         size_t pos = 0;
         bool elided = false;
 
         // Poor man's elided IPv6 address print.
         for (uint8_t i = 0; i < 16; i += 2) {
-            uint16_t val = (((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[i] << 8) +
-                        (((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[i+1]);
+            uint16_t val = (((struct nrf_sockaddr_in6 *)addr)->sin6_addr.s6_addr[i] << 8) +
+                           (((struct nrf_sockaddr_in6 *)addr)->sin6_addr.s6_addr[i+1]);
 
             if (elided || val != 0) {
                 if (pos >= 2 && ip_buffer[pos-2] == ':' && ip_buffer[pos-1] == ':') {
@@ -718,12 +722,12 @@ static void app_printable_ip_address(struct sockaddr * addr, char * ip_buffer, s
     }
 }
 
-static uint32_t app_resolve_server_uri(char            * server_uri,
-                                       uint8_t           uri_len,
-                                       struct sockaddr * addr,
-                                       bool            * secure,
-                                       sa_family_t       family_type,
-                                       int               pdn_handle)
+static uint32_t app_resolve_server_uri(char                * server_uri,
+                                       uint8_t               uri_len,
+                                       struct nrf_sockaddr * addr,
+                                       bool                * secure,
+                                       nrf_sa_family_t       family_type,
+                                       int                   pdn_handle)
 {
     // Create a string copy to null-terminate hostname within the server_uri.
     char * p_server_uri_val = lwm2m_os_malloc(uri_len + 1);
@@ -738,13 +742,13 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
         return EINVAL;
     }
 
-    struct addrinfo hints = {
+    struct nrf_addrinfo hints = {
         .ai_family = family_type,
-        .ai_socktype = SOCK_DGRAM
+        .ai_socktype = NRF_SOCK_DGRAM
     };
 
     // Structures that might be pointed to by APN hints.
-    struct addrinfo apn_hints;
+    struct nrf_addrinfo apn_hints;
     char apn_name_zero_terminated[64];
 
     if (pdn_handle > -1)
@@ -755,19 +759,19 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
         memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
         apn_name_zero_terminated[class_apn_len] = '\0';
 
-        apn_hints.ai_family    = AF_LTE;
-        apn_hints.ai_socktype  = SOCK_MGMT;
-        apn_hints.ai_protocol  = NPROTO_PDN;
+        apn_hints.ai_family    = NRF_AF_LTE;
+        apn_hints.ai_socktype  = NRF_SOCK_MGMT;
+        apn_hints.ai_protocol  = NRF_PROTO_PDN;
         apn_hints.ai_canonname = apn_name_zero_terminated;
 
         hints.ai_next = &apn_hints;
     }
 
     LWM2M_INF("Doing DNS lookup using %s (APN %s)",
-            (family_type == AF_INET6) ? "IPv6" : "IPv4",
+            (family_type == NRF_AF_INET6) ? "IPv6" : "IPv4",
             (pdn_handle > -1) ? lwm2m_os_log_strdup(apn_name_zero_terminated) : "default");
 
-    struct addrinfo *result;
+    struct nrf_addrinfo *result;
     int ret_val = -1;
     int cnt = 1;
 
@@ -777,7 +781,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     //  60 = NRF_ETIMEDOUT is a timeout waiting for DNS query response.
 
     while (ret_val != 0 && ret_val != 22 && ret_val != 60 && cnt <= 5) {
-        ret_val = getaddrinfo(hostname, NULL, &hints, &result);
+        ret_val = nrf_getaddrinfo(hostname, NULL, &hints, &result);
         if (ret_val != 0 && ret_val != 22 && ret_val != 60 && cnt < 5) {
             lwm2m_os_sleep(1000 * cnt);
         }
@@ -785,7 +789,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     }
 
     if (ret_val == 22 || ret_val == 60) {
-        LWM2M_WRN("No %s address found for \"%s\"", (family_type == AF_INET6) ? "IPv6" : "IPv4", lwm2m_os_log_strdup(hostname));
+        LWM2M_WRN("No %s address found for \"%s\"", (family_type == NRF_AF_INET6) ? "IPv6" : "IPv4", lwm2m_os_log_strdup(hostname));
         lwm2m_os_free(p_server_uri_val);
         return EINVAL;
     } else if (ret_val != 0) {
@@ -796,13 +800,13 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
 
     app_init_sockaddr_in(addr, result->ai_family, port);
 
-    if (result->ai_family == AF_INET) {
-        ((struct sockaddr_in *)addr)->sin_addr.s_addr = ((struct sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
+    if (result->ai_family == NRF_AF_INET) {
+        ((struct nrf_sockaddr_in *)addr)->sin_addr.s_addr = ((struct nrf_sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
     } else {
-        memcpy(((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr, ((struct sockaddr_in6 *)result->ai_addr)->sin6_addr.s6_addr, 16);
+        memcpy(((struct nrf_sockaddr_in6 *)addr)->sin6_addr.s6_addr, ((struct nrf_sockaddr_in6 *)result->ai_addr)->sin6_addr.s6_addr, 16);
     }
 
-    freeaddrinfo(result);
+    nrf_freeaddrinfo(result);
     lwm2m_os_free(p_server_uri_val);
 
     char ip_buffer[64];
@@ -813,11 +817,11 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
 }
 
 /**@brief Helper function to parse the uri and save the remote to the LWM2M remote database. */
-static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_server_id,
-                                                    char            * server_uri,
-                                                    uint8_t           uri_len,
-                                                    bool            * secure,
-                                                    struct sockaddr * p_remote)
+static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t              short_server_id,
+                                                    char                * server_uri,
+                                                    uint8_t               uri_len,
+                                                    bool                * secure,
+                                                    struct nrf_sockaddr * p_remote)
 {
     uint32_t err_code;
 
@@ -830,7 +834,7 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_serv
         (void) lwm2m_remote_deregister(short_server_id);
 
         // Register the short_server_id
-        err_code = lwm2m_remote_register(short_server_id, (struct sockaddr *)p_remote);
+        err_code = lwm2m_remote_register(short_server_id, (struct nrf_sockaddr *)p_remote);
     }
 
     return err_code;
@@ -844,9 +848,9 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
     if (no_reply && !lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6) && !lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_FALLBACK))
     {
         // Fallback to the other IP version
-        m_family_type[instance_id] = (m_family_type[instance_id] == AF_INET6) ? AF_INET : AF_INET6;
+        m_family_type[instance_id] = (m_family_type[instance_id] == NRF_AF_INET6) ? NRF_AF_INET : NRF_AF_INET6;
 
-        if (m_family_type[instance_id] == AF_INET)
+        if (m_family_type[instance_id] == NRF_AF_INET)
         {
             // No retry delay when IPv6 to IPv4 fallback
             LWM2M_INF("IPv6 to IPv4 fallback");
@@ -890,10 +894,10 @@ static void app_cancel_lifetime_timer(uint8_t instance_id)
 }
 
 /**@brief LWM2M notification handler. */
-void lwm2m_notification(lwm2m_notification_type_t type,
-                        struct sockaddr *         p_remote,
-                        uint8_t                   coap_code,
-                        uint32_t                  err_code)
+void lwm2m_notification(lwm2m_notification_type_t   type,
+                        struct nrf_sockaddr       * p_remote,
+                        uint8_t                     coap_code,
+                        uint32_t                    err_code)
 {
 #if defined(CONFIG_NRF_LWM2M_ENABLE_LOGS)
     static char *str_type[] = { "Bootstrap", "Register", "Update", "Deregister" };
@@ -1470,7 +1474,7 @@ static void app_bootstrap_connect(void)
                                                    p_server_uri,
                                                    uri_len,
                                                    &secure,
-                                                   &m_bs_remote_server);
+                                                   (struct nrf_sockaddr *)&m_bs_remote_server);
     if (err_code != 0) {
         lwm2m_disconnect_admin_pdn(0);
 
@@ -1488,12 +1492,12 @@ static void app_bootstrap_connect(void)
     {
         LWM2M_TRC("SECURE session (bootstrap)");
 
-        struct sockaddr local_addr;
-        app_init_sockaddr_in(&local_addr, m_bs_remote_server.sa_family, LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT);
+        struct nrf_sockaddr_in6 local_addr;
+        app_init_sockaddr_in((struct nrf_sockaddr *)&local_addr, m_bs_remote_server.sin6_family, LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT);
 
         #define SEC_TAG_COUNT 1
 
-        sec_tag_t sec_tag_list[SEC_TAG_COUNT] = {APP_BOOTSTRAP_SEC_TAG};
+        nrf_sec_tag_t sec_tag_list[SEC_TAG_COUNT] = {APP_BOOTSTRAP_SEC_TAG};
 
         coap_sec_config_t setting =
         {
@@ -1504,9 +1508,9 @@ static void app_bootstrap_connect(void)
 
         coap_local_t local_port =
         {
-            .addr         = &local_addr,
+            .addr         = (struct nrf_sockaddr *)&local_addr,
             .setting      = &setting,
-            .protocol     = IPPROTO_DTLS_1_2
+            .protocol     = NRF_SPROTO_DTLS1v2
         };
 
         char apn_name_zero_terminated[64];
@@ -1524,7 +1528,7 @@ static void app_bootstrap_connect(void)
         LWM2M_INF("Setup secure DTLS session (server 0) (APN %s)",
                   (local_port.interface) ? lwm2m_os_log_strdup(apn_name_zero_terminated) : "default");
 
-        err_code = coap_security_setup(&local_port, &m_bs_remote_server);
+        err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_bs_remote_server);
 
         if (err_code == 0)
         {
@@ -1541,12 +1545,14 @@ static void app_bootstrap_connect(void)
         {
             LWM2M_INF("Connection failed: %s (%ld), %s (%d)",
                       lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                      lwm2m_os_log_strdup(strerror(errno)), errno);
+                      lwm2m_os_log_strdup(strerror(lwm2m_os_errno())), lwm2m_os_errno());
             lwm2m_disconnect_admin_pdn(0);
 
             if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT)) {
                 // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
-                if (err_code == EIO && (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH)) {
+                if (err_code == EIO && (lwm2m_os_errno() == NRF_EINVAL ||
+                                        lwm2m_os_errno() == NRF_EOPNOTSUPP ||
+                                        lwm2m_os_errno() == NRF_ENETUNREACH)) {
                     app_handle_connect_retry(0, true);
                 } else {
                     app_handle_connect_retry(0, false);
@@ -1567,7 +1573,7 @@ static void app_bootstrap(void)
 
     m_use_client_holdoff_timer = true;
 
-    uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)&m_bs_remote_server,
+    uint32_t err_code = lwm2m_bootstrap((struct nrf_sockaddr *)&m_bs_remote_server,
                                         &m_client_id,
                                         m_lwm2m_transport[0]);
     if (err_code == 0)
@@ -1613,7 +1619,7 @@ static void app_server_connect(uint16_t instance_id)
 
     err_code = app_resolve_server_uri(p_server_uri,
                                       uri_len,
-                                      &m_remote_server[instance_id],
+                                      (struct nrf_sockaddr *)&m_remote_server[instance_id],
                                       &secure,
                                       m_family_type[instance_id],
                                       m_use_admin_pdn[instance_id] ? m_admin_pdn_handle : -1);
@@ -1636,12 +1642,12 @@ static void app_server_connect(uint16_t instance_id)
         LWM2M_TRC("SECURE session (register)");
 
         // TODO: Check if this has to be static.
-        struct sockaddr local_addr;
-        app_init_sockaddr_in(&local_addr, m_remote_server[instance_id].sa_family, LWM2M_LOCAL_CLIENT_PORT_OFFSET + instance_id);
+        struct nrf_sockaddr_in6 local_addr;
+        app_init_sockaddr_in((struct nrf_sockaddr *)&local_addr, m_remote_server[instance_id].sin6_family, LWM2M_LOCAL_CLIENT_PORT_OFFSET + instance_id);
 
         #define SEC_TAG_COUNT 1
 
-        sec_tag_t sec_tag_list[SEC_TAG_COUNT] = { APP_SEC_TAG_OFFSET + instance_id };
+        nrf_sec_tag_t sec_tag_list[SEC_TAG_COUNT] = { APP_SEC_TAG_OFFSET + instance_id };
 
         coap_sec_config_t setting =
         {
@@ -1652,9 +1658,9 @@ static void app_server_connect(uint16_t instance_id)
 
         coap_local_t local_port =
         {
-            .addr         = &local_addr,
+            .addr         = (struct nrf_sockaddr *)&local_addr,
             .setting      = &setting,
-            .protocol     = IPPROTO_DTLS_1_2
+            .protocol     = NRF_SPROTO_DTLS1v2
         };
 
         char apn_name_zero_terminated[64];
@@ -1673,7 +1679,7 @@ static void app_server_connect(uint16_t instance_id)
                   instance_id,
                   (local_port.interface) ? lwm2m_os_log_strdup(apn_name_zero_terminated) : "default");
 
-        err_code = coap_security_setup(&local_port, &m_remote_server[instance_id]);
+        err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_remote_server[instance_id]);
 
         if (err_code == 0)
         {
@@ -1690,12 +1696,14 @@ static void app_server_connect(uint16_t instance_id)
         {
             LWM2M_INF("Connection failed: %s (%ld), %s (%d)",
                       lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                      lwm2m_os_log_strdup(strerror(errno)), errno);
+                      lwm2m_os_log_strdup(strerror(lwm2m_os_errno())), lwm2m_os_errno());
             lwm2m_disconnect_admin_pdn(instance_id);
 
             if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
                 // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
-                if (err_code == EIO && (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH)) {
+                if (err_code == EIO && (lwm2m_os_errno() == NRF_EINVAL ||
+                                        lwm2m_os_errno() == NRF_EOPNOTSUPP ||
+                                        lwm2m_os_errno() == NRF_ENETUNREACH)) {
                     app_handle_connect_retry(instance_id, true);
                 } else {
                     app_handle_connect_retry(instance_id, false);
@@ -1728,7 +1736,7 @@ static void app_server_register(uint16_t instance_id)
         err_code = lwm2m_coap_handler_gen_link_format(p_link_format_string, (uint16_t *)&link_format_string_len);
         APP_ERROR_CHECK(err_code);
 
-        err_code = lwm2m_register((struct sockaddr *)&m_remote_server[instance_id],
+        err_code = lwm2m_register((struct nrf_sockaddr *)&m_remote_server[instance_id],
                                   &m_client_id,
                                   &m_server_conf[instance_id],
                                   m_lwm2m_transport[instance_id],
@@ -1753,7 +1761,7 @@ void app_server_update(uint16_t instance_id, bool connect_update)
 
         m_server_conf[instance_id].lifetime = lwm2m_server_lifetime_get(instance_id);
 
-        err_code = lwm2m_update((struct sockaddr *)&m_remote_server[instance_id],
+        err_code = lwm2m_update((struct nrf_sockaddr *)&m_remote_server[instance_id],
                                 &m_server_conf[instance_id],
                                 m_lwm2m_transport[instance_id]);
         if (err_code != 0) {
@@ -1796,7 +1804,7 @@ void app_server_disable(uint16_t instance_id)
 
     app_cancel_lifetime_timer(instance_id);
 
-    err_code = lwm2m_deregister((struct sockaddr *)&m_remote_server[instance_id],
+    err_code = lwm2m_deregister((struct nrf_sockaddr *)&m_remote_server[instance_id],
                                 m_lwm2m_transport[instance_id]);
     APP_ERROR_CHECK(err_code);
 }
@@ -1807,7 +1815,7 @@ static void app_server_deregister(uint16_t instance_id)
 
     app_cancel_lifetime_timer(instance_id);
 
-    err_code = lwm2m_deregister((struct sockaddr *)&m_remote_server[instance_id],
+    err_code = lwm2m_deregister((struct nrf_sockaddr *)&m_remote_server[instance_id],
                                 m_lwm2m_transport[instance_id]);
     APP_ERROR_CHECK(err_code);
 
@@ -1884,28 +1892,28 @@ static void app_wait_state_update(void *timer)
 #if APP_USE_SOCKET_POLL
 static bool app_coap_socket_poll(void)
 {
-    struct pollfd fds[1+LWM2M_MAX_SERVERS];
+    struct nrf_pollfd fds[1+LWM2M_MAX_SERVERS];
     int nfds = 0;
     int ret = 0;
 
     // Find active sockets
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
         if (m_lwm2m_transport[i] != -1) {
-            fds[nfds].fd = m_lwm2m_transport[i];
-            fds[nfds].events = POLLIN;
+            fds[nfds].handle = m_lwm2m_transport[i];
+            fds[nfds].requested = NRF_POLLIN;
 
-            // Only check POLLOUT (writing possible) when waiting for connect()
+            // Only check NRF_POLLOUT (writing possible) when waiting for connect()
             if ((i == m_server_instance) &&
                 ((m_app_state == LWM2M_STATE_BS_CONNECT_WAIT) ||
                  (m_app_state == LWM2M_STATE_SERVER_CONNECT_WAIT))) {
-                fds[nfds].events |= POLLOUT;
+                fds[nfds].events |= NRF_POLLOUT;
             }
             nfds++;
         }
     }
 
     if (nfds > 0) {
-        ret = poll(fds, nfds, 1000);
+        ret = nrf_poll(fds, nfds, 1000);
     } else {
         // No active sockets to poll.
         lwm2m_os_sleep(1000);
@@ -1915,19 +1923,20 @@ static bool app_coap_socket_poll(void)
         // Timeout; nothing more to check.
         return false;
     } else if (ret < 0) {
-        LWM2M_ERR("poll error: %s (%d)", lwm2m_os_log_strdup(strerror(errno)), errno);
+        LWM2M_ERR("poll error: %s (%d)",
+                  lwm2m_os_log_strdup(strerror(lwm2m_os_errno())), lwm2m_os_errno());
         return false;
     }
 
     bool data_ready = false;
 
     for (int i = 0; i < nfds; i++) {
-        if ((fds[i].revents & POLLIN) == POLLIN) {
+        if ((fds[i].returned & NRF_POLLIN) == NRF_POLLIN) {
             // There is data to read.
             data_ready = true;
         }
 
-        if ((fds[i].revents & POLLOUT) == POLLOUT) {
+        if ((fds[i].returned & NRF_POLLOUT) == NRF_POLLOUT) {
             // Writing is now possible.
             if (m_app_state == LWM2M_STATE_BS_CONNECT_WAIT) {
                 LWM2M_INF("Connected");
@@ -1938,7 +1947,7 @@ static bool app_coap_socket_poll(void)
             }
         }
 
-        if ((fds[i].revents & POLLERR) == POLLERR) {
+        if ((fds[i].returned & NRF_POLLERR) == NRF_POLLERR) {
             // Error condition.
             lwm2m_state_t next_state;
 
@@ -1948,13 +1957,13 @@ static bool app_coap_socket_poll(void)
                 next_state = LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT;
             } else {
                 // TODO handle?
-                LWM2M_ERR("POLLERR: %d", i);
+                LWM2M_ERR("NRF_POLLERR: %d", i);
                 continue;
             }
 
             int error = 0;
             int len = sizeof(error);
-            getsockopt(fds[i].fd, SOL_SOCKET, SO_ERROR, &error, &len);
+            nrf_getsockopt(fds[i].fd, NRF_SOL_SOCKET, NRF_SO_ERROR, &error, &len);
 
             uint32_t err_code = coap_security_destroy(fds[i].fd);
             ARG_UNUSED(err_code);
@@ -1975,9 +1984,9 @@ static bool app_coap_socket_poll(void)
             }
         }
 
-        if ((fds[i].revents & POLLNVAL) == POLLNVAL) {
-            // TODO: Ignore POLLNVAL for now.
-            LWM2M_ERR("POLLNVAL: %d", i);
+        if ((fds[i].returned & NRF_POLLNVAL) == NRF_POLLNVAL) {
+            // TODO: Ignore NRF_POLLNVAL for now.
+            LWM2M_ERR("NRF_POLLNVAL: %d", i);
         }
     }
 
@@ -2086,7 +2095,7 @@ static void app_lwm2m_process(void)
                 uint16_t short_server_id = lwm2m_server_short_server_id_get(m_server_instance);
 
                 // Register the remote.
-                lwm2m_remote_register(short_server_id, (struct sockaddr *)&m_remote_server[m_server_instance]);
+                lwm2m_remote_register(short_server_id, (struct nrf_sockaddr *)&m_remote_server[m_server_instance]);
 
                 // Load flash again, to retrieve the location.
                 lwm2m_instance_storage_server_load(m_server_instance);
@@ -2141,21 +2150,21 @@ static void app_coap_init(void)
 {
     uint32_t err_code;
 
-    struct sockaddr local_addr;
-    struct sockaddr non_sec_local_addr;
-    app_init_sockaddr_in(&local_addr, AF_INET, COAP_LOCAL_LISTENER_PORT);
-    app_init_sockaddr_in(&non_sec_local_addr, m_family_type[1], LWM2M_LOCAL_LISTENER_PORT);
+    struct nrf_sockaddr_in6 local_addr;
+    struct nrf_sockaddr_in6 non_sec_local_addr;
+    app_init_sockaddr_in((struct nrf_sockaddr *)&local_addr, NRF_AF_INET, COAP_LOCAL_LISTENER_PORT);
+    app_init_sockaddr_in((struct nrf_sockaddr *)&non_sec_local_addr, m_family_type[1], LWM2M_LOCAL_LISTENER_PORT);
 
     // If bootstrap server and server is using different port we can
     // register the ports individually.
     coap_local_t local_port_list[COAP_PORT_COUNT] =
     {
         {
-            .addr = &local_addr
+            .addr = (struct nrf_sockaddr *)&local_addr
         },
         {
-            .addr = &non_sec_local_addr,
-            .protocol = IPPROTO_UDP,
+            .addr = (struct nrf_sockaddr *)&non_sec_local_addr,
+            .protocol = NRF_IPPROTO_UDP,
             .setting = NULL,
         }
     };
@@ -2385,7 +2394,7 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 
     if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6)) {
         for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-            m_family_type[i] = AF_INET;
+            m_family_type[i] = NRF_AF_INET;
         }
     }
 

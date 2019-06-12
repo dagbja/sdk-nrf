@@ -4,17 +4,14 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#include <stdio.h>
-
 #include <at_interface.h>
 
-#include <nrf_socket.h>
-#include <lwm2m_os.h>
-#include <sms_receive.h>
-#include <lwm2m_api.h>
-
-/* For logging API. */
+#include <stdlib.h>
 #include <lwm2m.h>
+#include <lwm2m_os.h>
+#include <lwm2m_api.h>
+#include <nrf_socket.h>
+#include <sms_receive.h>
 
 // FIXME: remove this and move to KConfig
 #define APP_MAX_AT_READ_LENGTH          CONFIG_AT_CMD_RESPONSE_MAX_LEN

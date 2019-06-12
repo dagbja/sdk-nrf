@@ -382,12 +382,12 @@ struct coap_message_t {
 	/** Public. Structure containing address information and port number
 	 *  to the remote.
 	 */
-	struct sockaddr *remote;
+	struct nrf_sockaddr *remote;
 
 	/** Public. Structure containing local destination address information
 	 *  and port number.
 	 */
-	struct sockaddr *local;
+	struct nrf_sockaddr *local;
 
 	/** Public. Header structure containing the mandatory CoAP 4-byte header
 	 *  fields.
@@ -706,7 +706,7 @@ u32_t coap_message_opt_opaque_add(coap_message_t *message, u16_t option_num,
  * @retval 0 When copying the content has finished.
  */
 u32_t coap_message_remote_addr_set(coap_message_t *message,
-				   struct sockaddr *address);
+				   struct nrf_sockaddr *address);
 
 /**@brief Creates a CoAP endpoint resource.
  *
@@ -863,7 +863,7 @@ u32_t coap_time_tick(void);
  *
  * @retval 0 If setup of the secure DTLS session was successful.
  */
-u32_t coap_security_setup(coap_local_t *local, struct sockaddr const *remote);
+u32_t coap_security_setup(coap_local_t *local, struct nrf_sockaddr const *remote);
 
 /**@brief Destroy a secure DTLS session.
  *

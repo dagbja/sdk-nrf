@@ -244,12 +244,12 @@ u32_t internal_coap_message_send(u32_t *handle, coap_message_t *message)
 			item.transport = message->transport;
 			item.token_len = message->header.token_len;
 
-			if (message->remote->sa_family == AF_INET6) {
+			if (message->remote->sa_family == NRF_AF_INET6) {
 				memcpy(&item.remote, message->remote,
-				       sizeof(struct sockaddr_in6));
+				       sizeof(struct nrf_sockaddr_in6));
 			} else {
 				memcpy(&item.remote, message->remote,
-				       sizeof(struct sockaddr_in));
+				       sizeof(struct nrf_sockaddr_in));
 			}
 			memcpy(item.token, message->token,
 			       message->header.token_len);
@@ -378,8 +378,8 @@ static u32_t send_error_response(coap_message_t *message, u8_t code)
 }
 
 u32_t coap_transport_read(const coap_transport_handle_t transport,
-			  const struct sockaddr *remote,
-			  const struct sockaddr *local,
+			  const struct nrf_sockaddr *remote,
+			  const struct nrf_sockaddr *local,
 			  u32_t result, const u8_t *data, u16_t datalen)
 {
 	COAP_ENTRY();
@@ -414,8 +414,8 @@ u32_t coap_transport_read(const coap_transport_handle_t transport,
 	}
 
 	/* Copy the remote address information. */
-	message->remote = (struct sockaddr *)remote;
-	message->local = (struct sockaddr *)local;
+	message->remote = (struct nrf_sockaddr *)remote;
+	message->local = (struct nrf_sockaddr *)local;
 	message->transport = transport;
 
 	if (is_ping(message)) {
@@ -732,13 +732,13 @@ u32_t coap_time_tick(void)
 				/* Retransmit the message. */
 				u32_t err_code = coap_transport_write(
 					item->transport,
-					(struct sockaddr *)&item->remote,
+					(struct nrf_sockaddr *)&item->remote,
 					item->buffer,
 					item->buffer_len);
 				if (err_code != 0) {
 					coap_message_t message = {
 						.transport = item->transport,
-						.remote = (struct sockaddr *)&item->remote,
+						.remote = (struct nrf_sockaddr *)&item->remote,
 					};
 					app_error_notify(err_code, &message);
 				}
@@ -755,7 +755,7 @@ u32_t coap_time_tick(void)
 
 				coap_message_t message = {
 					.transport = item->transport,
-					.remote = (struct sockaddr *)&item->remote,
+					.remote = (struct nrf_sockaddr *)&item->remote,
 				};
 				item->callback(ETIMEDOUT, item->arg, &message);
 

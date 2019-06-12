@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#include <stdio.h>
+#include <string.h>
 #include <stdint.h>
 
 #include <lwm2m.h>

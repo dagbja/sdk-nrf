@@ -305,5 +305,11 @@ void lwm2m_os_pdn_disconnect(int pdn_fd);
  */
 int lwm2m_os_pdn_init_and_connect(const char *apn_name);
 
+/**
+ * @brief Translate the error number.
+ */
+int lwm2m_os_errno(void);
+
 /**@} */
-#endif /* LWM2M_OS_H__ */
+
+#endif // LWM2M_OS_H__

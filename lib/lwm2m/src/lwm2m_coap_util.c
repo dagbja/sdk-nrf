@@ -186,8 +186,8 @@ uint32_t lwm2m_observe_register(uint8_t             * p_payload,
     return err_code;
 }
 
-uint32_t lwm2m_observe_unregister(struct sockaddr  * p_remote,
-                                  void             * p_resource)
+uint32_t lwm2m_observe_unregister(struct nrf_sockaddr  * p_remote,
+                                  void                 * p_resource)
 {
     uint32_t handle;
 
@@ -215,7 +215,7 @@ static void observer_con_message_callback(uint32_t status, void * arg, coap_mess
         case ETIMEDOUT:
             {
                 coap_observer_t * p_observer = (coap_observer_t *)arg;
-                err_code = lwm2m_observe_unregister((struct sockaddr *)p_observer->remote,
+                err_code = lwm2m_observe_unregister((struct nrf_sockaddr *)p_observer->remote,
                                                     (lwm2m_instance_t *)p_observer->resource_of_interest);
 
                 (void)err_code;

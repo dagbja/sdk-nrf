@@ -6,7 +6,9 @@
 
 #ifndef LWM2M_VZW_MAIN_H__
 
-#include <net/socket.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <nrf_socket.h>
 
 typedef enum
 {
@@ -68,7 +70,7 @@ void lwm2m_request_disconnect(void);
 void lwm2m_request_reset(void);
 bool lwm2m_did_bootstrap(void);
 uint16_t lwm2m_server_instance(void);
-sa_family_t lwm2m_family_type_get(uint16_t instance_id);
+nrf_sa_family_t lwm2m_family_type_get(uint16_t instance_id);
 int32_t lwm2m_state_update_delay(void);
 
 void lwm2m_bootstrap_clear(void);
