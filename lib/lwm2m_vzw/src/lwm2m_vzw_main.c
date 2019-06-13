@@ -126,9 +126,7 @@ static char m_msisdn[16];
 /* Structures for delayed work */
 static struct k_delayed_work state_update_work;
 
-#if (APP_USE_CONTABO != 1)
 static struct k_delayed_work connection_update_work[1+LWM2M_MAX_SERVERS];
-#endif
 
 /* Resolved server addresses */
 #if APP_USE_CONTABO
@@ -551,7 +549,6 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
 
 static void app_restart_lifetime_timer(uint8_t instance_id)
 {
-#if (APP_USE_CONTABO != 1)
     int32_t timeout = (int32_t)(lwm2m_server_lifetime_get(instance_id) * 1000);
     if (timeout <= 0) {
         // FIXME: Lifetime timer too big for Zephyr, set to maximum possible value for now
@@ -559,7 +556,6 @@ static void app_restart_lifetime_timer(uint8_t instance_id)
     }
 
     k_delayed_work_submit(&connection_update_work[instance_id], timeout);
-#endif
 }
 
 /**@brief LWM2M notification handler. */
@@ -1686,7 +1682,6 @@ static void app_provision_secret_keys(void)
 
 /**@brief Handle server lifetime.
  */
-#if (APP_USE_CONTABO != 1)
 static void app_connection_update(struct k_work *work)
 {
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
@@ -1701,15 +1696,12 @@ static void app_connection_update(struct k_work *work)
         }
     }
 }
-#endif
 
 /**@brief Initializes and submits delayed work. */
 static void app_work_init(void)
 {
-#if (APP_USE_CONTABO != 1)
     k_delayed_work_init(&connection_update_work[1], app_connection_update);
     k_delayed_work_init(&connection_update_work[3], app_connection_update);
-#endif
     k_delayed_work_init(&state_update_work, app_wait_state_update);
 }
 
