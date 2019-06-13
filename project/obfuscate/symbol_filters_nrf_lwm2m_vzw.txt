@@ -6,9 +6,9 @@
 #
 # Symbol filter list used by obfuscate_symbols.py on VZW LWM2M
 
-# lwm2m_vzw_main.h
-^lwm2m_vzw_init$
-^lwm2m_vzw_run$
+# lwm2m_carrier.h
+^lwm2m_carrier_init$
+^lwm2m_carrier_run$
 
 # lwm2m_os.h
 ^lwm2m_os_malloc$

@@ -13,6 +13,7 @@
 #include <app_debug.h>
 #include <sms_receive.h>
 #include <lwm2m_vzw_main.h>
+#include <lwm2m_carrier.h>
 
 K_SEM_DEFINE(lwm2m_vzw_sem, 0, 1);
 
@@ -69,7 +70,7 @@ int main(void)
 
 void lwm2m_vzw_thread_run(void)
 {
-    int err = lwm2m_vzw_init();
+    int err = lwm2m_carrier_init();
     __ASSERT(err == 0, "Failed to initialize VZW LWM2M");
 
     if(err != 0) {
@@ -79,7 +80,7 @@ void lwm2m_vzw_thread_run(void)
     k_sem_give(&lwm2m_vzw_sem);
 
     // Non-return function.
-    lwm2m_vzw_run();
+    lwm2m_carrier_run();
 }
 
 K_THREAD_DEFINE(lwm2m_vzw_thread, LWM2M_VZW_THREAD_STACK_SIZE,

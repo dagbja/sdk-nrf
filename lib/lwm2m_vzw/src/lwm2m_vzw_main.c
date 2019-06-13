@@ -1778,7 +1778,7 @@ static void app_lwm2m_observer_process(void)
     lwm2m_firmware_observer_process();
 }
 
-int lwm2m_vzw_init(void)
+int lwm2m_carrier_init(void)
 {
     int err;
     enum lwm2m_firmware_update_state mdfu;
@@ -1878,7 +1878,7 @@ int lwm2m_vzw_init(void)
     return 0;
 }
 
-void lwm2m_vzw_run(void)
+void lwm2m_carrier_run(void)
 {
     for (;;)
     {

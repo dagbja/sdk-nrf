@@ -8,9 +8,6 @@
 
 #include <net/socket.h>
 
-int lwm2m_vzw_init(void);
-void lwm2m_vzw_run(void);
-
 #define SECURITY_SERVER_URI_SIZE_MAX 64    /**< Max size of server URIs. */
 
 typedef enum

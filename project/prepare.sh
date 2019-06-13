@@ -43,7 +43,7 @@ declare -A lib_paths=([${lib_names[0]}]="coap"
 		      [${lib_names[1]}]="lwm2m"
 		      [${lib_names[2]}]="lwm2m_vzw")
 
-declare -a api_headers_nrf_lwm2m_vzw=("lwm2m_vzw_main.h"
+declare -a api_headers_nrf_lwm2m_vzw=("lwm2m_carrier.h"
 				      "lwm2m_os.h")
 
 function obfuscate {
