@@ -21,6 +21,8 @@ manifest:
       url-base: https://github.com/lemrey
     - name: armmbed
       url-base: https://github.com/ARMmbed
+    - name: rlubos
+      url-base: https://github.com/rlubos
 
   # The list of external projects for the Nordic LWM2M library and client.
   projects:
@@ -35,7 +37,9 @@ manifest:
       revision: 7e64ac737daead12d2dbdda5daec04188243a81c
     - name: nrfxlib
       path: nrfxlib
-      revision: pull/70/head
+      # Custom branch, based on fw-nrfconnect-nrf v1.0.0-rc1, with lwm2m_carrier library
+      remote: rlubos
+      revision: add-lwm2m-library
     - name: mbedtls
       revision: mbedtls-2.13.1
       remote: armmbed

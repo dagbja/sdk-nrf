@@ -20,3 +20,5 @@ zephyr_include_directories(../client/src)
 
 # TODO We keep the lwm2m_vzw headers internal for now
 zephyr_include_directories(../lib/lwm2m_vzw/include)
+zephyr_include_directories(../lib/lwm2m/include)
+zephyr_include_directories(../lib/coap/include)
