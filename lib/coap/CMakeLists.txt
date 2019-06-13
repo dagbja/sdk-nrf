@@ -6,6 +6,21 @@
 
 zephyr_library_named(nrf_coap)
 
+if (CONFIG_NRF_COAP_STANDALONE_LIBRARY)
+zephyr_library_cc_option(
+    -nostdlib
+    -nodefaultlibs
+    -nostartfiles
+    -lnosys
+)
+endif()
+
+if (NOT CONFIG_NRF_COAP_INCLUDE_DEBUG_INFORMATION)
+zephyr_library_cc_option(
+    -g0
+)
+endif()
+
 zephyr_include_directories(include)
 
 zephyr_library_sources(

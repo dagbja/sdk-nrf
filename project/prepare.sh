@@ -21,8 +21,10 @@ done
 
 project_file="prj.conf"
 project_dir="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-output_dir="output"
 cpu_variant="cortex-m33"
+output_dir="output"
+output_lib="nrf_lwm2m_carrier"
+temp_dir="temp"
 
 if [ "$debug" = true ] ; then
 	project_file="$project_file overlay-debug.conf"
@@ -33,42 +35,22 @@ declare -a lib_variants=("hard-float"
 #			 "softfp-float"
 			)
 
-declare -a lib_names=("nrf_lwm2m"
+declare -a lib_names=("nrf_coap"
+		      "nrf_lwm2m"
 		      "nrf_lwm2m_vzw")
 
-declare -A lib_paths=([${lib_names[0]}]="lwm2m"
-		      [${lib_names[1]}]="lwm2m_vzw")
+declare -A lib_paths=([${lib_names[0]}]="coap"
+		      [${lib_names[1]}]="lwm2m"
+		      [${lib_names[2]}]="lwm2m_vzw")
 
-declare -a api_headers_nrf_lwm2m=("lwm2m_cfg.h"
-				  "lwm2m_api.h"
-				  "lwm2m_objects.h"
-				  "lwm2m_remote.h"
-				  "lwm2m_acl.h"
-				  "lwm2m_objects_tlv.h"
-				  "lwm2m_tlv.h"
-				  "lwm2m_objects_plain_text.h"
-				  "lwm2m.h")
-
-declare -a api_headers_nrf_lwm2m_vzw=(
-				#       "app_debug.h"
-				#       "at_interface.h"
-				#       "common.h"
-				#       "lwm2m_conn_mon.h"
-				#       "lwm2m_vzw_main.h"
-				#       "lwm2m_device.h"
-				#       "lwm2m_firmware.h"
-				#       "lwm2m_instance_storage.h"
-				#       "lwm2m_os.h"
-				#       "lwm2m_retry_delay.h"
-				#       "lwm2m_security.h"
-				#       "lwm2m_server.h"
-				      )
+declare -a api_headers_nrf_lwm2m_vzw=("lwm2m_vzw_main.h"
+				      "lwm2m_os.h")
 
 function obfuscate {
 	# $1 library name
 	# $2 cpu variant
 	# $3 float variant
-	target_dir=$project_dir/$output_dir/$1/lib/$2/$3
+	target_dir=$project_dir/$temp_dir/$1/lib/$2/$3
 	script_dir=$project_dir/obfuscate
 	name=lib$1.a
 	obfuscated_name=lib$1_obfuscated.a
@@ -87,12 +69,12 @@ function obfuscate {
 	# Cleanup
 	rm -rf $target_dir/$name
 	rm -rf $target_dir/$relinked_name
-	rm -rf $target_dir/$mapping_name
 	rm -rf $target_dir/tmp
 
 	mv $target_dir/$obfuscated_name $target_dir/$name
 }
 
+rm -rf $project_dir/$temp_dir
 rm -rf $project_dir/$output_dir
 
 # Build and copy libraries
@@ -108,41 +90,12 @@ do
 
 	for j in "${lib_names[@]}"
 	do
-		ninja lib$j.a
+		ninja lib$j.a || exit 1
 
-		mkdir -p $project_dir/$output_dir/$j/lib/$cpu_variant/$i
-		cp $project_dir/build-$i/zephyr/modules/lwm2m/lib/${lib_paths[$j]}/lib$j.a $project_dir/$output_dir/$j/lib/$cpu_variant/$i
+		mkdir -p $project_dir/$temp_dir/$j/lib/$cpu_variant/$i
+		cp $project_dir/build-$i/zephyr/modules/lwm2m/lib/${lib_paths[$j]}/lib$j.a $project_dir/$temp_dir/$j/lib/$cpu_variant/$i
 	done
 done
-
-# Copy headers
-
-mkdir -p $project_dir/$output_dir/nrf_lwm2m/include
-
-for i in "${api_headers_nrf_lwm2m[@]}"
-do
-	cp $project_dir/../lib/lwm2m/include/$i $project_dir/$output_dir/nrf_lwm2m/include
-done
-
-mkdir -p $project_dir/$output_dir/nrf_lwm2m_vzw/include
-
-for i in "${api_headers_nrf_lwm2m_vzw[@]}"
-do
-	cp $project_dir/../lib/lwm2m_vzw/include/$i $project_dir/$output_dir/nrf_lwm2m_vzw/include
-done
-
-# Replace Kconfig macros with acual values
-
-autoconf_file="$project_dir/build-${lib_variants[0]}/zephyr/include/generated/autoconf.h"
-target_file="$project_dir/$output_dir/${lib_names[0]}/include/lwm2m_cfg.h"
-
-while read -r def conf val
-do
-	if [[ $conf == CONFIG_NRF_LWM2M_* ]]
-	then
-		sed -i "s/$conf/$val/g" $target_file
-	fi
-done < "$autoconf_file"
 
 # Obfuscate the Verizon LWM2M library
 
@@ -152,3 +105,45 @@ if [ "$debug" = false ] ; then
 		obfuscate "nrf_lwm2m_vzw" $cpu_variant $i
 	done
 fi
+
+# Merge the libraries into a single archive
+
+for i in "${lib_variants[@]}"
+do
+	output_path=$project_dir/$output_dir/lib/$cpu_variant/$i
+	mkdir -p $output_path
+
+	ar_script="create $output_path/lib$output_lib.a\n"
+
+	for j in "${lib_names[@]}"
+	do
+		ar_script=$ar_script"addlib $project_dir/$temp_dir/$j/lib/$cpu_variant/$i/lib$j.a\n"
+	done
+
+	ar_script=$ar_script"save\nend\n"
+
+	echo -e "$ar_script" | ar -M
+done
+
+# Copy headers
+
+mkdir -p $project_dir/$output_dir/include
+
+for i in "${api_headers_nrf_lwm2m_vzw[@]}"
+do
+	cp $project_dir/../lib/lwm2m_vzw/include/$i $project_dir/$output_dir/include
+done
+
+# TODO This is not needed at the moment, we do not make other headers public
+# Replace Kconfig macros with acual values
+
+# autoconf_file="$project_dir/build-${lib_variants[0]}/zephyr/include/generated/autoconf.h"
+# target_file="$project_dir/$temp_dir/nrf_lwm2m/include/lwm2m_cfg.h"
+
+# while read -r def conf val
+# do
+# 	if [[ $conf == CONFIG_NRF_LWM2M_* ]]
+# 	then
+# 		sed -i "s/$conf/$val/g" $target_file
+# 	fi
+# done < "$autoconf_file"

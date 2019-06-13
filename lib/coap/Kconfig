@@ -11,6 +11,13 @@ menuconfig NRF_COAP
 
 if NRF_COAP
 
+config NRF_COAP_STANDALONE_LIBRARY
+	bool "Compile CoAP as a standalone library"
+
+config NRF_COAP_INCLUDE_DEBUG_INFORMATION
+	bool "Include debug information in the output library"
+	depends on NRF_COAP_STANDALONE_LIBRARY
+
 config NRF_COAP_LOG_LEVEL
 	int "Log level for CoAP"
 	default 0
