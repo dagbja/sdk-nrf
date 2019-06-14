@@ -1783,12 +1783,14 @@ int lwm2m_vzw_init(void)
         spm_request_system_reboot();
     }
 
+    // Initialize the AT command driver before sending any AT command.
     at_cmd_init();
+    mdm_interface_init();
 
     // Initialize debug settings from flash.
     app_debug_init();
 
-    // Enable logging and provision certs before establing LTE link.
+    // Enable logging before establing LTE link.
     app_debug_modem_logging_enable();
 
     // Establish LTE link.
@@ -1796,8 +1798,17 @@ int lwm2m_vzw_init(void)
         lte_lc_psm_req(false);
     }
 
+    // Provision certificates before turning Modem on.
     cert_provision();
+
+    // Set-phone-functionality. Blocking call until we are connected.
+    // The lc module uses AT notifications.
     lte_lc_init_and_connect();
+
+    // Now set the AT notification callback after link is up
+    // and link controller module is done.
+    // AT notifications are now process by the Modem AT interface.
+    mdm_interface_init();
 
     if (app_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6)) {
         for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {

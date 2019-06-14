@@ -3,3 +3,4 @@ build-*
 cscope.out
 tags
 output
+.vscode/ipch/

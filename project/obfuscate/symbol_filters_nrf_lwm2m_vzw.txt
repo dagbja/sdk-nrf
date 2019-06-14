@@ -57,7 +57,7 @@
 ^app_state_update_delay$
 ^app_system_reset$
 ^app_system_shutdown$
-^at_send_command$
+^mdm_interface_at_write$
 ^lwm2m_device_get_sim_iccid$
 ^lwm2m_instance_storage_security_store$
 ^lwm2m_instance_storage_server_store$

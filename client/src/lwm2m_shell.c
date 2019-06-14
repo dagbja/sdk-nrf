@@ -28,7 +28,7 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
         return 0;
     }
 
-    at_send_command(argv[1], true);
+    (void)mdm_interface_at_write(argv[1], true);
 
     return 0;
 }

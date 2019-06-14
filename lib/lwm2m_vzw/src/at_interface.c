@@ -7,13 +7,54 @@
 #include <stdio.h>
 #include <net/socket.h>
 #include <pdn_management.h>
+#include <at_cmd.h>
 
 /* For logging API. */
 #include <lwm2m.h>
 
-#define APP_MAX_AT_READ_LENGTH          256
+// FIXME: remove this and move to KConfig
+#define APP_MAX_AT_READ_LENGTH          CONFIG_AT_CMD_RESPONSE_MAX_LEN
 #define APP_MAX_AT_WRITE_LENGTH         256
 
+
+static void at_response_handler(char *response)
+{
+    // TODO: handle AT command async responses and notifications.
+}
+
+void mdm_interface_init()
+{
+    // The AT command driver initialization is done automatically by the OS.
+    // Set handler for AT notifications and events.
+    at_cmd_set_notification_handler(at_response_handler);
+}
+
+int mdm_interface_at_write(const char *const cmd, bool do_logging)
+{
+    int ret = 0;
+    char read_buffer[APP_MAX_AT_READ_LENGTH];
+
+    if (cmd == NULL) {
+        ret = -1;
+    }
+    else {
+        // Send a null-terminated AT command.
+        ret = at_cmd_write(cmd, read_buffer, APP_MAX_AT_READ_LENGTH, NULL);
+    }
+
+    if (do_logging) {
+        if (ret == 0) {
+            LWM2M_INF("%s", lwm2m_os_log_strdup(read_buffer));
+        }
+        else {
+            // Unable to send the AT command or received an error response.
+            // This usually indicates that an error has been received in the AT response.
+            LWM2M_ERR("AT error %d", ret);
+        }
+    }
+
+    return ret;
+}
 
 int at_apn_setup_wait_for_ipv6(char * apn)
 {
@@ -320,44 +361,6 @@ int at_read_firmware_version(char *p_fw_version, uint32_t *p_fw_version_len)
         }
     } else {
         LWM2M_ERR("send(%s) failed", lwm2m_os_log_strdup(at_cgmr));
-        retval = EIO;
-    }
-
-    close(at_socket_fd);
-
-    return retval;
-}
-
-int at_send_command(const char *at_command, bool do_logging)
-{
-    char write_buffer[APP_MAX_AT_WRITE_LENGTH];
-    char read_buffer[APP_MAX_AT_READ_LENGTH];
-
-    int at_socket_fd;
-    int length;
-    int retval = 0;
-
-    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
-    if (at_socket_fd < 0) {
-        LWM2M_ERR("socket() failed");
-        return EIO;
-    }
-
-    snprintf(write_buffer, APP_MAX_AT_WRITE_LENGTH, "%s", at_command);
-    length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
-
-    if (length == strlen(write_buffer)) {
-        length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-        if (length > 0) {
-            if (do_logging) {
-                LWM2M_INF("%s", lwm2m_os_log_strdup(read_buffer));
-            }
-        } else {
-            LWM2M_ERR("recv() failed");
-            retval = EIO;
-        }
-    } else {
-        LWM2M_ERR("send() failed");
         retval = EIO;
     }
 
