@@ -17,13 +17,8 @@ config NRF_LWM2M_INCLUDE_DEBUG_INFORMATION
 	bool "Include debug information in the output library"
 	depends on NRF_LWM2M_STANDALONE_LIBRARY
 
-config NRF_LWM2M_LOG_LEVEL
-	int "Log level for LwM2M"
-	depends on NRF_LWM2M
-	default 0
-	range 0 4
-	help
-	  "Enables LwM2M debug messages."
+config NRF_LWM2M_ENABLE_LOGS
+	bool "Include logs in the LWM2M library."
 
 config NRF_LWM2M_COAP_HANDLER_MAX_INSTANCES
 	int "Maximum number of object instance supported by the device."

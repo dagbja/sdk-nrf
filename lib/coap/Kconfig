@@ -18,12 +18,8 @@ config NRF_COAP_INCLUDE_DEBUG_INFORMATION
 	bool "Include debug information in the output library"
 	depends on NRF_COAP_STANDALONE_LIBRARY
 
-config NRF_COAP_LOG_LEVEL
-	int "Log level for CoAP"
-	default 0
-	range 0 4
-	help
-	  "Enables CoAP debug messages."
+config NRF_COAP_ENABLE_LOGS
+	bool "Include logs in the CoAP library."
 
 config NRF_COAP_ACK_RANDOM_FACTOR
 	int "Random factor to calculate the initial time-out value for a confirmable message."

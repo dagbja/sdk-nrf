@@ -35,10 +35,16 @@
 extern "C" {
 #endif
 
+#if defined(CONFIG_NRF_COAP_ENABLE_LOGS)
 /** Used for getting trace of execution in the module. */
 #define COAP_TRC(...) lwm2m_os_log(LWM2M_LOG_LEVEL_TRC, "coap: " __VA_ARGS__)
 /** Used for logging errors in the module. */
 #define COAP_ERR(...) lwm2m_os_log(LWM2M_LOG_LEVEL_ERR, "coap: " __VA_ARGS__)
+#else /* NRF_COAP_ENABLE_LOGS */
+#define COAP_TRC(...)
+#define COAP_ERR(...)
+#endif /* NRF_COAP_ENABLE_LOGS */
+
 
 #define COAP_ENTRY() COAP_TRC(">> %s", __func__)
 #define COAP_EXIT() COAP_TRC("<< %s", __func__)

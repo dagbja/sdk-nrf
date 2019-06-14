@@ -575,7 +575,9 @@ void lwm2m_notification(lwm2m_notification_type_t type,
                         uint8_t                   coap_code,
                         uint32_t                  err_code)
 {
+#if defined(CONFIG_NRF_LWM2M_ENABLE_LOGS)
     static char *str_type[] = { "Bootstrap", "Register", "Update", "Deregister" };
+#endif
     LWM2M_INF("Got LWM2M notification %s  CoAP %d.%02d  err:%lu", str_type[type], coap_code >> 5, coap_code & 0x1f, err_code);
 
     if (type == LWM2M_NOTIFCATION_TYPE_BOOTSTRAP)

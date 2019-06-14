@@ -46,7 +46,7 @@ void lwm2m_free(void * p_memory)
 }
 
 
-//#if (LWM2M_CONFIG_LOG_ENABLED != 0)
+#if defined(CONFIG_NRF_LWM2M_ENABLE_LOGS)
 
 static uint8_t op_desc_idx_lookup(uint8_t bitmask)
 {
@@ -74,8 +74,7 @@ static const char m_operation_desc[8][9] = {
     "OBSERVE"
 };
 
-
-//#endif
+#endif // defined(CONFIG_NRF_LWM2M_ENABLE_LOGS)
 
 /** Mutex used by LwM2M implementation. */
 /* Mutex disabled for now.
