@@ -4,16 +4,12 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#include <logging/log.h>
-#define LOG_LEVEL CONFIG_NRF_COAP_LOG_LEVEL
-LOG_MODULE_REGISTER(coap_block);
-
 #include <stdbool.h>
 #include <errno.h>
 
-#include <coap_block.h>
-
 #include "coap.h"
+
+#include <coap_block.h>
 
 /** Block size base exponent. 4 means a base block size of 2^4 = 16 bytes. */
 #define BLOCK_SIZE_BASE_CONSTANT 4

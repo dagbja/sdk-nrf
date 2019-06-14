@@ -4,10 +4,6 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#include <logging/log.h>
-#define LOG_LEVEL CONFIG_NRF_COAP_LOG_LEVEL
-LOG_MODULE_REGISTER(coap_resource);
-
 #include <string.h>
 #include <errno.h>
 

@@ -16,9 +16,13 @@
 #define COAP_H__
 
 #include <zephyr.h>
+#include <zephyr/types.h>
 #include <net/socket.h>
 
 #include <coap_api.h>
+
+/* Use a common header for now. */
+#include <lwm2m_os.h>
 
 /**
  * @defgroup iot_coap_log Module's Log Macros
@@ -32,9 +36,9 @@ extern "C" {
 #endif
 
 /** Used for getting trace of execution in the module. */
-#define COAP_TRC(...) LOG_DBG(__VA_ARGS__)
+#define COAP_TRC(...) lwm2m_os_log(LWM2M_LOG_LEVEL_TRC, "coap: " __VA_ARGS__)
 /** Used for logging errors in the module. */
-#define COAP_ERR(...) LOG_ERR(__VA_ARGS__)
+#define COAP_ERR(...) lwm2m_os_log(LWM2M_LOG_LEVEL_ERR, "coap: " __VA_ARGS__)
 
 #define COAP_ENTRY() COAP_TRC(">> %s", __func__)
 #define COAP_EXIT() COAP_TRC("<< %s", __func__)
