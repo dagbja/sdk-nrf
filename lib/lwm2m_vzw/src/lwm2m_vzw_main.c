@@ -67,7 +67,6 @@
 #endif
 
 static char m_app_bootstrap_psk[]  = APP_BOOTSTRAP_SEC_PSK;
-static int  m_app_admin_apn_handle = -1;
 
 #if CONFIG_DK_LIBRARY
 #define APP_ERROR_CHECK(error_code) \
@@ -113,6 +112,7 @@ static char m_bootstrap_object_alias_name[] = "bs";                             
 
 static coap_transport_handle_t             m_coap_transport = -1;                             /**< CoAP transport handle for the non bootstrap server. */
 static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS];            /**< CoAP transport handles for the secure servers. Obtained on @coap_security_setup. */
+static int                                 m_admin_pdn_handle[1+LWM2M_MAX_SERVERS];           /**< PDN connection handle. */
 
 static volatile app_state_t m_app_state = APP_STATE_BOOTING;                             /**< Application state. Should be one of @ref app_state_t. */
 static volatile uint16_t    m_server_instance;                                                /**< Server instance handled. */
@@ -143,7 +143,6 @@ static struct sockaddr m_bs_remote_server;                                      
 static struct sockaddr m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
 static volatile uint32_t tick_count = 0;
 
-static void app_teardown_admin_pdn(void);
 static void app_misc_data_set_bootstrapped(uint8_t bootstrapped);
 static void app_server_deregister(uint16_t instance_id);
 static void app_server_disconnect(uint16_t instance_id);
@@ -202,10 +201,6 @@ void app_system_shutdown(void)
 {
     app_disconnect();
 
-    if (m_app_admin_apn_handle != -1) {
-        app_teardown_admin_pdn();
-    }
-
     lte_lc_power_off();
 
     m_app_state = APP_STATE_SHUTDOWN;
@@ -220,26 +215,29 @@ void app_system_reset(void)
 }
 
 /**@brief Setup ADMIN PDN connection */
-static void app_setup_admin_pdn(void)
+static void app_setup_admin_pdn(uint16_t instance_id)
 {
-    // Set up APN for Bootstrap and DM server.
-    uint8_t class_apn_len = 0;
-    char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
-    char apn_name_zero_terminated[64];
+    if (app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT)) {
+        // Set up APN for Bootstrap and DM server.
+        uint8_t class_apn_len = 0;
+        char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
+        char apn_name_zero_terminated[64];
 
-    memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
-    apn_name_zero_terminated[class_apn_len] = '\0';
+        memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
+        apn_name_zero_terminated[class_apn_len] = '\0';
 
-    m_app_admin_apn_handle = at_apn_setup_wait_for_ipv6(apn_name_zero_terminated);
-
-    LWM2M_INF("APN setup: %s", lwm2m_os_log_strdup(apn_name_zero_terminated));
+        LWM2M_INF("APN setup: %s", lwm2m_os_log_strdup(apn_name_zero_terminated));
+        m_admin_pdn_handle[instance_id] = at_apn_setup_wait_for_ipv6(apn_name_zero_terminated);
+    }
 }
 
-/**@brief Tear down ADMIN PDN connection. */
-static void app_teardown_admin_pdn(void)
+/**@brief Disconnect ADMIN PDN connection. */
+static void app_disconnect_admin_pdn(uint16_t instance_id)
 {
-    pdn_disconnect(m_app_admin_apn_handle);
-    m_app_admin_apn_handle = -1;
+    if (m_admin_pdn_handle[instance_id] != -1) {
+        pdn_disconnect(m_admin_pdn_handle[instance_id]);
+        m_admin_pdn_handle[instance_id] = -1;
+    }
 }
 
 /**@brief Initialize IMEI and MSISDN to use in client id.
@@ -498,7 +496,7 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_serv
     uint32_t err_code;
 
     // Use DNS to lookup the IP
-    err_code = app_resolve_server_uri(server_uri, uri_len, p_remote, secure, m_family_type[0], m_app_admin_apn_handle);
+    err_code = app_resolve_server_uri(server_uri, uri_len, p_remote, secure, m_family_type[0], m_admin_pdn_handle[0]);
 
     if (err_code == 0)
     {
@@ -1042,6 +1040,8 @@ static void app_bootstrap_connect(void)
     uint32_t err_code;
     bool secure;
 
+    app_setup_admin_pdn(0);
+
     // Save the remote address of the bootstrap server.
     uint8_t uri_len = 0;
     char * p_server_uri = lwm2m_security_server_uri_get(0, &uri_len);
@@ -1086,7 +1086,7 @@ static void app_bootstrap_connect(void)
         };
 
         char apn_name_zero_terminated[64];
-        if (m_app_admin_apn_handle != -1)
+        if (m_admin_pdn_handle[0] != -1)
         {
             uint8_t class_apn_len = 0;
             char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
@@ -1116,6 +1116,8 @@ static void app_bootstrap_connect(void)
         else
         {
             LWM2M_INF("Connection failed: %ld (%d)", err_code, errno);
+            app_disconnect_admin_pdn(0);
+
             m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
             // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
             if (err_code == EIO && (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH)) {
@@ -1172,10 +1174,9 @@ static void app_server_connect(uint16_t instance_id)
 
     uint8_t uri_len = 0;
     char * p_server_uri = lwm2m_security_server_uri_get(instance_id, &uri_len);
-    int apn_handle = -1;
 
     if (instance_id == 1) {
-        apn_handle = m_app_admin_apn_handle;
+        app_setup_admin_pdn(instance_id);
     }
 
     err_code = app_resolve_server_uri(p_server_uri,
@@ -1183,7 +1184,7 @@ static void app_server_connect(uint16_t instance_id)
                                       &m_remote_server[instance_id],
                                       &secure,
                                       m_family_type[instance_id],
-                                      apn_handle);
+                                      m_admin_pdn_handle[instance_id]);
     if (err_code != 0)
     {
         m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
@@ -1222,7 +1223,7 @@ static void app_server_connect(uint16_t instance_id)
         };
 
         char apn_name_zero_terminated[64];
-        if ((instance_id == 1) && (m_app_admin_apn_handle != -1))
+        if (m_admin_pdn_handle[instance_id] != -1)
         {
             uint8_t class_apn_len = 0;
             char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
@@ -1253,6 +1254,8 @@ static void app_server_connect(uint16_t instance_id)
         else
         {
             LWM2M_INF("Connection failed: %ld (%d)", err_code, errno);
+            app_disconnect_admin_pdn(instance_id);
+
             m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
             // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
             if (err_code == EIO && (errno == EINVAL || errno == EOPNOTSUPP || errno == ENETUNREACH)) {
@@ -1350,6 +1353,8 @@ static void app_server_disconnect(uint16_t instance_id)
         coap_security_destroy(m_lwm2m_transport[instance_id]);
         m_lwm2m_transport[instance_id] = -1;
     }
+
+    app_disconnect_admin_pdn(instance_id);
 }
 
 static void app_disconnect(void)
@@ -1484,6 +1489,7 @@ static bool app_coap_socket_poll(void)
             m_lwm2m_transport[m_server_instance] = -1;
 
             LWM2M_INF("Connection failed (%d)", error);
+            app_disconnect_admin_pdn(m_server_instance);
 
             // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
             if (error == EINVAL || error == EOPNOTSUPP || error == ENETUNREACH) {
@@ -1632,6 +1638,7 @@ static void app_coap_init(void)
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
         m_lwm2m_transport[i] = -1;
+        m_admin_pdn_handle[i] = -1;
     }
 
 #if APP_USE_CONTABO
@@ -1664,11 +1671,6 @@ static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len
 
 static void app_provision_secret_keys(void)
 {
-    if (m_app_admin_apn_handle != -1)
-    {
-        app_teardown_admin_pdn();
-    }
-
     lte_lc_offline();
     LWM2M_TRC("Offline mode");
 
@@ -1704,10 +1706,6 @@ static void app_provision_secret_keys(void)
     LWM2M_INF("Wrote secret keys");
 
     lte_lc_init_and_connect();
-
-    if (app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT)) {
-        app_setup_admin_pdn();
-    }
 
     // THIS IS A HACK. Temporary solution to give a delay to recover Non-DTLS sockets from CFUN=4.
     // The delay will make TX available after CID again set.
@@ -1764,7 +1762,6 @@ int lwm2m_vzw_init(void)
 
     if (app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT)) {
         LWM2M_INF("PDN support enabled");
-        app_setup_admin_pdn();
     } else {
         LWM2M_INF("PDN support disabled");
     }
