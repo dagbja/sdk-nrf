@@ -43,7 +43,7 @@ void app_state_set(app_state_t app_state);
 char *app_imei_get(void);
 char *app_msisdn_get(void);
 
-void app_request_server_update(uint16_t instance_id);
+void app_request_server_update(uint16_t instance_id, bool reconnect);
 bool app_did_bootstrap(void);
 uint16_t app_server_instance(void);
 sa_family_t app_family_type_get(uint16_t instance_id);

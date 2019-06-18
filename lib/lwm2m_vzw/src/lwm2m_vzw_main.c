@@ -128,6 +128,7 @@ struct connection_update_t {
     void *timer;
     uint16_t instance_id;
     bool requested;
+    bool reconnect;
 };
 
 static struct connection_update_t m_connection_update[1+LWM2M_MAX_SERVERS];
@@ -152,9 +153,11 @@ static void app_disconnect(void);
 static const char * app_uri_get(char * p_server_uri, uint16_t * p_port, bool * p_secure);
 
 /** Functions available from shell access */
-void app_request_server_update(uint16_t instance_id)
+void app_request_server_update(uint16_t instance_id, bool reconnect)
 {
-    m_connection_update[instance_id].requested = true;
+    if (m_lwm2m_transport[instance_id] != -1 || reconnect) {
+        m_connection_update[instance_id].requested = true;
+    }
 }
 
 app_state_t app_state_get(void)
@@ -554,6 +557,7 @@ static void app_restart_lifetime_timer(uint8_t instance_id)
         timeout = INT32_MAX;
     }
 
+    m_connection_update[instance_id].reconnect = false;
     lwm2m_os_timer_start(m_connection_update[instance_id].timer, timeout);
 }
 
@@ -637,7 +641,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             // No response from update request
             LWM2M_INF("Update timeout, reconnect (server %d)", instance_id);
             app_server_disconnect(instance_id);
-            app_request_server_update(instance_id);
+            app_request_server_update(instance_id, true);
         }
     }
     else if (type == LWM2M_NOTIFCATION_TYPE_DEREGISTER)
@@ -672,6 +676,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             LWM2M_INF("Disable [%ld seconds] (server %d)", delay, instance_id);
             app_server_disconnect(instance_id);
 
+            m_connection_update[instance_id].reconnect = true;
             lwm2m_os_timer_start(m_connection_update[instance_id].timer, delay * 1000);
         }
     }
@@ -727,7 +732,7 @@ static void app_connection_update(void *timer)
         return;
     }
 
-    app_request_server_update(connection_update_p->instance_id);
+    app_request_server_update(connection_update_p->instance_id, connection_update_p->reconnect);
 }
 
 void init_connection_update(void)
@@ -737,9 +742,10 @@ void init_connection_update(void)
         uint8_t uri_len = 0;
         (void)lwm2m_security_server_uri_get(i, &uri_len);
         if (uri_len > 0) {
-            app_request_server_update(i);
+            app_request_server_update(i, true);
             m_connection_update[i].timer = lwm2m_os_timer_get(app_connection_update);
             m_connection_update[i].instance_id = i;
+            m_connection_update[i].reconnect = false;
         }
     }
 }
@@ -1316,7 +1322,7 @@ void app_server_update(uint16_t instance_id)
         if (err_code != 0) {
             LWM2M_INF("Update failed: %ld (%d), reconnect (server %d)", err_code, errno, instance_id);
             app_server_disconnect(instance_id);
-            app_request_server_update(instance_id);
+            app_request_server_update(instance_id, true);
         }
     }
     else

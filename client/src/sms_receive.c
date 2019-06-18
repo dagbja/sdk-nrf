@@ -55,7 +55,7 @@ static void sms_receive(void *id, void *unused1, void *unused2)
             if (object == 1 && instance >= 0 && instance < 4 && resource == 8) {
                 // Server Registration Update Trigger
                 LOG_INF("Server Registration Update Trigger (server %u)", instance);
-                app_request_server_update(instance);
+                app_request_server_update(instance, false);
             } else if (object == 3 && instance == 0 && resource == 4) {
                 // Device Reboot
                 LOG_INF("Device Reboot");
