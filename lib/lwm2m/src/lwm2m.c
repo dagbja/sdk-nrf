@@ -90,7 +90,7 @@ static uint16_t           m_num_instances;
 
 static void coap_error_handler(u32_t error_code, coap_message_t * p_message)
 {
-    LWM2M_ERR("[CoAP]: Unhandled CoAP message received. Error code: %u", error_code);
+    // LWM2M_ERR("[CoAP]: Unhandled CoAP message received. Error code: %u", error_code);
 }
 
 
