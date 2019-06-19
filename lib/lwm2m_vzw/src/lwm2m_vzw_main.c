@@ -518,7 +518,7 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
 {
     bool start_retry_delay = true;
 
-    if (no_reply && !app_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6))
+    if (no_reply && !app_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6) && !app_debug_flag_is_set(DEBUG_FLAG_DISABLE_FALLBACK))
     {
         // Fallback to the other IP version
         m_family_type[instance_id] = (m_family_type[instance_id] == AF_INET6) ? AF_INET : AF_INET6;
