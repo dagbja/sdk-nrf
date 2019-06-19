@@ -1469,7 +1469,7 @@ static bool app_coap_socket_poll(void)
                 m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
             } else {
                 // TODO handle?
-                LWM2M_ERR("POLLERR: %d\n", i);
+                LWM2M_ERR("POLLERR: %d", i);
                 continue;
             }
 
@@ -1495,7 +1495,7 @@ static bool app_coap_socket_poll(void)
 
         if ((fds[i].revents & POLLNVAL) == POLLNVAL) {
             // TODO: Ignore POLLNVAL for now.
-            LWM2M_ERR("POLLNVAL: %d\n", i);
+            LWM2M_ERR("POLLNVAL: %d", i);
         }
     }
 
