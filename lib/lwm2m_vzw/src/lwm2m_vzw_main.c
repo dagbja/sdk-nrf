@@ -717,7 +717,7 @@ static void app_connection_update(void *timer)
     struct connection_update_t * connection_update_p = NULL;
 
     /* Find owner of a timer. */
-    for (int i; i < 1+LWM2M_MAX_SERVERS; i++) {
+    for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
         if (m_connection_update[i].timer == timer) {
             connection_update_p = &m_connection_update[i];
             break;
