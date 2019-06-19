@@ -171,6 +171,11 @@ static const u8_t log_level_lut[] = {
 	LOG_LEVEL_DBG,  /* LWM2M_LOG_LEVEL_TRC */
 };
 
+const char *lwm2m_os_log_strdup(const char *str)
+{
+	return log_strdup(str);
+}
+
 void lwm2m_os_log(int level, const char *fmt, ...)
 {
 	struct log_msg_ids src_level = {

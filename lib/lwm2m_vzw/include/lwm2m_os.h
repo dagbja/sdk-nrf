@@ -37,6 +37,7 @@ int32_t lwm2m_os_timer_remaining(void *timer);
 #define LWM2M_LOG_LEVEL_INF  3
 #define LWM2M_LOG_LEVEL_TRC  4
 
+const char *lwm2m_os_log_strdup(const char *str);
 void lwm2m_os_log(int level, const char *fmt, ...);
 
 #endif // LWM2M_OS_H__

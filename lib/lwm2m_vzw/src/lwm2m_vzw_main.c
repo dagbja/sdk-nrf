@@ -232,7 +232,7 @@ static void app_setup_admin_pdn(void)
 
     m_app_admin_apn_handle = at_apn_setup_wait_for_ipv6(apn_name_zero_terminated);
 
-    LWM2M_INF("APN setup: %s", apn_name_zero_terminated);
+    LWM2M_INF("APN setup: %s", lwm2m_os_log_strdup(apn_name_zero_terminated));
 }
 
 /**@brief Tear down ADMIN PDN connection. */
@@ -267,7 +267,7 @@ static char * app_initialize_client_id(void)
     if (len > 0) {
         if (strlen(p_msisdn) > 0 && strcmp(p_msisdn, last_used_msisdn) != 0) {
             // MSISDN has changed, factory reset and initiate bootstrap.
-            LWM2M_INF("Detected changed MSISDN: %s -> %s", last_used_msisdn, p_msisdn);
+            LWM2M_INF("Detected changed MSISDN: %s -> %s", lwm2m_os_log_strdup(last_used_msisdn), lwm2m_os_log_strdup(p_msisdn));
             app_bootstrap_reset();
             lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
             provision_bs_psk = true;
@@ -335,7 +335,7 @@ static const char * app_uri_get(char * server_uri, uint16_t * p_port, bool * p_s
         *p_port = 5683;
         *p_secure = false;
     } else {
-        LWM2M_ERR("Invalid server URI: %s", server_uri);
+        LWM2M_ERR("Invalid server URI: %s", lwm2m_os_log_strdup(server_uri));
         return NULL;
     }
 
@@ -441,7 +441,7 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
 
     LWM2M_INF("Doing DNS lookup using %s (APN %s)",
             (family_type == AF_INET6) ? "IPv6" : "IPv4",
-            (pdn_handle > -1) ? apn_name_zero_terminated : "default");
+            (pdn_handle > -1) ? lwm2m_os_log_strdup(apn_name_zero_terminated) : "default");
 
     struct addrinfo *result;
     int ret_val = -1;
@@ -461,11 +461,11 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     }
 
     if (ret_val == 22 || ret_val == 60) {
-        LWM2M_WRN("No %s address found for \"%s\"", (family_type == AF_INET6) ? "IPv6" : "IPv4", hostname);
+        LWM2M_WRN("No %s address found for \"%s\"", (family_type == AF_INET6) ? "IPv6" : "IPv4", lwm2m_os_log_strdup(hostname));
         lwm2m_os_free(p_server_uri_val);
         return EINVAL;
     } else if (ret_val != 0) {
-        LWM2M_ERR("Failed to lookup \"%s\": %d", hostname, ret_val);
+        LWM2M_ERR("Failed to lookup \"%s\": %d", lwm2m_os_log_strdup(hostname), ret_val);
         lwm2m_os_free(p_server_uri_val);
         return ret_val;
     }
@@ -481,9 +481,9 @@ static uint32_t app_resolve_server_uri(char            * server_uri,
     freeaddrinfo(result);
     lwm2m_os_free(p_server_uri_val);
 
-    static char ip_buffer[64];
+    char ip_buffer[64];
     app_printable_ip_address(addr, ip_buffer, sizeof(ip_buffer));
-    LWM2M_INF("DNS result: %s", ip_buffer);
+    LWM2M_INF("DNS result: %s", lwm2m_os_log_strdup(ip_buffer));
 
     return 0;
 }
@@ -1098,7 +1098,7 @@ static void app_bootstrap_connect(void)
         }
 
         LWM2M_INF("Setup secure DTLS session (server 0) (APN %s)",
-                  (local_port.interface) ? apn_name_zero_terminated : "default");
+                  (local_port.interface) ? lwm2m_os_log_strdup(apn_name_zero_terminated) : "default");
 
         err_code = coap_security_setup(&local_port, &m_bs_remote_server);
 
@@ -1235,7 +1235,7 @@ static void app_server_connect(uint16_t instance_id)
 
         LWM2M_INF("Setup secure DTLS session (server %u) (APN %s)",
                   instance_id,
-                  (local_port.interface) ? apn_name_zero_terminated : "default");
+                  (local_port.interface) ? lwm2m_os_log_strdup(apn_name_zero_terminated) : "default");
 
         err_code = coap_security_setup(&local_port, &m_remote_server[instance_id]);
 
@@ -1696,7 +1696,7 @@ static void app_provision_secret_keys(void)
             lwm2m_os_free(p_server_uri_val);
 
             if (secure) {
-                LWM2M_TRC("Provisioning key for %s, short-id: %u", p_server_uri_val, lwm2m_server_short_server_id_get(i));
+                LWM2M_TRC("Provisioning key for %s, short-id: %u", lwm2m_os_log_strdup(p_server_uri_val), lwm2m_server_short_server_id_get(i));
                 app_provision_psk(APP_SEC_TAG_OFFSET + i, p_identity, identity_len, p_psk, psk_len);
             }
         }
