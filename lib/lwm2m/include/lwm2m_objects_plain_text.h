@@ -50,6 +50,12 @@ uint32_t lwm2m_plain_text_device_decode(lwm2m_device_t * p_device,
                                         uint8_t        * p_buffer,
                                         uint32_t         buffer_len);
 
+
+uint32_t lwm2m_plain_text_firmware_decode(lwm2m_firmware_t * p_firmware,
+                                          uint16_t           resource_id,
+                                          uint8_t          * p_buffer,
+                                          uint32_t           buffer_len);
+
 #ifdef __cplusplus
 }
 #endif

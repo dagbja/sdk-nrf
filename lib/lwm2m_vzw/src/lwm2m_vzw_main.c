@@ -8,6 +8,8 @@
 #include <string.h>
 
 #include <lwm2m.h>
+#include <bsd.h>
+#include <net/bsdlib.h>
 #include <lwm2m_tlv.h>
 #include <lwm2m_acl.h>
 #include <lwm2m_api.h>
@@ -16,6 +18,7 @@
 #include <lwm2m_device.h>
 #include <lwm2m_firmware.h>
 #include <lwm2m_instance_storage.h>
+#include <lwm2m_firmware_download.h>
 #include <lwm2m_remote.h>
 #include <lwm2m_retry_delay.h>
 #include <lwm2m_security.h>
@@ -23,6 +26,8 @@
 #include <lwm2m_os.h>
 
 #include <app_debug.h>
+#include <at_cmd.h>
+#include <secure_services.h>
 #include <at_interface.h>
 #include <lte_lc.h>
 #include <nrf_inbuilt_key.h>
@@ -152,6 +157,8 @@ static void app_provision_secret_keys(void);
 static void app_disconnect(void);
 static const char * app_uri_get(char * p_server_uri, uint16_t * p_port, bool * p_secure);
 
+extern int cert_provision();
+
 /** Functions available from shell access */
 void app_request_server_update(uint16_t instance_id, bool reconnect)
 {
@@ -214,7 +221,7 @@ void app_system_shutdown(void)
 void app_system_reset(void)
 {
     app_system_shutdown();
-    NVIC_SystemReset();
+    spm_request_system_reboot();
 }
 
 /**@brief Setup ADMIN PDN connection */
@@ -999,6 +1006,7 @@ static void app_lwm2m_create_objects(void)
     lwm2m_device_init();
     lwm2m_conn_mon_init();
     lwm2m_firmware_init();
+    lwm2m_firmware_download_init();
 }
 
 /**@brief LWM2M initialization.
@@ -1735,13 +1743,52 @@ static void app_lwm2m_observer_process(void)
 
 int lwm2m_vzw_init(void)
 {
+    int err;
+    enum lwm2m_firmware_update_state mdfu;
+
+    app_timers_init();
+
     // Initialize Non-volatile Storage.
     lwm2m_instance_storage_init();
+
+    err = lwm2m_firmware_update_state_get(&mdfu);
+    if (!err && mdfu == UPDATE_SCHEDULED) {
+        printk("Update scheduled, please wait..\n");
+        app_state_set(APP_STATE_MODEM_FIRMWARE_UPDATE);
+    }
+
+    err = bsdlib_init();
+    if (err) {
+        switch (err) {
+        case MODEM_DFU_RESULT_OK:
+            printk("Modem firmware update successful!\n");
+            printk("Modem will run the new firmware after reboot\n");
+            break;
+        case MODEM_DFU_RESULT_UUID_ERROR:
+        case MODEM_DFU_RESULT_AUTH_ERROR:
+            printk("Modem firmware update failed\n");
+            printk("Modem will run non-updated firmware on reboot.\n");
+            break;
+        case MODEM_DFU_RESULT_HARDWARE_ERROR:
+        case MODEM_DFU_RESULT_INTERNAL_ERROR:
+            printk("Modem firmware update failed\n");
+            printk("Fatal error.\n");
+            break;
+        default:
+            break;
+        }
+
+        // Whatever the result, reboot and change the state.
+        lwm2m_firmware_update_state_set(UPDATE_EXECUTED);
+        spm_request_system_reboot();
+    }
+
+    at_cmd_init();
 
     // Initialize debug settings from flash.
     app_debug_init();
 
-    // Enable logging before establing LTE link.
+    // Enable logging and provision certs before establing LTE link.
     app_debug_modem_logging_enable();
 
     // Establish LTE link.
@@ -1749,6 +1796,7 @@ int lwm2m_vzw_init(void)
         lte_lc_psm_req(false);
     }
 
+    cert_provision();
     lte_lc_init_and_connect();
 
     if (app_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6)) {
@@ -1771,8 +1819,6 @@ int lwm2m_vzw_init(void)
     } else {
         LWM2M_INF("PDN support disabled");
     }
-
-    app_timers_init();
 
     if (lwm2m_security_bootstrapped_get(0)) {
         m_app_state = APP_STATE_IDLE;

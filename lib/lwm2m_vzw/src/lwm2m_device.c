@@ -17,6 +17,8 @@
 #include <common.h>
 #include <at_interface.h>
 #include <lwm2m_vzw_main.h>
+#include "dfusock.h"
+#include <nrf_socket.h>
 
 #define VERIZON_RESOURCE 30000
 
@@ -238,10 +240,28 @@ void lwm2m_device_init(void)
     m_instance_device.serial_number.p_val = app_imei_get();
     m_instance_device.serial_number.len = strlen(m_instance_device.serial_number.p_val);
 
-    m_instance_device.firmware_version.len = 80; // Should be ok for now
+    m_instance_device.firmware_version.len = sizeof(nrf_dfu_fw_version_t);
     m_instance_device.firmware_version.p_val = lwm2m_malloc(m_instance_device.firmware_version.len);
+
+#if 0
     (void)at_read_firmware_version(m_instance_device.firmware_version.p_val,
                                    &m_instance_device.firmware_version.len);
+#else
+    int err;
+
+    err = dfusock_init();
+    if (err)
+    {
+        return;
+    }
+
+    err = dfusock_version_get(m_instance_device.firmware_version.p_val,
+                              m_instance_device.firmware_version.len);
+    if (err)
+    {
+        return;
+    }
+#endif
 
     m_instance_device.avail_power_sources.len = 2;
     m_instance_device.avail_power_sources.val.p_uint8[0] = 0; // DC power

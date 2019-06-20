@@ -182,3 +182,44 @@ uint32_t lwm2m_plain_text_device_decode(lwm2m_device_t * p_device,
 
     return err_code;
 }
+
+uint32_t lwm2m_plain_text_firmware_decode(lwm2m_firmware_t * p_firmware,
+                                          uint16_t           resource_id,
+                                          uint8_t          * p_buffer,
+                                          uint32_t           buffer_len)
+{
+    NULL_PARAM_CHECK(p_firmware);
+    NULL_PARAM_CHECK(p_buffer);
+
+    uint32_t err_code;
+
+    switch (resource_id)
+    {
+        case LWM2M_FIRMWARE_PACKAGE_URI:
+        {
+            err_code = lwm2m_bytebuffer_to_string((char *)p_buffer,
+                                                  buffer_len,
+                                                  &p_firmware->package_uri);
+            break;
+        }
+
+        case LWM2M_FIRMWARE_PACKAGE:
+        /* LWM2M_FIRMWARE_PACKAGE_URI */
+        case LWM2M_FIRMWARE_UPDATE:
+        case LWM2M_FIRMWARE_STATE:
+        case LWM2M_FIRMWARE_LEGACY_DO_NOT_RENDER:
+        case LWM2M_FIRMWARE_UPDATE_RESULT:
+        case LWM2M_FIRMWARE_PKG_NAME:
+        case LWM2M_FIRMWARE_PKG_VERSION:
+        case LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT:
+        case LWM2M_FIRMWARE_FIRMWARE_UPDATE_DELIVERY_METHOD:
+            err_code = ENOTSUP;
+            break;
+
+        default:
+            err_code = EINVAL;
+            break;
+    }
+
+    return err_code;
+}

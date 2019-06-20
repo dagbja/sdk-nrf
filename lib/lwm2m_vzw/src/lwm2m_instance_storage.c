@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include <nrf_socket.h>
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
@@ -27,6 +28,9 @@
 #define LWM2M_INSTANCE_STORAGE_DEBUG_SETTINGS  9
 #define LWM2M_INSTANCE_STORAGE_BASE_SECURITY  (1 * LWM2M_INSTANCE_STORAGE_TYPE_MAX_COUNT)
 #define LWM2M_INSTANCE_STORAGE_BASE_SERVER    (2 * LWM2M_INSTANCE_STORAGE_TYPE_MAX_COUNT)
+#define MODEM_FIRMWARE_VERSION                 0xBEEF
+#define MODEM_FIRMWARE_READY                   0xF0F0
+#define MODEM_FIRMWARE_UPDATE                  0x0F0F
 
 
 typedef struct __attribute__((__packed__))
@@ -94,7 +98,12 @@ typedef struct __attribute__((__packed__))
 
 int32_t lwm2m_instance_storage_init(void)
 {
-    return lwm2m_os_storage_init();
+    static bool init = false;
+    if (!init) {
+        init = true;
+        return lwm2m_os_storage_init();
+    }
+    return 0;
 }
 
 int32_t lwm2m_instance_storage_deinit(void)
@@ -669,4 +678,96 @@ int32_t lwm2m_debug_settings_load(debug_settings_t * debug_settings)
 int32_t lwm2m_debug_settings_store(const debug_settings_t * debug_settings)
 {
     return lwm2m_os_storage_write(LWM2M_INSTANCE_STORAGE_DEBUG_SETTINGS, debug_settings, sizeof(*debug_settings));
+}
+
+int lwm2m_last_firmware_version_get(uint8_t *ver, size_t len)
+{
+    ssize_t rc;
+
+    __ASSERT_NO_MSG(len == sizeof(nrf_dfu_fw_version_t));
+
+    len = sizeof(nrf_dfu_fw_version_t);
+    rc = lwm2m_os_storage_read(MODEM_FIRMWARE_VERSION, ver, len);
+    if (rc < 0)
+    {
+        LWM2M_TRC("Unable to read modem firmware version to flash, err %d", rc);
+        return rc;
+    }
+
+    return 0;
+}
+
+int lwm2m_last_firmware_version_set(uint8_t *ver, size_t len)
+{
+    ssize_t rc;
+
+    __ASSERT_NO_MSG(len == sizeof(nrf_dfu_fw_version_t));
+
+    len = sizeof(nrf_dfu_fw_version_t);
+    rc = lwm2m_os_storage_write(MODEM_FIRMWARE_VERSION, ver, len);
+    if (rc < 0)
+    {
+        LWM2M_ERR("Unable to write modem firmware version to flash, err %d", rc);
+        return rc;
+    }
+
+    LWM2M_TRC("Saved modem firmware version in flash");
+
+    return 0;
+}
+
+int lwm2m_firmware_image_ready_get(bool *ready)
+{
+    ssize_t rc;
+
+    rc = lwm2m_os_storage_read(MODEM_FIRMWARE_READY, ready, sizeof(*ready));
+    if (rc < 0)
+    {
+        LWM2M_TRC("Unable to find modem firmware state in flash, err %d", rc);
+        return rc;
+    }
+
+    return 0;
+}
+
+int lwm2m_firmware_image_ready_set(bool ready)
+{
+    ssize_t rc;
+
+    rc = lwm2m_os_storage_write(MODEM_FIRMWARE_READY, &ready, sizeof(ready));
+    if (rc < 0)
+    {
+        LWM2M_ERR("Unable to write modem firmware state to flash, err %d", rc);
+        return rc;
+    }
+
+    return 0;
+}
+
+int lwm2m_firmware_update_state_get(enum lwm2m_firmware_update_state *state)
+{
+    ssize_t rc;
+
+    rc = lwm2m_os_storage_read(MODEM_FIRMWARE_UPDATE, state, sizeof(*state));
+    if (rc < 0)
+    {
+        LWM2M_TRC("lwm2m_firmware_update_ready_get() not found, err %d", rc);
+        return rc;
+    }
+
+    return 0;
+}
+
+int lwm2m_firmware_update_state_set(enum lwm2m_firmware_update_state state)
+{
+    ssize_t rc;
+
+    rc = lwm2m_os_storage_write(MODEM_FIRMWARE_UPDATE, &state, sizeof(state));
+    if (rc < 0)
+    {
+        LWM2M_ERR("Unable to write modem firmware info to flash, err %d", rc);
+        return rc;
+    }
+
+    return 0;
 }

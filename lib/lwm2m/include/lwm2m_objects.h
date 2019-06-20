@@ -79,20 +79,30 @@ extern "C" {
 #define LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT 8
 #define LWM2M_FIRMWARE_FIRMWARE_UPDATE_DELIVERY_METHOD  9
 
-#define LWM2M_FIRMWARE_STATE_IDLE                      1
-#define LWM2M_FIRMWARE_STATE_DOWNLOADING               2
-#define LWM2M_FIRMWARE_STATE_DOWNLOADED                3
-#define LWM2M_FIRMWARE_STATE_UPDATING                  4
+#define LWM2M_FIRMWARE_STATE_IDLE                      0
+#define LWM2M_FIRMWARE_STATE_DOWNLOADING               1
+#define LWM2M_FIRMWARE_STATE_DOWNLOADED                2
+#define LWM2M_FIRMWARE_STATE_UPDATING                  3
 
+/* Default value, to be set at the beginning of the DFU process. */
 #define LWM2M_FIRMWARE_UPDATE_RESULT_DEFAULT                      0
+/* Firmware updated successfully */
 #define LWM2M_FIRMWARE_UPDATE_RESULT_SUCCESS                      1
+/* Not enough flash memory. */
 #define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_STORAGE                2
+/* Out of RAM during downloading process */
 #define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_MEMORY                 3
+/*  Connection lost during downloading process. */
 #define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CONN_LOST              4
+/*  Integrity check failure for new downloaded package. */
 #define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CRC                    5
-#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_UNSUPPORTED_PKT_TYPE   6
+/* Unsupported package type. */
+#define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_UNSUPPORTED_PKG_TYPE   6
+/* Invalid URI. */
 #define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI            7
+/* Firmware update failed. */
 #define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_FIRMWARE_UPDATE_FAILED 8
+/* Unsupported protocol. */
 #define LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_UNSUPPORTED_PROTOCOL   9
 
 #define LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT_COAP  0

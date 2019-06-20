@@ -35,7 +35,8 @@ typedef enum
     APP_STATE_SERVER_DEREGISTER,
     APP_STATE_SERVER_DEREGISTERING,
     APP_STATE_DISCONNECT,
-    APP_STATE_SHUTDOWN
+    APP_STATE_MODEM_FIRMWARE_UPDATE,
+    APP_STATE_SHUTDOWN,
 } app_state_t;
 
 app_state_t app_state_get(void);

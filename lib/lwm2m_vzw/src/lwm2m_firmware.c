@@ -11,12 +11,15 @@
 #include <lwm2m_objects.h>
 #include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
+#include <lwm2m_objects_plain_text.h>
+#include <lwm2m_vzw_main.h>
 
 #include <coap_option.h>
 #include <coap_observe_api.h>
 #include <coap_message.h>
 
 #include <common.h>
+#include <lwm2m_firmware_download.h>
 
 
 static lwm2m_object_t   m_object_firmware;
@@ -191,7 +194,19 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
 
                     case LWM2M_FIRMWARE_PACKAGE_URI:
                     {
-                        lwm2m_firmware_package_uri_set(instance_id, unpack_struct.package_uri.p_val, unpack_struct.package_uri.len);
+                        int err;
+
+                        lwm2m_firmware_package_uri_set(instance_id,
+				unpack_struct.package_uri.p_val, unpack_struct.package_uri.len);
+
+                        err = lwm2m_firmware_download_uri(
+                            m_instance_firmware.package_uri.p_val,
+                            m_instance_firmware.package_uri.len);
+
+                        if (err) {
+                            lwm2m_firmware_update_result_set(0,
+                                LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI);
+                        }
                         break;
                     }
 
@@ -204,13 +219,34 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
         }
         else if ((mask & COAP_CT_MASK_PLAIN_TEXT) || (mask & COAP_CT_MASK_APP_OCTET_STREAM))
         {
-/*
             err_code = lwm2m_plain_text_firmware_decode(&m_instance_firmware,
-                                                      resource_id,
-                                                      p_request->payload,
-                                                      p_request->payload_len);
-*/
-            (void)lwm2m_respond_with_code(COAP_CODE_501_NOT_IMPLEMENTED, p_request);
+                                                        resource_id,
+                                                        p_request->payload,
+                                                        p_request->payload_len);
+
+            switch (err_code)
+            {
+                case EINVAL:
+                    (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+                    return err_code;
+
+                case ENOTSUP:
+                    (void)lwm2m_respond_with_code(COAP_CODE_501_NOT_IMPLEMENTED, p_request);
+                    return err_code;
+            }
+
+            __ASSERT_NO_MSG(resource_id == LWM2M_FIRMWARE_PACKAGE_URI);
+
+            int err;
+
+            err = lwm2m_firmware_download_uri(
+                m_instance_firmware.package_uri.p_val,
+                m_instance_firmware.package_uri.len);
+
+            if (err) {
+                lwm2m_firmware_update_result_set(0,
+                    LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI);
+            }
         }
         else
         {
@@ -237,10 +273,18 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
         {
             case LWM2M_FIRMWARE_UPDATE:
             {
-                LWM2M_TRC("FIRMWARE UPDATE EXECUTE ISSUED");
-                // TODO: initiate HTTP(S) download.
+                int err;
+
+                err = lwm2m_firmware_download_apply();
+                if (err)
+                {
+                    break;
+                }
+
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-                lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_DOWNLOADING);
+                lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_UPDATING);
+                LWM2M_INF("Firmware update scheduled at boot");
+                app_system_reset();
                 break;
             }
 
@@ -372,7 +416,7 @@ void lwm2m_firmware_init(void)
     lwm2m_firmware_update_result_set(0, LWM2M_FIRMWARE_UPDATE_RESULT_DEFAULT);
 
     // Setup default list of delivery protocols supported. For now HTTP only.
-    uint8_t list[] = {LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT_HTTP};
+    uint8_t list[] = {LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT_HTTPS};
     lwm2m_firmware_firmware_update_protocol_support_set(0, list, sizeof(list));
 
     // Setup default delivery method.

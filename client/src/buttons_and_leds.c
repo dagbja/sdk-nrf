@@ -140,6 +140,10 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
             *blink = DK_LED1_MSK;
             break;
 
+        case APP_STATE_MODEM_FIRMWARE_UPDATE:
+            *blink = DK_LED1_MSK | DK_LED2_MSK | DK_LED3_MSK | DK_LED4_MSK;
+            break;
+
         case APP_STATE_SHUTDOWN:
             *blink = DK_LED4_MSK;
             break;

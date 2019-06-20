@@ -17,6 +17,8 @@ manifest:
       # nRF Connect SDK base URL.
     - name: ncs
       url-base: https://github.com/NordicPlayground
+    - name: lemrey
+      url-base: https://github.com/lemrey
     - name: armmbed
       url-base: https://github.com/ARMmbed
 
@@ -24,7 +26,8 @@ manifest:
   projects:
     - name: fw-nrfconnect-nrf
       path: nrf
-      revision: v1.0.0-rc1
+      remote: lemrey
+      revision: download
     - name: fw-nrfconnect-zephyr
       path: zephyr
       west-commands: scripts/west-commands.yml

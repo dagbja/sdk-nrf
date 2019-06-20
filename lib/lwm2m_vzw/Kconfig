@@ -16,3 +16,10 @@ config NRF_LWM2M_VZW_STANDALONE_LIBRARY
 config NRF_LWM2M_VZW_INCLUDE_DEBUG_INFORMATION
 	bool "Include debug information in the output library"
 	depends on NRF_LWM2M_VZW_STANDALONE_LIBRARY
+
+config NRF_LWM2M_VZW_SEC_TAG
+	int "TLS security tag for Firmware downloads"
+	default 11
+	help
+	  TLS security tag associated with Verizon certificates.
+	  Set to -1 to disable TLS.

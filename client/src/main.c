@@ -35,6 +35,7 @@ void bsd_irrecoverable_error_handler(uint32_t error)
     ARG_UNUSED(error);
     buttons_and_leds_uninit();
 #endif
+
     printk("IRRECOVERABLE ERROR %lu\n", error);
     while (true);
 }
@@ -43,12 +44,12 @@ void bsd_irrecoverable_error_handler(uint32_t error)
  */
 int main(void)
 {
-    k_sem_take(&lwm2m_vzw_sem, K_FOREVER);
-
 #if CONFIG_DK_LIBRARY
     // Initialize LEDs and Buttons.
     buttons_and_leds_init();
 #endif
+
+    k_sem_take(&lwm2m_vzw_sem, K_FOREVER);
 
     if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
         // Start SMS receive thread
@@ -64,7 +65,7 @@ int main(void)
 
 /* These should be configurable. */
 #define LWM2M_VZW_THREAD_STACK_SIZE 8192
-#define LWLM2_VZW_THREAD_PRIORITY 7
+#define LWLM2_VZW_THREAD_PRIORITY K_LOWEST_APPLICATION_THREAD_PRIO
 
 void lwm2m_vzw_thread_run(void)
 {
