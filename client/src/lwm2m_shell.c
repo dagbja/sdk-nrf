@@ -337,7 +337,8 @@ static int cmd_debug_sms_support(const struct shell *shell, size_t argc, char **
 
     if (sms_support) {
         app_debug_flag_set(DEBUG_FLAG_SMS_SUPPORT);
-        sms_receive_thread_start();
+        // Register for SMS notifications.
+        sms_receiver_init();
     } else {
         app_debug_flag_clear(DEBUG_FLAG_SMS_SUPPORT);
     }

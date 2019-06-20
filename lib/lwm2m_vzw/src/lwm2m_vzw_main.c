@@ -1798,7 +1798,7 @@ int lwm2m_vzw_init(void)
         lte_lc_psm_req(false);
     }
 
-    // Provision certificates before turning Modem on.
+    // Provision certificates for DFU before turning the Modem on.
     cert_provision();
 
     // Set-phone-functionality. Blocking call until we are connected.

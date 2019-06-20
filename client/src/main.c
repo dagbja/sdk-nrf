@@ -52,8 +52,8 @@ int main(void)
     k_sem_take(&lwm2m_vzw_sem, K_FOREVER);
 
     if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
-        // Start SMS receive thread
-        sms_receive_thread_start();
+        //Enable SMS.
+        sms_receiver_init();
     }
 
     for (;;) {
@@ -61,7 +61,7 @@ int main(void)
     }
 }
 
-/* LWM2M background thread - should become a seprarate module. */
+/* LWM2M background thread - should become a separate module. */
 
 /* These should be configurable. */
 #define LWM2M_VZW_THREAD_STACK_SIZE 8192
@@ -71,6 +71,10 @@ void lwm2m_vzw_thread_run(void)
 {
     int err = lwm2m_vzw_init();
     __ASSERT(err == 0, "Failed to initialize VZW LWM2M");
+
+    if(err != 0) {
+        return;
+    }
 
     k_sem_give(&lwm2m_vzw_sem);
 

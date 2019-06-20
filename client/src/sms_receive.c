@@ -4,92 +4,77 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
+#include <stdio.h>
+#include <stdint.h>
+
 #define LOG_MODULE_NAME lwm2m_sms
 
 #include <logging/log.h>
 LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
-#include <zephyr.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <net/socket.h>
+#include <sms_receive.h>
+#include <at_cmd.h>
 #include <lwm2m_vzw_main.h>
 
-#define APP_MAX_AT_READ_LENGTH 256
-
-static K_THREAD_STACK_ARRAY_DEFINE(sms_stack, 1, 1024);
-static struct k_thread sms_thread;
 static uint32_t receive_count = 0;
 
-static const char at_cnmi[] = "AT+CNMI=3,2,0,1";  // Selects how new messages are indicated
-static const char at_cnma[] = "AT+CNMA=1";        // Send new message ACK in PDU mode
-
-static void sms_receive(void *id, void *unused1, void *unused2)
+int32_t sms_receiver_init(void)
 {
-    char read_buffer[APP_MAX_AT_READ_LENGTH];
-    int at_socket_fd;
-    int length;
+    LOG_INF("Initializing SMS receiver.");
 
-    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
-    if (at_socket_fd < 0) {
-        LOG_ERR("socket() failed");
-        return;
+    // Selects how new messages are indicated.
+    int err = at_cmd_write("AT+CNMI=3,2,0,1", NULL, 0, NULL);
+
+    if (err) {
+        LOG_ERR("Unable to initializing SMS receiver AT error %d.", err);
+        return err;
     }
 
-    LOG_INF("Initializing SMS receiver");
-    length = send(at_socket_fd, at_cnmi, sizeof(at_cnmi) - 1, 0);
+    return 0;
+}
 
-    while (true) {
-        length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
+void sms_receiver_notif_parse(char *notif)
+{
+    // Check if this is an SMS notification.
+    int length = strlen(notif);
 
-        if (length > 12 && strncmp(read_buffer, "+CMT:", 5) == 0) {
-            // Send ACK
-            send(at_socket_fd, at_cnma, sizeof(at_cnma) - 1, 0);
-            receive_count++;
+    if (length > 12 && strncmp(notif, "+CMT:", 5) == 0) {
 
-            // Manually decode the last bytes to get CoAP URI (ignore trailing \r\n)
-            uint8_t object  = read_buffer[length-12] - '0';
-            uint8_t instance = read_buffer[length-8] - '0';
-            uint8_t resource = read_buffer[length-4] - '0';
+        receive_count++;
+        LOG_INF("SMS received (count=%lu)", receive_count);
 
-            if (object == 1 && instance >= 0 && instance < 4 && resource == 8) {
-                // Server Registration Update Trigger
-                LOG_INF("Server Registration Update Trigger (server %u)", instance);
-                app_request_server_update(instance, false);
-            } else if (object == 3 && instance == 0 && resource == 4) {
-                // Device Reboot
-                LOG_INF("Device Reboot");
-                app_system_reset();
-            } else if (object == 3 && instance == 0 && resource == 5) {
-                // Device Factory Reset
-                LOG_INF("Device Factory Reset");
-                app_factory_reset();
-                app_system_reset();
-            } else {
-                LOG_ERR("Execute /%d/%d/%d not handled", object, instance, resource);
-            }
+        // Send new message ACK in PDU mode.
+        int err = at_cmd_write("AT+CNMA=1", NULL, 0, NULL);
+        if(err != 0) {
+            // Ignore error and continue
+            LOG_ERR("Unable to ACK SMS notification.");
+        }
+
+        // Manually decode the last bytes to get CoAP URI (ignore trailing \r\n)
+        uint8_t object = notif[length-12] - '0';
+        uint8_t instance = notif[length-8] - '0';
+        uint8_t resource = notif[length-4] - '0';
+
+        if (object == 1 && instance >= 0 && instance < 4 && resource == 8) {
+            // Server Registration Update Trigger
+            LOG_INF("Server Registration Update Trigger (server %u)", instance);
+            app_request_server_update(instance, false);
+        } else if (object == 3 && instance == 0 && resource == 4) {
+            // Device Reboot
+            LOG_INF("Device Reboot");
+            app_system_reset();
+        } else if (object == 3 && instance == 0 && resource == 5) {
+            // Device Factory Reset
+            LOG_INF("Device Factory Reset");
+            app_factory_reset();
+            app_system_reset();
+        } else {
+            LOG_ERR("Execute /%d/%d/%d not handled", object, instance, resource);
         }
     }
-
-    LOG_ERR("exit");
-    close(at_socket_fd);
 }
 
 uint32_t sms_receive_counter(void)
 {
     return receive_count;
-}
-
-void sms_receive_thread_start(void)
-{
-    static bool initialized;
-
-    if (!initialized) {
-        k_thread_create(&sms_thread, sms_stack[0], 1024,
-                        sms_receive, NULL, NULL, NULL, 0,
-                        K_USER, K_FOREVER);
-        k_thread_start(&sms_thread);
-
-        initialized = true;
-    }
 }

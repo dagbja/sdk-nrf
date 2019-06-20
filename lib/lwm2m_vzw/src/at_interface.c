@@ -5,8 +5,12 @@
  */
 
 #include <stdio.h>
+
+#include <at_interface.h>
+
 #include <net/socket.h>
 #include <pdn_management.h>
+#include <sms_receive.h>
 #include <at_cmd.h>
 
 /* For logging API. */
@@ -19,14 +23,19 @@
 
 static void at_response_handler(char *response)
 {
-    // TODO: handle AT command async responses and notifications.
+    LWM2M_INF("AT notification: %s", lwm2m_os_log_strdup(response));
+
+    // Try to parse the notification message to see if this is an SMS.
+    sms_receiver_notif_parse(response);
 }
 
 void mdm_interface_init()
 {
     // The AT command driver initialization is done automatically by the OS.
-    // Set handler for AT notifications and events.
+    // Set handler for AT notifications and events (SMS, CESQ, etc.).
     at_cmd_set_notification_handler(at_response_handler);
+
+    LWM2M_INF("Modem interface initialized.");
 }
 
 int mdm_interface_at_write(const char *const cmd, bool do_logging)
