@@ -35,8 +35,7 @@ manifest:
       revision: 7e64ac737daead12d2dbdda5daec04188243a81c
     - name: nrfxlib
       path: nrfxlib
-      # As in fw-nrfconnect-nrf v1.0.0-rc1 (bsdlib 0.3.1)
-      revision: be4d8e08958e4ad960f39be24cf2816ced008841
+      revision: pull/66/head
     - name: mbedtls
       revision: mbedtls-2.13.1
       remote: armmbed
