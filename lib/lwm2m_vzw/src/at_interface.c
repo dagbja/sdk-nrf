@@ -53,7 +53,7 @@ int mdm_interface_at_write(const char *const cmd, bool do_logging)
 
     if (do_logging) {
         if (ret == 0) {
-            LWM2M_INF("%s", lwm2m_os_log_strdup(read_buffer));
+            printk("%s", read_buffer);
         }
         else {
             // Unable to send the AT command or received an error response.

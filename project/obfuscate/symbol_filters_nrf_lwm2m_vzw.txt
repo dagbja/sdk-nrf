@@ -94,6 +94,7 @@
 # zephyr
 ^__errno$
 ^socket_ops$
+^printk$
 
 # coap
 ^coap_init$
