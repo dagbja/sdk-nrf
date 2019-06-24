@@ -41,7 +41,7 @@ void sms_receiver_notif_parse(char *notif)
     if (length > 12 && strncmp(notif, "+CMT:", 5) == 0) {
 
         receive_count++;
-        LOG_INF("SMS received (count=%lu)", receive_count);
+        //LOG_INF("SMS received (count=%lu)", receive_count);
 
         // Send new message ACK in PDU mode.
         int err = at_cmd_write("AT+CNMA=1", NULL, 0, NULL);

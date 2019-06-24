@@ -23,7 +23,7 @@
 
 static void at_response_handler(char *response)
 {
-    LWM2M_INF("AT notification: %s", lwm2m_os_log_strdup(response));
+    //LWM2M_INF("AT notification: %s", lwm2m_os_log_strdup(response));
 
     // Try to parse the notification message to see if this is an SMS.
     sms_receiver_notif_parse(response);
