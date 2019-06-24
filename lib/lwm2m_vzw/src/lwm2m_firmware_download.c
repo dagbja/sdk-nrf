@@ -9,6 +9,7 @@
 #include <lwm2m.h>
 #include "lwm2m_firmware.h"
 #include "lwm2m_instance_storage.h"
+#include <lwm2m_conn_mon.h>
 #include "lwm2m_objects.h"
 #include "dfusock.h"
 #include <download_client.h>
@@ -23,10 +24,16 @@
 /* Byte-length, without NULL termination */
 #define BYTELEN(string) (sizeof(string) - 1)
 
+static char pdn[64];
 static char file[256];
 static char host[128];
 
 static void *download_dwork;
+
+static struct download_client_cfg config = {
+	.sec_tag = CONFIG_NRF_LWM2M_VZW_SEC_TAG,
+};
+
 static struct download_client http_downloader;
 
 static int callback(const struct download_client_evt *event)
@@ -140,8 +147,7 @@ static void download_task(void *w)
 	 * to minimize the idle time on the socket and prevent the peer from
 	 * closing the connection before we get a chance to begin downloading.
 	 */
-	err = download_client_connect(&http_downloader, host,
-				      CONFIG_NRF_LWM2M_VZW_SEC_TAG);
+	err = download_client_connect(&http_downloader, host, &config);
 	if (err) {
 		lwm2m_firmware_update_result_set(
 			0, LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI);
@@ -256,6 +262,22 @@ int lwm2m_firmware_download_uri(char *package_uri, size_t len)
 	file[partial_len + 1] = '\0';
 
 	LWM2M_INF("Resource: %s (%d)", lwm2m_os_log_strdup(file), partial_len);
+
+	/* Setup PDN.
+	 * Do not set this in the download task, or it will crash badly.
+	 */
+	p =  lwm2m_conn_mon_class_apn_get(2, (uint8_t*)&len);
+	if (p) {
+		/* NULL-terminate */
+		memcpy(pdn, p, len);
+		pdn[len] = '\0';
+		config.pdn = pdn;
+		LWM2M_INF("Setting up PDN for HTTP download: %s",
+			  lwm2m_os_log_strdup(config.pdn));
+	} else {
+		LWM2M_INF("No PDN set.");
+		config.pdn = NULL;
+	}
 
 	/* Set state now, since the actual download might be delayed in case
 	 * there is a firmware image in flash that needs to be deleted.

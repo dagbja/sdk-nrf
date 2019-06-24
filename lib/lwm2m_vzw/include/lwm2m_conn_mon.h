@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <lwm2m_api.h>
+#include <lwm2m_tlv.h>
 #include <lwm2m_objects.h>
 
 #define LWM2M_CONN_MON_30000_CLASS_APN_2  0
