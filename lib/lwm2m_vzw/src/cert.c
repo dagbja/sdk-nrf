@@ -99,8 +99,6 @@ LOG_MODULE_REGISTER(cert);
 int cert_provision(void)
 {
 	int err;
-	char dummy;
-	bool certif_exists = false;
 
 	nrf_sec_tag_t sec_tag = CONFIG_NRF_LWM2M_VZW_SEC_TAG;
 
@@ -109,30 +107,29 @@ int cert_provision(void)
 		return 0;
 	}
 
-	err = nrf_inbuilt_key_exists(sec_tag, NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
-				     &certif_exists, &dummy);
-	if (err) {
-		LOG_WRN("Unable to check for certificate, err %d", err);
-	}
+	/* Here we simply delete and provision the certificates at each boot.
+	 * This clearly has implications on the device lifetime.
+	 *
+	 * TODO:
+	 * - fix nrf_inbuilt_key_exists() implementation
+	 *   to not return an error when the key does not exist,
+	 *   since it has an output parameter
+	 * - update the documentation accordingly
+	 * - use it here to avoid deleting and
+	 *   re-provisioning certificates at each boot
+	 */
 
-#if 0
-	/* Delete certificates */
+	/* Delete certificate */
 	err = nrf_inbuilt_key_delete(sec_tag, NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN);
 	if (err) {
-		LOG_ERR("Unable to delete certificate, err %d", err);
-	}
-#endif
-
-	if (certif_exists) {
-		LOG_INF("Certificates existing");
-		return 0;
+		/* Ignore errors, which can happen if the key doesn't exist. */
 	}
 
 	err = nrf_inbuilt_key_write(sec_tag, NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
 				    (char *)motive, sizeof(motive) - 1);
 
 	if (err) {
-		LOG_ERR("Certificate error: %d", err);
+		LOG_ERR("Unable to provision certicate #1, err: %d", err);
 		return err;
 	}
 
@@ -141,7 +138,7 @@ int cert_provision(void)
 				    sizeof(digicert_global_ca_g2) - 1);
 
 	if (err) {
-		LOG_ERR("Certificate error: %d", err);
+		LOG_ERR("Unable to provision certificate #2, err: %d", err);
 		return err;
 	}
 
@@ -149,7 +146,7 @@ int cert_provision(void)
 				    (char *)digicert, sizeof(digicert) - 1);
 
 	if (err) {
-		LOG_ERR("Certificate error: %d", err);
+		LOG_ERR("Unable to provision certificate #3, err: %d", err);
 		return err;
 	}
 
