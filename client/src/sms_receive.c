@@ -51,9 +51,9 @@ void sms_receiver_notif_parse(char *notif)
         }
 
         // Manually decode the last bytes to get CoAP URI (ignore trailing \r\n)
-        uint8_t object = notif[length-12] - '0';
-        uint8_t instance = notif[length-8] - '0';
-        uint8_t resource = notif[length-4] - '0';
+        uint8_t object = notif[length-11] - '0';
+        uint8_t instance = notif[length-7] - '0';
+        uint8_t resource = notif[length-3] - '0';
 
         if (object == 1 && instance >= 0 && instance < 4 && resource == 8) {
             // Server Registration Update Trigger
