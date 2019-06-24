@@ -62,7 +62,7 @@ static int cmd_config_print(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Instance %d", i);
             shell_print(shell, "  Short Server ID  %d", lwm2m_server_short_server_id_get(i));
             shell_print(shell, "  Server URI       %s", terminated_uri);
-            shell_print(shell, "  Lifetime         %lld", lwm2m_server_lifetime_get(i));
+            shell_print(shell, "  Lifetime         %ld", lwm2m_server_lifetime_get(i));
             shell_print(shell, "  Owner            %d", p_instance->acl.owner);
         }
     }
