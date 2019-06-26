@@ -212,6 +212,7 @@ void app_system_shutdown(void)
     app_disconnect();
 
     lte_lc_power_off();
+    bsdlib_shutdown();
 
     m_app_state = APP_STATE_SHUTDOWN;
 
