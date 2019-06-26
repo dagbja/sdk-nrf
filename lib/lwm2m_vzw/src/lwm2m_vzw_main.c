@@ -1071,6 +1071,8 @@ static void app_bootstrap_connect(void)
                                                    &secure,
                                                    &m_bs_remote_server);
     if (err_code != 0) {
+        app_disconnect_admin_pdn(0);
+
         m_app_state = APP_STATE_BS_CONNECT_RETRY_WAIT;
         if (err_code == EINVAL) {
             app_handle_connect_retry(0, true);
@@ -1207,6 +1209,8 @@ static void app_server_connect(uint16_t instance_id)
                                       m_admin_pdn_handle[instance_id]);
     if (err_code != 0)
     {
+        app_disconnect_admin_pdn(instance_id);
+
         m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
         if (err_code == EINVAL) {
             app_handle_connect_retry(instance_id, true);
@@ -1274,7 +1278,9 @@ static void app_server_connect(uint16_t instance_id)
         else
         {
             LWM2M_INF("Connection failed: %ld (%d)", err_code, errno);
-            app_disconnect_admin_pdn(instance_id);
+            if (instance_id == 1) {
+                app_disconnect_admin_pdn(instance_id);
+            }
 
             m_app_state = APP_STATE_SERVER_CONNECT_RETRY_WAIT;
             // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
