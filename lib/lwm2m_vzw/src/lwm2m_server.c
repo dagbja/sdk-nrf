@@ -23,7 +23,7 @@
 #include <common.h>
 
 extern void app_server_disable(uint16_t instance_id);
-extern void app_server_update(uint16_t instance_id);
+extern void app_server_update(uint16_t instance_id, bool connect_update);
 
 #define VERIZON_RESOURCE 30000
 
@@ -67,7 +67,7 @@ void lwm2m_server_lifetime_set(uint16_t instance_id, lwm2m_time_t value)
     m_instance_server[instance_id].lifetime = value;
     if (value != previous)
     {
-        app_server_update(instance_id);
+        app_server_update(instance_id, false);
     }
 }
 
@@ -370,7 +370,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                     instance_id = 1;
                 }
 #endif
-                app_server_update(instance_id);
+                app_server_update(instance_id, false);
                 break;
             }
 

@@ -650,7 +650,12 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             LWM2M_INF("Update timeout, reconnect (server %d)", instance_id);
             app_server_disconnect(instance_id);
             app_request_server_update(instance_id, true);
+        } else if (m_app_state == APP_STATE_SERVER_REGISTER_WAIT) {
+            // Update instead of register during connect
+            LWM2M_INF("Update after connect (server %d)", instance_id);
+            m_app_state = APP_STATE_IDLE;
         }
+
     }
     else if (type == LWM2M_NOTIFCATION_TYPE_DEREGISTER)
     {
@@ -1318,9 +1323,10 @@ static void app_server_register(uint16_t instance_id)
     }
 }
 
-void app_server_update(uint16_t instance_id)
+void app_server_update(uint16_t instance_id, bool connect_update)
 {
     if ((m_app_state == APP_STATE_IDLE) ||
+        (connect_update) ||
         (instance_id != m_server_instance))
     {
         uint32_t err_code;
@@ -1332,6 +1338,8 @@ void app_server_update(uint16_t instance_id)
             LWM2M_INF("Update failed: %ld (%d), reconnect (server %d)", err_code, errno, instance_id);
             app_server_disconnect(instance_id);
             app_request_server_update(instance_id, true);
+        } else if (connect_update) {
+            m_app_state = APP_STATE_SERVER_REGISTER_WAIT;
         }
     }
     else
@@ -1537,7 +1545,7 @@ static void app_check_server_update(void)
             } else if (lwm2m_server_registered_get(i)) {
                 LWM2M_INF("app_server_update (server %u)", i);
                 m_connection_update[i].requested = false;
-                app_server_update(i);
+                app_server_update(i, false);
             }
         }
     }
@@ -1583,8 +1591,30 @@ static void app_lwm2m_process(void)
         }
         case APP_STATE_SERVER_CONNECTED:
         {
-            LWM2M_INF("app_server_register (server %u)", m_server_instance);
-            app_server_register(m_server_instance);
+            bool do_register = true;
+
+            /* If already registered and having a remote location then do update. */
+            if (lwm2m_server_registered_get(m_server_instance)) {
+                char   * p_location;
+                uint16_t location_len = 0;
+
+                uint16_t short_server_id = lwm2m_server_short_server_id_get(m_server_instance);
+                uint32_t err_code = lwm2m_remote_location_find(&p_location,
+                                                               &location_len,
+                                                               short_server_id);
+                if (err_code == 0) {
+                    do_register = false;
+                }
+            }
+
+            if (do_register) {
+                LWM2M_INF("app_server_register (server %u)", m_server_instance);
+                app_server_register(m_server_instance);
+            } else {
+                LWM2M_INF("app_server_update (server %u)", m_server_instance);
+                app_server_update(m_server_instance, true);
+            }
+
             break;
         }
         case APP_STATE_SERVER_DEREGISTER:
