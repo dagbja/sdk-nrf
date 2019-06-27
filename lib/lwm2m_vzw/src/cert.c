@@ -8,6 +8,7 @@
 #include <nrf_inbuilt_key.h>
 #include <nrf_key_mgmt.h>
 
+#if 0
 static const char motive[] = {
 "-----BEGIN CERTIFICATE-----\n"
 "MIIGszCCBZugAwIBAgIQAwteyFvVCv6KUtPkXpY8ezANBgkqhkiG9w0BAQsFADBEMQswCQYDVQQG\n"
@@ -70,6 +71,7 @@ static const char digicert_global_ca_g2[] = {
 "DJXWKTUgNX31EGDk92hiHuwZ4STyhxGs6QiA\n"
 "-----END CERTIFICATE-----"
 };
+#endif
 
 /* DigiCert Global Root G2 */
 static const char digicert[] = {
@@ -94,6 +96,7 @@ static const char digicert[] = {
 "-----END CERTIFICATE-----"
 };
 
+#if 0
 /*
  * CN=DigiCert Baltimore CA-2 G2, OU=www.digicert.com, O=DigiCert Inc, C=US
  */
@@ -121,6 +124,7 @@ static const char amazon[] = {
 "JUuOUFfrjsxOFT+xJd1BDKCcYm1vupcHi9nzBhDFKdT3uhaQqNBU4UtJx5g=\n"
 "-----END CERTIFICATE-----"
 };
+#endif
 
 LOG_MODULE_REGISTER(cert);
 
@@ -153,6 +157,7 @@ int cert_provision(void)
 		/* Ignore errors, which can happen if the key doesn't exist. */
 	}
 
+#if 0
 	err = nrf_inbuilt_key_write(sec_tag, NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
 				    (char *)motive, sizeof(motive) - 1);
 
@@ -160,7 +165,9 @@ int cert_provision(void)
 		LOG_ERR("Unable to provision certicate #1, err: %d", err);
 		return err;
 	}
+#endif
 
+#if 0
 	err = nrf_inbuilt_key_write(sec_tag, NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
 				    (char *)digicert_global_ca_g2,
 				    sizeof(digicert_global_ca_g2) - 1);
@@ -169,7 +176,9 @@ int cert_provision(void)
 		LOG_ERR("Unable to provision certificate #2, err: %d", err);
 		return err;
 	}
+#endif
 
+#if 1
 	err = nrf_inbuilt_key_write(sec_tag, NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
 				    (char *)digicert, sizeof(digicert) - 1);
 
@@ -178,6 +187,10 @@ int cert_provision(void)
 		return err;
 	}
 
+	LOG_INF("Provisioned certificate, tag %lu", sec_tag);
+#endif
+
+#if 0
 	err = nrf_inbuilt_key_write(sec_tag, NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
 				    (char *)amazon, sizeof(amazon) - 1);
 
@@ -185,6 +198,7 @@ int cert_provision(void)
 		LOG_ERR("Unable to provision certificate #4, err: %d", err);
 		return err;
 	}
+#endif
 
 	LOG_INF("Certificates provisioned");
 
