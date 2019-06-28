@@ -97,10 +97,12 @@ static void download_task(void *w)
 		if (err == -ENOEXEC) {
 			/* Operation is pending, wait until it has completed */
 			LWM2M_INF("Waiting for firmware to be deleted..");
-			lwm2m_os_timer_start(download_dwork, K_SECONDS(2));
 		} else {
-			LWM2M_ERR("Unxpected offset error %d", err);
+			/* Should not receive any other error, log this */
+			LWM2M_WRN("Waiting for firmware to be deleted (%d)",
+				  err);
 		}
+		lwm2m_os_timer_start(download_dwork, K_SECONDS(2));
 		return;
 	}
 
