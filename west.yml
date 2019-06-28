@@ -35,7 +35,7 @@ manifest:
       revision: 7e64ac737daead12d2dbdda5daec04188243a81c
     - name: nrfxlib
       path: nrfxlib
-      revision: pull/66/head
+      revision: pull/70/head
     - name: mbedtls
       revision: mbedtls-2.13.1
       remote: armmbed
