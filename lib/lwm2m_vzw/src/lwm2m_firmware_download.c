@@ -45,7 +45,7 @@ static int callback(const struct download_client_evt *event)
 		err = dfusock_fragment_send(event->fragment.buf,
 					    event->fragment.len);
 		if (err) {
-			/* TODO: ensure download can be restarted? */
+			/* The modem refused the fragment, can't recover */
 			download_client_disconnect(&http_downloader);
 			lwm2m_firmware_update_result_set(
 				0, LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CRC);
@@ -56,9 +56,14 @@ static int callback(const struct download_client_evt *event)
 		break;
 
 	case DOWNLOAD_CLIENT_EVT_DONE:
-		/* Ready to apply patch on execute */
 		LWM2M_INF("Download completed");
 		download_client_disconnect(&http_downloader);
+		/* Close the DFU socket to free up memory,
+		 * it will be re-opened in lwm2m_firmware_download_apply().
+		 */
+		LWM2M_INF("Closing DFU socket");
+		dfusock_close();
+		/* Save state and notify the server */
 		lwm2m_firmware_image_ready_set(true);
 		lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_DOWNLOADED);
 		break;
@@ -67,16 +72,21 @@ static int callback(const struct download_client_evt *event)
 		LWM2M_WRN("Download interrupted");
 		err = download_client_disconnect(&http_downloader);
 		if (err) {
-			LWM2M_WRN("Failed to close HTTP socket, err %d", err);
-		}
-		LWM2M_INF("Socket closed");
-		if (err) {
 			LWM2M_ERR("Failed to resume download");
 			lwm2m_firmware_update_result_set(
 				0,
 				LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CONN_LOST);
 			break;
 		}
+		/* Re-initialize the DFU socket to free up memory
+		 * that could be necessary for the TLS handshake.
+		 */
+		dfusock_close();
+		err = dfusock_init();
+		if (err) {
+			return -1;
+		}
+
 		lwm2m_os_timer_start(download_dwork, K_SECONDS(1));
 		break;
 	}
@@ -141,7 +151,7 @@ static void download_task(void *w)
 	LWM2M_INF("%s download", off ? lwm2m_os_log_strdup("Resuming") :
 				       lwm2m_os_log_strdup("Starting"));
 
-	/* Offset must be explicitly set */
+	/* Offset must be explicitly set when non-zero */
 	dfusock_offset_set(off);
 
 	/* Connect as late as possible.
@@ -304,6 +314,11 @@ int lwm2m_firmware_download_apply(void)
 		return -ENFILE;
 	}
 
+	err = dfusock_init();
+	if (err) {
+		return err;
+	}
+
 	err = dfusock_version_get(ver, UUID_LEN);
 	if (err) {
 		return err;
@@ -330,6 +345,9 @@ int lwm2m_firmware_download_apply(void)
 			0, LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CRC);
 		return err;
 	}
+
+	/* Ignore any errors, it is critical to set UPDATE_SCHEDULED */
+	dfusock_close();
 
 	err = lwm2m_firmware_update_state_set(UPDATE_SCHEDULED);
 	if (err) {

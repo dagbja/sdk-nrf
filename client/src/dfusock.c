@@ -130,10 +130,28 @@ int dfusock_firmware_revert(void)
 	return 0;
 }
 
+int dfusock_close(void)
+{
+	int err;
+
+	if (dfusock == -1) {
+		return 0;
+	}
+
+	err = nrf_close(dfusock);
+	if (err) {
+		LWM2M_ERR("Failed to close DFU socket, errno %d", errno);
+	}
+
+	dfusock = -1;
+
+	return err;
+}
+
 int dfusock_init(void)
 {
 	if (dfusock != -1) {
-		LWM2M_TRC("Socket already open");
+		LWM2M_TRC("DFU socket already open");
 		return 0;
 	}
 

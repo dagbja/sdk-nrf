@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 int dfusock_init(void);
+int dfusock_close(void);
 int dfusock_offset_get(uint32_t *off);
 int dfusock_offset_set(uint32_t off);
 
