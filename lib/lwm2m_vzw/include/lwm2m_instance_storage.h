@@ -73,4 +73,7 @@ enum lwm2m_firmware_update_state{
 int lwm2m_firmware_update_state_get(enum lwm2m_firmware_update_state *);
 int lwm2m_firmware_update_state_set(enum lwm2m_firmware_update_state);
 
+int lwm2m_firmware_uri_get(char *uri, size_t len);
+int lwm2m_firmware_uri_set(char *uri, size_t len);
+
 #endif // LWM2M_INSTANCE_STORAGE_H__

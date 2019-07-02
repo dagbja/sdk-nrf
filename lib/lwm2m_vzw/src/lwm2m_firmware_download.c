@@ -29,12 +29,13 @@ static char file[256];
 static char host[128];
 
 static void *download_dwork;
-
+static struct download_client http_downloader;
 static struct download_client_cfg config = {
 	.sec_tag = CONFIG_NRF_LWM2M_VZW_SEC_TAG,
 };
 
-static struct download_client http_downloader;
+int lwm2m_firmware_download_uri(char *package_uri, size_t len);
+
 
 static int callback(const struct download_client_evt *event)
 {
@@ -179,6 +180,7 @@ static void download_task(void *w)
 int lwm2m_firmware_download_init(void)
 {
 	int err;
+	uint32_t off;
 	enum lwm2m_firmware_update_state state;
 
 	uint8_t saved_ver[UUID_LEN];
@@ -230,6 +232,30 @@ int lwm2m_firmware_download_init(void)
 	}
 
 	LWM2M_INF("Firmware download ready");
+
+	/* Check if there is a download to resume */
+	err = dfusock_offset_get(&off);
+	if (err) {
+		return err;
+	}
+
+	/* Image offset must be not dirty and non-zero */
+	if (off != DIRTY_IMAGE && off != 0) {
+		bool ready = false;
+		char uri[512] = {0};
+		/* Check if image is complete, if not resume */
+		err = lwm2m_firmware_image_ready_get(&ready);
+		if (!err & !ready) {
+			err = lwm2m_firmware_uri_get(uri, sizeof(uri));
+			if (!err) {
+				/* Resume */
+				LWM2M_INF("Resuming after power loss");
+				lwm2m_firmware_download_uri(uri, sizeof(uri));
+			} else {
+				LWM2M_WRN("No package URI to resume from");
+			}
+		}
+	}
 
 	return 0;
 }
@@ -290,6 +316,11 @@ int lwm2m_firmware_download_uri(char *package_uri, size_t len)
 		LWM2M_INF("No PDN set.");
 		config.pdn = NULL;
 	}
+
+	/* Save package URI to resume automatically
+	 * on boot after a power loss has occurred.
+	 */
+	lwm2m_firmware_uri_set(package_uri, strlen(package_uri));
 
 	/* Set state now, since the actual download might be delayed in case
 	 * there is a firmware image in flash that needs to be deleted.

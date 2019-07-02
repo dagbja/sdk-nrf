@@ -197,15 +197,14 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
                         int err;
 
                         lwm2m_firmware_package_uri_set(instance_id,
-				unpack_struct.package_uri.p_val, unpack_struct.package_uri.len);
+                            unpack_struct.package_uri.p_val, unpack_struct.package_uri.len);
 
                         err = lwm2m_firmware_download_uri(
                             m_instance_firmware.package_uri.p_val,
                             m_instance_firmware.package_uri.len);
 
                         if (err) {
-                            lwm2m_firmware_update_result_set(0,
-                                LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI);
+                            LWM2M_ERR("Invalid protocol in package URI");
                         }
                         break;
                     }

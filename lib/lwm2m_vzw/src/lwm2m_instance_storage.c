@@ -31,6 +31,7 @@
 #define MODEM_FIRMWARE_VERSION                 0xBEEF
 #define MODEM_FIRMWARE_READY                   0xF0F0
 #define MODEM_FIRMWARE_UPDATE                  0x0F0F
+#define LWM2M_FIRMWARE_URI                     0xFAFA
 
 typedef struct __attribute__((__packed__))
 {
@@ -746,6 +747,34 @@ int lwm2m_firmware_update_state_set(enum lwm2m_firmware_update_state state)
     if (rc < 0)
     {
         LWM2M_ERR("Unable to write modem firmware info to flash, err %d", rc);
+        return rc;
+    }
+
+    return 0;
+}
+
+int lwm2m_firmware_uri_get(char *uri, size_t len)
+{
+    ssize_t rc;
+
+    rc = lwm2m_os_storage_read(LWM2M_FIRMWARE_URI, uri, len);
+    if (rc < 0)
+    {
+        LWM2M_TRC("lwm2m_firmware_uri_get(), err %d", rc);
+        return rc;
+    }
+
+    return 0;
+}
+
+int lwm2m_firmware_uri_set(char *uri, size_t len)
+{
+    ssize_t rc;
+
+    rc = lwm2m_os_storage_write(LWM2M_FIRMWARE_URI, uri, len);
+    if (rc < 0)
+    {
+        LWM2M_ERR("lwm2m_firmware_uri_set(), err %d", rc);
         return rc;
     }
 
