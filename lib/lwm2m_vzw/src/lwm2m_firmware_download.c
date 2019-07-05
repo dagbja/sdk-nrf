@@ -7,13 +7,14 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <lwm2m.h>
-#include "lwm2m_firmware.h"
-#include "lwm2m_instance_storage.h"
 #include <lwm2m_conn_mon.h>
-#include "lwm2m_objects.h"
-#include "dfusock.h"
 #include <download_client.h>
 #include <nrf_socket.h>
+
+#include "lwm2m_objects.h"
+#include "lwm2m_firmware.h"
+#include "lwm2m_instance_storage.h"
+#include "dfusock.h"
 
 /* The offset is set to this value for dirty images, or backup images */
 #define DIRTY_IMAGE 2621440
@@ -36,63 +37,93 @@ static struct download_client_cfg config = {
 
 int lwm2m_firmware_download_uri(char *package_uri, size_t len);
 
-
-static int callback(const struct download_client_evt *event)
+static int on_fragment(const struct download_client_evt *event)
 {
 	int err;
 
-	switch (event->id) {
-	case DOWNLOAD_CLIENT_EVT_FRAGMENT:
-		err = dfusock_fragment_send(event->fragment.buf,
-					    event->fragment.len);
-		if (err) {
-			/* The modem refused the fragment, can't recover */
-			download_client_disconnect(&http_downloader);
-			lwm2m_firmware_update_result_set(
-				0, LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CRC);
-			lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_IDLE);
-			/* Stop the download */
-			return -1;
-		}
-		break;
-
-	case DOWNLOAD_CLIENT_EVT_DONE:
-		LWM2M_INF("Download completed");
-		download_client_disconnect(&http_downloader);
-		/* Close the DFU socket to free up memory,
-		 * it will be re-opened in lwm2m_firmware_download_apply().
-		 */
-		LWM2M_INF("Closing DFU socket");
-		dfusock_close();
-		/* Save state and notify the server */
-		lwm2m_firmware_image_ready_set(true);
-		lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_DOWNLOADED);
-		break;
-
-	case DOWNLOAD_CLIENT_EVT_ERROR:
-		LWM2M_WRN("Download interrupted");
-		err = download_client_disconnect(&http_downloader);
-		if (err) {
-			LWM2M_ERR("Failed to resume download");
-			lwm2m_firmware_update_result_set(
-				0,
-				LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CONN_LOST);
-			break;
-		}
-		/* Re-initialize the DFU socket to free up memory
-		 * that could be necessary for the TLS handshake.
-		 */
-		dfusock_close();
-		err = dfusock_init();
-		if (err) {
-			return -1;
-		}
-
-		lwm2m_os_timer_start(download_dwork, K_SECONDS(1));
-		break;
+	err = dfusock_fragment_send(event->fragment.buf, event->fragment.len);
+	if (!err) {
+		/* Continue the download */
+		return 0;
 	}
 
+	/* The modem refused the fragment, can't recover */
+	download_client_disconnect(&http_downloader);
+
+	lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_IDLE);
+	lwm2m_firmware_update_result_set(0,
+		LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CRC);
+
+	/* Re-initialize the DFU socket to free up memory
+	 * that could be necessary for the TLS handshake.
+	 */
+	dfusock_close();
+	dfusock_init();
+
+	/* Stop the download */
+	return -1;
+}
+
+static int on_done(const struct download_client_evt *event)
+{
+	LWM2M_INF("Download completed");
+
+	download_client_disconnect(&http_downloader);
+
+	/* Save state and notify the server */
+	lwm2m_firmware_image_ready_set(true);
+	lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_DOWNLOADED);
+
+	/* Close the DFU socket to free up memory for TLS,
+	 * it will be re-opened in lwm2m_firmware_download_apply().
+	 */
+	LWM2M_INF("Closing DFU socket");
+	dfusock_close();
+
 	return 0;
+}
+
+static int on_error(const struct download_client_evt *event)
+{
+	int err;
+
+	LWM2M_WRN("Download interrupted");
+	err = download_client_disconnect(&http_downloader);
+	if (err) {
+		LWM2M_ERR("Failed to resume download");
+		lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_IDLE);
+		lwm2m_firmware_update_result_set(0,
+			LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CONN_LOST);
+
+		return -1;
+	}
+
+	/* Re-initialize the DFU socket to free up memory
+	 * that could be necessary for the TLS handshake.
+	 */
+	dfusock_close();
+	err = dfusock_init();
+	if (err) {
+		return -1;
+	}
+
+	lwm2m_os_timer_start(download_dwork, K_SECONDS(1));
+
+	return 0;
+}
+
+static int callback(const struct download_client_evt *event)
+{
+	switch (event->id) {
+	case DOWNLOAD_CLIENT_EVT_FRAGMENT:
+		return on_fragment(event);
+	case DOWNLOAD_CLIENT_EVT_DONE:
+		return on_done(event);
+	case DOWNLOAD_CLIENT_EVT_ERROR:
+		return on_error(event);
+	default:
+		return 0;
+	}
 }
 
 static void download_task(void *w)
