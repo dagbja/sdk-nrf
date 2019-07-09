@@ -61,6 +61,8 @@
 ^lwm2m_device_get_sim_iccid$
 ^lwm2m_instance_storage_security_store$
 ^lwm2m_instance_storage_server_store$
+^lwm2m_plain_text_firmware_decode$
+^lwm2m_remote_location_find$
 ^lwm2m_retry_delay_get$
 ^lwm2m_security_bootstrapped_get$
 ^lwm2m_security_server_uri_get$
@@ -70,6 +72,8 @@
 ^lwm2m_server_lifetime_set$
 ^lwm2m_server_registered_get$
 ^lwm2m_server_short_server_id_get$
+^sms_receive_counter$
+^sms_receiver_init$
 
 # External symbols we should not modify
 
@@ -79,6 +83,7 @@
 ^__sprintf_chk$
 ^atoi$
 ^memcpy$
+^memcmp$
 ^memset$
 ^snprintf$
 ^sprintf$
@@ -154,13 +159,29 @@
 ^lwm2m_update$
 
 # others
+^at_cmd_init$
+^at_cmd_set_notification_handler$
+^at_cmd_write$
+^bsdlib_init$
+^bsdlib_shutdown$
+^download_client_connect$
+^download_client_disconnect$
+^download_client_init$
+^download_client_start$
+^download_task$
 ^lte_lc_init_and_connect$
 ^lte_lc_normal$
 ^lte_lc_offline$
 ^lte_lc_power_off$
 ^lte_lc_psm_req$
+^nrf_close$
+^nrf_getsockopt$
+^nrf_setsockopt$
+^nrf_socket$
 ^nrf_apn_class_read$
 ^nrf_apn_class_update$
 ^nrf_inbuilt_key_write$
+^nrf_inbuilt_key_delete$
 ^pdn_disconnect$
 ^pdn_init_and_connect$
+^spm_request_system_reboot$

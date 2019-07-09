@@ -10,12 +10,7 @@
 #include <buttons_and_leds.h>
 #endif
 
-#include <app_debug.h>
-#include <sms_receive.h>
-#include <lwm2m_vzw_main.h>
 #include <lwm2m_carrier.h>
-
-K_SEM_DEFINE(lwm2m_vzw_sem, 0, 1);
 
 /**@brief Recoverable BSD library error. */
 void bsd_recoverable_error_handler(uint32_t error)
@@ -50,13 +45,6 @@ int main(void)
     buttons_and_leds_init();
 #endif
 
-    k_sem_take(&lwm2m_vzw_sem, K_FOREVER);
-
-    if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
-        //Enable SMS.
-        sms_receiver_init();
-    }
-
     for (;;) {
         k_sleep(K_SECONDS(1));
     }
@@ -76,8 +64,6 @@ void lwm2m_vzw_thread_run(void)
     if(err != 0) {
         return;
     }
-
-    k_sem_give(&lwm2m_vzw_sem);
 
     // Non-return function.
     lwm2m_carrier_run();

@@ -32,6 +32,7 @@
 #include <lte_lc.h>
 #include <nrf_inbuilt_key.h>
 #include <pdn_management.h>
+#include <sms_receive.h>
 
 #define APP_USE_SOCKET_POLL             0 // Use socket poll() to check status
 #define APP_ACL_DM_SERVER_HACK          1
@@ -1848,6 +1849,11 @@ int lwm2m_carrier_init(void)
     // and link controller module is done.
     // AT notifications are now process by the Modem AT interface.
     mdm_interface_init();
+
+    if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
+        //Enable SMS.
+        sms_receiver_init();
+    }
 
     if (app_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6)) {
         for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {

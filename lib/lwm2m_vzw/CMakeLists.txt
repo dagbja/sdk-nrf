@@ -30,6 +30,7 @@ zephyr_library_sources(
     src/app_debug.c
     src/at_interface.c
     src/common.c
+    src/dfusock.c
     src/lwm2m_conn_mon.c
     src/lwm2m_vzw_main.c
     src/lwm2m_device.c
@@ -40,6 +41,7 @@ zephyr_library_sources(
     src/lwm2m_retry_delay.c
     src/lwm2m_security.c
     src/lwm2m_server.c
+    src/sms_receive.c
 )
 
 if (NOT CONFIG_NRF_LWM2M_VZW_STANDALONE_LIBRARY)
