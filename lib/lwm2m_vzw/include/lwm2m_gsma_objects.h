@@ -589,6 +589,186 @@ typedef struct
     int32_t          prach_repetition_seq;
 } lwm2m_gsma_prach_report_t;
 
+/**@brief Initialize a LWM2M GSMA powerupLog object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_powerup_log_init(lwm2m_gsma_powerup_log_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA plmnSearchEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_plmn_search_event_init(lwm2m_gsma_plmn_search_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA scellID object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_scell_id_init(lwm2m_gsma_scell_id_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA cellReselectionEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_cell_reselection_event_init(lwm2m_gsma_cell_reselection_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA handoverEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_handover_event_init(lwm2m_gsma_handover_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA radioLinkFailureEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_radio_link_failure_event_init(lwm2m_gsma_radio_link_failure_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA rrcStateChangeEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_rrc_state_change_event_init(lwm2m_gsma_rrc_state_change_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA rrcTimerExpiryEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_rrc_timer_expiry_event_init(lwm2m_gsma_rrc_timer_expiry_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA cellBlacklistEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_cell_blacklist_event_init(lwm2m_gsma_cell_blacklist_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA esmContextInfo object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_esm_context_info_init(lwm2m_gsma_esm_context_info_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA emmStateValue object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_emm_state_value_init(lwm2m_gsma_emm_state_value_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA nasEmmTimerExpiryEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_nas_emm_timer_expiry_event_init(lwm2m_gsma_nas_emm_timer_expiry_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA nasEsmExpiryEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_nas_esm_expiry_event_init(lwm2m_gsma_nas_esm_expiry_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA emmFailureCauseEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_emm_failure_cause_event_init(lwm2m_gsma_emm_failure_cause_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA rachLatency_delay object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_rach_latency_delay_init(lwm2m_gsma_rach_latency_delay_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA macRachAttemptEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_mac_rach_attempt_event_init(lwm2m_gsma_mac_rach_attempt_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA macRachAttemptReasonEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_mac_rach_attempt_reason_event_init(lwm2m_gsma_mac_rach_attempt_reason_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA macTimerStatusEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_mac_timer_status_event_init(lwm2m_gsma_mac_timer_status_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA macTimingAdvanceEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_mac_timing_advance_event_init(lwm2m_gsma_mac_timing_advance_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA ServingCellMeasurement object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_serving_cell_measurement_init(lwm2m_gsma_serving_cell_measurement_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA NeighborCellMeasurements object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_neighbor_cell_measurements_init(lwm2m_gsma_neighbor_cell_measurements_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA TimingAdvance object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_timing_advance_init(lwm2m_gsma_timing_advance_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA txPowerHeadroomEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_tx_power_headroom_event_init(lwm2m_gsma_tx_power_headroom_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA radioLinkMonitoring object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_radio_link_monitoring_init(lwm2m_gsma_radio_link_monitoring_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA PagingDRX object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_paging_drx_init(lwm2m_gsma_paging_drx_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA txPowerBackOffEvent object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_tx_power_back_off_event_init(lwm2m_gsma_tx_power_back_off_event_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA Message3Report object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_message_3_report_init(lwm2m_gsma_message_3_report_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA PbchDecodingResults object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_pbch_decoding_results_init(lwm2m_gsma_pbch_decoding_results_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA pucchPowerControl object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_pucch_power_control_init(lwm2m_gsma_pucch_power_control_t * p_instance);
+
+/**@brief Initialize a LWM2M GSMA PrachReport object instance.
+ *
+ * @param[in, out] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_gsma_instance_prach_report_init(lwm2m_gsma_prach_report_t * p_instance);
+
 #ifdef __cplusplus
 }
 #endif
