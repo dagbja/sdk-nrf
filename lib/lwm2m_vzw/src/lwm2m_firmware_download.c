@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <lwm2m.h>
 #include <lwm2m_conn_mon.h>
-#include <download_client.h>
+#include <net/download_client.h>
 #include <nrf_socket.h>
 
 #include "lwm2m_objects.h"
@@ -25,7 +25,7 @@
 /* Byte-length, without NULL termination */
 #define BYTELEN(string) (sizeof(string) - 1)
 
-static char pdn[64];
+static char apn[64];
 static char file[256];
 static char host[128];
 
@@ -338,14 +338,14 @@ int lwm2m_firmware_download_uri(char *package_uri, size_t len)
 	p =  lwm2m_conn_mon_class_apn_get(2, (uint8_t*)&len);
 	if (p) {
 		/* NULL-terminate */
-		memcpy(pdn, p, len);
-		pdn[len] = '\0';
-		config.pdn = pdn;
-		LWM2M_INF("Setting up PDN for HTTP download: %s",
-			  lwm2m_os_log_strdup(config.pdn));
+		memcpy(apn, p, len);
+		apn[len] = '\0';
+		config.apn = apn;
+		LWM2M_INF("Setting up apn for HTTP download: %s",
+			  lwm2m_os_log_strdup(config.apn));
 	} else {
-		LWM2M_INF("No PDN set.");
-		config.pdn = NULL;
+		LWM2M_INF("No APN set.");
+		config.apn = NULL;
 	}
 
 	/* Save package URI to resume automatically

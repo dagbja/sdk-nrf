@@ -17,8 +17,6 @@ manifest:
       # nRF Connect SDK base URL.
     - name: ncs
       url-base: https://github.com/NordicPlayground
-    - name: lemrey
-      url-base: https://github.com/lemrey
     - name: armmbed
       url-base: https://github.com/ARMmbed
     - name: rlubos
@@ -28,13 +26,11 @@ manifest:
   projects:
     - name: fw-nrfconnect-nrf
       path: nrf
-      remote: lemrey
-      revision: download
+      revision: 16bc508d43abee1b913d0473416cf1671e38ec28
     - name: fw-nrfconnect-zephyr
       path: zephyr
       west-commands: scripts/west-commands.yml
-      # As in fw-nrfconnect-nrf v1.0.0-rc1
-      revision: 7e64ac737daead12d2dbdda5daec04188243a81c
+      revision: a8933a2ead01db56a3d3828d81887535be8b5bda
     - name: nrfxlib
       path: nrfxlib
       # Custom branch, based on fw-nrfconnect-nrf v1.0.0-rc1, with lwm2m_carrier library
