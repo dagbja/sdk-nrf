@@ -1851,12 +1851,11 @@ int lwm2m_carrier_init(void)
 
     // Initialize the AT command driver before sending any AT command.
     at_cmd_init();
-    mdm_interface_init();
 
     // Initialize debug settings from flash.
     app_debug_init();
 
-    // Enable logging before establing LTE link.
+    // Enable logging before establishing LTE link.
     app_debug_modem_logging_enable();
 
     // Establish LTE link.
@@ -1874,7 +1873,7 @@ int lwm2m_carrier_init(void)
     // Now set the AT notification callback after link is up
     // and link controller module is done.
     // AT notifications are now process by the Modem AT interface.
-    mdm_interface_init();
+    (void)mdm_interface_init();
 
     // Check operator ID
     at_read_operator_id(&m_operator_id);

@@ -11,7 +11,7 @@
 
 /* TODO: Move APIs to modem interface modem with data model. */
 
-void mdm_interface_init();
+int mdm_interface_init(void);
 
 /**
  * @brief Send an null-terminated AT command to the Modem.

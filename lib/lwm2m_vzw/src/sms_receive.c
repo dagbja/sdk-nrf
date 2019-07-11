@@ -33,11 +33,10 @@ int32_t sms_receiver_init(void)
     return 0;
 }
 
-void sms_receiver_notif_parse(char *notif)
+int sms_receiver_notif_parse(char *notif)
 {
     // Check if this is an SMS notification.
     int length = strlen(notif);
-
     if (length > 12 && strncmp(notif, "+CMT:", 5) == 0) {
 
         receive_count++;
@@ -71,7 +70,13 @@ void sms_receiver_notif_parse(char *notif)
         } else {
             LOG_ERR("Execute /%d/%d/%d not handled", object, instance, resource);
         }
+
+        // CMT notification has been parsed.
+        return 0;
     }
+
+    // Not SMS related.
+    return -1;
 }
 
 uint32_t sms_receive_counter(void)

@@ -22,6 +22,31 @@
 #define APP_MAX_AT_READ_LENGTH          CONFIG_AT_CMD_RESPONSE_MAX_LEN
 #define APP_MAX_AT_WRITE_LENGTH         256
 
+/**
+ * @brief The array index is the CID number.
+ *
+ * The maximum CIDs allowed in the system defines the size of the table.
+ * The table index is the CID value (CID value 0 to 11).
+ */
+static volatile bool cid_ipv6_table[12];
+
+/**
+ * @brief At command events or notifications handler.
+ *
+ * @param[in] evt Pointer to a null-terminated AT string (notification or event).
+ * @return 0 if the event has been consumed,
+ *           or an error code if the event should be propagated to the other handlers.
+ */
+typedef int (*at_notif_handler)(char* evt);
+
+static int at_cgev_handler(char *notif);
+
+static const at_notif_handler at_handlers[] = {
+    at_cgev_handler,         ///< Parse AT CGEV events for PDN/IPv6.
+    sms_receiver_notif_parse ///< Parse received SMS events.
+};
+
+
 static int at_send_command_and_parse_params(const char * p_at_command, struct at_param_list * p_param_list, int param_count)
 {
     char read_buffer[APP_MAX_AT_READ_LENGTH];
@@ -48,22 +73,55 @@ static int at_send_command_and_parse_params(const char * p_at_command, struct at
     return retval;
 }
 
-
 static void at_response_handler(char *response)
 {
-    //LWM2M_INF("AT notification: %s", lwm2m_os_log_strdup(response));
-
-    // Try to parse the notification message to see if this is an SMS.
-    sms_receiver_notif_parse(response);
+    for (int i = 0; i < ARRAY_SIZE(at_handlers); i++) {
+        int ret = at_handlers[i](response);
+        if (ret == 0) {
+            // Message or events is consumed. Skip next handlers and wait for next message/event.
+            return;
+        }
+    }
 }
 
-void mdm_interface_init()
+static int at_cgev_handler(char *notif)
+{
+    // Check if this is a CGEV event.
+    int length = strlen(notif);
+    if (length >= 8 && strncmp(notif, "+CGEV: ", 7) == 0)
+    {
+        // Check type of CGEV event.
+        char * cgev_evt = &notif[7];
+
+        // TODO: Check if IPV6 fail for CID first.
+
+        // IPv6 link is up for the default bearer.
+        if (strncmp(cgev_evt, "IPV6 ", 5) == 0)
+        {
+            // Save result for each CIDs.
+            int cid = strtol(&cgev_evt[5], NULL, 0);
+            if (cid >= 0 && cid < ARRAY_SIZE(cid_ipv6_table))
+            {
+                cid_ipv6_table[cid] = true;
+            }
+        }
+
+        // CGEV event parsed.
+        return 0;
+    }
+
+    // Not a CGEV event.
+    return -1;
+}
+
+int mdm_interface_init(void)
 {
     // The AT command driver initialization is done automatically by the OS.
     // Set handler for AT notifications and events (SMS, CESQ, etc.).
     at_cmd_set_notification_handler(at_response_handler);
 
     LWM2M_INF("Modem interface initialized.");
+    return 0;
 }
 
 int mdm_interface_at_write(const char *const cmd, bool do_logging)
@@ -95,78 +153,59 @@ int mdm_interface_at_write(const char *const cmd, bool do_logging)
 
 int at_apn_setup_wait_for_ipv6(char * apn)
 {
-    char write_buffer[APP_MAX_AT_WRITE_LENGTH];
-    char read_buffer[APP_MAX_AT_READ_LENGTH];
-
     int apn_handle = -1;
-
-    int at_socket_fd;
-    int at_socket_cgev_fd;
+    int cid_number = -1;
+    bool cid_found = false;
 
     if (apn == NULL) {
         return -1;
     }
 
-    at_socket_cgev_fd = socket(AF_LTE, 0, NPROTO_AT);
-    if (at_socket_cgev_fd < 0) {
-        LWM2M_ERR("socket() failed");
-    }
+    // Clear the CID table before registering for packet events.
+    memset((void *)cid_ipv6_table, 0x00, sizeof(cid_ipv6_table));
 
-    // Subscribe to CGEV
-    const char at_cgerep[] = "AT+CGEREP=1\r\n";
-    int sent_cgev_length = send(at_socket_cgev_fd, at_cgerep, sizeof(at_cgerep), 0);
-    if (sent_cgev_length == -1)
+    // Register for packet domain event reporting +CGEREP.
+    // The unsolicited result code is +CGEV: XXX.
+    int err = at_cmd_write("AT+CGEREP=1", NULL, 0, NULL);
+
+    if (err != 0)
     {
-        // Should still be -1.
-        LWM2M_ERR("IPv6 APN failed sending CGEREP=1");
-        return -1;
-    }
-
-    int received_cgev_length = 0;
-    do {
-        memset(read_buffer, 0, sizeof(read_buffer));
-        received_cgev_length = recv(at_socket_cgev_fd, read_buffer, sizeof(read_buffer), 0);
-    } while (received_cgev_length <= 0);
-
-    // Check if subscription went OK.
-    if ((received_cgev_length <= 0) || strstr(read_buffer, "OK\r\n") == NULL)
-    {
-        LWM2M_ERR("IPv6 APN CGERRP response not ok: %s", lwm2m_os_log_strdup(read_buffer));
+        // Check if subscription went OK.
+        LWM2M_ERR("Unable to register to CGEV events for IPv6 APN");
         return -1;
     }
 
     // Set up APN which implicitly creates a CID.
     apn_handle = pdn_init_and_connect(apn);
 
-    bool cid_found = false;
-    int  cid_number = 0;
     if (apn_handle > -1)
     {
-        at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
-        if (at_socket_fd < 0) {
-            LWM2M_ERR("socket() failed");
-        }
+        char at_cmd[16];
+        char read_buffer[APP_MAX_AT_READ_LENGTH];
 
-        // Loop through possible CID to and lookup the APN.
-        for (; cid_number < 12; cid_number++) {
-            snprintf(write_buffer, sizeof(write_buffer), "AT+CGCONTRDP=%u\r\n", cid_number);
-            int sent_length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
-            if (sent_length == -1)
+        // Loop through all possible CID values and search for the APN.
+        for (cid_number = 0; cid_number < ARRAY_SIZE(cid_ipv6_table); cid_number++) {
+            snprintf(at_cmd, sizeof(at_cmd), "AT+CGCONTRDP=%u", cid_number);
+
+            int err = at_cmd_write(at_cmd, read_buffer, sizeof(read_buffer), NULL);
+
+            if (err != 0)
             {
+                LWM2M_ERR("Unable to read information for PDN connection (cid=%u)", cid_number);
                 break;
             }
-            memset(read_buffer, 0, sizeof(read_buffer));
-            int revieved_length = recv(at_socket_fd, read_buffer, sizeof(read_buffer), 0);
 
-            if ((revieved_length > 0) && (strstr(read_buffer, apn) != NULL))
+            // TODO: Use parser instead of strstr. Change only APN name in response to lower case.
+            if (strstr(read_buffer, apn) != NULL)
             {
+                // APN name found in the AT command response for CID.
                 cid_found = true;
                 break;
             }
 
-            if (revieved_length > 0 && (!cid_found))
+            if (cid_found == false)
             {
-                // Test oposite casing variant of the APN name.
+                // Test opposite casing variant of the APN name.
                 char oposite_case[64];
                 memcpy(oposite_case, apn, strlen(apn));
 
@@ -184,40 +223,31 @@ int at_apn_setup_wait_for_ipv6(char * apn)
                 }
                 oposite_case[strlen(apn)] = '\0';
 
-                if ((revieved_length > 0) && (strstr(read_buffer, oposite_case) != NULL))
+                if (strstr(read_buffer, oposite_case) != NULL)
                 {
+                    // APN name found in the AT command response for CID.
                     cid_found = true;
                     break;
                 }
             }
         }
-
-        // Clean up CID lookup socket.
-        close(at_socket_fd);
     }
 
-    // Now block until IPv6 is ready to be used.
+    // Block forever until IPv6 is ready to be used.
     if (cid_found)
     {
-        bool ipv6_active = false;
-        do
-        {
-            memset(read_buffer, 0, sizeof(read_buffer));
-            received_cgev_length = recv(at_socket_cgev_fd, read_buffer, sizeof(read_buffer), 0);
-            if ((received_cgev_length > 0) && (strstr(read_buffer, "CGEV: IPV6") != NULL))
-            {
-                // We have a hit on IPV6 link up notification, lets verify the CID.
-                char * p_start = strstr(read_buffer, "IPV6");
-                int cid_candidate = atoi(&p_start[strlen("IPV6") + 1]);
-                if (cid_candidate == cid_number)
-                {
-                    ipv6_active = true;
-                }
-            }
-        } while (!ipv6_active);
+        LWM2M_TRC("CID %d found", cid_number);
+
+        while(cid_ipv6_table[cid_number] == false) {
+            // TODO: Add a timeout to not wait forever in case IPv6 is not available on that CID.
+            k_sleep(100);
+        }
+
+        LWM2M_TRC("IPv6 available for CID %d", cid_number);
     }
 
-    close(at_socket_cgev_fd);
+    // Do not forward unsolicited CGEV result codes. Not needed anymore.
+    (void)at_cmd_write("AT+CGEREP=0", NULL, 0, NULL);
 
     return apn_handle;
 }

@@ -9,10 +9,10 @@
 
 /**
  * @brief Enable SMS support using an AT command.
- * 
+ *
  * When SMS are received, an AT notification will be received and parsed.
  * SMS support is not available by default.
- * 
+ *
  * @return 0 if success or and error if the AT command to enable SMS failed.
  */
 int32_t sms_receiver_init(void);
@@ -22,7 +22,7 @@ int32_t sms_receiver_init(void);
  *
  * @param[in] notif NUll-terminated AT notification
  */
-void sms_receiver_notif_parse(char *notif);
+int sms_receiver_notif_parse(char *notif);
 
 /**
  * @return The number of valid SMS decoded.
