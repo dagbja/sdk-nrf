@@ -98,11 +98,7 @@ typedef struct __attribute__((__packed__))
 
 int32_t lwm2m_instance_storage_init(void)
 {
-    static bool init = false;
-    if (!init) {
-        init = true;
-        return lwm2m_os_storage_init();
-    }
+    // NVS subystem is initialized in lwm2m_os_init().
     return 0;
 }
 

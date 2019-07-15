@@ -4,11 +4,39 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
+#include <lwm2m_os.h>
+
 #include <zephyr.h>
 #include <nvs/nvs.h>
 #include <logging/log.h>
+#include <secure_services.h>
 
-#include <lwm2m_os.h>
+/* NVS-related defines */
+#define NVS_SECTOR_SIZE    DT_FLASH_ERASE_BLOCK_SIZE    /* Multiple of FLASH_PAGE_SIZE */
+#define NVS_SECTOR_COUNT   3                            /* At least 2 sectors */
+#define NVS_STORAGE_OFFSET DT_FLASH_AREA_STORAGE_OFFSET /* Start address of the filesystem in flash */
+
+static struct nvs_fs fs = {
+	.sector_size = NVS_SECTOR_SIZE,
+	.sector_count = NVS_SECTOR_COUNT,
+	.offset = NVS_STORAGE_OFFSET,
+};
+
+int lwm2m_os_init(void)
+{
+	int err;
+
+	/* Initialize random seed */
+	srand(k_cycle_get_32());
+
+	/* Initialize storage */
+	err = nvs_init(&fs, DT_FLASH_DEV_NAME);
+	if (err) {
+		return err;
+	}
+
+	return 0;
+}
 
 /* Memory mangement. */
 
@@ -34,30 +62,20 @@ int lwm2m_os_sleep(int ms)
 	return k_sleep(K_MSEC(ms));
 }
 
-/* Non volatile storage */
+/* OS functions */
 
-/* NVS-related defines */
-#define NVS_SECTOR_SIZE    DT_FLASH_ERASE_BLOCK_SIZE    /* Multiple of FLASH_PAGE_SIZE */
-#define NVS_SECTOR_COUNT   3                            /* At least 2 sectors */
-#define NVS_STORAGE_OFFSET DT_FLASH_AREA_STORAGE_OFFSET /* Start address of the filesystem in flash */
-
-static struct nvs_fs fs = {
-    .sector_size  = NVS_SECTOR_SIZE,
-    .sector_count = NVS_SECTOR_COUNT,
-    .offset       = NVS_STORAGE_OFFSET,
-};
-
-int lwm2m_os_storage_init(void)
+void lwm2m_os_sys_reset(void)
 {
-    int rc = nvs_init(&fs, DT_FLASH_DEV_NAME);
-
-    if (rc != 0)
-    {
-        return rc;
-    }
-
-    return 0;
+	spm_request_system_reboot();
+	CODE_UNREACHABLE;
 }
+
+uint32_t lwm2m_os_rand_get(void)
+{
+	return rand();
+}
+
+/* Non volatile storage */
 
 int lwm2m_os_storage_delete(uint16_t id)
 {
@@ -85,8 +103,8 @@ static struct lwm2m_work lwm2m_works[LWM2M_OS_MAX_TIMER_COUNT];
 
 static void work_handler(struct k_work *work)
 {
-	struct lwm2m_work *lwm2m_work = CONTAINER_OF(work, struct lwm2m_work,
-						     work_item);
+	struct lwm2m_work *lwm2m_work =
+		CONTAINER_OF(work, struct lwm2m_work, work_item);
 
 	lwm2m_work->handler(lwm2m_work);
 }

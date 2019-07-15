@@ -223,7 +223,7 @@ void app_system_shutdown(void)
 void app_system_reset(void)
 {
     app_system_shutdown();
-    spm_request_system_reboot();
+    lwm2m_os_sys_reset();
 }
 
 /**@brief Setup ADMIN PDN connection */
@@ -1676,15 +1676,9 @@ static void app_coap_init(void)
     coap_transport_init_t port_list;
     port_list.port_table = &local_port_list[0];
 
-    // Fetch last used CoAP Message ID
-    lwm2m_instance_storage_misc_data_t misc_data = { 0 };
-    lwm2m_instance_storage_misc_data_load(&misc_data);
-
-    err_code = coap_init(misc_data.coap_initial_message_id, &port_list, lwm2m_os_malloc, lwm2m_os_free);
+    err_code = coap_init(lwm2m_os_rand_get(), &port_list,
+                         lwm2m_os_malloc, lwm2m_os_free);
     APP_ERROR_CHECK(err_code);
-
-    misc_data.coap_initial_message_id += 100;
-    (void)lwm2m_instance_storage_misc_data_store(&misc_data);
 
     m_coap_transport = local_port_list[0].transport;
     ARG_UNUSED(m_coap_transport);
@@ -1788,8 +1782,9 @@ int lwm2m_carrier_init(void)
 
     app_timers_init();
 
-    // Initialize Non-volatile Storage.
-    lwm2m_instance_storage_init();
+    // Initialize OS abstraction layer.
+    // This will initialize the NVS subsystem as well.
+    lwm2m_os_init();
 
     err = lwm2m_firmware_update_state_get(&mdfu);
     if (!err && mdfu == UPDATE_SCHEDULED) {
@@ -1820,7 +1815,7 @@ int lwm2m_carrier_init(void)
 
         // Whatever the result, reboot and change the state.
         lwm2m_firmware_update_state_set(UPDATE_EXECUTED);
-        spm_request_system_reboot();
+        lwm2m_os_sys_reset();
     }
 
     // Initialize the AT command driver before sending any AT command.

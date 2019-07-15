@@ -9,13 +9,17 @@
 #include <stdint.h>
 #include <stddef.h>
 
+int lwm2m_os_init(void);
+
 void *lwm2m_os_malloc(size_t size);
 void lwm2m_os_free(void *ptr);
 
 int64_t lwm2m_os_uptime_get(void);
 int lwm2m_os_sleep(int ms);
 
-int lwm2m_os_storage_init(void);
+void lwm2m_os_sys_reset(void);
+uint32_t lwm2m_os_rand_get(void);
+
 int lwm2m_os_storage_delete(uint16_t id);
 int lwm2m_os_storage_read(uint16_t id, void *data, size_t len);
 int lwm2m_os_storage_write(uint16_t id, const void *data, size_t len);
