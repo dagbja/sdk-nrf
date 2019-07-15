@@ -32,22 +32,6 @@
 #define MODEM_FIRMWARE_READY                   0xF0F0
 #define MODEM_FIRMWARE_UPDATE                  0x0F0F
 
-
-typedef struct __attribute__((__packed__))
-{
-    uint8_t bootstrapped;
-/*
-    // One bit for each server.
-    uint8_t server_is_registered_mask;                // Server object extended data?
-    uint8_t dfu_state;
-    uint8_t world_clock;
-    // Identify mode and carrier switch.
-    char * msisdn;
-    uint8_t carrier_id;
-    uint8_t server_retry_timeouts[LWM2M_MAX_SERVERS]; // Server object extended data?
-*/
-} storage_misc_data_t;
-
 typedef struct __attribute__((__packed__))
 {
     uint8_t  boostrap_server;
