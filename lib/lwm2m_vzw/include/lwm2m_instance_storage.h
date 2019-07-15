@@ -16,7 +16,6 @@
 typedef struct __attribute__((__packed__))
 {
     uint8_t bootstrapped;
-    uint16_t coap_initial_message_id;
 } lwm2m_instance_storage_misc_data_t;
 
 int32_t lwm2m_instance_storage_init(void);
