@@ -45,9 +45,7 @@ int main(void)
     buttons_and_leds_init();
 #endif
 
-    for (;;) {
-        k_sleep(K_SECONDS(1));
-    }
+    return 0;
 }
 
 /* LWM2M background thread - should become a separate module. */
