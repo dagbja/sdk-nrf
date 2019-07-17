@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#define LWM2M_LOG_MODULE_NAME lwm2m
-
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>

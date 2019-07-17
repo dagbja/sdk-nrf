@@ -6,8 +6,6 @@
 
 #if CONFIG_SHELL
 
-#define LWM2M_LOG_MODULE_NAME lwm2m_shell
-
 #include <shell/shell.h>
 #include <fcntl.h>
 
