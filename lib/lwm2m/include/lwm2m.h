@@ -16,13 +16,7 @@
 #define LWM2M_H__
 
 #include <stdint.h>
-#include <stdbool.h>
-
 #include <lwm2m_os.h>
-
-#include <coap_message.h>
-#include <coap_codes.h>
-#include <coap_observe_api.h>
 
 #ifdef __cplusplus
 extern "C" {

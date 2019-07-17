@@ -12,6 +12,7 @@
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
 #include <lwm2m_os.h>
+#include <coap_message.h>
 #include <common.h>
 #include <at_interface.h>
 #include <lwm2m_vzw_main.h>

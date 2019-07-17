@@ -17,6 +17,7 @@
 #include <lwm2m_tlv.h>
 #include <lwm2m_objects.h>
 #include <lwm2m_remote.h>
+#include <coap_message.h>
 
 static lwm2m_alloc_t   m_alloc_fn = NULL;                                                           /**< Memory allocator function, populated on @lwm2m_init. */
 static lwm2m_free_t    m_free_fn = NULL;                                                            /**< Memory free function, populated on @lwm2m_init. */
