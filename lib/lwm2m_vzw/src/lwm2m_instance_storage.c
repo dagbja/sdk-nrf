@@ -175,7 +175,7 @@ int32_t lwm2m_instance_storage_security_load(uint16_t instance_id)
     }
 
     // Read full entry.
-    uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
+    uint8_t * p_scratch_buffer = lwm2m_os_malloc(read_count);
     read_count = lwm2m_os_storage_read(id, p_scratch_buffer, read_count);
     (void)read_count;
 
@@ -203,7 +203,7 @@ int32_t lwm2m_instance_storage_security_load(uint16_t instance_id)
         lwm2m_security_hold_off_timer_set(instance_id, p_data_carrier_specific->hold_off_timer);
     }
 
-    lwm2m_free(p_scratch_buffer);
+    lwm2m_os_free(p_scratch_buffer);
 
     return 0;
 }
@@ -244,7 +244,7 @@ int32_t lwm2m_instance_storage_security_store(uint16_t instance_id)
         temp_storage.offset_carrier_specific = LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET;
     }
 
-    uint8_t * p_scratch_buffer = lwm2m_malloc(total_entry_len);
+    uint8_t * p_scratch_buffer = lwm2m_os_malloc(total_entry_len);
     memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_security_t));
     memcpy(&p_scratch_buffer[temp_storage.offset_uri], uri, uri_len);
     memcpy(&p_scratch_buffer[temp_storage.offset_sms_number], sms_number, sms_number_len);
@@ -261,7 +261,7 @@ int32_t lwm2m_instance_storage_security_store(uint16_t instance_id)
 
     lwm2m_os_storage_write(id, p_scratch_buffer, total_entry_len);
 
-    lwm2m_free(p_scratch_buffer);
+    lwm2m_os_free(p_scratch_buffer);
 
     return 0;
 }
@@ -286,7 +286,7 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
     }
 
     // Read full entry.
-    uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
+    uint8_t * p_scratch_buffer = lwm2m_os_malloc(read_count);
     read_count = lwm2m_os_storage_read(id, p_scratch_buffer, read_count);
     (void)read_count;
 
@@ -327,7 +327,7 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
     lwm2m_instance_acl_t * p_real_acl = &p_instance->acl;
     p_real_acl->id = p_acl->id;
 
-    lwm2m_free(p_scratch_buffer);
+    lwm2m_os_free(p_scratch_buffer);
 
     return err_code;
 }
@@ -371,7 +371,7 @@ int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
         temp_storage.offset_acl              = temp_storage.offset_carrier_specific + sizeof(vzw_server_settings_t);
     }
 
-    uint8_t * p_scratch_buffer = lwm2m_malloc(total_entry_len);
+    uint8_t * p_scratch_buffer = lwm2m_os_malloc(total_entry_len);
     memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_server_t));
     memcpy(&p_scratch_buffer[temp_storage.offset_binding], binding, binding_len);
     memcpy(&p_scratch_buffer[temp_storage.offset_acl], p_acl, sizeof(lwm2m_instance_acl_t));
@@ -388,7 +388,7 @@ int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
 
     lwm2m_os_storage_write(id, p_scratch_buffer, total_entry_len);
 
-    lwm2m_free(p_scratch_buffer);
+    lwm2m_os_free(p_scratch_buffer);
 
     return 0;
 }
@@ -413,7 +413,7 @@ int32_t lwm2m_instance_storage_device_load(uint16_t instance_id)
     }
 
     // Read full entry.
-    uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
+    uint8_t * p_scratch_buffer = lwm2m_os_malloc(read_count);
     read_count = lwm2m_os_storage_read(id, p_scratch_buffer, read_count);
     (void)read_count;
 
@@ -439,7 +439,7 @@ int32_t lwm2m_instance_storage_device_load(uint16_t instance_id)
     lwm2m_instance_acl_t * p_real_acl = &p_instance->acl;
     p_real_acl->id = p_acl->id;
 
-    lwm2m_free(p_scratch_buffer);
+    lwm2m_os_free(p_scratch_buffer);
 
     return err_code;
 }
@@ -462,13 +462,13 @@ int32_t lwm2m_instance_storage_device_store(uint16_t instance_id)
     temp_storage.offset_carrier_specific = LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET;
     temp_storage.offset_acl              = sizeof(storage_device_t);
 
-    uint8_t * p_scratch_buffer = lwm2m_malloc(total_entry_len);
+    uint8_t * p_scratch_buffer = lwm2m_os_malloc(total_entry_len);
     memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_device_t));
     memcpy(&p_scratch_buffer[temp_storage.offset_acl], p_acl, sizeof(lwm2m_instance_acl_t));
 
     lwm2m_os_storage_write(id, p_scratch_buffer, total_entry_len);
 
-    lwm2m_free(p_scratch_buffer);
+    lwm2m_os_free(p_scratch_buffer);
 
     return 0;
 }
@@ -493,7 +493,7 @@ int32_t lwm2m_instance_storage_conn_mon_load(uint16_t instance_id)
     }
 
     // Read full entry.
-    uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
+    uint8_t * p_scratch_buffer = lwm2m_os_malloc(read_count);
     read_count = lwm2m_os_storage_read(id, p_scratch_buffer, read_count);
     (void)read_count;
 
@@ -519,7 +519,7 @@ int32_t lwm2m_instance_storage_conn_mon_load(uint16_t instance_id)
     lwm2m_instance_acl_t * p_real_acl = &p_instance->acl;
     p_real_acl->id = p_acl->id;
 
-    lwm2m_free(p_scratch_buffer);
+    lwm2m_os_free(p_scratch_buffer);
 
     return err_code;
 }
@@ -542,13 +542,13 @@ int32_t lwm2m_instance_storage_conn_mon_store(uint16_t instance_id)
     temp_storage.offset_carrier_specific = LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET;
     temp_storage.offset_acl              = sizeof(storage_conn_mon_t);
 
-    uint8_t * p_scratch_buffer = lwm2m_malloc(total_entry_len);
+    uint8_t * p_scratch_buffer = lwm2m_os_malloc(total_entry_len);
     memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_conn_mon_t));
     memcpy(&p_scratch_buffer[temp_storage.offset_acl], p_acl, sizeof(lwm2m_instance_acl_t));
 
     lwm2m_os_storage_write(id, p_scratch_buffer, total_entry_len);
 
-    lwm2m_free(p_scratch_buffer);
+    lwm2m_os_free(p_scratch_buffer);
 
     return 0;
 }
@@ -573,7 +573,7 @@ int32_t lwm2m_instance_storage_firmware_load(uint16_t instance_id)
     }
 
     // Read full entry.
-    uint8_t * p_scratch_buffer = lwm2m_malloc(read_count);
+    uint8_t * p_scratch_buffer = lwm2m_os_malloc(read_count);
     read_count = lwm2m_os_storage_read(id, p_scratch_buffer, read_count);
     (void)read_count;
 
@@ -599,7 +599,7 @@ int32_t lwm2m_instance_storage_firmware_load(uint16_t instance_id)
     lwm2m_instance_acl_t * p_real_acl = &p_instance->acl;
     p_real_acl->id = p_acl->id;
 
-    lwm2m_free(p_scratch_buffer);
+    lwm2m_os_free(p_scratch_buffer);
 
     return err_code;
 }
@@ -622,13 +622,13 @@ int32_t lwm2m_instance_storage_firmware_store(uint16_t instance_id)
     temp_storage.offset_carrier_specific = LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET;
     temp_storage.offset_acl              = sizeof(storage_firmware_t);
 
-    uint8_t * p_scratch_buffer = lwm2m_malloc(total_entry_len);
+    uint8_t * p_scratch_buffer = lwm2m_os_malloc(total_entry_len);
     memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_firmware_t));
     memcpy(&p_scratch_buffer[temp_storage.offset_acl], p_acl, sizeof(lwm2m_instance_acl_t));
 
     lwm2m_os_storage_write(id, p_scratch_buffer, total_entry_len);
 
-    lwm2m_free(p_scratch_buffer);
+    lwm2m_os_free(p_scratch_buffer);
 
     return 0;
 }

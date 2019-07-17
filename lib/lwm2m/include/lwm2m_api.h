@@ -163,22 +163,6 @@ typedef struct lwm2m_object_t   lwm2m_object_t;
 typedef struct lwm2m_instance_t lwm2m_instance_t;
 /**@endcond */
 
-/**@brief Signature of function registered by the application
- *        with module to allocate memory for internal module use.
- *
- * @param[in] size Size of memory to be used.
- *
- * @retval A valid memory address on success, else NULL.
- */
-typedef void * (*lwm2m_alloc_t) (size_t size);
-
-/**@brief Signature of function registered by the application with
- *        module to free the memory allocated by the module.
- *
- * @param[in] p_memory Address of memory to be freed.
- */
-typedef void (*lwm2m_free_t)(void * p_memory);
-
 /**@brief Callback function upon requests on a given LWM2M resource instance.
  *
  * @details Will be called when the request is for an instance Ex. /0/1.
@@ -330,14 +314,9 @@ uint32_t lwm2m_coap_handler_root(uint8_t op_code, coap_message_t * p_request);
 
 /**@brief Initialize LWM2M library.
  *
- * @param[in] alloc_fn Function registered with the module to allocate memory.
- *                     Shall not be NULL.
- * @param[in] free_fn  Function registered with the module to free allocated memory.
- *                     Shall not be NULL.
- *
  * @retval NRF_SUCCESS If initialization was successful.
  */
-uint32_t lwm2m_init(lwm2m_alloc_t alloc_fn, lwm2m_free_t free_fn);
+uint32_t lwm2m_init();
 
 /**@brief Send bootstrap request to a remote bootstrap server.
  *

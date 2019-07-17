@@ -240,7 +240,7 @@ void lwm2m_device_init(void)
     m_instance_device.serial_number.len = strlen(m_instance_device.serial_number.p_val);
 
     m_instance_device.firmware_version.len = sizeof(nrf_dfu_fw_version_t);
-    m_instance_device.firmware_version.p_val = lwm2m_malloc(m_instance_device.firmware_version.len);
+    m_instance_device.firmware_version.p_val = lwm2m_os_malloc(m_instance_device.firmware_version.len);
 
 #if 0
     (void)at_read_firmware_version(m_instance_device.firmware_version.p_val,
@@ -295,7 +295,7 @@ void lwm2m_device_init(void)
 
     // Verizon specific SIM ICCID and HomeOrRoaming
     m_verizon_resources[0].len = 20;
-    m_verizon_resources[0].p_val = lwm2m_malloc(m_verizon_resources[0].len);
+    m_verizon_resources[0].p_val = lwm2m_os_malloc(m_verizon_resources[0].len);
     (void)at_read_sim_iccid(m_verizon_resources[0].p_val, &m_verizon_resources[0].len);
     char * home_or_roaming = "Home"; // TODO: Read from AT+CEREG?
     (void)lwm2m_bytebuffer_to_string(home_or_roaming, strlen(home_or_roaming), &m_verizon_resources[1]);

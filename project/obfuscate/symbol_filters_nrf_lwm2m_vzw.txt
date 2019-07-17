@@ -125,14 +125,12 @@
 ^lwm2m_coap_handler_instance_delete$
 ^lwm2m_coap_handler_object_add$
 ^lwm2m_deregister$
-^lwm2m_free$
 ^lwm2m_init$
 ^lwm2m_instance_connectivity_monitoring_init$
 ^lwm2m_instance_device_init$
 ^lwm2m_instance_firmware_init$
 ^lwm2m_instance_security_init$
 ^lwm2m_instance_server_init$
-^lwm2m_malloc$
 ^lwm2m_notify$
 ^lwm2m_observe_register$
 ^lwm2m_plain_text_device_decode$
