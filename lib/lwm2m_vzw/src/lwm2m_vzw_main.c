@@ -74,39 +74,23 @@
 
 static char m_app_bootstrap_psk[]  = APP_BOOTSTRAP_SEC_PSK;
 
-#if CONFIG_DK_LIBRARY
-#define APP_ERROR_CHECK(error_code) \
-    do { \
-        if (error_code != 0) { \
-            LWM2M_ERR("Error: %lu", error_code); \
-            while (1); \
-        } \
+#define APP_ERROR_CHECK(error_code)                                            \
+    do {                                                                       \
+        if (error_code != 0) {                                                 \
+            LWM2M_ERR("Error: %lu", error_code);                               \
+            while (1)                                                          \
+                ;                                                              \
+        }                                                                      \
     } while (0)
-#define APP_ERROR_CHECK_BOOL(boolean_value) \
-    do { \
-        const uint32_t local_value = (boolean_value); \
-        if (!local_value) { \
-            LWM2M_ERR("BOOL check failure"); \
-            while (1); \
-        } \
+#define APP_ERROR_CHECK_BOOL(boolean_value)                                    \
+    do {                                                                       \
+        const uint32_t local_value = (boolean_value);                          \
+        if (!local_value) {                                                    \
+            LWM2M_ERR("BOOL check failure");                                   \
+            while (1)                                                          \
+                ;                                                              \
+        }                                                                      \
     } while (0)
-#else
-#define APP_ERROR_CHECK(error_code) \
-    do { \
-        if (error_code != 0) { \
-            LWM2M_ERR("Error: %lu", error_code); \
-            while (1); \
-        } \
-    } while (0)
-#define APP_ERROR_CHECK_BOOL(boolean_value) \
-    do { \
-        const uint32_t local_value = (boolean_value); \
-        if (!local_value) { \
-            LWM2M_ERR("BOOL check failure"); \
-            while (1); \
-        } \
-    } while (0)
-#endif
 
 static lwm2m_server_config_t               m_server_conf[1+LWM2M_MAX_SERVERS];                /**< Server configuration structure. */
 static lwm2m_client_identity_t             m_client_id;                                       /**< Client ID structure to hold the client's UUID. */
