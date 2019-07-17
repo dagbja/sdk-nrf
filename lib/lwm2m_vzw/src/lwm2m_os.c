@@ -6,6 +6,7 @@
 
 #include <lwm2m_os.h>
 
+#include <stdlib.h>
 #include <zephyr.h>
 #include <nvs/nvs.h>
 #include <logging/log.h>

@@ -16,8 +16,8 @@
 #define LWM2M_OBJECTS_TLV_H__
 
 #include <stdint.h>
-#include <lwm2m_objects.h>
 #include <lwm2m_tlv.h>
+#include <lwm2m_objects.h>
 
 #ifdef __cplusplus
 extern "C" {

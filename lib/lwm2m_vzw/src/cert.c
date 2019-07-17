@@ -9,7 +9,6 @@
 #include <nrf_key_mgmt.h>
 #include <toolchain.h>
 
-
 static const char ca_chain[] = {
 #if 1
 	#include "../certs/DigiCertGlobalRootG2.pem" /* Motive */

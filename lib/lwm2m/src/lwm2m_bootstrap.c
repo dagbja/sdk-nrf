@@ -7,10 +7,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <lwm2m.h>
 #include <lwm2m_api.h>
-#include <lwm2m_bootstrap.h>
 #include <coap_api.h>
 
 #define LWM2M_BOOTSTRAP_URI_PATH "bs"

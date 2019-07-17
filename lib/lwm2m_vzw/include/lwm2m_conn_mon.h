@@ -5,7 +5,6 @@
  */
 
 #include <stdint.h>
-#include <lwm2m_api.h>
 #include <lwm2m_tlv.h>
 #include <lwm2m_objects.h>
 

@@ -6,15 +6,17 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <lwm2m.h>
-#include <lwm2m_conn_mon.h>
-#include <net/download_client.h>
-#include <nrf_socket.h>
 
-#include "lwm2m_objects.h"
-#include "lwm2m_firmware.h"
-#include "lwm2m_instance_storage.h"
-#include "dfusock.h"
+#include <nrf_socket.h>
+#include <net/download_client.h>
+
+#include <lwm2m.h>
+#include <lwm2m_objects.h>
+#include <lwm2m_firmware.h>
+#include <lwm2m_conn_mon.h>
+#include <lwm2m_instance_storage.h>
+
+#include <dfusock.h>
 
 /* The offset is set to this value for dirty images, or backup images */
 #define DIRTY_IMAGE 2621440

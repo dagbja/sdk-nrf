@@ -5,22 +5,16 @@
  */
 
 #include <stdint.h>
+
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
 #include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
-
-#include "lwm2m_conn_mon.h"
-
-#include <coap_option.h>
-#include <coap_observe_api.h>
+#include <lwm2m_conn_mon.h>
 #include <coap_message.h>
-
 #include <common.h>
-#include <app_debug.h>
-
-#include "nrf_apn_class.h"
+#include <nrf_apn_class.h>
 
 #define VERIZON_RESOURCE 30000
 

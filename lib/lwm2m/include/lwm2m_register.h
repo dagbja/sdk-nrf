@@ -16,7 +16,7 @@
 #define LWM2M_REGISTER_H__
 
 #include <stdint.h>
-#include <lwm2m_api.h>
+#include <net/socket.h>
 
 #ifdef __cplusplus
 extern "C" {

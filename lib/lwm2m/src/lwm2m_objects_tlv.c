@@ -5,8 +5,8 @@
  */
 
 #include <lwm2m.h>
-#include <lwm2m_objects_tlv.h>
 #include <lwm2m_tlv.h>
+#include <lwm2m_objects_tlv.h>
 
 
 static void index_buffer_len_update(uint32_t * index, uint32_t * buffer_len, uint32_t max_buffer)

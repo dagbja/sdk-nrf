@@ -16,6 +16,7 @@
 #define LWM2M_TLV_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <lwm2m_objects.h>
 
 #ifdef __cplusplus

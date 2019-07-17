@@ -5,6 +5,8 @@
  */
 
 #include <stdint.h>
+#include <net/socket.h>
+
 #include <lwm2m_api.h>
 #include <lwm2m_acl.h>
 #include <lwm2m_remote.h>

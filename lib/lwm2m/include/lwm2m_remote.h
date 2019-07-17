@@ -15,7 +15,8 @@
 #ifndef LWM2M_REMOTE_H__
 #define LWM2M_REMOTE_H__
 
-#include <lwm2m_api.h>
+#include <stdint.h>
+#include <net/socket.h>
 
 /**
  * @brief      Initialize this module.

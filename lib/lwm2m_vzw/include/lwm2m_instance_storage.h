@@ -6,7 +6,6 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <lwm2m_api.h>
 #include <lwm2m_objects.h>
 #include <app_debug.h>
 

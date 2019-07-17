@@ -16,7 +16,7 @@
 #include <common.h>
 #include <at_interface.h>
 #include <lwm2m_vzw_main.h>
-#include "dfusock.h"
+#include <dfusock.h>
 #include <nrf_socket.h>
 
 #define VERIZON_RESOURCE 30000

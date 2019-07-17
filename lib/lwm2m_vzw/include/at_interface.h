@@ -7,7 +7,6 @@
 #ifndef AT_INTERFACE_H__
 #define AT_INTERFACE_H__
 
-#include <stdint.h>
 #include <stdbool.h>
 
 /* TODO: Move APIs to modem interface modem with data model. */
@@ -16,7 +15,7 @@ void mdm_interface_init();
 
 /**
  * @brief Send an null-terminated AT command to the Modem.
- * 
+ *
  * @param[in] cmd Pointer to the null-terminated AT command to send.
  * @param[in] do_logging Set to true to print the AT command response.
  * @return An error code if the command write or response read failed.

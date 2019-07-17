@@ -17,12 +17,12 @@
 #include <stdint.h>
 
 #include <net/socket.h>
-#include <coap_api.h>
 #include <coap_observe_api.h>
 
 #include <lwm2m_cfg.h>
 
 #define USE_SHORT_SMS 0
+
 /**@addtogroup LWM2M_opcodes Types
  * @{
  * @brief LWMW2M Bootstrap type definitions.

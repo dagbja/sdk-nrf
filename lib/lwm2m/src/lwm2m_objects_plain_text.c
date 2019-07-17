@@ -7,8 +7,8 @@
 #include <stdlib.h>
 
 #include <lwm2m.h>
-#include <lwm2m_objects_plain_text.h>
 #include <lwm2m_objects.h>
+#include <lwm2m_objects_plain_text.h>
 
 
 static uint32_t lwm2m_plain_text_to_int32(uint8_t * p_payload, uint16_t payload_len, int32_t * p_value)
