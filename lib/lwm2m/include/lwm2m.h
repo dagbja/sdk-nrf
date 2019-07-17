@@ -72,20 +72,6 @@ extern "C" {
 #endif // LWM2M_DISABLE_API_PARAM_CHECK
 
 
-/**
- * @defgroup iot_lwm2m_error Module's Error Macros
- * @details Macros used to return errors with the right base
- *
- * @{
- */
-#define LWM2M_ERROR(PARAM) (PARAM | IOT_LWM2M_ERR_BASE)
-/** @} */
-
-#define LWM2M_REQUEST_TYPE_BOOTSTRAP  1
-#define LWM2M_REQUEST_TYPE_REGISTER   2
-#define LWM2M_REQUEST_TYPE_UPDATE     3
-#define LWM2M_REQUEST_TYPE_DEREGISTER 4
-
 /**@brief Memory allocator function.
  *
  * @param[in] size Size of memory to be used.
