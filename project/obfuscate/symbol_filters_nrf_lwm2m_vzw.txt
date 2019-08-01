@@ -11,20 +11,23 @@
 ^lwm2m_carrier_run$
 
 # lwm2m_os.h
-^lwm2m_os_malloc$
 ^lwm2m_os_free$
-^lwm2m_os_uptime_get$
+^lwm2m_os_init$
+^lwm2m_os_log$
+^lwm2m_os_malloc$
+^lwm2m_os_rand_get$
 ^lwm2m_os_sleep$
-^lwm2m_os_storage_init$
 ^lwm2m_os_storage_delete$
+^lwm2m_os_storage_init$
 ^lwm2m_os_storage_read$
 ^lwm2m_os_storage_write$
+^lwm2m_os_sys_reset$
+^lwm2m_os_timer_cancel$
 ^lwm2m_os_timer_get$
 ^lwm2m_os_timer_release$
-^lwm2m_os_timer_start$
-^lwm2m_os_timer_cancel$
 ^lwm2m_os_timer_remaining$
-^lwm2m_os_log$
+^lwm2m_os_timer_start$
+^lwm2m_os_uptime_get$
 
 # Callbacks
 ^lwm2m_coap_handler_root$
