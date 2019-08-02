@@ -192,20 +192,26 @@ static const u8_t log_level_lut[] = {
 
 const char *lwm2m_os_log_strdup(const char *str)
 {
-	return log_strdup(str);
+	if (IS_ENABLED(CONFIG_LOG)) {
+		return log_strdup(str);
+	}
+
+	return str;
 }
 
 void lwm2m_os_log(int level, const char *fmt, ...)
 {
-	struct log_msg_ids src_level = {
-		.level = log_level_lut[level],
-		.domain_id = CONFIG_LOG_DOMAIN_ID,
-		.source_id = LOG_CURRENT_MODULE_ID()
-	};
+	if (IS_ENABLED(CONFIG_LOG)) {
+		struct log_msg_ids src_level = {
+			.level = log_level_lut[level],
+			.domain_id = CONFIG_LOG_DOMAIN_ID,
+			.source_id = LOG_CURRENT_MODULE_ID()
+		};
 
-	va_list ap;
+		va_list ap;
 
-	va_start(ap, fmt);
-	log_generic(src_level, fmt, ap);
-	va_end(ap);
+		va_start(ap, fmt);
+		log_generic(src_level, fmt, ap);
+		va_end(ap);
+	}
 }
