@@ -13,6 +13,7 @@
 #include <lwm2m_tlv.h>
 #include <lwm2m_acl.h>
 #include <lwm2m_api.h>
+#include <lwm2m_carrier.h>
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_vzw_main.h>
 #include <lwm2m_device.h>
@@ -145,6 +146,41 @@ static const char * app_uri_get(char * p_server_uri, uint16_t * p_port, bool * p
 
 extern int cert_provision();
 
+static void app_event_notify(uint32_t type, void * data)
+{
+    lwm2m_carrier_event_t event =
+    {
+        .type = type,
+        .data = data
+    };
+
+    lwm2m_carrier_event_handler(&event);
+}
+
+static void app_init_and_connect(void)
+{
+        lte_lc_init_and_connect();
+        app_event_notify(LWM2M_CARRIER_EVENT_CONNECT, NULL);
+}
+
+static void app_offline(void)
+{
+        app_event_notify(LWM2M_CARRIER_EVENT_DISCONNECT, NULL);
+        lte_lc_offline();
+}
+
+static bool lwm2m_is_registration_ready(void)
+{
+    for (int i = 1; i < 1 + LWM2M_MAX_SERVERS; i++) {
+        if ((m_connection_update[i].instance_id != 0) && m_connection_update[i].requested) {
+            /* More registrations to come, not ready yet. */
+            return false;
+        }
+    }
+
+    return true;
+}
+
 /** Functions available from shell access */
 void lwm2m_request_server_update(uint16_t instance_id, bool reconnect)
 {
@@ -207,6 +243,7 @@ void lwm2m_system_shutdown(void)
 
 void lwm2m_system_reset(void)
 {
+    app_event_notify(LWM2M_CARRIER_EVENT_REBOOT, NULL);
     lwm2m_system_shutdown();
     lwm2m_os_sys_reset();
 }
@@ -276,9 +313,9 @@ static char * app_initialize_client_id(void)
     snprintf(client_id, 128, "urn:imei-msisdn:%s-%s", m_imei, p_msisdn);
 
     if (provision_bs_psk) {
-        lte_lc_offline();
+        app_offline();
         app_provision_psk(APP_BOOTSTRAP_SEC_TAG, client_id, strlen(client_id), m_app_bootstrap_psk, sizeof(m_app_bootstrap_psk));
-        lte_lc_init_and_connect();
+        app_init_and_connect();
     }
 
     return client_id;
@@ -625,6 +662,10 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             lwm2m_server_registered_set(instance_id, true);
 
             m_app_state = LWM2M_STATE_IDLE;
+
+            if (lwm2m_is_registration_ready()) {
+                app_event_notify(LWM2M_CARRIER_EVENT_READY, NULL);
+            }
         }
         else
         {
@@ -1707,7 +1748,7 @@ static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len
 
 static void app_provision_secret_keys(void)
 {
-    lte_lc_offline();
+    app_offline();
     LWM2M_TRC("Offline mode");
 
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
@@ -1741,7 +1782,7 @@ static void app_provision_secret_keys(void)
     }
     LWM2M_INF("Wrote secret keys");
 
-    lte_lc_init_and_connect();
+    app_init_and_connect();
 
     // THIS IS A HACK. Temporary solution to give a delay to recover Non-DTLS sockets from CFUN=4.
     // The delay will make TX available after CID again set.
@@ -1806,6 +1847,8 @@ int lwm2m_carrier_init(void)
         lwm2m_os_sys_reset();
     }
 
+    app_event_notify(LWM2M_CARRIER_EVENT_BSDLIB_INIT, NULL);
+
     // Initialize the AT command driver before sending any AT command.
     at_cmd_init();
     mdm_interface_init();
@@ -1826,7 +1869,7 @@ int lwm2m_carrier_init(void)
 
     // Set-phone-functionality. Blocking call until we are connected.
     // The lc module uses AT notifications.
-    lte_lc_init_and_connect();
+    app_init_and_connect();
 
     // Now set the AT notification callback after link is up
     // and link controller module is done.

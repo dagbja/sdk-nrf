@@ -12,6 +12,11 @@
 
 #include <lwm2m_carrier.h>
 
+void lwm2m_carrier_event_handler(const lwm2m_carrier_event_t * event)
+{
+	ARG_UNUSED(event);
+}
+
 /**@brief Recoverable BSD library error. */
 void bsd_recoverable_error_handler(uint32_t error)
 {
