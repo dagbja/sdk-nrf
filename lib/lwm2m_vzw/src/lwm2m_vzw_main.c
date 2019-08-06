@@ -216,18 +216,16 @@ static void app_setup_admin_pdn(uint16_t instance_id)
 {
     if (m_operator_id == APP_OPERATOR_ID_VZW)
     {
-        if (app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT)) {
-            // Set up APN for Bootstrap and DM server.
-            uint8_t class_apn_len = 0;
-            char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
-            char apn_name_zero_terminated[64];
+        // Set up APN for Bootstrap and DM server.
+        uint8_t class_apn_len = 0;
+        char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
+        char apn_name_zero_terminated[64];
 
-            memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
-            apn_name_zero_terminated[class_apn_len] = '\0';
+        memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
+        apn_name_zero_terminated[class_apn_len] = '\0';
 
-            LWM2M_INF("APN setup: %s", lwm2m_os_log_strdup(apn_name_zero_terminated));
-            m_admin_pdn_handle[instance_id] = at_apn_setup_wait_for_ipv6(apn_name_zero_terminated);
-        }
+        LWM2M_INF("APN setup: %s", lwm2m_os_log_strdup(apn_name_zero_terminated));
+        m_admin_pdn_handle[instance_id] = at_apn_setup_wait_for_ipv6(apn_name_zero_terminated);
     }
 }
 
@@ -1170,19 +1168,17 @@ static void app_server_connect(uint16_t instance_id)
 
     if (m_operator_id == APP_OPERATOR_ID_VZW)
     {
-        if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
-            m_server_conf[instance_id].binding.p_val = "UQS";
-            m_server_conf[instance_id].binding.len = 3;
+        m_server_conf[instance_id].binding.p_val = "UQS";
+        m_server_conf[instance_id].binding.len = 3;
 
-            if (instance_id) {
-                char *endptr;
-                const char * p_msisdn = app_debug_msisdn_get();
-                if (!p_msisdn || p_msisdn[0] == 0) {
-                    p_msisdn = m_msisdn;
-                }
-
-                m_server_conf[instance_id].msisdn = strtoull(p_msisdn, &endptr, 10);
+        if (instance_id) {
+            char *endptr;
+            const char * p_msisdn = app_debug_msisdn_get();
+            if (!p_msisdn || p_msisdn[0] == 0) {
+                p_msisdn = m_msisdn;
             }
+
+            m_server_conf[instance_id].msisdn = strtoull(p_msisdn, &endptr, 10);
         }
     }
 
@@ -1840,12 +1836,9 @@ int lwm2m_carrier_init(void)
     // Check operator ID
     at_read_operator_id(&m_operator_id);
 
-    if (m_operator_id == APP_OPERATOR_ID_VZW)
-    {
-        if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
-            //Enable SMS.
-            sms_receiver_init();
-        }
+    if (m_operator_id == APP_OPERATOR_ID_VZW) {
+        // Enable SMS.
+        sms_receiver_init();
     }
 
     if (app_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6)) {
@@ -1863,15 +1856,8 @@ int lwm2m_carrier_init(void)
     // Create LwM2M factory bootstraped objects.
     app_lwm2m_create_objects();
 
-    if (m_operator_id == APP_OPERATOR_ID_VZW)
-    {
-        if (app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT)) {
-            LWM2M_INF("PDN support enabled");
-        }
-        else
-        {
-            LWM2M_INF("PDN support disabled");
-        }
+    if (m_operator_id == APP_OPERATOR_ID_VZW) {
+        LWM2M_INF("PDN support enabled");
     } else {
         LWM2M_INF("PDN support disabled");
     }

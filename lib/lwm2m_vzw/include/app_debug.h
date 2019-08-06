@@ -10,8 +10,6 @@
 #include <stdint.h>
 
 #define DEBUG_FLAG_DISABLE_PSM  0x01       /**< Set if disable PSM. */
-#define DEBUG_FLAG_SMS_SUPPORT  0x02       /**< Set if enable SMS support. */
-#define DEBUG_FLAG_PDN_SUPPORT  0x04       /**< Set if using PDN settings. */
 #define DEBUG_FLAG_DISABLE_IPv6 0x08       /**< Set if disable IPv6. */
 #define DEBUG_FLAG_DISABLE_FALLBACK  0x10  /**< Set if disable IP fallback. */
 

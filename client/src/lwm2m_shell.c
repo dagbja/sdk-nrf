@@ -159,14 +159,9 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "  SIM ICCID      %s", iccid);
     shell_print(shell, "  Logging        %s", app_debug_modem_logging_get());
     shell_print(shell, "  Disable PSM    %s", app_debug_flag_is_set(DEBUG_FLAG_DISABLE_PSM) ? "Yes" : "No");
-    shell_print(shell, "  PDN Support    %s", app_debug_flag_is_set(DEBUG_FLAG_PDN_SUPPORT) ? "Yes" : "No");
     shell_print(shell, "  IPv6 enabled   %s", app_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6) ? "No" : "Yes");
     shell_print(shell, "  IP Fallback    %s", app_debug_flag_is_set(DEBUG_FLAG_DISABLE_FALLBACK) ? "No" : "Yes");
-    shell_print(shell, "  SMS Support    %s", app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT) ? "Yes" : "No");
-
-    if (app_debug_flag_is_set(DEBUG_FLAG_SMS_SUPPORT)) {
-        shell_print(shell, "  SMS Counter    %u", sms_receive_counter());
-    }
+    shell_print(shell, "  SMS Counter    %u", sms_receive_counter());
 
     return 0;
 }
@@ -263,33 +258,6 @@ static int cmd_debug_disable_psm(const struct shell *shell, size_t argc, char **
     return 0;
 }
 
-static int cmd_debug_pdn_support(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc != 2) {
-        shell_print(shell, "%s <value>", argv[0]);
-        shell_print(shell, " 0 = disable");
-        shell_print(shell, " 1 = enable");
-        return 0;
-    }
-
-    int pdn_support = atoi(argv[1]);
-
-    if (pdn_support != 0 && pdn_support != 1) {
-        shell_print(shell, "invalid value, must be 0 or 1");
-        return 0;
-    }
-
-    if (pdn_support) {
-        app_debug_flag_set(DEBUG_FLAG_PDN_SUPPORT);
-    } else {
-        app_debug_flag_clear(DEBUG_FLAG_PDN_SUPPORT);
-    }
-
-    shell_print(shell, "Set PDN support: %d", pdn_support);
-
-    return 0;
-}
-
 static int cmd_debug_ipv6_enabled(const struct shell *shell, size_t argc, char **argv)
 {
     if (argc != 2) {
@@ -313,35 +281,6 @@ static int cmd_debug_ipv6_enabled(const struct shell *shell, size_t argc, char *
     }
 
     shell_print(shell, "Set IPv6 enabled: %d", enable_ipv6);
-
-    return 0;
-}
-
-static int cmd_debug_sms_support(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc != 2) {
-        shell_print(shell, "%s <value>", argv[0]);
-        shell_print(shell, " 0 = disable");
-        shell_print(shell, " 1 = enable");
-        return 0;
-    }
-
-    int sms_support = atoi(argv[1]);
-
-    if (sms_support != 0 && sms_support != 1) {
-        shell_print(shell, "invalid value, must be 0 or 1");
-        return 0;
-    }
-
-    if (sms_support) {
-        app_debug_flag_set(DEBUG_FLAG_SMS_SUPPORT);
-        // Register for SMS notifications.
-        sms_receiver_init();
-    } else {
-        app_debug_flag_clear(DEBUG_FLAG_SMS_SUPPORT);
-    }
-
-    shell_print(shell, "Set SMS support: %d", sms_support);
 
     return 0;
 }
@@ -585,9 +524,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(msisdn, NULL, "Set static MSISDN", cmd_debug_msisdn),
     SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
     SHELL_CMD(disable_psm, NULL, "Disable PSM", cmd_debug_disable_psm),
-    SHELL_CMD(pdn_support, NULL, "Set PDN Support", cmd_debug_pdn_support),
     SHELL_CMD(ipv6_enable, NULL, "Set IPv6 enabled", cmd_debug_ipv6_enabled),
-    SHELL_CMD(sms_support, NULL, "Set SMS Support", cmd_debug_sms_support),
     SHELL_CMD(fallback, NULL, "Set IP Fallback", cmd_debug_fallback_disabled),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );
