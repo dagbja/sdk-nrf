@@ -159,14 +159,19 @@ static void app_event_notify(uint32_t type, void * data)
 
 static void app_init_and_connect(void)
 {
-        lte_lc_init_and_connect();
-        app_event_notify(LWM2M_CARRIER_EVENT_CONNECT, NULL);
+    lte_lc_init_and_connect();
+    app_event_notify(LWM2M_CARRIER_EVENT_CONNECT, NULL);
+
+    // Now set the AT notification callback after link is up
+    // and link controller module is done.
+    // AT notifications are now process by the Modem AT interface.
+    (void)mdm_interface_init();
 }
 
 static void app_offline(void)
 {
-        app_event_notify(LWM2M_CARRIER_EVENT_DISCONNECT, NULL);
-        lte_lc_offline();
+    app_event_notify(LWM2M_CARRIER_EVENT_DISCONNECT, NULL);
+    lte_lc_offline();
 }
 
 static bool lwm2m_is_registration_ready(void)
@@ -1869,11 +1874,6 @@ int lwm2m_carrier_init(void)
     // Set-phone-functionality. Blocking call until we are connected.
     // The lc module uses AT notifications.
     app_init_and_connect();
-
-    // Now set the AT notification callback after link is up
-    // and link controller module is done.
-    // AT notifications are now process by the Modem AT interface.
-    (void)mdm_interface_init();
 
     // Check operator ID
     at_read_operator_id(&m_operator_id);
