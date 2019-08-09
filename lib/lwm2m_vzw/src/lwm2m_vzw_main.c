@@ -72,7 +72,14 @@
 
 #define APP_OPERATOR_ID_VZW             1                                                   /**< Operator id for Verizon SIM. */
 
-static char m_app_bootstrap_psk[]  = APP_BOOTSTRAP_SEC_PSK;
+static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
+
+/* Initialize config with default values. */
+lwm2m_carrier_config_t m_app_config = {
+    .bootstrap_uri = BOOTSTRAP_URI,
+    .psk           = m_app_bootstrap_psk,
+    .psk_length    = sizeof(m_app_bootstrap_psk)
+};
 
 #define APP_ERROR_CHECK(error_code)                                            \
     do {                                                                       \
@@ -319,7 +326,7 @@ static char * app_initialize_client_id(void)
 
     if (provision_bs_psk) {
         app_offline();
-        app_provision_psk(APP_BOOTSTRAP_SEC_TAG, client_id, strlen(client_id), m_app_bootstrap_psk, sizeof(m_app_bootstrap_psk));
+        app_provision_psk(APP_BOOTSTRAP_SEC_TAG, client_id, strlen(client_id), m_app_config.psk, m_app_config.psk_length);
         app_init_and_connect();
     }
 
@@ -896,7 +903,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             lwm2m_server_short_server_id_set(0, 100);
             lwm2m_server_client_hold_off_timer_set(0, 30);
 
-            lwm2m_security_server_uri_set(0, BOOTSTRAP_URI, strlen(BOOTSTRAP_URI));
+            lwm2m_security_server_uri_set(0, m_app_config.bootstrap_uri, strlen(m_app_config.bootstrap_uri));
             lwm2m_security_is_bootstrap_server_set(0, true);
             lwm2m_security_bootstrapped_set(0, false);
 
@@ -1809,10 +1816,19 @@ static void app_lwm2m_observer_process(void)
     lwm2m_firmware_observer_process();
 }
 
-int lwm2m_carrier_init(void)
+int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 {
     int err;
     enum lwm2m_firmware_update_state mdfu;
+
+    if ((config != NULL) && (config->bootstrap_uri != NULL)) {
+        m_app_config.bootstrap_uri = config->bootstrap_uri;
+    }
+
+    if ((config != NULL) && (config->psk != NULL)) {
+        m_app_config.psk        = config->psk;
+        m_app_config.psk_length = config->psk_length;
+    }
 
     app_timers_init();
 

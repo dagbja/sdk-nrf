@@ -61,7 +61,7 @@ int main(void)
 
 void lwm2m_vzw_thread_run(void)
 {
-    int err = lwm2m_carrier_init();
+    int err = lwm2m_carrier_init(NULL);
     __ASSERT(err == 0, "Failed to initialize VZW LWM2M");
 
     if(err != 0) {

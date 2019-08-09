@@ -21,7 +21,14 @@ typedef struct
 /* This has to be implemented by the application. */
 void lwm2m_carrier_event_handler(const lwm2m_carrier_event_t * event);
 
-int lwm2m_carrier_init(void);
+typedef struct
+{
+    char * bootstrap_uri; /* URI of the bootstrap server. Shall be a NULL terminated string. */
+    char * psk;           /* Pre-shared key that the device will use. */
+    size_t psk_length;    /* Length of the pre-shared key. */
+} lwm2m_carrier_config_t;
+
+int lwm2m_carrier_init(const lwm2m_carrier_config_t * config);
 void lwm2m_carrier_run(void);
 
 /**
