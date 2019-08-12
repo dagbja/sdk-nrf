@@ -9,31 +9,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
-int lwm2m_os_init(void);
-
-void *lwm2m_os_malloc(size_t size);
-void lwm2m_os_free(void *ptr);
-
-int64_t lwm2m_os_uptime_get(void);
-int lwm2m_os_sleep(int ms);
-
-void lwm2m_os_sys_reset(void);
-uint32_t lwm2m_os_rand_get(void);
-
-int lwm2m_os_storage_delete(uint16_t id);
-int lwm2m_os_storage_read(uint16_t id, void *data, size_t len);
-int lwm2m_os_storage_write(uint16_t id, const void *data, size_t len);
-
-typedef void (*lwm2m_os_timer_handler_t)(void *timer);
-
-/* TODO Get some reasonable source for this config. */
+/*
+ * @brief Maximum number of timers that system must support.
+ */
 #define LWM2M_OS_MAX_TIMER_COUNT 5
-
-void *lwm2m_os_timer_get(lwm2m_os_timer_handler_t handler);
-void lwm2m_os_timer_release(void *timer);
-int lwm2m_os_timer_start(void *timer, int32_t timeout);
-void lwm2m_os_timer_cancel(void *timer);
-int32_t lwm2m_os_timer_remaining(void *timer);
 
 #define LWM2M_LOG_LEVEL_NONE 0
 #define LWM2M_LOG_LEVEL_ERR  1
@@ -41,7 +20,94 @@ int32_t lwm2m_os_timer_remaining(void *timer);
 #define LWM2M_LOG_LEVEL_INF  3
 #define LWM2M_LOG_LEVEL_TRC  4
 
+/**
+ * @brief Timer callback function.
+ */
+typedef void (*lwm2m_os_timer_handler_t)(void *timer);
+
+/**
+ * @brief Initialize LWM2M OS layer.
+ */
+int lwm2m_os_init(void);
+
+/**
+ * @brief Allocate memory.
+ */
+void *lwm2m_os_malloc(size_t size);
+
+/**
+ * @brief Free memory.
+ */
+void lwm2m_os_free(void *ptr);
+
+/**
+ * @brief Get uptime, in milliseconds.
+ */
+int64_t lwm2m_os_uptime_get(void);
+
+/**
+ * @brief Put a thread to a sleep.
+ */
+int lwm2m_os_sleep(int ms);
+
+/**
+ * @brief Reboot system.
+ */
+void lwm2m_os_sys_reset(void);
+
+/**
+ * @brief Get random value
+ */
+uint32_t lwm2m_os_rand_get(void);
+
+/**
+ * @brief Delete a non-volatile storage entry.
+ */
+int lwm2m_os_storage_delete(uint16_t id);
+
+/**
+ * @brief Read an entry from non-volatile storage.
+ */
+int lwm2m_os_storage_read(uint16_t id, void *data, size_t len);
+
+/**
+ * @brief Write an entry in non-volatile storage.
+ */
+int lwm2m_os_storage_write(uint16_t id, const void *data, size_t len);
+
+/**
+ * @brief Request a timer from the OS.
+ */
+void *lwm2m_os_timer_get(lwm2m_os_timer_handler_t handler);
+
+/**
+ * @brief Release a timer.
+ */
+void lwm2m_os_timer_release(void *timer);
+
+/**
+ * @brief Start a timer.
+ */
+int lwm2m_os_timer_start(void *timer, int32_t timeout);
+
+/**
+ * @brief Cancel a timer run.
+ */
+void lwm2m_os_timer_cancel(void *timer);
+
+/**
+ * @brief Obtain a time remaining on a timer.
+ */
+int32_t lwm2m_os_timer_remaining(void *timer);
+
+/**
+ * @brief Create a string copy for a logger subsystem.
+ */
 const char *lwm2m_os_log_strdup(const char *str);
+
+/**
+ * @brief Log a message.
+ */
 void lwm2m_os_log(int level, const char *fmt, ...);
 
 #endif // LWM2M_OS_H__
