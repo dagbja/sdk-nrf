@@ -320,7 +320,7 @@ int at_apn_setup_wait_for_ipv6(char * apn)
 
         while (cid_ipv6_table[cid_number] == false) {
             // TODO: Add a timeout to not wait forever in case IPv6 is not available on that CID.
-            k_sleep(100);
+            lwm2m_os_sleep(100);
         }
 
         LWM2M_TRC("IPv6 available for CID %d", cid_number);

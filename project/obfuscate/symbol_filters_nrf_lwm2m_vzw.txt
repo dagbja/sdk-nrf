@@ -85,6 +85,7 @@
 ^__aeabi_uldivmod$
 ^__memcpy_chk$
 ^__sprintf_chk$
+^abs$
 ^atoi$
 ^memcpy$
 ^memcmp$
@@ -98,6 +99,7 @@
 ^strncmp$
 ^strncpy$
 ^strstr$
+^strtol$
 ^strtoull$
 
 # zephyr
@@ -167,6 +169,7 @@
 ^at_params_list_free$
 ^at_params_list_init$
 ^at_params_short_get$
+^at_params_string_get$
 ^at_parser_params_from_str$
 ^bsdlib_init$
 ^bsdlib_shutdown$
