@@ -298,13 +298,7 @@ void lwm2m_device_init(void)
     m_instance_device.firmware_version.len = sizeof(nrf_dfu_fw_version_t);
     m_instance_device.firmware_version.p_val = lwm2m_os_malloc(m_instance_device.firmware_version.len);
 
-#if 0
-    (void)at_read_firmware_version(m_instance_device.firmware_version.p_val,
-                                   &m_instance_device.firmware_version.len);
-#else
-    int err;
-
-    err = dfusock_init();
+    int err = dfusock_init();
     if (err)
     {
         return;
@@ -316,7 +310,6 @@ void lwm2m_device_init(void)
     {
         return;
     }
-#endif
 
     m_instance_device.avail_power_sources.len = 2;
     m_instance_device.avail_power_sources.val.p_uint8[0] = 0; // DC power

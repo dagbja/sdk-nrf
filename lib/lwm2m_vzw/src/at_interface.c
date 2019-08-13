@@ -479,49 +479,46 @@ int at_read_sim_iccid(char *p_iccid, uint32_t * p_iccid_len)
     return retval;
 }
 
+
 int at_read_firmware_version(char *p_fw_version, uint32_t *p_fw_version_len)
 {
     char read_buffer[APP_MAX_AT_READ_LENGTH];
+    int retval = EINVAL;
 
-    int at_socket_fd;
-    int length;
-    int retval = 0;
-
-    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
-    if (at_socket_fd < 0) {
-        LWM2M_ERR("socket() failed");
-        return EIO;
+    if (p_fw_version == NULL || p_fw_version_len == NULL) {
+        return EINVAL;
     }
 
-    // Read Modem version
-    const char at_cgmr[] = "AT+CGMR";
-    length = send(at_socket_fd, at_cgmr, sizeof(at_cgmr) - 1, 0);
-
-    if (length == sizeof(at_cgmr) - 1) {
-        length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-        if (length > 0) {
-            char * p_end = strstr(read_buffer, "\r");
-            if (p_end) {
-                uint32_t len = (uint32_t)(p_end - read_buffer);
+    // Read Modem revision identification.
+    int err = at_cmd_write("AT+CGMR", read_buffer, APP_MAX_AT_READ_LENGTH, NULL);
+    if (err == 0) {
+        // OK response from the Modem. Extract revision identification.
+        // TODO: Use AT parser
+        char * p_end = strstr(read_buffer, "\r");
+        if (p_end) {
+            uint32_t len = (uint32_t)(p_end - read_buffer);
+            if(*p_fw_version_len > len) {
                 memcpy(p_fw_version, read_buffer, len);
                 p_fw_version[len] = '\0';
                 *p_fw_version_len = len;
-            } else {
-                retval = EINVAL;
+                retval = 0;
             }
-        } else {
-            LWM2M_ERR("recv(%s) failed", lwm2m_os_log_strdup(at_cgmr));
-            retval = EIO;
+            else {
+                LWM2M_ERR("Revision identification too big.");
+            }
         }
-    } else {
-        LWM2M_ERR("send(%s) failed", lwm2m_os_log_strdup(at_cgmr));
+        else {
+             LWM2M_ERR("Invalid revision identification format.");
+        }
+    }
+    else {
+        LWM2M_ERR("Unable to read firmware version. AT command error %d.", err);
         retval = EIO;
     }
 
-    close(at_socket_fd);
-
     return retval;
 }
+
 
 int at_read_operator_id(uint32_t  *p_operator_id)
 {

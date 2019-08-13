@@ -26,7 +26,14 @@ int lwm2m_at_write(const char *const cmd, bool do_logging);
 int at_apn_setup_wait_for_ipv6(char * apn);
 int at_read_imei_and_msisdn(char *p_imei, int imei_len, char *p_msisdn, int msisdn_len);
 int at_read_sim_iccid(char *p_iccid, uint32_t * p_iccid_len);
+
+/**
+ * @brief Read the Modem firmware version name.
+ *
+ * Version name is something like "mfw_nrf9160_0.7.0-15.alpha".
+ */
 int at_read_firmware_version(char *p_fw_version, uint32_t * p_fw_version_len);
+
 int at_read_operator_id(uint32_t *p_oper_id);
 int at_read_net_reg_stat(uint32_t * p_net_stat);
 int at_read_manufacturer(lwm2m_string_t * p_manufacturer_id);
