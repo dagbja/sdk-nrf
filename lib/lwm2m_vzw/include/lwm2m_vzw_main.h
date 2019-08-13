@@ -43,7 +43,17 @@ void lwm2m_observable_pmax_set(uint32_t pmax);
 
 lwm2m_state_t lwm2m_state_get(void);
 bool lwm2m_state_set(lwm2m_state_t lwm2m_state);
+
+/**
+ * @brief Get device IMEI that we can use as a unique serial number.
+ * @return IMEI has a NULL-terminated String.
+ */
 char *lwm2m_imei_get(void);
+
+/**
+ * @brief Get device MSISDN.
+ * @return MSISDN has a NULL-terminated String.
+ */
 char *lwm2m_msisdn_get(void);
 
 bool lwm2m_is_admin_pdn_ready(void);

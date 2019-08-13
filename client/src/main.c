@@ -15,7 +15,7 @@
 
 void lwm2m_carrier_event_handler(const lwm2m_carrier_event_t * event)
 {
-	ARG_UNUSED(event);
+    ARG_UNUSED(event);
 }
 
 /**@brief Recoverable BSD library error. */
@@ -70,9 +70,9 @@ void lwm2m_vzw_thread_run(void)
     };
 
     int err = lwm2m_carrier_init(&carrier_config);
-    __ASSERT(err == 0, "Failed to initialize VZW LWM2M");
-
-    if(err != 0) {
+    if (err != 0) {
+        printk("Failed to initialize the VZW LWM2M carrier library (%d). Exit!\n", err);
+        __ASSERT(false, "Failed to initialize the VZW LWM2M carrier library (%d). Exit!\n", err);
         return;
     }
 

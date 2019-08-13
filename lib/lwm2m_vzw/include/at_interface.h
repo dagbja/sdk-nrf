@@ -18,7 +18,37 @@ typedef void (*at_net_reg_stat_cb_t)(uint32_t net_stat);
 int mdm_interface_init(void);
 
 int at_apn_setup_wait_for_ipv6(char * apn);
-int at_read_imei_and_msisdn(char *p_imei, int imei_len, char *p_msisdn, int msisdn_len);
+
+/**
+ * @brief Read device IMEI.
+ * IMEI is always 14 digits and a check digit.
+ * 
+ * @param p_imei[in] Buffer to store IMEI. Stored as a NULL-terminated String with 15 digits.
+ * @param imei_len[in] Size of the buffer. Must be at least 16 bytes.
+ * 
+ * @return Result of the IMEI read AT command.
+ * @retval EINVAL Invalid parameters.
+ * @retval EIO AT command error.
+ * @retval 0 Success.
+ */
+int at_read_imei(char * const p_imei, int imei_len);
+
+/**
+ * @brief Read subscriber number (MSISDN).
+ * MSISDN is maximum 15 digits. Length may varies based on the operator.
+ * MSISDN may not always be available depending on the SIM card.
+ * 
+ * @param p_msisdn[in] Buffer to store IMEI. Store a NULL-terminated String with max 15 digits MSISDN.
+ * @param msisdn_len[in] Size of the buffer. Must be at least 16 bytes.
+ * 
+ * @return Result of the MSISDN read AT command.
+ * @retval EINVAL Invalid parameters.
+ * @retval EIO AT command error.
+ * @retval EPERM No MSISDN available on the SIM card.
+ * @retval 0 Success.
+ */
+int at_read_msisdn(char * const p_msisdn, int msisdn_len);
+
 int at_read_sim_iccid(char *p_iccid, uint32_t * p_iccid_len);
 
 /**

@@ -36,7 +36,7 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
 static int cmd_config_clear(const struct shell *shell, size_t argc, char **argv)
 {
     lwm2m_bootstrap_clear();
-    shell_print(shell, "Cleared bootstraped");
+    shell_print(shell, "Cleared bootstrapped");
 
     return 0;
 }

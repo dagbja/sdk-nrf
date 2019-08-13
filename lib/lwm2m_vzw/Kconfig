@@ -10,6 +10,8 @@ config NRF_LWM2M_VZW
 	help
 	  "Enable Verizon LwM2M library"
 
+if NRF_LWM2M_VZW
+
 config NRF_LWM2M_VZW_STANDALONE_LIBRARY
 	bool "Compile VZW LWM2M as a standalone library"
 
@@ -23,3 +25,5 @@ config NRF_LWM2M_VZW_SEC_TAG
 	help
 	  TLS security tag associated with Verizon certificates.
 	  Set to -1 to disable TLS.
+
+endif # NRF_LWM2M_VZW

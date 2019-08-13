@@ -377,77 +377,79 @@ int at_apn_setup_wait_for_ipv6(char * apn)
     return apn_handle;
 }
 
-
-int at_read_imei_and_msisdn(char *p_imei, int imei_len, char *p_msisdn, int msisdn_len)
+int at_read_imei(char * const p_imei, int imei_len)
 {
-    char write_buffer[APP_MAX_AT_WRITE_LENGTH];
     char read_buffer[APP_MAX_AT_READ_LENGTH];
-
-    int at_socket_fd;
-    int length;
     int retval = 0;
 
-    if (imei_len < 15 || msisdn_len < 10) {
+    if (p_imei == NULL || imei_len < 16) {
         return EINVAL;
     }
 
-    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
-    if (at_socket_fd < 0) {
-        LWM2M_ERR("socket() failed");
-        return EIO;
+    // Read IMEI.
+    // AT response format: 490154203237518\r\n or ERROR
+    int err = at_cmd_write("AT+CGSN", read_buffer, APP_MAX_AT_READ_LENGTH, NULL);
+    if (err == 0) {
+        // TODO: Use AT+CGSN=1 instead and parser
+        // OK response from the Modem. Extract IMEI from response payload (15 digits).
+        memcpy(p_imei, read_buffer, 15);
+        p_imei[15] = '\0';
     }
-
-    // Read IMEI
-    const char *at_cgsn = "AT+CGSN";
-    snprintf(write_buffer, APP_MAX_AT_WRITE_LENGTH, "%s", at_cgsn);
-    length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
-
-    if (length == strlen(write_buffer)) {
-        memset(p_imei, 0, imei_len);
-        length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-        if (length > 0) {
-            memcpy(p_imei, read_buffer, 15);
-        } else {
-            LWM2M_ERR("recv(%s) failed", lwm2m_os_log_strdup(at_cgsn));
-            retval = EIO;
-        }
-    } else {
-        LWM2M_ERR("send(%s) failed", lwm2m_os_log_strdup(at_cgsn));
+    else {
+        // AT command error
+        LWM2M_ERR("Unable to read IMEI. AT command error %d.", err);
         retval = EIO;
     }
 
-    // Read MSISDN
-    const char *at_cnum = "AT+CNUM";
-    snprintf(write_buffer, APP_MAX_AT_WRITE_LENGTH, "%s", at_cnum);
-    length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
+    return retval;
+}
 
-    if (length == strlen(write_buffer)) {
-        memset(p_msisdn, 0, msisdn_len);
-        length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-        if (length > 0) {
-            char * p_start = strstr(read_buffer, "\"");
-            if (p_start) {
-                char * p_end = strstr(p_start + 1, "\"");
-                if (p_end && (p_end - p_start - 1 >= 10)) {
-                    // FIXME: This only uses the last 10 digits
-                    memcpy(p_msisdn, p_end - 10, 10);
-                }
-            }
-            if (!p_msisdn[0]) {
-                // SIM has no number
-                // FIXME: For debug purpose use the last 10 digits of IMEI
-                memcpy(p_msisdn, &p_imei[5], 10);
-            }
-        } else {
-            LWM2M_ERR("recv(%s) failed", lwm2m_os_log_strdup(at_cnum));
-            retval = EIO;
-        }
-    } else {
-        LWM2M_ERR("send(%s) failed", lwm2m_os_log_strdup(at_cnum));
-        retval = EIO;
+int at_read_msisdn(char * const p_msisdn, int msisdn_len)
+{
+    char read_buffer[APP_MAX_AT_READ_LENGTH];
+    int retval = 0;
+
+    if (p_msisdn == NULL || msisdn_len < 16) {
+        return EINVAL;
     }
 
-    close(at_socket_fd);
+    // Read subscriber number (MSISDN).
+    // AT command response format: +CNUM: ,"+1234567891234",145 or ERROR.
+    int err = at_cmd_write("AT+CNUM", read_buffer, APP_MAX_AT_READ_LENGTH, NULL);
+
+    if(err == 0) {
+        // OK response from the Modem. Parse CNUM response.
+        // TODO: Use AT parser instead
+        char * p_start = strstr(read_buffer, "\"");
+        char * p_end = NULL;
+
+        if (p_start) {
+            p_start += 1;
+            p_end = strstr(p_start, "\"");
+            if (p_end) {
+                // MSISDN is max 15 digits. May be less depending on the operator.
+                int len = p_end - p_start;
+                memcpy(p_msisdn, p_start, len);
+                p_msisdn[len] = '\0';
+            }
+        }
+
+        if (p_start == NULL || p_end == NULL) {
+            // Invalid AT command response format.
+            LWM2M_ERR("Invalid MSISDN format.");
+            retval = EIO;
+        }
+    }
+    else if (err == -ENOEXEC) {
+        // An ERROR response is returned if MSISDN is not available on SIM card or if SIM card is not initialized.
+        LWM2M_ERR("No subscriber number (MSISDN) available on this SIM.");
+        retval = EPERM;
+    }
+    else {
+        // Unknown error.
+        LWM2M_ERR("Unable to read MSISDN. AT command error %d.", err);
+        retval = EIO;
+    }
 
     return retval;
 }

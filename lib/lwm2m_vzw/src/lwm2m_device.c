@@ -428,6 +428,7 @@ void lwm2m_device_init(void)
 
     (void)at_read_manufacturer(&m_instance_device.manufacturer);
     (void)at_read_model_number(&m_instance_device.model_number);
+
     m_instance_device.serial_number.p_val = lwm2m_imei_get();
     m_instance_device.serial_number.len = strlen(m_instance_device.serial_number.p_val);
 

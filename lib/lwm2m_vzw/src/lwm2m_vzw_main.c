@@ -81,6 +81,8 @@
 #define APP_NET_REG_STAT_HOME           1                                                   /**< Registered to home network. */
 #define APP_NET_REG_STAT_ROAM           5                                                   /**< Registered to roaming network. */
 
+#define APP_CLIENT_ID_MIN_LENGTH        43                                                  /**< Minimum buffer size to store the Client ID. */
+
 static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
 
 /* Initialize config with default values. */
@@ -126,8 +128,16 @@ static volatile lwm2m_state_t m_app_state = LWM2M_STATE_BOOTING;                
 static volatile uint16_t    m_server_instance;                                                /**< Server instance handled. */
 static volatile bool        m_did_bootstrap;
 
+/** @brief 15 digits IMEI stored as a NULL-terminated String. */
 static char m_imei[16];
+
+/**
+ * @brief Subscriber number (MSISDN) stored as a NULL-terminated String.
+ * Number with max 15 digits. Length varies depending on the operator and country.
+ * Motive test allows only 10 digits.
+ */
 static char m_msisdn[16];
+
 static uint32_t m_operator_id;
 static uint32_t m_net_stat;
 
@@ -298,9 +308,27 @@ char *lwm2m_imei_get(void)
     return m_imei;
 }
 
+/** Return a 10 digits MSISDN. */
 char *lwm2m_msisdn_get(void)
 {
-    return m_msisdn;
+    char * p_msisdn;
+
+    if (m_operator_id == APP_OPERATOR_ID_VZW) {
+        // MSISDN is read from Modem and includes country code.
+        // The country code "+1" should not be used in VZW network.
+        p_msisdn = &m_msisdn[2]; // Remove country code "+1".
+    }
+    else
+    {
+        // Make sure the MSISDN value is 10 digits long.
+        size_t len = strlen(m_msisdn);
+        __ASSERT_NO_MSG(len >= 10);
+        p_msisdn = &m_msisdn[len - 10];
+    }
+
+    // MSISDN is used to generate the Client ID. Must be 10 digits for Motive testing.
+    __ASSERT(strlen(p_msisdn) == 10, "Invalid MSISDN length");
+    return p_msisdn;
 }
 
 bool lwm2m_did_bootstrap(void)
@@ -389,40 +417,77 @@ static void app_vzw_sha256_psk(char *p_imei, uint16_t short_server_id, char *p_p
     sha256_final(&ctx, p_psk);
 }
 
-/**@brief Initialize IMEI and MSISDN to use in client id.
- *
+/**
+ * @brief Generate a unique Client ID using device IMEI and MSISDN if available.
  * Factory reset to start bootstrap if MSISDN is different than last start.
  */
-static char * app_initialize_client_id(void)
+static int app_generate_client_id(char * const p_client_id, size_t client_id_len)
 {
-    static char client_id[128];
     char last_used_msisdn[128];
     bool provision_bs_psk = false;
     bool provision_diag_psk = false;
 
-    (void)at_read_imei_and_msisdn(m_imei, sizeof(m_imei), m_msisdn, sizeof(m_msisdn));
+    if (p_client_id == NULL || client_id_len < APP_CLIENT_ID_MIN_LENGTH)
+    {
+        return EINVAL;
+    }
+
+    int ret = at_read_imei(m_imei, sizeof(m_imei));
+    if (ret != 0)
+    {
+        // IMEI is required to generate a unique Client ID. Cannot continue.
+        LWM2M_ERR("Unable to read IMEI. Cannot generate Client ID. Exit!");
+        return EIO;
+    }
+
+    ret = at_read_msisdn(m_msisdn, sizeof(m_msisdn));
+    if (ret != 0)
+    {
+        if (m_operator_id == APP_OPERATOR_ID_VZW) {
+            // MSISDN is mandatory on VZW network. Cannot continue.
+            LWM2M_ERR("No MSISDN available on VZW network. Exit!");
+            return EACCES;
+        }
+        else if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
+            // If no MSISDN is available, use part of IMEI to generate a unique Client ID.
+            // This is not allowed on VZW network. Use for testing purposes only.
+            LWM2M_WRN("No MSISDN available. Generate a Client ID using part of IMEI instead.");
+            memcpy(m_msisdn, &m_imei[5], 10);
+            m_msisdn[10] = '\0';
+        }
+        else {
+            // No MSISDN available to generate a unique Client ID.
+            // Project configuration has to be changed to disable carrier check.
+            return EACCES;
+        }
+    }
+
+    // Get the MSISDN with correct format for Motive.
+    char * p_msisdn = lwm2m_msisdn_get();
 
     int32_t len = lwm2m_last_used_msisdn_get(last_used_msisdn, sizeof(last_used_msisdn));
     if (len > 0) {
-        if (strlen(m_msisdn) > 0 && strcmp(m_msisdn, last_used_msisdn) != 0) {
+        if (strlen(p_msisdn) > 0 && strcmp(p_msisdn, last_used_msisdn) != 0) {
             // MSISDN has changed, factory reset and initiate bootstrap.
-            LWM2M_INF("Detected changed MSISDN: %s -> %s", lwm2m_os_log_strdup(last_used_msisdn), lwm2m_os_log_strdup(m_msisdn));
+            LWM2M_INF("New MSISDN detected: %s -> %s.", lwm2m_os_log_strdup(last_used_msisdn), lwm2m_os_log_strdup(p_msisdn));
             lwm2m_bootstrap_clear();
-            lwm2m_last_used_msisdn_set(m_msisdn, strlen(m_msisdn) + 1);
+            lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
             provision_bs_psk = true;
         }
     } else {
-        lwm2m_last_used_msisdn_set(m_msisdn, strlen(m_msisdn) + 1);
+        lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
         provision_bs_psk = true;
         provision_diag_psk = true;
     }
 
-    snprintf(client_id, 128, "urn:imei-msisdn:%s-%s", m_imei, m_msisdn);
+    // Generate a unique Client ID based on IMEI and MSISDN.
+    snprintf(p_client_id, client_id_len, "urn:imei-msisdn:%s-%s", lwm2m_imei_get(), p_msisdn);
+    LWM2M_INF("Client ID '%s'.", lwm2m_os_log_strdup(p_client_id));
 
     if (provision_bs_psk || provision_diag_psk) {
         app_offline();
         if (provision_bs_psk) {
-            app_provision_psk(APP_BOOTSTRAP_SEC_TAG, client_id, strlen(client_id),
+            app_provision_psk(APP_BOOTSTRAP_SEC_TAG, p_client_id, strlen(p_client_id),
                               m_app_config.psk, m_app_config.psk_length);
         }
         if (provision_diag_psk) {
@@ -434,7 +499,7 @@ static char * app_initialize_client_id(void)
         app_init_and_connect();
     }
 
-    return client_id;
+    return 0;
 }
 
 /**@brief Application implementation of the root handler interface.
@@ -1183,7 +1248,7 @@ static void app_lwm2m_create_objects(void)
  *          of existing instances. If bootstrap is not performed, the registration to the server
  *          will use what is initialized in this function.
  */
-static void app_lwm2m_setup(void)
+static int app_lwm2m_setup(void)
 {
     (void)lwm2m_init(lwm2m_os_malloc, lwm2m_os_free);
     (void)lwm2m_remote_init();
@@ -1209,12 +1274,18 @@ static void app_lwm2m_setup(void)
     // Add firmware support.
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_firmware_get_object());
 
-    // Initialize client ID.
-    char * p_ep_id = app_initialize_client_id();
+    // Generate a unique Client ID.
+    char client_id[APP_CLIENT_ID_MIN_LENGTH];
+    int err = app_generate_client_id(client_id, sizeof(client_id));
+    if (err)
+    {
+        return err;
+    }
 
-    memcpy(&m_client_id.value.imei_msisdn[0], p_ep_id, strlen(p_ep_id));
-    m_client_id.len  = strlen(p_ep_id);
+    m_client_id.len = strlen(client_id);
     m_client_id.type = LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN;
+    memcpy(m_client_id.value.imei_msisdn, client_id, m_client_id.len);
+    return 0;
 }
 
 static void app_bootstrap_connect(void)
@@ -1350,7 +1421,7 @@ static void app_server_connect(uint16_t instance_id)
 
         if (instance_id) {
             char *endptr;
-            m_server_conf[instance_id].msisdn = strtoull(m_msisdn, &endptr, 10);
+            m_server_conf[instance_id].msisdn = strtoull(lwm2m_msisdn_get(), &endptr, 10);
         }
     }
 
@@ -2031,7 +2102,7 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 
     err = lwm2m_firmware_update_state_get(&mdfu);
     if (!err && mdfu == UPDATE_SCHEDULED) {
-        printk("Update scheduled, please wait..\n");
+        LWM2M_INF("Update scheduled, please wait..\n");
         lwm2m_state_set(LWM2M_STATE_MODEM_FIRMWARE_UPDATE);
     }
 
@@ -2039,18 +2110,18 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     if (err) {
         switch (err) {
         case MODEM_DFU_RESULT_OK:
-            printk("Modem firmware update successful!\n");
-            printk("Modem will run the new firmware after reboot\n");
+            LWM2M_INF("Modem firmware update successful.");
+            LWM2M_INF("Modem will run the new firmware after reboot.");
             break;
         case MODEM_DFU_RESULT_UUID_ERROR:
         case MODEM_DFU_RESULT_AUTH_ERROR:
-            printk("Modem firmware update failed\n");
-            printk("Modem will run non-updated firmware on reboot.\n");
+            LWM2M_ERR("Modem firmware update failed.");
+            LWM2M_ERR("Modem will run non-updated firmware on reboot.");
             break;
         case MODEM_DFU_RESULT_HARDWARE_ERROR:
         case MODEM_DFU_RESULT_INTERNAL_ERROR:
-            printk("Modem firmware update failed\n");
-            printk("Fatal error.\n");
+            LWM2M_ERR("Modem firmware update failed.");
+            LWM2M_ERR("Fatal error.");
             break;
         default:
             break;
@@ -2080,9 +2151,13 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     app_coap_init();
 
     // Setup LWM2M endpoints.
-    app_lwm2m_setup();
+    err = app_lwm2m_setup();
+    if (err) {
+        LWM2M_ERR("Unable to generate a Client ID.");
+        return -err;
+    }
 
-    // Create LwM2M factory bootstraped objects.
+    // Create LwM2M factory bootstrapped objects.
     app_lwm2m_create_objects();
 
     if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6)) {
