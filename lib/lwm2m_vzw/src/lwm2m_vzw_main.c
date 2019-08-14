@@ -51,7 +51,7 @@
 #if APP_USE_CONTABO
 #define BOOTSTRAP_URI                   "coaps://vmi36865.contabo.host:5784"                  /**< Server URI to the bootstrap server when using security (DTLS). */
 #else
-#define BOOTSTRAP_URI                   "coaps://xvzwcdpii.xdev.motive.com:5684"              /**< Server URI to the bootstrap server when using security (DTLS). */
+#define BOOTSTRAP_URI                   "coaps://boot.lwm2m.vzwdm.com:5684"                   /**< Server URI to the bootstrap server when using security (DTLS). */
 #endif
 
 #define APP_SEC_TAG_OFFSET              25

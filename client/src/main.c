@@ -61,7 +61,11 @@ int main(void)
 
 void lwm2m_vzw_thread_run(void)
 {
-    int err = lwm2m_carrier_init(NULL);
+
+    const lwm2m_carrier_config_t carrier_config = {
+        .bootstrap_uri = "coaps://xvzwcdpii.xdev.motive.com:5684"
+    };
+    int err = lwm2m_carrier_init(&carrier_config);
     __ASSERT(err == 0, "Failed to initialize VZW LWM2M");
 
     if(err != 0) {
