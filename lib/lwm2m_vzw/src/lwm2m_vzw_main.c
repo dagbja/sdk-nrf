@@ -50,13 +50,17 @@
 
 #if APP_USE_CONTABO
 #define BOOTSTRAP_URI                   "coaps://vmi36865.contabo.host:5784"                  /**< Server URI to the bootstrap server when using security (DTLS). */
+#define DIAGNOSTICS_URI                 ""                                                    /**< Server URI to the diagnostics server when using security (DTLS). */
 #else
 #define BOOTSTRAP_URI                   "coaps://boot.lwm2m.vzwdm.com:5684"                   /**< Server URI to the bootstrap server when using security (DTLS). */
+#define DIAGNOSTICS_URI                 "coaps://diag.lwm2m.vzwdm.com:5684"                   /**< Server URI to the diagnostics server when using security (DTLS). */
 #endif
 
 #define APP_SEC_TAG_OFFSET              25
 
-#define APP_BOOTSTRAP_SEC_TAG           APP_SEC_TAG_OFFSET                                    /**< Tag used to identify security credentials used by the client for bootstrapping. */
+#define APP_BOOTSTRAP_SEC_TAG           (APP_SEC_TAG_OFFSET + 0)                              /**< Tag used to identify security credentials used by the client for bootstrapping. */
+#define APP_DIAGNOSTICS_SEC_TAG         (APP_SEC_TAG_OFFSET + 2)                              /**< Tag used to identify security credentials used by the client for diagnostics server. */
+
 #if APP_USE_CONTABO
 #define APP_BOOTSTRAP_SEC_PSK           {'g', 'l', 'e', 'n', 'n', 's', 's', 'e', 'c', 'r', 'e', 't'}  /**< Pre-shared key used for bootstrap server in hex format. */
 #else
@@ -70,9 +74,14 @@
                                          0x0a, 0x91, 0xe7, 0x47} /**< Pre-shared key used for bootstrap server in hex format. */
 #endif
 
+// TODO: Generate diagnostics PSK from IMEI.
+// Portland R&D kit generated with `echo -n 352656100000804101 | sha256sum | cut -d' ' -f1 | sed -e 's/\(..\)/0x\1, /g' | sed -e 's/^\(.*\), $/{ \1 };/'`
+#define APP_DIAGNOSTICS_SEC_PSK { 0x48, 0xe3, 0x08, 0xc4, 0xe3, 0xb0, 0x6a, 0xd0, 0xfb, 0x2f, 0x67, 0x55, 0x9f, 0xb8, 0xd0, 0x86, 0x28, 0x30, 0x54, 0x19, 0x7a, 0x07, 0x57, 0x06, 0x19, 0x07, 0x81, 0x07, 0xb6, 0x5a, 0xd5, 0x07 };
+
 #define APP_OPERATOR_ID_VZW             1                                                   /**< Operator id for Verizon SIM. */
 
 static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
+static char m_app_diagnostics_psk[] = APP_DIAGNOSTICS_SEC_PSK;
 
 /* Initialize config with default values. */
 lwm2m_carrier_config_t m_app_config = {
@@ -109,7 +118,9 @@ static char m_bootstrap_object_alias_name[] = "bs";                             
 
 static coap_transport_handle_t             m_coap_transport = -1;                             /**< CoAP transport handle for the non bootstrap server. */
 static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS];            /**< CoAP transport handles for the secure servers. Obtained on @coap_security_setup. */
-static int                                 m_admin_pdn_handle[1+LWM2M_MAX_SERVERS];           /**< PDN connection handle. */
+
+static int   m_admin_pdn_handle = -1;                                                         /**< VZWADMIN PDN connection handle. */
+static bool  m_use_admin_pdn[1+LWM2M_MAX_SERVERS] = { true, true, true, false };              /**< Use VZWADMIN PDN for connection. */
 
 static volatile lwm2m_state_t m_app_state = LWM2M_STATE_BOOTING;                              /**< Application state. Should be one of @ref lwm2m_state_t. */
 static volatile uint16_t    m_server_instance;                                                /**< Server instance handled. */
@@ -140,7 +151,7 @@ static bool m_use_client_holdoff_timer = true;
 #if APP_USE_CONTABO
 static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET, AF_INET, 0, AF_INET };     /**< Current IP versions, start using IPv6. */
 #else
-static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET6, AF_INET6, 0, AF_INET6 };  /**< Current IP versions, start using IPv6. */
+static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET6, AF_INET6, AF_INET6, AF_INET6 };  /**< Current IP versions, start using IPv6. */
 #endif
 static struct sockaddr m_bs_remote_server;                                                    /**< Remote bootstrap server address to connect to. */
 
@@ -277,7 +288,9 @@ void lwm2m_system_reset(void)
 /**@brief Setup ADMIN PDN connection */
 static void lwm2m_setup_admin_pdn(uint16_t instance_id)
 {
-    if (m_operator_id == APP_OPERATOR_ID_VZW)
+    if ((m_operator_id == APP_OPERATOR_ID_VZW) &&
+        (m_use_admin_pdn[instance_id]) &&
+        (m_admin_pdn_handle == -1))
     {
         // Set up APN for Bootstrap and DM server.
         uint8_t class_apn_len = 0;
@@ -288,16 +301,16 @@ static void lwm2m_setup_admin_pdn(uint16_t instance_id)
         apn_name_zero_terminated[class_apn_len] = '\0';
 
         LWM2M_INF("APN setup: %s", lwm2m_os_log_strdup(apn_name_zero_terminated));
-        m_admin_pdn_handle[instance_id] = at_apn_setup_wait_for_ipv6(apn_name_zero_terminated);
+        m_admin_pdn_handle = at_apn_setup_wait_for_ipv6(apn_name_zero_terminated);
     }
 }
 
 /**@brief Disconnect ADMIN PDN connection. */
 static void lwm2m_disconnect_admin_pdn(uint16_t instance_id)
 {
-    if (m_admin_pdn_handle[instance_id] != -1) {
-        pdn_disconnect(m_admin_pdn_handle[instance_id]);
-        m_admin_pdn_handle[instance_id] = -1;
+    if (m_admin_pdn_handle != -1) {
+        pdn_disconnect(m_admin_pdn_handle);
+        m_admin_pdn_handle = -1;
     }
 }
 
@@ -309,6 +322,7 @@ static char * app_initialize_client_id(void)
 {
     static char client_id[128];
     bool provision_bs_psk = false;
+    bool provision_diag_psk = false;
 
     (void)at_read_imei_and_msisdn(m_imei, sizeof(m_imei), m_msisdn, sizeof(m_msisdn));
 
@@ -334,13 +348,21 @@ static char * app_initialize_client_id(void)
     } else {
         lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
         provision_bs_psk = true;
+        provision_diag_psk = true;
     }
 
     snprintf(client_id, 128, "urn:imei-msisdn:%s-%s", m_imei, p_msisdn);
 
-    if (provision_bs_psk) {
+    if (provision_bs_psk || provision_diag_psk) {
         app_offline();
-        app_provision_psk(APP_BOOTSTRAP_SEC_TAG, client_id, strlen(client_id), m_app_config.psk, m_app_config.psk_length);
+        if (provision_bs_psk) {
+            app_provision_psk(APP_BOOTSTRAP_SEC_TAG, client_id, strlen(client_id),
+                              m_app_config.psk, m_app_config.psk_length);
+        }
+        if (provision_diag_psk) {
+            app_provision_psk(APP_DIAGNOSTICS_SEC_TAG, m_imei, strlen(m_imei),
+                              m_app_diagnostics_psk, sizeof(m_app_diagnostics_psk));
+        }
         app_init_and_connect();
     }
 
@@ -557,7 +579,7 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t          short_serv
     uint32_t err_code;
 
     // Use DNS to lookup the IP
-    err_code = app_resolve_server_uri(server_uri, uri_len, p_remote, secure, m_family_type[0], m_admin_pdn_handle[0]);
+    err_code = app_resolve_server_uri(server_uri, uri_len, p_remote, secure, m_family_type[0], m_admin_pdn_handle);
 
     if (err_code == 0)
     {
@@ -807,10 +829,21 @@ static void app_connection_update(void *timer)
 
 void init_connection_update(void)
 {
+    uint8_t bootstrap_uri_len = 0;
+    char * bootstrap_uri = lwm2m_security_server_uri_get(0, &bootstrap_uri_len);
+
+    // Enable Diagnostics server only when using live VZW bootstrap server
+    bool enable_diagnostics_server = (strncmp(bootstrap_uri, BOOTSTRAP_URI, bootstrap_uri_len) == 0);
+
     // Register all servers having a URI.
     for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
         uint8_t uri_len = 0;
-        (void)lwm2m_security_server_uri_get(i, &uri_len);
+
+        // Instance 2 is the diagnostics server.
+        if ((i != 2) || enable_diagnostics_server) {
+            (void)lwm2m_security_server_uri_get(i, &uri_len);
+        }
+
         if (uri_len > 0) {
             lwm2m_request_server_update(i, true);
             m_connection_update[i].timer = lwm2m_os_timer_get(app_connection_update);
@@ -925,15 +958,14 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             lwm2m_server_short_server_id_set(2, 101);
             lwm2m_server_client_hold_off_timer_set(2, 30);
 
-            lwm2m_security_server_uri_set(2, "", 0);
+            lwm2m_security_server_uri_set(2, DIAGNOSTICS_URI, strlen(DIAGNOSTICS_URI));
             lwm2m_server_lifetime_set(2, 86400);
             lwm2m_server_min_period_set(2, 300);
-            lwm2m_server_min_period_set(2, 6000);
+            lwm2m_server_max_period_set(2, 6000);
             lwm2m_server_notif_storing_set(2, 1);
             lwm2m_server_binding_set(2, "UQS", 3);
 
-            acl.access[0] = rwde_access;
-            acl.server[0] = 102;
+            acl.owner = 101;
             app_init_server_acl(2, &acl);
             break;
         }
@@ -1153,7 +1185,7 @@ static void app_bootstrap_connect(void)
         };
 
         char apn_name_zero_terminated[64];
-        if (m_admin_pdn_handle[0] != -1)
+        if (m_use_admin_pdn[0] && m_admin_pdn_handle != -1)
         {
             uint8_t class_apn_len = 0;
             char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
@@ -1246,16 +1278,14 @@ static void app_server_connect(uint16_t instance_id)
     uint8_t uri_len = 0;
     char * p_server_uri = lwm2m_security_server_uri_get(instance_id, &uri_len);
 
-    if (instance_id == 1) {
-        lwm2m_setup_admin_pdn(instance_id);
-    }
+    lwm2m_setup_admin_pdn(instance_id);
 
     err_code = app_resolve_server_uri(p_server_uri,
                                       uri_len,
                                       &m_remote_server[instance_id],
                                       &secure,
                                       m_family_type[instance_id],
-                                      m_admin_pdn_handle[instance_id]);
+                                      m_use_admin_pdn[instance_id] ? m_admin_pdn_handle : -1);
     if (err_code != 0)
     {
         lwm2m_disconnect_admin_pdn(instance_id);
@@ -1296,7 +1326,7 @@ static void app_server_connect(uint16_t instance_id)
         };
 
         char apn_name_zero_terminated[64];
-        if (m_admin_pdn_handle[instance_id] != -1)
+        if (m_use_admin_pdn[instance_id] && m_admin_pdn_handle != -1)
         {
             uint8_t class_apn_len = 0;
             char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
@@ -1327,9 +1357,7 @@ static void app_server_connect(uint16_t instance_id)
         else
         {
             LWM2M_INF("Connection failed: %ld (%d)", err_code, errno);
-            if (instance_id == 1) {
-                lwm2m_disconnect_admin_pdn(instance_id);
-            }
+            lwm2m_disconnect_admin_pdn(instance_id);
 
             m_app_state = LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT;
             // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
@@ -1746,7 +1774,6 @@ static void app_coap_init(void)
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
         m_lwm2m_transport[i] = -1;
-        m_admin_pdn_handle[i] = -1;
     }
 
 #if APP_USE_CONTABO

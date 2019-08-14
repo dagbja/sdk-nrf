@@ -112,11 +112,8 @@ static int cmd_config_lifetime(const struct shell *shell, size_t argc, char **ar
     }
 
     if (lifetime != lwm2m_server_lifetime_get(instance_id)) {
-        if (instance_id == 1 || instance_id == 3) {
-            // Lifetime changed, send update server
-            lwm2m_request_server_update(instance_id, false);
-        }
-
+        // Lifetime changed, send update server
+        lwm2m_request_server_update(instance_id, false);
         lwm2m_server_lifetime_set(instance_id, lifetime);
         lwm2m_instance_storage_server_store(instance_id);
 
@@ -331,9 +328,9 @@ static int cmd_lwm2m_update(const struct shell *shell, size_t argc, char **argv)
     if (argc == 2) {
         instance_id = atoi(argv[1]);
 
-        if (instance_id != 1 && instance_id != 3)
+        if (instance_id < 1 || instance_id >= (1+LWM2M_MAX_SERVERS))
         {
-            shell_print(shell, "instance must be 1 or 3");
+            shell_print(shell, "instance must be between 1 and %d", LWM2M_MAX_SERVERS);
             return 0;
         }
     }
