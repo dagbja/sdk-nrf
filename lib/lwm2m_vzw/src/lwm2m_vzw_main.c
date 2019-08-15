@@ -131,6 +131,7 @@ struct connection_update_t {
 };
 
 static struct connection_update_t m_connection_update[1+LWM2M_MAX_SERVERS];
+static bool m_use_client_holdoff_timer;
 
 /* Resolved server addresses */
 #if APP_USE_CONTABO
@@ -676,6 +677,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             m_app_state = LWM2M_STATE_IDLE;
 
             if (lwm2m_is_registration_ready()) {
+                m_use_client_holdoff_timer = false;
                 app_event_notify(LWM2M_CARRIER_EVENT_READY, NULL);
             }
         }
@@ -811,9 +813,6 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
                                    uint8_t          op_code,
                                    coap_message_t * p_request)
 {
-    s64_t time_stamp;
-    s64_t milliseconds_spent;
-
     LWM2M_INF("Bootstrap done, timeout cancelled");
     lwm2m_os_timer_cancel(state_update_timer);
 
@@ -823,8 +822,6 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     // Close connection to bootstrap server.
     app_server_disconnect(0);
     lwm2m_retry_delay_reset(0);
-
-    time_stamp = lwm2m_os_uptime_get();
 
     app_provision_secret_keys();
 
@@ -840,24 +837,8 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
         lwm2m_instance_storage_server_store(i);
     }
 
+    m_app_state = LWM2M_STATE_IDLE;
     init_connection_update();
-
-    milliseconds_spent = lwm2m_os_uptime_get() - time_stamp;
-#if APP_USE_CONTABO
-    // On contabo we want to jump directly to start connecting to servers when bootstrap is complete.
-    m_app_state = LWM2M_STATE_SERVER_CONNECT;
-    m_server_instance = 1;
-#else
-    m_app_state = LWM2M_STATE_BOOTSTRAP_HOLDOFF;
-    int32_t hold_off_time = (lwm2m_server_client_hold_off_timer_get(0) * 1000) - milliseconds_spent;
-    if (hold_off_time > 0) {
-        LWM2M_INF("Client holdoff timer: sleeping %ld milliseconds...", hold_off_time);
-    } else {
-        // Already used the holdoff timer, just continue
-        hold_off_time = 0;
-    }
-    lwm2m_os_timer_start(state_update_timer, hold_off_time);
-#endif
 
     return 0;
 }
@@ -901,11 +882,12 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
         case 0: // Bootstrap server
         {
             lwm2m_server_short_server_id_set(0, 100);
-            lwm2m_server_client_hold_off_timer_set(0, 30);
+            lwm2m_server_client_hold_off_timer_set(0, 0);
 
             lwm2m_security_server_uri_set(0, m_app_config.bootstrap_uri, strlen(m_app_config.bootstrap_uri));
             lwm2m_security_is_bootstrap_server_set(0, true);
             lwm2m_security_bootstrapped_set(0, false);
+            lwm2m_security_hold_off_timer_set(0, 10);
 
             acl.access[0] = rwde_access;
             acl.server[0] = 102;
@@ -1200,6 +1182,8 @@ static void app_bootstrap_connect(void)
 
 static void app_bootstrap(void)
 {
+    m_use_client_holdoff_timer = true;
+
     uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)&m_bs_remote_server,
                                         &m_client_id,
                                         m_lwm2m_transport[0]);
@@ -1461,9 +1445,9 @@ static void app_wait_state_update(void *timer)
             m_app_state = LWM2M_STATE_BOOTSTRAP_TIMEDOUT;
             break;
 
-        case LWM2M_STATE_BOOTSTRAP_HOLDOFF:
-            // Client holdoff timer expired
-            m_app_state = LWM2M_STATE_IDLE;
+        case LWM2M_STATE_CLIENT_HOLD_OFF:
+            // Client hold off timer expired
+            m_app_state = LWM2M_STATE_SERVER_CONNECT;
             break;
 
         case LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT:
@@ -1588,9 +1572,23 @@ static void app_check_server_update(void)
         if (m_connection_update[i].requested) {
             if (m_lwm2m_transport[i] == -1) {
                 if (m_app_state == LWM2M_STATE_IDLE) {
-                    m_app_state = LWM2M_STATE_SERVER_CONNECT;
                     m_server_instance = i;
                     m_connection_update[i].requested = false;
+
+#if APP_USE_CONTABO
+                    // On contabo we don't use client hold off timer
+                    m_app_state == LWM2M_STATE_SERVER_CONNECT;
+#else
+                    int32_t client_hold_off_time = lwm2m_server_client_hold_off_timer_get(i);
+                    if (m_use_client_holdoff_timer && client_hold_off_time > 0) {
+                        LWM2M_INF("Client hold off timer [%ld seconds] (server %u)", client_hold_off_time, i);
+                        m_app_state = LWM2M_STATE_CLIENT_HOLD_OFF;
+                        lwm2m_os_timer_start(state_update_timer, client_hold_off_time * 1000);
+                    } else {
+                        // No client hold off timer
+                        m_app_state = LWM2M_STATE_SERVER_CONNECT;
+                    }
+#endif
                 }
             } else if (lwm2m_server_registered_get(i)) {
                 LWM2M_INF("Server update (server %u)", i);

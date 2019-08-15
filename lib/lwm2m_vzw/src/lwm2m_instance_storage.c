@@ -381,8 +381,8 @@ int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
     {
         // Fetch carrier specific data.
         vzw_server_settings_t data_carrier_specific;
-        data_carrier_specific.is_registered         = lwm2m_security_bootstrapped_get(instance_id);
-        data_carrier_specific.client_hold_off_timer = lwm2m_security_client_hold_off_time_get(instance_id);
+        data_carrier_specific.is_registered         = lwm2m_server_registered_get(instance_id);
+        data_carrier_specific.client_hold_off_timer = lwm2m_server_client_hold_off_timer_get(instance_id);
         memcpy(&p_scratch_buffer[temp_storage.offset_carrier_specific], &data_carrier_specific, sizeof(vzw_server_settings_t));
     }
 

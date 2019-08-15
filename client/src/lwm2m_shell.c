@@ -424,8 +424,8 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         case LWM2M_STATE_BOOTSTRAPPING:
             shell_print(shell, "Bootstrapping [%s]", ip_version);
             break;
-        case LWM2M_STATE_BOOTSTRAP_HOLDOFF:
-            shell_print(shell, "Bootstrap holdoff [%s]", ip_version);
+        case LWM2M_STATE_CLIENT_HOLD_OFF:
+            shell_print(shell, "Client hold off (server %d)", lwm2m_server_instance());
             break;
         case LWM2M_STATE_SERVER_CONNECT:
             shell_print(shell, "Server %d connecting [%s]", lwm2m_server_instance(), ip_version);
