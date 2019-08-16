@@ -107,6 +107,13 @@ char * lwm2m_conn_mon_class_apn_get(uint8_t apn_class, uint8_t * p_len)
                 // TODO: Value is different from previous value, do a notification.
                 // lwm2m_conn_mon_notify_resource(apn_index);
             }
+
+            // Update APN resource in case Class 2
+            if (apn_class == 2)
+            {
+                (void) lwm2m_bytebuffer_to_string(m_apn_class_scratch_buffer, apn_class_len, &m_instance_conn_mon.apn.val.p_string[0]);
+                m_instance_conn_mon.apn.len = 1;
+            }
         }
     }
 
@@ -352,10 +359,14 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                 case LWM2M_CONN_MON_SMCC:
                     (void)at_read_smnc_smcc(&m_instance_conn_mon.smnc, &m_instance_conn_mon.smcc);
                     break;
+                case LWM2M_CONN_MON_IP_ADDRESSES:
+                    (void)at_read_ipaddr(&m_instance_conn_mon.ip_addresses);
+                    break;
                 case LWM2M_NAMED_OBJECT:
                     (void)at_read_radio_signal_strength_and_link_quality(&m_instance_conn_mon.radio_signal_strength, &m_instance_conn_mon.link_quality);
                     (void)at_read_cell_id(&m_instance_conn_mon.cell_id);
                     (void)at_read_smnc_smcc(&m_instance_conn_mon.smnc, &m_instance_conn_mon.smcc);
+                    (void)at_read_ipaddr(&m_instance_conn_mon.ip_addresses);
                     break;
                 default:
                     break;
@@ -502,13 +513,8 @@ void lwm2m_conn_mon_init(void)
     m_instance_conn_mon.available_network_bearer.val.p_int32[0] = 6; // LTE-FDD
     (void)at_read_radio_signal_strength_and_link_quality(&m_instance_conn_mon.radio_signal_strength, &m_instance_conn_mon.link_quality);
     m_instance_conn_mon.link_quality = 100;
-    m_instance_conn_mon.ip_addresses.len = 1;
-    char * ip_address = "192.168.0.0";
-    (void)lwm2m_bytebuffer_to_string(ip_address, strlen(ip_address), &m_instance_conn_mon.ip_addresses.val.p_string[0]);
     m_instance_conn_mon.link_utilization = 0;
-    m_instance_conn_mon.apn.len = 1;
-    char * apn = "VZWADMIN";
-    (void)lwm2m_bytebuffer_to_string(apn, strlen(apn), &m_instance_conn_mon.apn.val.p_string[0]);
+    (void)at_read_ipaddr(&m_instance_conn_mon.ip_addresses);
     (void)at_read_cell_id(&m_instance_conn_mon.cell_id);
     (void)at_read_smnc_smcc(&m_instance_conn_mon.smnc, &m_instance_conn_mon.smcc);
 

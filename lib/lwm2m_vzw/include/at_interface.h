@@ -45,6 +45,7 @@ int at_read_smnc_smcc(int32_t * p_smnc, int32_t *p_smcc);
  *
  * */
 int at_read_time(int32_t * p_time, int32_t * p_utc_offset);
+int at_read_ipaddr(lwm2m_list_t * p_ipaddr_list);
 
 void at_subscribe_net_reg_stat(at_net_reg_stat_cb_t net_reg_stat_cb);
 

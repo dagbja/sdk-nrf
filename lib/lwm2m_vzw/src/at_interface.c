@@ -957,3 +957,109 @@ int at_read_time(int32_t *p_time, int32_t *p_utc_offset)
     return retval;
 }
 
+int at_read_ipaddr(lwm2m_list_t * p_ipaddr_list)
+{
+    char read_buffer[APP_MAX_AT_READ_LENGTH];
+    struct at_param_list cgdcont_params;
+    int retval;
+
+    const char *at_cgdcont = "AT+CGDCONT?";
+
+    retval = at_cmd_write(at_cgdcont, read_buffer, APP_MAX_AT_READ_LENGTH, NULL);
+
+    if (retval == 0) {
+
+        cgdcont_params.params = NULL;
+        retval = at_params_list_init(&cgdcont_params, 6);
+
+        if (retval == 0)
+        {
+            char * p_line_start = read_buffer;
+            char * p_command_end = strchr(read_buffer, ':');
+            char * p_new_line_pos = strchr(read_buffer, '\n');
+            char * p_resp_end = strchr(read_buffer, '\0');
+
+            bool consumed = false;
+
+            int max_ip_addr = p_ipaddr_list->max_len;
+            int idx = 0;
+
+            while (consumed != true)
+            {
+                // Detect if all lines are consumed
+                if ((p_resp_end - p_new_line_pos) == 1)
+                {
+                    consumed = true;
+                }
+
+                // Update line start position as next char after echo of the AT command
+                if (p_command_end != NULL) {
+                    p_line_start = p_command_end+1;
+                }
+                else
+                {
+                    LWM2M_ERR("ip addr parsing failed: p_command_end == NULL");
+                    retval = -EINVAL;
+                    break;
+                }
+
+                // Make line a null terminated string for parsing
+                read_buffer[p_new_line_pos - read_buffer] = '\0';
+
+                // Parse current line
+                retval = at_parser_params_from_str(p_line_start, &cgdcont_params);
+
+                if (retval != 0)
+                {
+                    LWM2M_ERR("ip addr string parsing failed");
+                    retval = -EINVAL;
+                    break;
+                }
+
+                // Store IP addresses
+                int ip_len = at_params_string_get(&cgdcont_params, 3, read_buffer, sizeof(read_buffer));
+                read_buffer[ip_len] = '\0';
+
+                for (char *ip_addr = strtok(read_buffer, " "); ip_addr; ip_addr = strtok(NULL, " ")) {
+                    if (idx < max_ip_addr) {
+                        (void)lwm2m_bytebuffer_to_string(ip_addr, strlen(ip_addr), &p_ipaddr_list->val.p_string[idx++]);
+                        p_ipaddr_list->len = idx;
+                    } else {
+                        LWM2M_ERR("ipaddr list full");
+                        at_params_list_free(&cgdcont_params);
+                        return -ENOMEM;
+                    }
+                }
+
+                if (consumed != true)
+                {
+                    // Set pointers to next line
+                    p_command_end = strchr(p_new_line_pos+1, ':');
+                    p_new_line_pos = strchr(p_new_line_pos+1, '\n');
+
+                    // Check for error cases
+                    if (p_new_line_pos == NULL || p_new_line_pos >= p_resp_end)
+                    {
+                        LWM2M_ERR("cgdcont parse failed: fault processing multiple lines");
+                        retval = -EINVAL;
+                        break;
+                    }
+
+                    at_params_list_clear(&cgdcont_params);
+                }
+            }
+
+            at_params_list_free(&cgdcont_params);
+        }
+        else
+        {
+            LWM2M_ERR("cgdcont_params list init failed: %d", (int)retval);
+        }
+    }
+    else
+    {
+        LWM2M_ERR("cgdcont at cmd failed: %d", (int)retval);
+    }
+
+    return retval;
+}
