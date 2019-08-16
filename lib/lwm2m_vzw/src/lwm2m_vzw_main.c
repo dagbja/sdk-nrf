@@ -1593,7 +1593,7 @@ static void app_check_server_update(void)
                     m_connection_update[i].requested = false;
                 }
             } else if (lwm2m_server_registered_get(i)) {
-                LWM2M_INF("app_server_update (server %u)", i);
+                LWM2M_INF("Server update (server %u)", i);
                 m_connection_update[i].requested = false;
                 app_server_update(i, false);
             }
@@ -1615,13 +1615,13 @@ static void app_lwm2m_process(void)
     {
         case LWM2M_STATE_BS_CONNECT:
         {
-            LWM2M_INF("app_bootstrap_connect");
+            LWM2M_INF("Bootstrap connect");
             app_bootstrap_connect();
             break;
         }
         case LWM2M_STATE_BOOTSTRAP_TIMEDOUT:
         {
-            LWM2M_INF("app_handle_connect_retry");
+            LWM2M_INF("Bootstrap timed out");
             app_disconnect();
             m_app_state = LWM2M_STATE_BS_CONNECT_RETRY_WAIT;
             app_handle_connect_retry(0, false);
@@ -1629,13 +1629,13 @@ static void app_lwm2m_process(void)
         }
         case LWM2M_STATE_BS_CONNECTED:
         {
-            LWM2M_INF("app_bootstrap");
+            LWM2M_INF("Bootstrap register");
             app_bootstrap();
             break;
         }
         case LWM2M_STATE_SERVER_CONNECT:
         {
-            LWM2M_INF("app_server_connect (server %u)", m_server_instance);
+            LWM2M_INF("Server connect (server %u)", m_server_instance);
             app_server_connect(m_server_instance);
             break;
         }
@@ -1658,10 +1658,10 @@ static void app_lwm2m_process(void)
             }
 
             if (do_register) {
-                LWM2M_INF("app_server_register (server %u)", m_server_instance);
+                LWM2M_INF("Server register (server %u)", m_server_instance);
                 app_server_register(m_server_instance);
             } else {
-                LWM2M_INF("app_server_update (server %u)", m_server_instance);
+                LWM2M_INF("Server update (server %u)", m_server_instance);
                 app_server_update(m_server_instance, true);
             }
 
@@ -1669,13 +1669,13 @@ static void app_lwm2m_process(void)
         }
         case LWM2M_STATE_SERVER_DEREGISTER:
         {
-            LWM2M_INF("app_server_deregister (server %u)", m_server_instance);
+            LWM2M_INF("Server deregister (server %u)", m_server_instance);
             app_server_deregister(m_server_instance);
             break;
         }
         case LWM2M_STATE_DISCONNECT:
         {
-            LWM2M_INF("app_disconnect");
+            LWM2M_INF("Disconnect");
             app_disconnect();
             break;
         }
