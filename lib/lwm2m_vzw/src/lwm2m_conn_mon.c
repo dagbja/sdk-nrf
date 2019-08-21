@@ -463,15 +463,14 @@ void lwm2m_conn_mon_init(void)
     m_object_conn_mon.object_id = LWM2M_OBJ_CONN_MON;
     m_instance_conn_mon.proto.expire_time = 60; // Default to 60 second notifications.
     m_instance_conn_mon.network_bearer = 6;
-    m_instance_conn_mon.available_network_bearer.len = 2;
-    m_instance_conn_mon.available_network_bearer.val.p_int32[0] = 5;
-    m_instance_conn_mon.available_network_bearer.val.p_int32[1] = 6;
+    m_instance_conn_mon.available_network_bearer.len = 1;
+    m_instance_conn_mon.available_network_bearer.val.p_int32[0] = 6;
     (void)at_read_radio_signal_strength(&m_instance_conn_mon.radio_signal_strength);
     m_instance_conn_mon.link_quality = 100;
     m_instance_conn_mon.ip_addresses.len = 1;
     char * ip_address = "192.168.0.0";
     (void)lwm2m_bytebuffer_to_string(ip_address, strlen(ip_address), &m_instance_conn_mon.ip_addresses.val.p_string[0]);
-    m_instance_conn_mon.link_utilization = 100;
+    m_instance_conn_mon.link_utilization = 0;
     m_instance_conn_mon.apn.len = 1;
     char * apn = "VZWADMIN";
     (void)lwm2m_bytebuffer_to_string(apn, strlen(apn), &m_instance_conn_mon.apn.val.p_string[0]);

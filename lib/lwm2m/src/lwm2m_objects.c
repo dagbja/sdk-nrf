@@ -224,7 +224,7 @@ void lwm2m_instance_connectivity_monitoring_init(lwm2m_connectivity_monitoring_t
     p_instance->operations[3]  = LWM2M_OPERATION_CODE_READ;
     p_instance->operations[4]  = LWM2M_OPERATION_CODE_READ;
     p_instance->operations[5]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[6]  = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[6]  = LWM2M_OPERATION_CODE_NONE; // "Link Utilization" is currently unused.
     p_instance->operations[7]  = LWM2M_OPERATION_CODE_READ;
     p_instance->operations[8]  = LWM2M_OPERATION_CODE_READ;
     p_instance->operations[9]  = LWM2M_OPERATION_CODE_READ;
