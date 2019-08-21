@@ -977,6 +977,9 @@ void lwm2m_factory_reset(void)
 {
     app_misc_data_set_bootstrapped(0);
 
+    // Provision bootstrap PSK and diagnostic PSK at next startup
+    lwm2m_last_used_msisdn_set("", 0);
+
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
         lwm2m_instance_storage_security_delete(i);
