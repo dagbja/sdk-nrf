@@ -35,6 +35,8 @@
 #include <pdn_management.h>
 #include <sms_receive.h>
 
+#include <sha256.h>
+
 #define APP_USE_SOCKET_POLL             0 // Use socket poll() to check status
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_CONTABO                 0
@@ -74,14 +76,9 @@
                                          0x0a, 0x91, 0xe7, 0x47} /**< Pre-shared key used for bootstrap server in hex format. */
 #endif
 
-// TODO: Generate diagnostics PSK from IMEI.
-// Portland R&D kit generated with `echo -n 352656100000804101 | sha256sum | cut -d' ' -f1 | sed -e 's/\(..\)/0x\1, /g' | sed -e 's/^\(.*\), $/{ \1 };/'`
-#define APP_DIAGNOSTICS_SEC_PSK { 0x48, 0xe3, 0x08, 0xc4, 0xe3, 0xb0, 0x6a, 0xd0, 0xfb, 0x2f, 0x67, 0x55, 0x9f, 0xb8, 0xd0, 0x86, 0x28, 0x30, 0x54, 0x19, 0x7a, 0x07, 0x57, 0x06, 0x19, 0x07, 0x81, 0x07, 0xb6, 0x5a, 0xd5, 0x07 };
-
 #define APP_OPERATOR_ID_VZW             1                                                   /**< Operator id for Verizon SIM. */
 
 static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
-static char m_app_diagnostics_psk[] = APP_DIAGNOSTICS_SEC_PSK;
 
 /* Initialize config with default values. */
 lwm2m_carrier_config_t m_app_config = {
@@ -314,6 +311,19 @@ static void lwm2m_disconnect_admin_pdn(uint16_t instance_id)
     }
 }
 
+static void app_vzw_sha256_psk(char *p_imei, uint16_t short_server_id, char *p_psk)
+{
+    SHA256_CTX ctx;
+    char imei_and_id[24];
+
+    // VZW PSK Secret Key Algorithm: sha256sum(imei+short_server_id)
+    snprintf(imei_and_id, sizeof(imei_and_id), "%s%3d", p_imei, short_server_id);
+
+    sha256_init(&ctx);
+    sha256_update(&ctx, imei_and_id, strlen(imei_and_id));
+    sha256_final(&ctx, p_psk);
+}
+
 /**@brief Initialize IMEI and MSISDN to use in client id.
  *
  * Factory reset to start bootstrap if MSISDN is different than last start.
@@ -360,8 +370,10 @@ static char * app_initialize_client_id(void)
                               m_app_config.psk, m_app_config.psk_length);
         }
         if (provision_diag_psk) {
+            char app_diagnostics_psk[SHA256_BLOCK_SIZE];
+            app_vzw_sha256_psk(m_imei, 101, app_diagnostics_psk);
             app_provision_psk(APP_DIAGNOSTICS_SEC_TAG, m_imei, strlen(m_imei),
-                              m_app_diagnostics_psk, sizeof(m_app_diagnostics_psk));
+                              app_diagnostics_psk, sizeof(app_diagnostics_psk));
         }
         app_init_and_connect();
     }
