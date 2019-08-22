@@ -10,7 +10,12 @@
 ^lwm2m_carrier_event_handler$
 ^lwm2m_carrier_init$
 ^lwm2m_carrier_run$
-^lwm2m_carrier_timezone$
+^lwm2m_carrier_timezone_read$
+^lwm2m_carrier_timezone_write$
+^lwm2m_carrier_utc_offset_read$
+^lwm2m_carrier_utc_offset_write$
+^lwm2m_carrier_utc_time_read$
+^lwm2m_carrier_utc_time_write$
 
 # lwm2m_os.h
 ^lwm2m_os_free$

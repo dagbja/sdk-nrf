@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
@@ -24,6 +25,9 @@
 #define VERIZON_RESOURCE 30000
 
 #define MAX_TIMEZONE_LEN 64
+
+#define TIMEZONE_MIN_OFFSET -720
+#define TIMEZONE_MAX_OFFSET  840
 
 static lwm2m_object_t m_object_device;    /**< Device base object. */
 static lwm2m_device_t m_instance_device;  /**< Device object instance. */
@@ -49,46 +53,136 @@ static uint32_t tlv_device_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p
     return 0;
 }
 
-/**@brief Update time related resources from modem. */
-static void lwm2m_current_time_update()
+static void lwm2m_device_current_time_update(void)
 {
-    int32_t utc_offset_15min;
+    m_instance_device.current_time = lwm2m_carrier_utc_time_read();
+}
 
-    (void)at_read_time(&m_instance_device.current_time, &utc_offset_15min);
+static void lwm2m_device_utc_offset_update(void)
+{
+    char string_buffer[17];
 
-    char string_buf[MAX_TIMEZONE_LEN];
-    snprintf(string_buf, sizeof(string_buf), "%+03d:%02d", (int)utc_offset_15min / 4, (int)(abs(utc_offset_15min) % 4) * 15);
-    (void)lwm2m_bytebuffer_to_string(string_buf, strlen(string_buf), &m_instance_device.utc_offset);
+    int utc_offset = lwm2m_carrier_utc_offset_read();
+    snprintf(string_buffer, sizeof(string_buffer), "UTC%+03d:%02d", utc_offset / 60, abs(utc_offset % 60));
 
-    // Give offset in minutes west of GMT
-    const char * p_tz_string = lwm2m_carrier_timezone((-15 * utc_offset_15min), 0);
+    (void)lwm2m_bytebuffer_to_string(string_buffer, strlen(string_buffer), &m_instance_device.utc_offset);
+}
 
-    if (p_tz_string == NULL)
+static void lwm2m_device_timezone_update(void)
+{
+    const char *p_tz = lwm2m_carrier_timezone_read();
+    int tz_len = strlen(p_tz);
+
+    if (tz_len > MAX_TIMEZONE_LEN)
     {
-        if (utc_offset_15min != 0)
+        tz_len = MAX_TIMEZONE_LEN;
+    }
+
+    (void)lwm2m_bytebuffer_to_string((char*)p_tz, tz_len, &m_instance_device.timezone);
+}
+
+static void lwm2m_device_timezone_write(lwm2m_device_t * p_device)
+{
+    char string_buffer[MAX_TIMEZONE_LEN+1];
+    int len;
+
+    if (p_device->timezone.len <= MAX_TIMEZONE_LEN)
+    {
+        len = p_device->timezone.len;
+    }
+    else
+    {
+        len = MAX_TIMEZONE_LEN;
+    }
+
+    strncpy(string_buffer, p_device->timezone.p_val, len);
+    string_buffer[len] = '\0'; // null-terminated
+
+    lwm2m_carrier_timezone_write(string_buffer);
+}
+
+static int lwm2m_device_utc_offset_write(lwm2m_device_t * p_device)
+{
+    char string_buffer[10];
+    int utc_offset_mins = 0;
+
+    if (p_device->utc_offset.len < 10)
+    {
+        strncpy(string_buffer, p_device->utc_offset.p_val, p_device->utc_offset.len);
+        string_buffer[p_device->utc_offset.len] = '\0';
+
+        int offset = 0;
+        int len = p_device->utc_offset.len;
+
+        // Detect UTC notation
+        if (strncmp(string_buffer, "UTC", 3) == 0)
         {
-            // This simple conversion will loose the timezones containing +-15 +-30min offsets
-            snprintf(string_buf, sizeof(string_buf), "Etc/GMT%+d", (int)-utc_offset_15min / 4);
+            offset = 3;
+            len -= 3;
+        }
+
+        if (len <= 3)
+        {
+            // +hh
+            char *p_tail;
+            utc_offset_mins = (int32_t)strtol(&string_buffer[offset], &p_tail, 10) * 60;
+            if (p_tail == string_buffer)
+            {
+                return -EINVAL;
+            }
+        }
+        else if (len == 5 || len == 6)
+        {
+            // +hhmm or +hh:mm
+
+            if (len == 6 && string_buffer[offset + 3] != ':')
+            {
+                return -EINVAL;
+            }
+
+            char *p_tail;
+            int mins_offset = offset + len - 2;
+            int tmp_mins = (int32_t)strtol(&string_buffer[mins_offset], &p_tail, 10);
+            if (p_tail == &string_buffer[mins_offset])
+            {
+                return -EINVAL;
+            }
+            string_buffer[mins_offset] = '\0';
+
+            utc_offset_mins = (int32_t)strtol(&string_buffer[offset], &p_tail, 10) * 60;
+            if (p_tail == &string_buffer[offset])
+            {
+                return -EINVAL;
+            }
+
+            if (utc_offset_mins < 0)
+            {
+                utc_offset_mins -= tmp_mins;
+            }
+            else
+            {
+                utc_offset_mins += tmp_mins;
+            }
+
+            if (utc_offset_mins < TIMEZONE_MIN_OFFSET || utc_offset_mins > TIMEZONE_MAX_OFFSET)
+            {
+                return -EINVAL;
+            }
         }
         else
         {
-            snprintf(string_buf, sizeof(string_buf), "Etc/GMT");
+            return -EINVAL;
         }
     }
     else
     {
-        strncpy(string_buf, p_tz_string, sizeof(string_buf));
+        return -EINVAL;
     }
 
-    (void)lwm2m_bytebuffer_to_string(string_buf, strlen(string_buf),&m_instance_device.timezone);
+    lwm2m_carrier_utc_offset_write(utc_offset_mins);
+    return 0;
 }
 
-const char * __WEAK lwm2m_carrier_timezone(int32_t tz_offset, int32_t dst)
-{
-    ARG_UNUSED(tz_offset);
-    ARG_UNUSED(dst);
-    return NULL;
-}
 
 char * lwm2m_device_get_sim_iccid(uint32_t * iccid_len)
 {
@@ -150,10 +244,18 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
             switch (resource_id)
             {
                 case LWM2M_DEVICE_CURRENT_TIME:
+                    lwm2m_device_current_time_update();
+                    break;
                 case LWM2M_DEVICE_UTC_OFFSET:
+                    lwm2m_device_utc_offset_update();
+                    break;
                 case LWM2M_DEVICE_TIMEZONE:
+                    lwm2m_device_timezone_update();
+                    break;
                 case LWM2M_NAMED_OBJECT:
-                    lwm2m_current_time_update();
+                    lwm2m_device_current_time_update();
+                    lwm2m_device_utc_offset_update();
+                    lwm2m_device_timezone_update();
                     break;
                 default:
                     break;
@@ -218,6 +320,40 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
 
         if (err_code == 0)
         {
+            int err;
+
+            switch (resource_id)
+            {
+                case LWM2M_DEVICE_CURRENT_TIME:
+                    lwm2m_carrier_utc_time_write(m_instance_device.current_time);
+                    break;
+                case LWM2M_DEVICE_UTC_OFFSET:
+                    err = lwm2m_device_utc_offset_write(&m_instance_device);
+                    if (err != 0)
+                    {
+                        (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+                        return 0;
+                    }
+                    break;
+                case LWM2M_DEVICE_TIMEZONE:
+                    lwm2m_device_timezone_write(&m_instance_device);
+                    break;
+                case LWM2M_NAMED_OBJECT:
+                {
+                    lwm2m_carrier_utc_time_write(m_instance_device.current_time);
+                    err = lwm2m_device_utc_offset_write(&m_instance_device);
+                    if (err != 0)
+                    {
+                        (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+                        return 0;
+                    }
+                    lwm2m_device_timezone_write(&m_instance_device);
+                    break;
+                }
+                default:
+                    (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+                    return 0;
+            }
             (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
         }
         else if (err_code == ENOTSUP)
@@ -328,7 +464,9 @@ void lwm2m_device_init(void)
     m_instance_device.error_code.len = 1;
     m_instance_device.error_code.val.p_int32[0] = 0; // No error
 
-    lwm2m_current_time_update();
+    lwm2m_device_current_time_update();
+    lwm2m_device_utc_offset_update();
+    lwm2m_device_timezone_update();
 
     (void)lwm2m_bytebuffer_to_string("UQS", 3, &m_instance_device.supported_bindings);
     m_instance_device.device_type.p_val = "Smart Device";

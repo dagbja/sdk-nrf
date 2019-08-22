@@ -35,6 +35,15 @@ int at_read_model_number(lwm2m_string_t * p_model_number);
 int at_read_radio_signal_strength_and_link_quality(int32_t * p_signal_strength, int32_t * p_link_quality);
 int at_read_cell_id(uint32_t * p_cell_id);
 int at_read_smnc_smcc(int32_t * p_smnc, int32_t *p_smcc);
+
+/**@brief Read time from modem using AT+CCLK? at command.
+ *
+ * @param[out] p_time       Pointer to time since Epoch
+ * @param[out] p_utc_offset Pointer to UTC offset
+ *
+ * @return Pointer to timezone string or NULL in case lookup failed
+ *
+ * */
 int at_read_time(int32_t * p_time, int32_t * p_utc_offset);
 
 void at_subscribe_net_reg_stat(at_net_reg_stat_cb_t net_reg_stat_cb);

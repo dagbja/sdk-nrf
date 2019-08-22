@@ -41,6 +41,7 @@ zephyr_library_sources(
     src/lwm2m_retry_delay.c
     src/lwm2m_security.c
     src/lwm2m_server.c
+    src/lwm2m_time.c
     src/sha256.c
     src/sms_receive.c
 )

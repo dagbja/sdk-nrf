@@ -67,7 +67,7 @@ static int at_send_command_and_parse_params(const char * p_at_command, struct at
 
     if (retval == 0) {
         char * p_start = read_buffer;
-        char * p_command_end = strstr(read_buffer, ":");
+        char * p_command_end = strchr(read_buffer, ':');
         if (p_command_end) {
             p_start = p_command_end+1;
         }
@@ -220,34 +220,40 @@ static int at_cereg_handler(char *notif)
     return -1;
 }
 
-static void cclk_reponse_convert(const char* p_read_buf, int32_t * p_time, int32_t * p_utc_offset)
+/**@brief Convert AT+CCLK? at command response into seconds since Epoch and UTC offset.
+ *
+ * @param[in]  p_read_buf   Pointer to response string
+ * @param[out] p_time       Pointer to time since Epoch
+ * @param[out] p_utc_offset Pointer to UTC offset
+ *
+ * */
+static void at_cclk_reponse_convert(const char *p_read_buf, int32_t *p_time, int32_t *p_utc_offset)
 {
     // Seconds since Epoch approximation
     char *p_end;
     int tmp_year = 2000 + (int32_t)strtol(p_read_buf, &p_end, 10);
     int year = tmp_year - 1900;
-    int mon = (int32_t)strtol(p_end+1, &p_end, 10) - 1;
-    int mday = (int32_t)strtol(p_end+1, &p_end, 10);
-    int hour = (int32_t)strtol(p_end+1, &p_end, 10);
-    int min = (int32_t)strtol(p_end+1, &p_end, 10);
-    int sec = (int32_t)strtol(p_end+1, &p_end, 10);
+    int mon = (int32_t)strtol(p_end + 1, &p_end, 10) - 1;
+    int mday = (int32_t)strtol(p_end + 1, &p_end, 10);
+    int hour = (int32_t)strtol(p_end + 1, &p_end, 10);
+    int min = (int32_t)strtol(p_end + 1, &p_end, 10);
+    int sec = (int32_t)strtol(p_end + 1, &p_end, 10);
 
-    if ((mon > 11) || (mon < 0))
-    {
+    if ((mon > 11) || (mon < 0)) {
         mon = 0;
     }
 
     int yday = mday - 1 + cum_ydays[mon];
 
-     /*
+    /*
      * The Open Group Base Specifications Issue 7, 2018 edition
      * IEEE Std 1003.1-2017: 4.16 Seconds Since the Epoch
      *
      * http://http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_16
      */
-    *p_time = sec + min*60 + hour*3600 + yday*86400 +
-            (year-70)*31536000 + ((year-69)/4)*86400 -
-            ((year-1)/100)*86400 + ((year+299)/400)*86400;
+    *p_time = sec + min * 60 + hour * 3600 + yday * 86400 +
+          (year - 70) * 31536000 + ((year - 69) / 4) * 86400 -
+          ((year - 1) / 100) * 86400 + ((year + 299) / 400) * 86400;
 
     // UTC offset as 15 min units
     *p_utc_offset = (int32_t)strtol(p_end, &p_end, 10);
@@ -895,7 +901,7 @@ int at_read_smnc_smcc(int32_t * p_smnc, int32_t *p_smcc)
     return retval;
 }
 
-int at_read_time(int32_t * p_time, int32_t * p_utc_offset)
+int at_read_time(int32_t *p_time, int32_t *p_utc_offset)
 {
     int retval = 0;
     struct at_param_list cclk_params;
@@ -910,13 +916,10 @@ int at_read_time(int32_t * p_time, int32_t * p_utc_offset)
     cclk_params.params = NULL;
 
     retval = at_params_list_init(&cclk_params, 1);
-    if (retval)
-    {
+    if (retval) {
         LWM2M_ERR("cclk_params list_init failed");
-        retval = EINVAL;
-    }
-    else
-    {
+        retval = -EINVAL;
+    }else {
         if (at_send_command_and_parse_params(at_cclk, &cclk_params) == 0)
         {
             retval = at_params_string_get(&cclk_params, 0, read_buf, sizeof(read_buf));
@@ -927,7 +930,9 @@ int at_read_time(int32_t * p_time, int32_t * p_utc_offset)
                     // Zero termination
                     read_buf[retval] = '\0';
 
-                    cclk_reponse_convert(read_buf, p_time, p_utc_offset);
+                    at_cclk_reponse_convert(read_buf, p_time, p_utc_offset);
+
+                    retval = 0;
                 }
                 else
                 {

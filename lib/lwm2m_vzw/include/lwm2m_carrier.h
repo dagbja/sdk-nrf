@@ -72,19 +72,70 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t *config);
 void lwm2m_carrier_run(void);
 
 /**
- * @brief Timezone function that returns a timezone string
- * based on the offset to GMT.
+ * @brief Function to read current UTC time
  *
- * @note  It can be overwritten by the application.
- *        Defaults to Etc/GMT+-X format
+ * @note This function can be implemented by the application, if custom time management
+ *       is needed.
  *
- * @param[in] tz_offset Offset as the number of minutes west of GMT.
- * @param[in] dst       Daylight saving in minutes included in the @p tz_offset.
- *
- * @return  Pointer to the null terminated timezone string.
- *          In case no valid timezone found, NULL pointer can be returned.
+ * @return  Current UTC time since Epoch in seconds
  */
-const char *lwm2m_carrier_timezone(int32_t tz_offset, int32_t dst);
+int32_t lwm2m_carrier_utc_time_read(void);
+
+/**
+ * @brief Function to read offset to UTC time
+ *
+ * @note This function can be implemented by the application, if custom time management
+ *       is needed.
+ *
+ * @return  UTC offset in minutes
+ */
+int lwm2m_carrier_utc_offset_read(void);
+
+/**
+ * @brief Function to read timezone
+ *
+ * @note This function can be implemented by the application, if custom time management
+ *       is needed.
+ *
+ * @return  Null-terminated timezone string pointer, IANA Timezone (TZ) database format
+ */
+const char* lwm2m_carrier_timezone_read(void);
+
+/**
+ * @brief Function to write current UTC time (LWM2M server write operation)
+ *
+ * @note This function can be implemented by the application, if custom time management
+ *       is needed.
+ *
+ * @param[in] time Time since Epoch in seconds
+ *
+ * @return 0 on success, negative error code on error.
+ */
+int lwm2m_carrier_utc_time_write(int32_t time);
+
+/**
+ * @brief Function to write UTC offset (LWM2M server write operation)
+ *
+ * @note This function can be implemented by the application, if custom time management
+ *       is needed.
+ *
+ * @param[in] offset UTC offset in minutes
+ *
+ * @return 0 on success, negative error code on error.
+ */
+int lwm2m_carrier_utc_offset_write(int offset);
+
+/**
+ * @brief Function to write timezone (LWM2M server write operation)
+ *
+ * @note This function can be implemented by the application, if custom time management
+ *       is needed.
+ *
+ * @param[in] p_tz Null-terminated timezone string pointer
+ *
+ * @return 0 on success, negative error code on error.
+ */
+int lwm2m_carrier_timezone_write(const char* p_tz);
 
 /**
  * @brief LWM2M carrier library event handler.
