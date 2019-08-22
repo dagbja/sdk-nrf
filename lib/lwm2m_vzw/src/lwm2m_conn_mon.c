@@ -280,11 +280,57 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
         return 0;
     }
 
+    uint8_t  buffer[200];
+    uint32_t buffer_size = sizeof(buffer);
+
+    if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
+    {
+        u32_t observe_option = 0;
+        for (uint8_t index = 0; index < p_request->options_count; index++)
+        {
+            if (p_request->options[index].number == COAP_OPT_OBSERVE)
+            {
+                err_code = coap_opt_uint_decode(&observe_option,
+                                                p_request->options[index].length,
+                                                p_request->options[index].data);
+                break;
+            }
+        }
+
+        if (err_code == 0)
+        {
+            if (observe_option == 0) // Observe start
+            {
+                LWM2M_INF("Observe requested on object 4/%i/%i", p_instance->instance_id, resource_id);
+                err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
+                                                                    &buffer_size,
+                                                                    resource_id,
+                                                                    &m_instance_conn_mon);
+
+                err_code = lwm2m_observe_register(buffer,
+                                                  buffer_size,
+                                                  m_instance_conn_mon.proto.expire_time,
+                                                  p_request,
+                                                  COAP_CT_APP_LWM2M_TLV,
+                                                  (lwm2m_instance_t *)&m_instance_conn_mon);
+            }
+            else if (observe_option == 1) // Observe stop
+            {
+                LWM2M_INF("Observe cancel on object 4/%i/%i", p_instance->instance_id, resource_id);
+
+                // Process the GET request as usual.
+                op_code = LWM2M_OPERATION_CODE_READ;
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+                return 0;
+            }
+        }
+    }
+
     if (op_code == LWM2M_OPERATION_CODE_READ)
     {
-        uint8_t  buffer[200];
-        uint32_t buffer_size = sizeof(buffer);
-
         if (resource_id == VERIZON_RESOURCE)
         {
             err_code = tlv_conn_mon_verizon_encode(instance_id, buffer, &buffer_size);
@@ -397,44 +443,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
     }
     else if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
     {
-        LWM2M_TRC("CoAP observe requested on object 4/%i/%i", p_instance->instance_id, resource_id);
-
-        u32_t observe_option = 0;
-        for (uint8_t index = 0; index < p_request->options_count; index++)
-        {
-            if (p_request->options[index].number == COAP_OPT_OBSERVE)
-            {
-                err_code = coap_opt_uint_decode(&observe_option,
-                                                p_request->options[index].length,
-                                                p_request->options[index].data);
-                break;
-            }
-        }
-
-        if (err_code == 0)
-        {
-            if (observe_option == 0) // Observe start
-            {
-                LWM2M_TRC("CoAP observe requested on object 4/%i/%i - START", p_instance->instance_id, resource_id);
-                uint8_t  buffer[200];
-                uint32_t buffer_size = sizeof(buffer);
-                err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
-                                                                    &buffer_size,
-                                                                    resource_id,
-                                                                    &m_instance_conn_mon);
-
-                err_code = lwm2m_observe_register(buffer,
-                                                  buffer_size,
-                                                  m_instance_conn_mon.proto.expire_time,
-                                                  p_request,
-                                                  COAP_CT_APP_LWM2M_TLV,
-                                                  (lwm2m_instance_t *)&m_instance_conn_mon);
-            }
-            else // Observe stop
-            {
-                LWM2M_TRC("CoAP observe requested on object 4/%i/%i - STOP", p_instance->instance_id, resource_id);
-            }
-        }
+        // Already handled
     }
     else
     {
