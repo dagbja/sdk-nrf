@@ -342,7 +342,7 @@ void lwm2m_device_init(void)
     m_instance_device.device_type.len = strlen(m_instance_device.device_type.p_val);
     m_instance_device.hardware_version.p_val = "1.0";
     m_instance_device.hardware_version.len = strlen(m_instance_device.hardware_version.p_val);
-    m_instance_device.software_version.p_val = "LWM2M_0.5.0";
+    m_instance_device.software_version.p_val = "LwM2M 0.6.0";
     m_instance_device.software_version.len = strlen(m_instance_device.software_version.p_val);
 
     m_instance_device.proto.callback = device_instance_callback;
