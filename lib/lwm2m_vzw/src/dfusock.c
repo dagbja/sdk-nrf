@@ -29,6 +29,21 @@ int dfusock_fragment_send(const void *buf, size_t len)
 	return 0;
 }
 
+int dfusock_error_get(nrf_dfu_err_t *dfu_err)
+{
+	int err;
+	nrf_socklen_t len;
+
+	len = sizeof(*dfu_err);
+	err = nrf_getsockopt(dfusock, NRF_SOL_DFU, NRF_SO_DFU_ERROR,
+			     dfu_err, &len);
+	if (err) {
+		LWM2M_ERR("Unable to fetch modem error, errno %d", errno);
+	}
+
+	return err;
+}
+
 int dfusock_offset_get(uint32_t *off)
 {
 	int err;

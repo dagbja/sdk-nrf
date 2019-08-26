@@ -42,15 +42,42 @@ int lwm2m_firmware_download_uri(char *package_uri, size_t len);
 static int on_fragment(const struct download_client_evt *event)
 {
 	int err;
+	nrf_dfu_err_t dfu_err;
 
 	err = dfusock_fragment_send(event->fragment.buf, event->fragment.len);
 	if (!err) {
-		/* Continue the download */
+		/* All good, continue the download */
 		return 0;
 	}
 
-	/* The modem refused the fragment, can't recover */
+	/* The modem refused the fragment.
+	 * We can try to recover from this error and reattempt the download.
+	 * Disconnect the HTTP socket regardless of whether we will reattempt
+	 * the download, since we'll open it again anyway if and when we do.
+	 */
 	download_client_disconnect(&http_downloader);
+
+	if (err == -ENOEXEC) {
+		/* Let's fetch the RPC error reason. */
+		err = dfusock_error_get(&dfu_err);
+		if (!err && dfu_err == DFU_AREA_NOT_BLANK) {
+			/* It could happen, after a manual or specific firmware
+			 * update, that the scratch area is not erased even
+			 * though the offset reported by the modem is zero.
+			 * After rejecting a fragment the modem will report a
+			 * "dirty" offset, and the download task will erase
+			 * the scratch area before re-starting the download.
+			 */
+			LWM2M_WRN("DFU socket error %d", (int)dfu_err);
+			LWM2M_INF("Attempting to clean flash area and retry");
+			lwm2m_os_timer_start(download_dwork, K_MSEC(100));
+
+			/* Stop the download, it will be restarted */
+			return -1;
+		}
+	}
+
+	/* We can't recover from here, simply give up. */
 
 	lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_IDLE);
 	lwm2m_firmware_update_result_set(0,
@@ -206,8 +233,6 @@ static void download_task(void *w)
 			0, LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI);
 		return;
 	}
-
-	return;
 }
 
 int lwm2m_firmware_download_init(void)
@@ -237,6 +262,7 @@ int lwm2m_firmware_download_init(void)
 	/* dfusock_version_get() will NULL-terminate the version string */
 	LWM2M_INF("Modem firmware version: %s", lwm2m_os_log_strdup(cur_ver));
 
+	/* Detect if a firmware update has just happened */
 	err = lwm2m_firmware_update_state_get(&state);
 	if (!err && state == UPDATE_EXECUTED) {
 		/* Check update result by comparing modem firmware versions */
@@ -282,10 +308,11 @@ int lwm2m_firmware_download_init(void)
 			err = lwm2m_firmware_uri_get(uri, sizeof(uri));
 			if (!err) {
 				/* Resume */
-				LWM2M_INF("Resuming after power loss");
+				LWM2M_INF("Resuming download after power loss");
 				lwm2m_firmware_download_uri(uri, sizeof(uri));
 			} else {
-				LWM2M_WRN("No package URI to resume from");
+				/* Should not happen */
+				LWM2M_WRN("No URI to resume firmware update!");
 			}
 		}
 	}
@@ -337,7 +364,7 @@ int lwm2m_firmware_download_uri(char *package_uri, size_t len)
 	/* Setup PDN.
 	 * Do not set this in the download task, or it will crash badly.
 	 */
-	p =  lwm2m_conn_mon_class_apn_get(2, (uint8_t*)&len);
+	p =  lwm2m_conn_mon_class_apn_get(2, (uint8_t *)&len);
 	if (p) {
 		/* NULL-terminate */
 		memcpy(apn, p, len);
