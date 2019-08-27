@@ -119,6 +119,9 @@ static char m_imei[16];
 static char m_msisdn[16];
 static uint32_t m_operator_id;
 
+// TODO: Use observable settings pr. resource
+static uint32_t observable_pmin = 15;
+static uint32_t observable_pmax = 60;
 
 /* Structures for timers */
 static void *state_update_timer;
@@ -200,6 +203,16 @@ void lwm2m_request_server_update(uint16_t instance_id, bool reconnect)
     if (m_lwm2m_transport[instance_id] != -1 || reconnect) {
         m_connection_update[instance_id].requested = true;
     }
+}
+
+void lwm2m_observable_pmin_set(uint32_t pmin)
+{
+    observable_pmin = pmin;
+}
+
+void lwm2m_observable_pmax_set(uint32_t pmax)
+{
+    observable_pmax = pmax;
 }
 
 lwm2m_state_t lwm2m_state_get(void)
@@ -1947,7 +1960,7 @@ void lwm2m_carrier_run(void)
 
         app_lwm2m_process();
 
-        if (tick_count % 1000 == 0)
+        if (tick_count % (observable_pmin * 100) == 0)
         {
             app_lwm2m_observer_process();
         }

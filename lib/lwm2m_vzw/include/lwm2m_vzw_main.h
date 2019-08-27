@@ -34,6 +34,13 @@ typedef enum
     LWM2M_STATE_SHUTDOWN,
 } lwm2m_state_t;
 
+/*
+ * The current LwM2M observe implementation uses one common pmin for all observers.
+ * The pmax is currently unused.
+ */
+void lwm2m_observable_pmin_set(uint32_t pmin);
+void lwm2m_observable_pmax_set(uint32_t pmax);
+
 lwm2m_state_t lwm2m_state_get(void);
 void lwm2m_state_set(lwm2m_state_t lwm2m_state);
 char *lwm2m_imei_get(void);

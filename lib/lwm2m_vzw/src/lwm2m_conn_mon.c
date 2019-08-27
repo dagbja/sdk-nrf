@@ -15,6 +15,7 @@
 #include <coap_message.h>
 #include <common.h>
 #include <nrf_apn_class.h>
+#include <lwm2m_vzw_main.h>
 #include <at_interface.h>
 
 #define VERIZON_RESOURCE 30000
@@ -353,6 +354,27 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                                                                 p_request->payload,
                                                                 p_request->payload_len,
                                                                 tlv_conn_mon_resource_decode);
+        }
+        else if (mask == 0)
+        {
+            // TODO: Setting options should be a generic operation, not specific in conn_mon.
+            //       Only using pmin and pmax for now.
+            char option[255];
+            for (int i = 0; i < p_request->options_count; i++) {
+                memcpy(option, p_request->options[i].data, p_request->options[i].length);
+                option[p_request->options[i].length] = 0;
+
+                if (strncmp(option, "pmin=", 5) == 0) {
+                    uint32_t p_min = strtol(&option[5], NULL, 10);
+                    lwm2m_observable_pmin_set(p_min);
+                } else if (strncmp(option, "pmax=", 5) == 0) {
+                    uint32_t p_max = strtol(&option[5], NULL, 10);
+                    lwm2m_observable_pmax_set(p_max);
+                }
+            }
+
+            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            return 0;
         }
         else
         {
