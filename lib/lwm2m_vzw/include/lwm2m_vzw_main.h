@@ -52,7 +52,7 @@ uint16_t lwm2m_server_instance(void);
 sa_family_t lwm2m_family_type_get(uint16_t instance_id);
 int32_t lwm2m_state_update_delay(void);
 
-void lwm2m_bootstrap_reset(void);
+void lwm2m_bootstrap_clear(void);
 void lwm2m_factory_reset(void);
 void lwm2m_system_shutdown(void);
 void lwm2m_system_reset(void);

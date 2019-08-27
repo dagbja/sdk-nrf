@@ -327,7 +327,7 @@ static char * app_initialize_client_id(void)
         if (strlen(p_msisdn) > 0 && strcmp(p_msisdn, last_used_msisdn) != 0) {
             // MSISDN has changed, factory reset and initiate bootstrap.
             LWM2M_INF("Detected changed MSISDN: %s -> %s", lwm2m_os_log_strdup(last_used_msisdn), lwm2m_os_log_strdup(p_msisdn));
-            lwm2m_bootstrap_reset();
+            lwm2m_bootstrap_clear();
             lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
             provision_bs_psk = true;
         }
@@ -963,6 +963,11 @@ static void app_misc_data_set_bootstrapped(uint8_t bootstrapped)
     lwm2m_instance_storage_misc_data_store(&misc_data);
 }
 
+void lwm2m_bootstrap_clear(void)
+{
+    app_misc_data_set_bootstrapped(0);
+}
+
 void lwm2m_bootstrap_reset(void)
 {
     if (lwm2m_security_short_server_id_get(0) == 0) {
@@ -1199,6 +1204,8 @@ static void app_bootstrap_connect(void)
 static void app_bootstrap(void)
 {
     m_use_client_holdoff_timer = true;
+
+    lwm2m_bootstrap_reset();
 
     uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)&m_bs_remote_server,
                                         &m_client_id,

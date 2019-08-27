@@ -37,7 +37,6 @@
 ^lwm2m_handler_error$
 
 # Other APIs that are needed for now
-^lwm2m_bootstrap_reset$
 ^app_debug_clear$
 ^app_debug_flag_clear$
 ^app_debug_flag_is_set$
@@ -49,6 +48,7 @@
 ^app_debug_modem_logging_set$
 ^app_debug_msisdn_get$
 ^app_debug_msisdn_set$
+^lwm2m_bootstrap_clear$
 ^lwm2m_did_bootstrap$
 ^lwm2m_factory_reset$
 ^lwm2m_family_type_get$

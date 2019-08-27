@@ -28,7 +28,7 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
         if (!(buttons & 0x08)) // Switch 2 in right position
         {
             printk("Reset bootstrap!\n");
-            lwm2m_bootstrap_reset();
+            lwm2m_bootstrap_clear();
             lwm2m_system_reset();
         }
         else if (app_state == LWM2M_STATE_IP_INTERFACE_UP)
