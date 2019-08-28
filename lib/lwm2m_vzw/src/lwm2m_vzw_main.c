@@ -134,7 +134,7 @@ struct connection_update_t {
 };
 
 static struct connection_update_t m_connection_update[1+LWM2M_MAX_SERVERS];
-static bool m_use_client_holdoff_timer;
+static bool m_use_client_holdoff_timer = true;
 
 /* Resolved server addresses */
 #if APP_USE_CONTABO
@@ -1203,8 +1203,6 @@ static void app_bootstrap_connect(void)
 
 static void app_bootstrap(void)
 {
-    m_use_client_holdoff_timer = true;
-
     lwm2m_bootstrap_reset();
 
     uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)&m_bs_remote_server,
