@@ -37,23 +37,26 @@
 ^lwm2m_handler_error$
 
 # Other APIs that are needed for now
-^app_debug_clear$
-^app_debug_flag_clear$
-^app_debug_flag_is_set$
-^app_debug_flag_set$
-^app_debug_imei_get$
-^app_debug_imei_set$
-^app_debug_modem_logging_enable$
-^app_debug_modem_logging_get$
-^app_debug_modem_logging_set$
-^app_debug_msisdn_get$
-^app_debug_msisdn_set$
+^lwm2m_at_write$
 ^lwm2m_bootstrap_clear$
+^lwm2m_debug_clear$
+^lwm2m_debug_flag_clear$
+^lwm2m_debug_flag_is_set$
+^lwm2m_debug_flag_set$
+^lwm2m_debug_modem_logging_enable$
+^lwm2m_debug_modem_logging_get$
+^lwm2m_debug_modem_logging_set$
+^lwm2m_device_get_sim_iccid$
 ^lwm2m_did_bootstrap$
 ^lwm2m_factory_reset$
 ^lwm2m_family_type_get$
 ^lwm2m_imei_get$
+^lwm2m_instance_storage_security_store$
+^lwm2m_instance_storage_server_store$
 ^lwm2m_msisdn_get$
+^lwm2m_plain_text_firmware_decode$
+^lwm2m_remote_location_find$
+^lwm2m_retry_delay_get$
 ^lwm2m_request_server_update$
 ^lwm2m_server_instance$
 ^lwm2m_state_get$
@@ -61,13 +64,6 @@
 ^lwm2m_state_update_delay$
 ^lwm2m_system_reset$
 ^lwm2m_system_shutdown$
-^mdm_interface_at_write$
-^lwm2m_device_get_sim_iccid$
-^lwm2m_instance_storage_security_store$
-^lwm2m_instance_storage_server_store$
-^lwm2m_plain_text_firmware_decode$
-^lwm2m_remote_location_find$
-^lwm2m_retry_delay_get$
 ^lwm2m_security_bootstrapped_get$
 ^lwm2m_security_server_uri_get$
 ^lwm2m_security_server_uri_set$
@@ -76,8 +72,8 @@
 ^lwm2m_server_lifetime_set$
 ^lwm2m_server_registered_get$
 ^lwm2m_server_short_server_id_get$
-^sms_receive_counter$
-^sms_receiver_init$
+^lwm2m_sms_receive_counter$
+^lwm2m_sms_receiver_init$
 
 # External symbols we should not modify
 

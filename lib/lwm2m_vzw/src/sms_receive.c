@@ -18,7 +18,7 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 
 static uint32_t receive_count = 0;
 
-int32_t sms_receiver_init(void)
+int32_t lwm2m_sms_receiver_init(void)
 {
     LOG_INF("Initializing SMS receiver.");
 
@@ -79,7 +79,7 @@ int sms_receiver_notif_parse(char *notif)
     return -1;
 }
 
-uint32_t sms_receive_counter(void)
+uint32_t lwm2m_sms_receive_counter(void)
 {
     return receive_count;
 }

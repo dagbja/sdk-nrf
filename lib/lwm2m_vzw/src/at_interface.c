@@ -204,7 +204,7 @@ int mdm_interface_init(void)
     return 0;
 }
 
-int mdm_interface_at_write(const char *const cmd, bool do_logging)
+int lwm2m_at_write(const char *const cmd, bool do_logging)
 {
     int ret = 0;
     char read_buffer[APP_MAX_AT_READ_LENGTH];

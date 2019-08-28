@@ -19,51 +19,38 @@ void app_debug_init(void)
     (void)lwm2m_debug_settings_load(&m_debug_settings);
 }
 
-void app_debug_clear(void)
+void lwm2m_debug_clear(void)
 {
     memset(&m_debug_settings, 0, sizeof(m_debug_settings));
 
     lwm2m_debug_settings_store(&m_debug_settings);
 }
 
-const char * app_debug_msisdn_get(void)
-{
-    return m_debug_settings.msisdn;
-}
-
-int32_t app_debug_msisdn_set(const char * msisdn)
-{
-    memset(m_debug_settings.msisdn, 0, sizeof(m_debug_settings.msisdn));
-    strncpy(m_debug_settings.msisdn, msisdn, sizeof(m_debug_settings.msisdn) - 1);
-
-    return lwm2m_debug_settings_store(&m_debug_settings);
-}
-
-bool app_debug_flag_is_set(uint32_t flag)
+bool lwm2m_debug_flag_is_set(uint32_t flag)
 {
     return ((m_debug_settings.flags & flag) == flag);
 }
 
-int32_t app_debug_flag_set(uint32_t flag)
+int32_t lwm2m_debug_flag_set(uint32_t flag)
 {
     m_debug_settings.flags |= flag;
 
     return lwm2m_debug_settings_store(&m_debug_settings);
 }
 
-int32_t app_debug_flag_clear(uint32_t flag)
+int32_t lwm2m_debug_flag_clear(uint32_t flag)
 {
     m_debug_settings.flags &= ~flag;
 
     return lwm2m_debug_settings_store(&m_debug_settings);
 }
 
-const char * app_debug_modem_logging_get(void)
+const char * lwm2m_debug_modem_logging_get(void)
 {
     return m_debug_settings.modem_logging;
 }
 
-int32_t app_debug_modem_logging_set(const char * modem_logging)
+int32_t lwm2m_debug_modem_logging_set(const char * modem_logging)
 {
     memset(m_debug_settings.modem_logging, 0, sizeof(m_debug_settings.modem_logging));
     strncpy(m_debug_settings.modem_logging, modem_logging, sizeof(m_debug_settings.modem_logging) - 1);
@@ -111,24 +98,24 @@ static void modem_trace_enable(void)
 //   1,2 = generic (and coredump)
 //   1,3 = lwm2m   (and coredump)
 //   1,4 = ip only (and coredump)
-void app_debug_modem_logging_enable(void)
+void lwm2m_debug_modem_logging_enable(void)
 {
     // FIXME: add APIs to enable modem trace.
     if ((m_debug_settings.modem_logging[0] == 0) ||
         (strcmp(m_debug_settings.modem_logging, "0") == 0)) {
-        mdm_interface_at_write("AT%XMODEMTRACE=1,0", false);
+        lwm2m_at_write("AT%XMODEMTRACE=1,0", false);
     } else if (strcmp(m_debug_settings.modem_logging, "1") == 0) {
-        mdm_interface_at_write("AT%XMODEMTRACE=1,2", false);
+        lwm2m_at_write("AT%XMODEMTRACE=1,2", false);
     } else if (strcmp(m_debug_settings.modem_logging, "2") == 0) {
-        mdm_interface_at_write("AT%XMODEMTRACE=1,1", false);
+        lwm2m_at_write("AT%XMODEMTRACE=1,1", false);
         modem_trace_enable();
     } else if (strcmp(m_debug_settings.modem_logging, "3") == 0) {
-        mdm_interface_at_write("AT%XMODEMTRACE=1,3", false);
+        lwm2m_at_write("AT%XMODEMTRACE=1,3", false);
     } else if (strcmp(m_debug_settings.modem_logging, "4") == 0) {
-        mdm_interface_at_write("AT%XMODEMTRACE=1,4", false);
+        lwm2m_at_write("AT%XMODEMTRACE=1,4", false);
     } else if (strlen(m_debug_settings.modem_logging) == 64) {
         char at_command[128];
         sprintf(at_command, "AT%%XMODEMTRACE=2,,3,%s", m_debug_settings.modem_logging);
-        mdm_interface_at_write(at_command, false);
+        lwm2m_at_write(at_command, false);
     }
 }

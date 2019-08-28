@@ -26,7 +26,7 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
         return 0;
     }
 
-    (void)mdm_interface_at_write(argv[1], true);
+    (void)lwm2m_at_write(argv[1], true);
 
     return 0;
 }
@@ -126,16 +126,9 @@ static int cmd_config_lifetime(const struct shell *shell, size_t argc, char **ar
 
 static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
 {
-    const char * p_debug_msisdn = app_debug_msisdn_get();
-
     shell_print(shell, "Debug configuration");
     shell_print(shell, "  IMEI           %s", lwm2m_imei_get());
-
-    if (p_debug_msisdn && p_debug_msisdn[0]) {
-        shell_print(shell, "  MSISDN         %s (static)", p_debug_msisdn);
-    } else {
-        shell_print(shell, "  MSISDN         %s", lwm2m_msisdn_get());
-    }
+    shell_print(shell, "  MSISDN         %s", lwm2m_msisdn_get());
 
     uint32_t iccid_len;
     char * p_iccid = lwm2m_device_get_sim_iccid(&iccid_len);
@@ -148,10 +141,10 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     }
 
     shell_print(shell, "  SIM ICCID      %s", iccid);
-    shell_print(shell, "  Logging        %s", app_debug_modem_logging_get());
-    shell_print(shell, "  IPv6 enabled   %s", app_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6) ? "No" : "Yes");
-    shell_print(shell, "  IP Fallback    %s", app_debug_flag_is_set(DEBUG_FLAG_DISABLE_FALLBACK) ? "No" : "Yes");
-    shell_print(shell, "  SMS Counter    %u", sms_receive_counter());
+    shell_print(shell, "  Logging        %s", lwm2m_debug_modem_logging_get());
+    shell_print(shell, "  IPv6 enabled   %s", lwm2m_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6) ? "No" : "Yes");
+    shell_print(shell, "  IP Fallback    %s", lwm2m_debug_flag_is_set(DEBUG_FLAG_DISABLE_FALLBACK) ? "No" : "Yes");
+    shell_print(shell, "  SMS Counter    %u", lwm2m_sms_receive_counter());
 
     return 0;
 }
@@ -159,34 +152,7 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_debug_reset(const struct shell *shell, size_t argc, char **argv)
 {
-    app_debug_clear();
-
-    return 0;
-}
-
-
-static int cmd_debug_msisdn(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc != 2) {
-        shell_print(shell, "%s MSISDN", argv[0]);
-        return 0;
-    }
-
-    char *msisdn = argv[1];
-    size_t msisdn_len = strlen(msisdn);
-
-    if (msisdn_len != 0 && msisdn_len != 10) {
-        shell_print(shell, "length of MSISDN must be 10");
-        return 0;
-    }
-
-    app_debug_msisdn_set(msisdn);
-
-    if (msisdn_len) {
-        shell_print(shell, "Set static MSISDN: %s", msisdn);
-    } else {
-        shell_print(shell, "Removed static MSISDN");
-    }
+    lwm2m_debug_clear();
 
     return 0;
 }
@@ -212,8 +178,8 @@ static int cmd_debug_logging(const struct shell *shell, size_t argc, char **argv
         return 0;
     }
 
-    app_debug_modem_logging_set(logging);
-    app_debug_modem_logging_enable();
+    lwm2m_debug_modem_logging_set(logging);
+    lwm2m_debug_modem_logging_enable();
 
     shell_print(shell, "Set logging value: %s", logging);
 
@@ -238,9 +204,9 @@ static int cmd_debug_ipv6_enabled(const struct shell *shell, size_t argc, char *
     }
 
     if (enable_ipv6) {
-        app_debug_flag_clear(DEBUG_FLAG_DISABLE_IPv6);
+        lwm2m_debug_flag_clear(DEBUG_FLAG_DISABLE_IPv6);
     } else {
-        app_debug_flag_set(DEBUG_FLAG_DISABLE_IPv6);
+        lwm2m_debug_flag_set(DEBUG_FLAG_DISABLE_IPv6);
     }
 
     shell_print(shell, "Set IPv6 enabled: %d", enable_ipv6);
@@ -265,9 +231,9 @@ static int cmd_debug_fallback_disabled(const struct shell *shell, size_t argc, c
     }
 
     if (enable_fallback) {
-        app_debug_flag_clear(DEBUG_FLAG_DISABLE_FALLBACK);
+        lwm2m_debug_flag_clear(DEBUG_FLAG_DISABLE_FALLBACK);
     } else {
-        app_debug_flag_set(DEBUG_FLAG_DISABLE_FALLBACK);
+        lwm2m_debug_flag_set(DEBUG_FLAG_DISABLE_FALLBACK);
     }
 
     shell_print(shell, "Set IP fallback: %d", enable_fallback);
@@ -484,7 +450,6 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_config,
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(print, NULL, "Print configuration", cmd_debug_print),
     SHELL_CMD(reset, NULL, "Reset configuration", cmd_debug_reset),
-    SHELL_CMD(msisdn, NULL, "Set static MSISDN", cmd_debug_msisdn),
     SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
     SHELL_CMD(ipv6_enable, NULL, "Set IPv6 enabled", cmd_debug_ipv6_enabled),
     SHELL_CMD(fallback, NULL, "Set IP Fallback", cmd_debug_fallback_disabled),

@@ -336,37 +336,28 @@ static void app_vzw_sha256_psk(char *p_imei, uint16_t short_server_id, char *p_p
 static char * app_initialize_client_id(void)
 {
     static char client_id[128];
+    char last_used_msisdn[128];
     bool provision_bs_psk = false;
     bool provision_diag_psk = false;
 
     (void)at_read_imei_and_msisdn(m_imei, sizeof(m_imei), m_msisdn, sizeof(m_msisdn));
 
-    char last_used_msisdn[128];
-    const char *p_msisdn;
-
-    const char * p_debug_msisdn = app_debug_msisdn_get();
-    if (p_debug_msisdn && p_debug_msisdn[0]) {
-        p_msisdn = p_debug_msisdn;
-    } else {
-        p_msisdn = m_msisdn;
-    }
-
     int32_t len = lwm2m_last_used_msisdn_get(last_used_msisdn, sizeof(last_used_msisdn));
     if (len > 0) {
-        if (strlen(p_msisdn) > 0 && strcmp(p_msisdn, last_used_msisdn) != 0) {
+        if (strlen(m_msisdn) > 0 && strcmp(m_msisdn, last_used_msisdn) != 0) {
             // MSISDN has changed, factory reset and initiate bootstrap.
-            LWM2M_INF("Detected changed MSISDN: %s -> %s", lwm2m_os_log_strdup(last_used_msisdn), lwm2m_os_log_strdup(p_msisdn));
+            LWM2M_INF("Detected changed MSISDN: %s -> %s", lwm2m_os_log_strdup(last_used_msisdn), lwm2m_os_log_strdup(m_msisdn));
             lwm2m_bootstrap_clear();
-            lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
+            lwm2m_last_used_msisdn_set(m_msisdn, strlen(m_msisdn) + 1);
             provision_bs_psk = true;
         }
     } else {
-        lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
+        lwm2m_last_used_msisdn_set(m_msisdn, strlen(m_msisdn) + 1);
         provision_bs_psk = true;
         provision_diag_psk = true;
     }
 
-    snprintf(client_id, 128, "urn:imei-msisdn:%s-%s", m_imei, p_msisdn);
+    snprintf(client_id, 128, "urn:imei-msisdn:%s-%s", m_imei, m_msisdn);
 
     if (provision_bs_psk || provision_diag_psk) {
         app_offline();
@@ -615,7 +606,7 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
 {
     bool start_retry_delay = true;
 
-    if (no_reply && !app_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6) && !app_debug_flag_is_set(DEBUG_FLAG_DISABLE_FALLBACK))
+    if (no_reply && !lwm2m_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6) && !lwm2m_debug_flag_is_set(DEBUG_FLAG_DISABLE_FALLBACK))
     {
         // Fallback to the other IP version
         m_family_type[instance_id] = (m_family_type[instance_id] == AF_INET6) ? AF_INET : AF_INET6;
@@ -1283,12 +1274,7 @@ static void app_server_connect(uint16_t instance_id)
 
         if (instance_id) {
             char *endptr;
-            const char * p_msisdn = app_debug_msisdn_get();
-            if (!p_msisdn || p_msisdn[0] == 0) {
-                p_msisdn = m_msisdn;
-            }
-
-            m_server_conf[instance_id].msisdn = strtoull(p_msisdn, &endptr, 10);
+            m_server_conf[instance_id].msisdn = strtoull(m_msisdn, &endptr, 10);
         }
     }
 
@@ -1943,7 +1929,7 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     app_debug_init();
 
     // Enable logging before establishing LTE link.
-    app_debug_modem_logging_enable();
+    lwm2m_debug_modem_logging_enable();
 
     // Provision certificates for DFU before turning the Modem on.
     cert_provision();
@@ -1957,10 +1943,10 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 
     if (m_operator_id == APP_OPERATOR_ID_VZW) {
         // Enable SMS.
-        sms_receiver_init();
+        lwm2m_sms_receiver_init();
     }
 
-    if (app_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6)) {
+    if (lwm2m_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6)) {
         for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
             m_family_type[i] = AF_INET;
         }
