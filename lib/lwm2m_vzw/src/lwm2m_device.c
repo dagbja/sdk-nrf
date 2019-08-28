@@ -329,7 +329,9 @@ void lwm2m_device_init(void)
     m_instance_device.power_source_current.val.p_int32[1] = 0;
 
     m_instance_device.battery_level = 0;
-    m_instance_device.memory_free = 64;
+    m_instance_device.battery_status = 5; // The battery is not installed
+    m_instance_device.memory_free = 0;
+    m_instance_device.memory_total = 0;
     m_instance_device.error_code.len = 1;
     m_instance_device.error_code.val.p_int32[0] = 0; // No error
 
@@ -342,8 +344,6 @@ void lwm2m_device_init(void)
     m_instance_device.hardware_version.len = strlen(m_instance_device.hardware_version.p_val);
     m_instance_device.software_version.p_val = "LWM2M_0.5.0";
     m_instance_device.software_version.len = strlen(m_instance_device.software_version.p_val);
-    m_instance_device.battery_status = 5;
-    m_instance_device.memory_total = 128;
 
     m_instance_device.proto.callback = device_instance_callback;
 
