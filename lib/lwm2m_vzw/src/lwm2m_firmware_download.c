@@ -11,8 +11,8 @@
 #include <net/download_client.h>
 
 #include <lwm2m.h>
-#include <lwm2m_objects.h>
 #include <lwm2m_firmware.h>
+#include <lwm2m_vzw_main.h>
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_instance_storage.h>
 
@@ -162,6 +162,17 @@ static void download_task(void *w)
 
 	/* Is a complete firmware image present? */
 	bool ready = false;
+
+	/* Query lwm2m_vzw_main to check if the PDN is ready.
+	 * These two conditions alone are not entirely reliable,
+	 * so we wait a generous delay before starting to download.
+	 * This is hackish, we should have a more reliable check.
+	 */
+	if (config.apn != NULL && !lwm2m_is_admin_pdn_ready()) {
+		LWM2M_INF("Waiting for PDN setup to resume firmware update");
+		lwm2m_os_timer_start(download_dwork, K_SECONDS(6));
+		return;
+	}
 
 	err = dfusock_offset_get(&off);
 	if (err) {

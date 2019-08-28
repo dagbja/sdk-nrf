@@ -46,6 +46,8 @@ void lwm2m_state_set(lwm2m_state_t lwm2m_state);
 char *lwm2m_imei_get(void);
 char *lwm2m_msisdn_get(void);
 
+bool lwm2m_is_admin_pdn_ready(void);
+
 void lwm2m_request_server_update(uint16_t instance_id, bool reconnect);
 bool lwm2m_did_bootstrap(void);
 uint16_t lwm2m_server_instance(void);

@@ -248,6 +248,11 @@ bool lwm2m_did_bootstrap(void)
     return m_did_bootstrap;
 }
 
+bool lwm2m_is_admin_pdn_ready()
+{
+    return (m_admin_pdn_handle != -1);
+}
+
 uint16_t lwm2m_server_instance(void)
 {
     return m_server_instance;
