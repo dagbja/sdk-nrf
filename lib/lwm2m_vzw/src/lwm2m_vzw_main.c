@@ -1940,11 +1940,6 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     // Enable logging before establishing LTE link.
     app_debug_modem_logging_enable();
 
-    // Establish LTE link.
-    if (app_debug_flag_is_set(DEBUG_FLAG_DISABLE_PSM)) {
-        lte_lc_psm_req(false);
-    }
-
     // Provision certificates for DFU before turning the Modem on.
     cert_provision();
 

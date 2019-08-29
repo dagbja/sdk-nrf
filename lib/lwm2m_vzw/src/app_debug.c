@@ -16,17 +16,12 @@ static debug_settings_t m_debug_settings;
 
 void app_debug_init(void)
 {
-    int ret = lwm2m_debug_settings_load(&m_debug_settings);
-
-    if (ret != sizeof m_debug_settings) {
-        app_debug_flag_set(DEBUG_FLAG_DISABLE_PSM);
-    }
+    (void)lwm2m_debug_settings_load(&m_debug_settings);
 }
 
 void app_debug_clear(void)
 {
     memset(&m_debug_settings, 0, sizeof(m_debug_settings));
-    app_debug_flag_set(DEBUG_FLAG_DISABLE_PSM);
 
     lwm2m_debug_settings_store(&m_debug_settings);
 }

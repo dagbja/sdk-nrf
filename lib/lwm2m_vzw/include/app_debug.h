@@ -9,7 +9,6 @@
 
 #include <stdint.h>
 
-#define DEBUG_FLAG_DISABLE_PSM  0x01       /**< Set if disable PSM. */
 #define DEBUG_FLAG_DISABLE_IPv6 0x08       /**< Set if disable IPv6. */
 #define DEBUG_FLAG_DISABLE_FALLBACK  0x10  /**< Set if disable IP fallback. */
 
