@@ -1027,12 +1027,15 @@ void lwm2m_bootstrap_reset(void)
 
     app_misc_data_set_bootstrapped(0);
 
-    for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
-        lwm2m_instance_storage_security_delete(i);
-        lwm2m_instance_storage_server_delete(i);
-        // Set server short_id to 0 to disable
-        lwm2m_server_short_server_id_set(i, 0);
-    }
+    // Remove DM server
+    lwm2m_instance_storage_security_delete(1);
+    lwm2m_instance_storage_server_delete(1);
+    lwm2m_server_short_server_id_set(1, 0);
+
+    // Remove Repository server
+    lwm2m_instance_storage_security_delete(3);
+    lwm2m_instance_storage_server_delete(3);
+    lwm2m_server_short_server_id_set(3, 0);
 }
 
 void lwm2m_factory_reset(void)
