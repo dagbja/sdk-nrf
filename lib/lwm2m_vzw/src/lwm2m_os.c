@@ -27,9 +27,6 @@ int lwm2m_os_init(void)
 {
 	int err;
 
-	/* Initialize random seed */
-	srand(k_cycle_get_32());
-
 	/* Initialize storage */
 	err = nvs_init(&fs, DT_FLASH_DEV_NAME);
 	if (err) {
@@ -73,7 +70,7 @@ void lwm2m_os_sys_reset(void)
 
 uint32_t lwm2m_os_rand_get(void)
 {
-	return rand();
+	return sys_rand32_get();
 }
 
 /* Non volatile storage */
