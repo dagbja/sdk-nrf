@@ -11,6 +11,8 @@
 #include <net/download_client.h>
 
 #include <lwm2m.h>
+#include <lwm2m_objects.h>
+#include <lwm2m_carrier.h>
 #include <lwm2m_firmware.h>
 #include <lwm2m_vzw_main.h>
 #include <lwm2m_conn_mon.h>
@@ -407,7 +409,12 @@ int lwm2m_firmware_download_uri(char *package_uri, size_t len)
 	 */
 	lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_DOWNLOADING);
 
-	lwm2m_os_timer_start(download_dwork, K_MSEC(1));
+	lwm2m_carrier_event_t event = {
+		.type = LWM2M_CARRIER_EVENT_FOTA
+	};
+	lwm2m_carrier_event_handler(&event);
+
+	lwm2m_os_timer_start(download_dwork, K_SECONDS(1));
 
 	return 0;
 }

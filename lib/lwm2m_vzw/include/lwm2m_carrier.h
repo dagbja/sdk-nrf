@@ -11,11 +11,12 @@
 /**@defgroup lwm2m_carrier_event LWM2M carrier library events.
  * @{
  */
-#define LWM2M_CARRIER_EVENT_BSDLIB_INIT 1 /**< bsdlib library initialized. */
-#define LWM2M_CARRIER_EVENT_CONNECT     2 /**< LTE link connected. */
-#define LWM2M_CARRIER_EVENT_DISCONNECT  3 /**< LTE link will disconnect. */
-#define LWM2M_CARRIER_EVENT_READY       4 /**< LWM2M carrier registered. */
-#define LWM2M_CARRIER_EVENT_REBOOT      5 /**< Application will reboot. */
+#define LWM2M_CARRIER_EVENT_BSDLIB_INIT 1  /**< bsdlib library initialized. */
+#define LWM2M_CARRIER_EVENT_CONNECT     2  /**< LTE link connected. */
+#define LWM2M_CARRIER_EVENT_DISCONNECT  3  /**< LTE link will disconnect. */
+#define LWM2M_CARRIER_EVENT_READY       4  /**< LWM2M carrier registered. */
+#define LWM2M_CARRIER_EVENT_FOTA_START  5  /**< Modem firmware update started. */
+#define LWM2M_CARRIER_EVENT_REBOOT      10 /**< Application will reboot. */
 /**@} */
 
 /**
