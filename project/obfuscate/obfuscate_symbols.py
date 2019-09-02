@@ -127,7 +127,8 @@ def obfuscate(temp_directory, input_archive, output_archive, relinked_archive, s
 
     # Generate dict for symbol renaming
     rename_symbols = [symbol for symbol in orig_symbols if not any([sfilter.match(symbol) for sfilter in symbol_filters])]
-    symbol_indices = random.sample(range(1, 0x10000000), len(rename_symbols))
+    # Do not go wild here, a very high upper bound might crash some environments
+    symbol_indices = random.sample(range(1, 0x100000), len(rename_symbols))
     renamed_symbols = {symbol: "symbol_{:07x}".format(i) for i, symbol in zip(symbol_indices, rename_symbols)}
 
     # Create edit symbol rename file for objcopy
