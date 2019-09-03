@@ -166,11 +166,13 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
                                                   m_instance_firmware.proto.expire_time,
                                                   p_request,
                                                   COAP_CT_APP_LWM2M_TLV,
-                                                  (lwm2m_instance_t *)&m_instance_firmware);
+                                                  (void *)&m_instance_firmware.resource_ids[resource_id]);
             }
             else if (observe_option == 1) // Observe stop
             {
                 LWM2M_INF("Observe cancel on object 5/%i/%i", p_instance->instance_id, resource_id);
+
+                lwm2m_observe_unregister(p_request->remote, (void *)&m_instance_firmware.resource_ids[resource_id]);
 
                 // Process the GET request as usual.
                 op_code = LWM2M_OPERATION_CODE_READ;

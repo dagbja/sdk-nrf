@@ -475,7 +475,19 @@ uint32_t lwm2m_observe_register(uint8_t             * p_payload,
                                 uint16_t              max_age,
                                 coap_message_t      * p_request,
                                 coap_content_type_t   content_type,
-                                lwm2m_instance_t    * p_instance_proto);
+                                void                * p_resource);
+
+/**@brief Unregister observer if found.
+ *
+ * @param p_remote           Remote address of the observing server.
+ * @param p_resource   Pointer to the resource of interest registered.
+ *
+ * @retval 0      If the observable resource was unregistered successfully.
+ * @retval ENOMEM If the observable resource could not be found in the list.
+ * @retval EINVAL If one of the parameters is a NULL pointer.
+ */
+uint32_t lwm2m_observe_unregister(struct sockaddr  * p_remote,
+                                  void             * p_resource);
 
 uint32_t lwm2m_notify(uint8_t         * p_payload,
                       uint16_t          payload_len,

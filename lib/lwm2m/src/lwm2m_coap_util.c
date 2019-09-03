@@ -71,7 +71,7 @@ uint32_t lwm2m_observe_register(uint8_t             * p_payload,
                                 uint16_t              max_age,
                                 coap_message_t      * p_request,
                                 coap_content_type_t   content_type,
-                                lwm2m_instance_t    * p_instance_proto)
+                                void                * p_resource)
 {
     NULL_PARAM_CHECK(p_request);
     NULL_PARAM_CHECK(p_payload);
@@ -85,7 +85,7 @@ uint32_t lwm2m_observe_register(uint8_t             * p_payload,
     // Set the token length.
     observer.token_len              = p_request->header.token_len;
     // Set the resource of interest.
-    observer.resource_of_interest = (coap_resource_t *)p_instance_proto;
+    observer.resource_of_interest = (coap_resource_t *)p_resource;
     // Set the remote.
     observer.remote = p_request->remote;
     // Set the transport where to send notifications.
@@ -151,7 +151,7 @@ uint32_t lwm2m_observe_register(uint8_t             * p_payload,
             return err_code;
         }
 
-        err_code = coap_message_opt_uint_add(p_response, COAP_OPT_MAX_AGE, p_instance_proto->expire_time);
+        err_code = coap_message_opt_uint_add(p_response, COAP_OPT_MAX_AGE, max_age);
         if (err_code != 0)
         {
             (void)coap_message_delete(p_response);
@@ -186,6 +186,23 @@ uint32_t lwm2m_observe_register(uint8_t             * p_payload,
     return err_code;
 }
 
+uint32_t lwm2m_observe_unregister(struct sockaddr  * p_remote,
+                                  void             * p_resource)
+{
+    u32_t handle;
+
+    uint32_t err_code = coap_observe_server_search(&handle,
+                                                   p_remote,
+                                                   p_resource);
+
+    if (err_code == 0)
+    {
+        err_code = coap_observe_server_unregister(handle);
+    }
+
+    return err_code;
+}
+
 static void observer_con_message_callback(u32_t status, void * arg, coap_message_t * p_response)
 {
     uint32_t err_code;
@@ -198,15 +215,9 @@ static void observer_con_message_callback(u32_t status, void * arg, coap_message
         case ETIMEDOUT:
             {
                 coap_observer_t * p_observer = (coap_observer_t *)arg;
+                err_code = lwm2m_observe_unregister((struct sockaddr *)p_observer->remote,
+                                                    (lwm2m_instance_t *)p_observer->resource_of_interest);
 
-                // Remove observer from its list.
-                u32_t handle;
-                err_code = coap_observe_server_search(&handle,
-                                                      (struct sockaddr *)p_observer->remote,
-                                                      (coap_resource_t *)p_observer->resource_of_interest);
-                (void)err_code;
-
-                err_code = coap_observe_server_unregister(handle);
                 (void)err_code;
             }
             break;
