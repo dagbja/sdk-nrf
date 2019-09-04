@@ -75,8 +75,8 @@ static const struct tz tz_conv[] =
 
 /**@brief Lookup time zone based on tz offset.
  *
- * @param[in] tz_offset UTC offset in minutes
- * @param[in] dst       Daylight saving time in minutes
+ * @param[in] tz_offset UTC offset in minutes, west of GMT
+ * @param[in] dst       Daylight saving adjustment in minutes
  *
  * @return Pointer to timezone string or NULL in case lookup failed
  *
@@ -84,10 +84,20 @@ static const struct tz tz_conv[] =
 static const char *lwm2m_time_timezone(int32_t tz_offset, int32_t dst)
 {
     int i = 0;
+    int offset = tz_offset;
+
+    if (tz_offset <= 0)
+    {
+        offset += dst;
+    }
+    else
+    {
+        offset -= dst;
+    }
 
     while (tz_conv[i].tz_string != NULL)
     {
-        if ((tz_offset - dst) == tz_conv[i].tz_offset)
+        if ((offset) == tz_conv[i].tz_offset)
         {
             return tz_conv[i].tz_string;
         }
@@ -102,8 +112,9 @@ static int lwm2m_time_modem_time_get(void)
 {
     int32_t utc_offset_15min;
     int32_t time;
+    int32_t dst_adjustment;
 
-    int err = at_read_time(&time, &utc_offset_15min);
+    int err = at_read_time(&time, &utc_offset_15min, &dst_adjustment);
 
     /* Check that no err and time makes sense - i.e. time after 2019-01-01T00:00:00 */
     if (err == 0 && time > 1546300800)
@@ -121,8 +132,8 @@ static int lwm2m_time_modem_time_get(void)
 
         if (m_timezone_set == false)
         {
-            /* Give offset in minutes west of GMT */
-            const char *p_tz_string = lwm2m_time_timezone(-m_utc_offset, 0);
+            /* Give offset in minutes WEST OF GMT */
+            const char *p_tz_string = lwm2m_time_timezone(-m_utc_offset, dst_adjustment * 60);
 
             if (p_tz_string == NULL)
             {

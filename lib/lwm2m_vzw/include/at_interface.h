@@ -66,29 +66,92 @@ int at_read_sim_iccid(char *p_iccid, uint32_t * p_iccid_len);
 /**
  * @brief Read the Modem firmware version name.
  *
+ * @param[out] p_manufacturer_id Pointer to store the firmware version
+ *
  * Version name is something like "mfw_nrf9160_0.7.0-15.alpha".
  */
-int at_read_firmware_version(char *p_fw_version, uint32_t * p_fw_version_len);
+int at_read_firmware_version(lwm2m_string_t *p_manufacturer_id);
 
+/**
+ * @brief Read operator ID from modem as defined in XOPERID at command.
+ *
+ * @param[out] p_oper_id Pointer to store the operator ID
+ * @return An error code if the read failed.
+ */
 int at_read_operator_id(uint32_t *p_oper_id);
-int at_read_net_reg_stat(uint32_t * p_net_stat);
-int at_read_manufacturer(lwm2m_string_t * p_manufacturer_id);
-int at_read_model_number(lwm2m_string_t * p_model_number);
-int at_read_radio_signal_strength_and_link_quality(int32_t * p_signal_strength, int32_t * p_link_quality);
-int at_read_cell_id(uint32_t * p_cell_id);
-int at_read_smnc_smcc(int32_t * p_smnc, int32_t *p_smcc);
 
-/**@brief Read time from modem using AT+CCLK? at command.
+/**
+ * @brief Read network registration status as defined in CEREG AT command <stat> field definition.
  *
- * @param[out] p_time       Pointer to time since Epoch
- * @param[out] p_utc_offset Pointer to UTC offset
+ * @param[out] p_net_stat Pointer to store the stat
+ * @return An error code if the read failed.
+ */
+int at_read_net_reg_stat(uint32_t * p_net_stat);
+
+/**
+ * @brief Read manufacturer string from modem.
  *
- * @return Pointer to timezone string or NULL in case lookup failed
+ * @param[out] p_manufacturer_id Pointer to store the manufacturer as lwm2m_string_t
+ * @return An error code if the read failed.
+ */
+int at_read_manufacturer(lwm2m_string_t * p_manufacturer_id);
+
+/**
+ * @brief Read model string from modem.
  *
- * */
-int at_read_time(int32_t * p_time, int32_t * p_utc_offset);
+ * @param[out] p_model_number Pointer to store the model as lwm2m_string_t
+ * @return An error code if the read failed.
+ */
+int at_read_model_number(lwm2m_string_t * p_model_number);
+
+/**
+ * @brief Read radio signal strength. Converted from RSRP to dBm.
+ *
+ * @param[out] p_signal_strength Pointer to store signal strength in dBm.
+ * @return An error code if the read failed.
+ */
+int at_read_radio_signal_strength_and_link_quality(int32_t * p_signal_strength, int32_t * p_link_quality);
+
+/**
+ * @brief Read E-UTRAN cell ID.
+ *
+ * @param[out] p_model_number Pointer to store the cell ID
+ * @return An error code if the read failed.
+ */
+int at_read_cell_id(uint32_t * p_cell_id);
+
+/**
+ * @brief Read Mobile Country Code (MCC) and Mobile Network Code (MNC) values from modem.
+ *
+ * @param[out] p_smnc Pointer to store the MNC value
+ * @param[out] p_smcc Pointer to store the MCC value
+ * @return An error code if the read failed.
+ */
+int at_read_smnc_smcc(int32_t * p_smnc, int32_t * p_smcc);
+
+/**
+ * @brief Read time and UTC offset from modem.
+ *
+ * @param[out] p_time           Pointer to store the time as seconds since Epoch
+ * @param[out] p_utc_offset     Pointer to store the UTC offset as units of 15 minutes
+ * @param[out] p_dst_adjustment Pointer to store the daylight saving adjustment as units of hours
+ * @return An error code if the read failed.
+ */
+int at_read_time(int32_t * p_time, int32_t * p_utc_offset, int32_t * p_dst_adjustment);
+
+/**
+ * @brief Read IP addresses from modem.
+ *
+ * @param[out] p_ipaddr_list       Pointer to list to store the IP addresses
+ * @return An error code if the read failed.
+ */
 int at_read_ipaddr(lwm2m_list_t * p_ipaddr_list);
 
+/**
+ * @brief Subscribe to notifications in change of network registration status
+ *
+ * @param[in] net_reg_stat_cb       Callback function to be called on changes
+ */
 void at_subscribe_net_reg_stat(at_net_reg_stat_cb_t net_reg_stat_cb);
 
 int at_read_connstat(lwm2m_connectivity_statistics_t * p_conn_stat);
