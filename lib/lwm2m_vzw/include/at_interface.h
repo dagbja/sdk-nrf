@@ -18,7 +18,15 @@ typedef void (*at_net_reg_stat_cb_t)(uint32_t net_stat);
 
 int mdm_interface_init(void);
 
-int at_apn_setup_wait_for_ipv6(char * apn);
+/**
+ * @brief Wait for IPV6 link on APN.
+ * Wait until IPv6 link is ready. Return an error after a timeout of one minute.
+ *
+ * @param[in] apn APN name.
+ *
+ * @return PDN socket handle or an invalid handle in case of error or timeout.
+ */
+int at_apn_setup_wait_for_ipv6(const char * const apn);
 
 /**
  * @brief Read device IMEI.

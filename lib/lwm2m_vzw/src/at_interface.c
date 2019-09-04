@@ -8,7 +8,7 @@
 
 #include <at_interface.h>
 
-#include <net/socket.h>
+#include <nrf_socket.h>
 #include <pdn_management.h>
 #include <sms_receive.h>
 #include <at_cmd.h>
@@ -28,13 +28,9 @@
  *  */
 static int cum_ydays[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
 
-/**
- * @brief The array index is the CID number.
- *
- * The maximum CIDs allowed in the system defines the size of the table.
- * The table index is the CID value (CID value 0 to 11).
- */
-static volatile bool cid_ipv6_table[12];
+/** @brief PDN context ID. Negative values if no CID found. */
+static volatile int8_t cid_number = -1;
+static volatile bool cid_ipv6_link_up = false;
 
 /**
  * @brief At command events or notifications handler.
@@ -172,16 +168,14 @@ static int at_cgev_handler(char *notif)
         // Check type of CGEV event.
         char * cgev_evt = &notif[7];
 
-        // TODO: Check if IPV6 fail for CID first.
-
         // IPv6 link is up for the default bearer.
         if (strncmp(cgev_evt, "IPV6 ", 5) == 0)
         {
-            // Save result for each CIDs.
+            // Match CID with PDN socket context.
             int cid = strtol(&cgev_evt[5], NULL, 0);
-            if (cid >= 0 && cid < ARRAY_SIZE(cid_ipv6_table))
+            if (cid >= 0 && cid == cid_number)
             {
-                cid_ipv6_table[cid] = true;
+                cid_ipv6_link_up = true;
             }
         }
 
@@ -291,18 +285,15 @@ int mdm_interface_init(void)
     return 0;
 }
 
-int at_apn_setup_wait_for_ipv6(char * apn)
+int at_apn_setup_wait_for_ipv6(const char * const apn)
 {
-    int apn_handle = -1;
-    int cid_number = -1;
-    bool cid_found = false;
-
     if (apn == NULL) {
         return -1;
     }
 
-    // Clear the CID table before registering for packet events.
-    memset((void *)cid_ipv6_table, 0x00, sizeof(cid_ipv6_table));
+    // Clear previous state before registering for packet domain events.
+    cid_number = -1;
+    cid_ipv6_link_up = false;
 
     // Register for packet domain event reporting +CGEREP.
     // The unsolicited result code is +CGEV: XXX.
@@ -316,84 +307,45 @@ int at_apn_setup_wait_for_ipv6(char * apn)
     }
 
     // Set up APN which implicitly creates a CID.
-    apn_handle = pdn_init_and_connect(apn);
+    int apn_handle = pdn_init_and_connect((char *)apn);
 
     if (apn_handle > -1)
     {
-        char at_cmd[16];
-        char read_buffer[APP_MAX_AT_READ_LENGTH];
+        nrf_socklen_t len = sizeof(cid_number);
+        int error = nrf_getsockopt(apn_handle, NRF_SOL_PDN, NRF_SO_PDN_CONTEXT_ID, (void *)&cid_number, &len);
 
-        // Loop through all possible CID values and search for the APN.
-        for (cid_number = 0; cid_number < ARRAY_SIZE(cid_ipv6_table); cid_number++) {
-            snprintf(at_cmd, sizeof(at_cmd), "AT+CGCONTRDP=%u", cid_number);
+        if (error == 0)
+        {
+            LWM2M_INF("PDN cid %d found. Wait for IPv6 link...", cid_number);
 
-            int err = at_cmd_write(at_cmd, read_buffer, sizeof(read_buffer), NULL);
+            int timeout_ms = 1 * 60 * 1000; // One minute timeout.
 
-            if (err != 0)
-            {
-                LWM2M_ERR("Unable to read information for PDN connection (cid=%u)", cid_number);
-                break;
+            // Wait until IPv6 link is up or timeout.
+            while (cid_ipv6_link_up == false && timeout_ms > 0) {
+                lwm2m_os_sleep(100);
+                timeout_ms -= 100;
             }
 
-            // TODO: Use parser instead of strstr. Change only APN name in response to lower case.
-            if (strstr(read_buffer, apn) != NULL)
+            if (timeout_ms <= 0)
             {
-                // APN name found in the AT command response for CID.
-                cid_found = true;
-                break;
+                LWM2M_ERR("Timeout while waiting for IPv6 (cid=%u)", cid_number);
+                pdn_disconnect(apn_handle); // Cleanup socket
+                apn_handle = -1;
             }
-
-            if (cid_found == false)
+            else
             {
-                // Test opposite casing variant of the APN name.
-                char oposite_case[64];
-                memcpy(oposite_case, apn, strlen(apn));
-
-                if (apn[0] >= 'a')
-                {
-                    for (uint8_t i = 0; i < strlen(apn); i++)
-                    {
-                        oposite_case[i] = apn[i] - 32;
-                    }
-                } else {
-                    for (uint8_t i = 0; i < strlen(apn); i++)
-                    {
-                        oposite_case[i] = apn[i] + 32;
-                    }
-                }
-                oposite_case[strlen(apn)] = '\0';
-
-                if (strstr(read_buffer, oposite_case) != NULL)
-                {
-                    // APN name found in the AT command response for CID.
-                    cid_found = true;
-                    break;
-                }
+                LWM2M_INF("IPv6 link ready for cid %d", cid_number);
             }
         }
-    }
-
-    // Block until IPv6 is ready to be used or timeout after 5 minutes.
-    if (cid_found)
-    {
-        LWM2M_TRC("CID %d found", cid_number);
-
-        int timeout = 5 * 60 * 1000; // 5 minutes timeout
-        while (cid_ipv6_table[cid_number] == false && timeout > 0) {
-            lwm2m_os_sleep(100);
-            timeout -= 100;
-        }
-
-        if (timeout == 0) {
-            LWM2M_ERR("Timeout waiting for IPv6 (cid=%u)", cid_number);
-            pdn_disconnect(apn_handle);
+        else
+        {
+            LWM2M_ERR("Unable to get PDN context ID on socket %d, errno=%d", apn_handle, errno);
+            pdn_disconnect(apn_handle); // Cleanup socket
             apn_handle = -1;
-        } else {
-            LWM2M_TRC("IPv6 available for CID %d", cid_number);
         }
     }
 
-    // Do not forward unsolicited CGEV result codes. Not needed anymore.
+    // Unregister from packet domain events.
     (void)at_cmd_write("AT+CGEREP=0", NULL, 0, NULL);
 
     return apn_handle;
