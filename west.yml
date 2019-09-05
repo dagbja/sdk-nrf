@@ -17,6 +17,8 @@ manifest:
       # nRF Connect SDK base URL.
     - name: ncs
       url-base: https://github.com/NordicPlayground
+    - name: zephyrproject
+      url-base: https://github.com/zephyrproject-rtos
     - name: armmbed
       url-base: https://github.com/ARMmbed
 
@@ -24,19 +26,23 @@ manifest:
   projects:
     - name: fw-nrfconnect-nrf
       path: nrf
-      revision: f9685c671be513bd1cdfaa1a5200220689b69b09
+      revision: dd25b1ccaf7b30d165d67f4b6de51bfa61d7cefb
     - name: fw-nrfconnect-zephyr
       path: zephyr
       west-commands: scripts/west-commands.yml
-      revision: 4493a423a645cb54de2ef2720ebb7c403774ae11
+      revision: d6e67554cfeb28df5525e53c073f61a00836f283
     - name: nrfxlib
       path: nrfxlib
-      revision: 35120d32233dc354c89d8c62eaa6267093c7e35b
+      revision: 0f140413f675b802f408a547bf66e74ae6ac4ed1
     - name: mbedtls-nrf
       path: mbedtls
       repo-path: mbedtls
       revision: mbedtls-2.13.1
       remote: armmbed
+    - name: hal_nordic
+      path: modules/hal/nordic
+      remote: zephyrproject
+      revision: 1b14177ff2176a1d17f3dd5e7e217f44337255db
 
   self:
     path: lwm2m
