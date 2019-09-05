@@ -31,6 +31,12 @@ static char apn[64];
 static char file[256];
 static char host[128];
 
+static char *img_state_str[] = {
+	[FIRMWARE_NONE] = "no image",
+	[FIRMWARE_DOWNLOADING] = "downloading",
+	[FIRMWARE_READY] = "complete image",
+};
+
 static void *download_dwork;
 static struct download_client http_downloader;
 static struct download_client_cfg config = {
@@ -100,7 +106,7 @@ static int on_done(const struct download_client_evt *event)
 	download_client_disconnect(&http_downloader);
 
 	/* Save state and notify the server */
-	lwm2m_firmware_image_ready_set(true);
+	lwm2m_firmware_image_state_set(FIRMWARE_READY);
 	lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_DOWNLOADED);
 
 	/* Close the DFU socket to free up memory for TLS,
@@ -163,9 +169,7 @@ static void download_task(void *w)
 {
 	int err;
 	uint32_t off;
-
-	/* Is a complete firmware image present? */
-	bool ready = false;
+	enum lwm2m_firmware_image_state state = FIRMWARE_NONE;
 
 	/* Query lwm2m_vzw_main to check if the PDN is ready.
 	 * These two conditions alone are not entirely reliable,
@@ -194,16 +198,22 @@ static void download_task(void *w)
 
 	LWM2M_INF("Offset retrieved: %lu", off);
 
-	/* At the moment we do not know if a non-zero offset is a
-	 * complete firmware image or not. We should send a HEAD request
-	 * to the HTTP server and see if the offset matches and if not,
-	 * attempt to resume.
-	 *
-	 * A non-zero offset may also indicate that the download cannot
-	 * be resumed, in which case it is the same as the flash size returned
-	 * by the dedicated RPC call; in that situation we should delete the
-	 * firmware image in flash.
+	/* We rely on the information in flash to interpret whether a non-zero,
+	 * non-dirty firmware offset is a complete firmware image or not.
 	 */
+	if (off != 0 && off != DIRTY_IMAGE) {
+		err = lwm2m_firmware_image_state_get(&state);
+		if (!err && state == FIRMWARE_READY) {
+			LWM2M_INF("Image already present");
+			lwm2m_firmware_state_set(
+				0, LWM2M_FIRMWARE_STATE_DOWNLOADED);
+			return;
+		}
+	}
+
+	/* We are downloading a new firmware image */
+	lwm2m_firmware_image_state_set(FIRMWARE_DOWNLOADING);
+
 	if (off == DIRTY_IMAGE) {
 		LWM2M_INF("Deleting existing firmware in flash");
 		err = dfusock_firmware_delete();
@@ -213,14 +223,6 @@ static void download_task(void *w)
 		/* Wait until operation has completed */
 		lwm2m_os_timer_start(download_dwork, K_SECONDS(1));
 		return;
-	} else if (off != 0) {
-		err = lwm2m_firmware_image_ready_get(&ready);
-		if (!err && ready) {
-			LWM2M_INF("Image already present");
-			lwm2m_firmware_state_set(
-				0, LWM2M_FIRMWARE_STATE_DOWNLOADED);
-			return;
-		}
 	}
 
 	/* No image, or a resumable image */
@@ -253,15 +255,21 @@ static void download_task(void *w)
 int lwm2m_firmware_download_init(void)
 {
 	int err;
-	uint32_t off;
-	enum lwm2m_firmware_update_state state;
-
 	uint8_t saved_ver[UUID_LEN];
 	uint8_t cur_ver[PRINTABLE_UUID_LEN];
+	enum lwm2m_firmware_update_state update;
+	enum lwm2m_firmware_image_state img = FIRMWARE_NONE;
+	/* Silence warnings */
+	(void)img_state_str;
 
 	download_dwork = lwm2m_os_timer_get(download_task);
 	if (!download_dwork) {
 		return -1;
+	}
+
+	err = download_client_init(&http_downloader, callback);
+	if (err) {
+		return err;
 	}
 
 	err = dfusock_init();
@@ -278,8 +286,8 @@ int lwm2m_firmware_download_init(void)
 	LWM2M_INF("Modem firmware version: %s", lwm2m_os_log_strdup(cur_ver));
 
 	/* Detect if a firmware update has just happened */
-	err = lwm2m_firmware_update_state_get(&state);
-	if (!err && state == UPDATE_EXECUTED) {
+	err = lwm2m_firmware_update_state_get(&update);
+	if (!err && update == UPDATE_EXECUTED) {
 		/* Check update result by comparing modem firmware versions */
 		lwm2m_last_firmware_version_get(saved_ver, UUID_LEN);
 
@@ -300,35 +308,32 @@ int lwm2m_firmware_download_init(void)
 		}
 	}
 
-	err = download_client_init(&http_downloader, callback);
-	if (err) {
-		return err;
-	}
+	/* Check if image is complete, if not resume.
+	 * We have to rely on the information in flash to determine
+	 * whether or not to resume, because the offset alone does
+	 * provide enough information to resume in these two cases:
+	 *
+	 * - Zero : if we began erasing, and lost power while erasing
+	 * - Non-Dirty, Non-Zero: if the image in flash is complete or not
+	 *
+	 * The download task handles the erase of any firmware image in flash,
+	 * if that is necessary.
+	 */
+	err = lwm2m_firmware_image_state_get(&img);
 
-	LWM2M_INF("Firmware download ready");
+	LWM2M_INF("Firmware download ready (%s)",
+		  lwm2m_os_log_strdup(img_state_str[img]));
 
-	/* Check if there is a download to resume */
-	err = dfusock_offset_get(&off);
-	if (err) {
-		return err;
-	}
-
-	/* Image offset must be not dirty and non-zero */
-	if (off != DIRTY_IMAGE && off != 0) {
-		bool ready = false;
-		char uri[512] = {0};
-		/* Check if image is complete, if not resume */
-		err = lwm2m_firmware_image_ready_get(&ready);
-		if (!err & !ready) {
-			err = lwm2m_firmware_uri_get(uri, sizeof(uri));
-			if (!err) {
-				/* Resume */
-				LWM2M_INF("Resuming download after power loss");
-				lwm2m_firmware_download_uri(uri, sizeof(uri));
-			} else {
-				/* Should not happen */
-				LWM2M_WRN("No URI to resume firmware update!");
-			}
+	if (!err && img == FIRMWARE_DOWNLOADING) {
+		char uri[512] = { 0 };
+		err = lwm2m_firmware_uri_get(uri, sizeof(uri));
+		if (!err) {
+			/* Resume */
+			LWM2M_INF("Resuming download after power loss");
+			lwm2m_firmware_download_uri(uri, sizeof(uri));
+		} else {
+			/* Should not happen */
+			LWM2M_WRN("No URI to resume firmware update!");
 		}
 	}
 
@@ -410,12 +415,13 @@ int lwm2m_firmware_download_uri(char *package_uri, size_t len)
 int lwm2m_firmware_download_apply(void)
 {
 	int err;
-	bool ready = true;
 	uint8_t ver[UUID_LEN];
+	enum lwm2m_firmware_image_state state;
 
-	err = lwm2m_firmware_image_ready_get(&ready);
+	err = lwm2m_firmware_image_state_get(&state);
 
-	if (!err && !ready) {
+	if (!err && state != FIRMWARE_READY) {
+		/* Request should not have come at this time. */
 		LWM2M_WRN("Ignoring update request, not ready yet.");
 		return -ENFILE;
 	}
@@ -436,7 +442,7 @@ int lwm2m_firmware_download_apply(void)
 	}
 
 	/* We won't need to re-download / re-apply this image */
-	err = lwm2m_firmware_image_ready_set(false);
+	err = lwm2m_firmware_image_state_set(FIRMWARE_NONE);
 	if (err) {
 		return err;
 	}

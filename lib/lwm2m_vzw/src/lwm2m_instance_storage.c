@@ -697,11 +697,11 @@ int lwm2m_last_firmware_version_set(uint8_t *ver, size_t len)
     return 0;
 }
 
-int lwm2m_firmware_image_ready_get(bool *ready)
+int lwm2m_firmware_image_state_get(enum lwm2m_firmware_image_state *state)
 {
     ssize_t rc;
 
-    rc = lwm2m_os_storage_read(MODEM_FIRMWARE_READY, ready, sizeof(*ready));
+    rc = lwm2m_os_storage_read(MODEM_FIRMWARE_READY, state, sizeof(*state));
     if (rc < 0)
     {
         LWM2M_TRC("Unable to find modem firmware state in flash, err %d", rc);
@@ -711,11 +711,11 @@ int lwm2m_firmware_image_ready_get(bool *ready)
     return 0;
 }
 
-int lwm2m_firmware_image_ready_set(bool ready)
+int lwm2m_firmware_image_state_set(enum lwm2m_firmware_image_state state)
 {
     ssize_t rc;
 
-    rc = lwm2m_os_storage_write(MODEM_FIRMWARE_READY, &ready, sizeof(ready));
+    rc = lwm2m_os_storage_write(MODEM_FIRMWARE_READY, &state, sizeof(state));
     if (rc < 0)
     {
         LWM2M_ERR("Unable to write modem firmware state to flash, err %d", rc);
