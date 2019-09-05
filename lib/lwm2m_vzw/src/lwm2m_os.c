@@ -11,6 +11,7 @@
 #include <nvs/nvs.h>
 #include <logging/log.h>
 #include <secure_services.h>
+#include <misc/util.h>
 
 /* NVS-related defines */
 #define NVS_SECTOR_SIZE    DT_FLASH_ERASE_BLOCK_SIZE    /* Multiple of FLASH_PAGE_SIZE */
@@ -150,6 +151,22 @@ int lwm2m_os_timer_start(void *timer, int32_t timeout)
 		return -EINVAL;
 	}
 
+	/* Zephyr's timing subsystem uses positive integers so the
+	 * largest tick count that can be represented is 31 bit large.
+	 * Avoid requesting timeouts larger than that, or they will expire
+	 * immediately.
+	 *
+	 * max_timeout_sec = int max - 1 / ticks per sec
+	 */
+	const int max_timeout_sec =
+		(INT32_MAX - 1) / CONFIG_SYS_CLOCK_TICKS_PER_SEC;
+
+	/* `timeout` is expressed in milliseconds,
+	 * use K_SECONDS to specify the correct unit.
+	 */
+	timeout = MIN(K_SECONDS(max_timeout_sec), timeout);
+
+	/* FIXME: return an error if the timeout requested is too large. */
 	return k_delayed_work_submit(&work->work_item, K_MSEC(timeout));
 }
 
