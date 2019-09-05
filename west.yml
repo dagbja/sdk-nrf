@@ -19,24 +19,22 @@ manifest:
       url-base: https://github.com/NordicPlayground
     - name: armmbed
       url-base: https://github.com/ARMmbed
-    - name: rlubos
-      url-base: https://github.com/rlubos
 
   # The list of external projects for the Nordic LWM2M library and client.
   projects:
     - name: fw-nrfconnect-nrf
       path: nrf
-      revision: 16bc508d43abee1b913d0473416cf1671e38ec28
+      revision: f23a27908ab64903b358a99de15a99a0abb15c88
     - name: fw-nrfconnect-zephyr
       path: zephyr
       west-commands: scripts/west-commands.yml
-      revision: a8933a2ead01db56a3d3828d81887535be8b5bda
+      revision: 4493a423a645cb54de2ef2720ebb7c403774ae11
     - name: nrfxlib
       path: nrfxlib
-      # Custom branch, based on fw-nrfconnect-nrf v1.0.0-rc1, with lwm2m_carrier library
-      remote: rlubos
-      revision: add-lwm2m-library
-    - name: mbedtls
+      revision: 35120d32233dc354c89d8c62eaa6267093c7e35b
+    - name: mbedtls-nrf
+      path: mbedtls
+      repo-path: mbedtls
       revision: mbedtls-2.13.1
       remote: armmbed
 
