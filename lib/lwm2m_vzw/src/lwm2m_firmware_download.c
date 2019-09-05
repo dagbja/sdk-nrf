@@ -104,10 +104,14 @@ static int on_done(const struct download_client_evt *event)
 	lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_DOWNLOADED);
 
 	/* Close the DFU socket to free up memory for TLS,
-	 * it will be re-opened in lwm2m_firmware_download_apply().
+	 * and re-open it in case a new download is started without
+	 * this delta ever being applied. That shouldn't happen but we guard
+	 * ourselves against incorrect server behavior, which would otherwise
+	 * start the download with the DFU socket closed.
 	 */
 	LWM2M_INF("Closing DFU socket");
 	dfusock_close();
+	dfusock_init();
 
 	return 0;
 }
