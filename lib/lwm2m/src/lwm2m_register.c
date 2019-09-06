@@ -50,7 +50,7 @@ static uint32_t internal_server_config_set(coap_message_t * msg, lwm2m_server_co
 
     if (p_config->lifetime > 0)
     {
-        int retval = snprintf(buffer, sizeof(buffer), "lt=%lu", p_config->lifetime);
+        int retval = snprintf(buffer, sizeof(buffer), "lt=%u", p_config->lifetime);
         if (retval < 0)
         {
             err_code = EINVAL;

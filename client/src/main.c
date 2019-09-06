@@ -37,7 +37,7 @@ void bsd_irrecoverable_error_handler(uint32_t error)
     buttons_and_leds_uninit();
 #endif
 
-    printk("IRRECOVERABLE ERROR %lu\n", error);
+    printk("IRRECOVERABLE ERROR %u\n", error);
     while (true);
 }
 
