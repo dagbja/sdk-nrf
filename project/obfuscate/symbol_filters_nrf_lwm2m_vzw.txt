@@ -135,6 +135,7 @@
 ^lwm2m_instance_server_init$
 ^lwm2m_notify$
 ^lwm2m_observe_register$
+^lwm2m_observe_unregister$
 ^lwm2m_plain_text_device_decode$
 ^lwm2m_plain_text_server_decode$
 ^lwm2m_register$
