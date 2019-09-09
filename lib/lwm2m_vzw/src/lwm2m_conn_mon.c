@@ -458,7 +458,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
 void lwm2m_conn_mon_observer_process(void)
 {
     coap_observer_t * p_observer = NULL;
-    while (coap_observe_server_next_get(&p_observer, p_observer, (coap_resource_t *)&m_instance_conn_mon) == 0)
+    while (coap_observe_server_next_get(&p_observer, p_observer, (void *)&m_instance_conn_mon.resource_ids[LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH]) == 0)
     {
         LWM2M_TRC("Observer found");
 

@@ -357,7 +357,7 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
 static void lwm2m_firmware_notify_resource(uint16_t resource_id)
 {
     coap_observer_t * p_observer = NULL;
-    while (coap_observe_server_next_get(&p_observer, p_observer, (coap_resource_t *)&m_instance_firmware) == 0)
+    while (coap_observe_server_next_get(&p_observer, p_observer, (void *)&m_instance_firmware.resource_ids[resource_id]) == 0)
     {
         LWM2M_TRC("Observer found");
         uint8_t  buffer[200];
@@ -385,7 +385,7 @@ static void lwm2m_firmware_notify_resource(uint16_t resource_id)
 void lwm2m_firmware_observer_process(void)
 {
     coap_observer_t * p_observer = NULL;
-    while (coap_observe_server_next_get(&p_observer, p_observer, (coap_resource_t *)&m_instance_firmware) == 0)
+    while (coap_observe_server_next_get(&p_observer, p_observer, (void *)&m_instance_firmware.resource_ids[LWM2M_FIRMWARE_STATE]) == 0)
     {
         LWM2M_TRC("Observer found");
         uint8_t  buffer[200];
