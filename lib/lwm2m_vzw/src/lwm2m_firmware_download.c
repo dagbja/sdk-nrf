@@ -410,7 +410,7 @@ int lwm2m_firmware_download_uri(char *package_uri, size_t len)
 	lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_DOWNLOADING);
 
 	lwm2m_carrier_event_t event = {
-		.type = LWM2M_CARRIER_EVENT_FOTA
+		.type = LWM2M_CARRIER_EVENT_FOTA_START
 	};
 	lwm2m_carrier_event_handler(&event);
 
