@@ -313,17 +313,24 @@ int at_apn_setup_wait_for_ipv6(char * apn)
         }
     }
 
-    // Block forever until IPv6 is ready to be used.
+    // Block until IPv6 is ready to be used or timeout after 5 minutes.
     if (cid_found)
     {
         LWM2M_TRC("CID %d found", cid_number);
 
-        while (cid_ipv6_table[cid_number] == false) {
-            // TODO: Add a timeout to not wait forever in case IPv6 is not available on that CID.
+        int timeout = 5 * 60 * 1000; // 5 minutes timeout
+        while (cid_ipv6_table[cid_number] == false && timeout > 0) {
             lwm2m_os_sleep(100);
+            timeout -= 100;
         }
 
-        LWM2M_TRC("IPv6 available for CID %d", cid_number);
+        if (timeout == 0) {
+            LWM2M_ERR("Timeout waiting for IPv6 (cid=%u)", cid_number);
+            pdn_disconnect(apn_handle);
+            apn_handle = -1;
+        } else {
+            LWM2M_TRC("IPv6 available for CID %d", cid_number);
+        }
     }
 
     // Do not forward unsolicited CGEV result codes. Not needed anymore.
