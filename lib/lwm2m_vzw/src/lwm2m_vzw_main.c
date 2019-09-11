@@ -973,6 +973,8 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             lwm2m_server_notif_storing_set(2, 1);
             lwm2m_server_binding_set(2, "UQS", 3);
 
+            acl.access[0] = rwde_access;
+            acl.server[0] = 102;
             acl.owner = 101;
             app_init_server_acl(2, &acl);
             break;
