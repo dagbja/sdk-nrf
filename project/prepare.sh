@@ -23,7 +23,7 @@ project_file="prj.conf"
 project_dir="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cpu_variant="cortex-m33"
 output_dir="output"
-output_lib="nrf_lwm2m_carrier"
+output_lib="lwm2m_carrier"
 temp_dir="temp"
 
 if [ "$debug" = true ] ; then
@@ -45,6 +45,8 @@ declare -A lib_paths=([${lib_names[0]}]="coap"
 
 declare -a api_headers_nrf_lwm2m_vzw=("lwm2m_carrier.h"
 				      "lwm2m_os.h")
+
+declare -a api_impl_nrf_lwm2m_vzw=("lwm2m_os.c")
 
 function obfuscate {
 	# $1 library name
@@ -132,6 +134,15 @@ mkdir -p $project_dir/$output_dir/include
 for i in "${api_headers_nrf_lwm2m_vzw[@]}"
 do
 	cp $project_dir/../lib/lwm2m_vzw/include/$i $project_dir/$output_dir/include
+done
+
+# Copy OS glue
+
+mkdir -p $project_dir/$output_dir/os
+
+for i in "${api_impl_nrf_lwm2m_vzw[@]}"
+do
+	cp $project_dir/../lib/lwm2m_vzw/src/$i $project_dir/$output_dir/os
 done
 
 # TODO This is not needed at the moment, we do not make other headers public
