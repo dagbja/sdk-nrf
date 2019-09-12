@@ -14,9 +14,13 @@
 #include <misc/util.h>
 
 /* NVS-related defines */
-#define NVS_SECTOR_SIZE    DT_FLASH_ERASE_BLOCK_SIZE    /* Multiple of FLASH_PAGE_SIZE */
-#define NVS_SECTOR_COUNT   3                            /* At least 2 sectors */
-#define NVS_STORAGE_OFFSET DT_FLASH_AREA_STORAGE_OFFSET /* Start address of the filesystem in flash */
+
+/* Multiple of FLASH_PAGE_SIZE */
+#define NVS_SECTOR_SIZE    DT_FLASH_ERASE_BLOCK_SIZE
+/* At least 2 sectors */
+#define NVS_SECTOR_COUNT   3
+/* Start address of the filesystem in flash */
+#define NVS_STORAGE_OFFSET DT_FLASH_AREA_STORAGE_OFFSET
 
 static struct nvs_fs fs = {
 	.sector_size = NVS_SECTOR_SIZE,
@@ -26,18 +30,11 @@ static struct nvs_fs fs = {
 
 int lwm2m_os_init(void)
 {
-	int err;
-
 	/* Initialize storage */
-	err = nvs_init(&fs, DT_FLASH_DEV_NAME);
-	if (err) {
-		return err;
-	}
-
-	return 0;
+	return nvs_init(&fs, DT_FLASH_DEV_NAME);
 }
 
-/* Memory mangement. */
+/* Memory management. */
 
 void *lwm2m_os_malloc(size_t size)
 {
@@ -151,17 +148,19 @@ int lwm2m_os_timer_start(void *timer, int32_t timeout)
 		return -EINVAL;
 	}
 
-	/* Zephyr's timing subsystem uses positive integers so the
+	/* Zephyr's timing subsystem uses signed integers so the
 	 * largest tick count that can be represented is 31 bit large.
-	 * Avoid requesting timeouts larger than that, or they will expire
-	 * immediately.
 	 *
 	 * max_timeout_sec = int max - 1 / ticks per sec
 	 */
 	const int max_timeout_sec =
 		(INT32_MAX - 1) / CONFIG_SYS_CLOCK_TICKS_PER_SEC;
 
-	/* `timeout` is expressed in milliseconds,
+	/* Avoid requesting timeouts larger than max_timeout_sec,
+	 * or they will expire immediately.
+	 * See: https://github.com/zephyrproject-rtos/zephyr/issues/19075
+	 *
+	 * `timeout` is expressed in milliseconds,
 	 * use K_SECONDS to specify the correct unit.
 	 */
 	timeout = MIN(K_SECONDS(max_timeout_sec), timeout);

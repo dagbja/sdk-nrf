@@ -6,11 +6,17 @@
 
 #ifndef LWM2M_OS_H__
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
-/*
- * @brief Maximum number of timers that system must support.
+/**@file lwm2m_os.h
+ *
+ * @defgroup lwm2m_carrier_os LWM2M OS layer
+ * @{
+ */
+
+/**
+ * @brief Maximum number of timers that the system must support.
  */
 #define LWM2M_OS_MAX_TIMER_COUNT 5
 
@@ -26,7 +32,7 @@
 typedef void (*lwm2m_os_timer_handler_t)(void *timer);
 
 /**
- * @brief Initialize LWM2M OS layer.
+ * @brief Initialize the LWM2M OS layer.
  */
 int lwm2m_os_init(void);
 
@@ -56,7 +62,7 @@ int lwm2m_os_sleep(int ms);
 void lwm2m_os_sys_reset(void);
 
 /**
- * @brief Get random value
+ * @brief Get a random value.
  */
 uint32_t lwm2m_os_rand_get(void);
 
@@ -71,7 +77,7 @@ int lwm2m_os_storage_delete(uint16_t id);
 int lwm2m_os_storage_read(uint16_t id, void *data, size_t len);
 
 /**
- * @brief Write an entry in non-volatile storage.
+ * @brief Write an entry to non-volatile storage.
  */
 int lwm2m_os_storage_write(uint16_t id, const void *data, size_t len);
 
@@ -96,7 +102,7 @@ int lwm2m_os_timer_start(void *timer, int32_t timeout);
 void lwm2m_os_timer_cancel(void *timer);
 
 /**
- * @brief Obtain a time remaining on a timer.
+ * @brief Obtain the time remaining on a timer.
  */
 int32_t lwm2m_os_timer_remaining(void *timer);
 
@@ -109,5 +115,5 @@ const char *lwm2m_os_log_strdup(const char *str);
  * @brief Log a message.
  */
 void lwm2m_os_log(int level, const char *fmt, ...);
-
-#endif // LWM2M_OS_H__
+/**@} */
+#endif /* LWM2M_OS_H__ */
