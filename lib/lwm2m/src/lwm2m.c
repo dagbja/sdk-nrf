@@ -79,7 +79,10 @@ static bool numbers_only(const char * p_str, uint16_t str_len)
 {
     for (uint16_t i = 0; i < str_len; i++)
     {
-        if (isdigit((int)p_str[i]) == 0)
+        /* isdigit() implementation to avoid incompatibility between
+         * the implementation provided by newlibc across compilers versions.
+         */
+        if (p_str[i] < '0' || p_str[i] > '9')
         {
             return false;
         }
