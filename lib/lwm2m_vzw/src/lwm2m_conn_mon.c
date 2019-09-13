@@ -342,7 +342,8 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
             switch (resource_id)
             {
                 case LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH:
-                    (void)at_read_radio_signal_strength(&m_instance_conn_mon.radio_signal_strength);
+                case LWM2M_CONN_MON_LINK_QUALITY:
+                    (void)at_read_radio_signal_strength_and_link_quality(&m_instance_conn_mon.radio_signal_strength, &m_instance_conn_mon.link_quality);
                     break;
                 case LWM2M_CONN_MON_CELL_ID:
                     (void)at_read_cell_id(&m_instance_conn_mon.cell_id);
@@ -352,7 +353,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                     (void)at_read_smnc_smcc(&m_instance_conn_mon.smnc, &m_instance_conn_mon.smcc);
                     break;
                 case LWM2M_NAMED_OBJECT:
-                    (void)at_read_radio_signal_strength(&m_instance_conn_mon.radio_signal_strength);
+                    (void)at_read_radio_signal_strength_and_link_quality(&m_instance_conn_mon.radio_signal_strength, &m_instance_conn_mon.link_quality);
                     (void)at_read_cell_id(&m_instance_conn_mon.cell_id);
                     (void)at_read_smnc_smcc(&m_instance_conn_mon.smnc, &m_instance_conn_mon.smcc);
                     break;
@@ -462,7 +463,7 @@ void lwm2m_conn_mon_observer_process(void)
     {
         LWM2M_TRC("Observer found");
 
-        (void)at_read_radio_signal_strength(&m_instance_conn_mon.radio_signal_strength);
+        (void)at_read_radio_signal_strength_and_link_quality(&m_instance_conn_mon.radio_signal_strength, &m_instance_conn_mon.link_quality);
 
         uint8_t  buffer[200];
         uint32_t buffer_size = sizeof(buffer);
@@ -484,6 +485,7 @@ void lwm2m_conn_mon_observer_process(void)
             LWM2M_ERR("Could notify observer, error code: %lu", err_code);
         }
     }
+
 }
 
 void lwm2m_conn_mon_init(void)
@@ -498,7 +500,7 @@ void lwm2m_conn_mon_init(void)
     m_instance_conn_mon.network_bearer = 6; // LTE-FDD
     m_instance_conn_mon.available_network_bearer.len = 1;
     m_instance_conn_mon.available_network_bearer.val.p_int32[0] = 6; // LTE-FDD
-    (void)at_read_radio_signal_strength(&m_instance_conn_mon.radio_signal_strength);
+    (void)at_read_radio_signal_strength_and_link_quality(&m_instance_conn_mon.radio_signal_strength, &m_instance_conn_mon.link_quality);
     m_instance_conn_mon.link_quality = 100;
     m_instance_conn_mon.ip_addresses.len = 1;
     char * ip_address = "192.168.0.0";

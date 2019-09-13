@@ -29,7 +29,7 @@ int at_read_operator_id(uint32_t *p_oper_id);
 int at_read_net_reg_stat(uint32_t * p_net_stat);
 int at_read_manufacturer(lwm2m_string_t * p_manufacturer_id);
 int at_read_model_number(lwm2m_string_t * p_model_number);
-int at_read_radio_signal_strength(int32_t * p_signal_strength);
+int at_read_radio_signal_strength_and_link_quality(int32_t * p_signal_strength, int32_t * p_link_quality);
 int at_read_cell_id(uint32_t * p_cell_id);
 int at_read_smnc_smcc(int32_t * p_smnc, int32_t *p_smcc);
 int at_read_time(int32_t * p_time, int32_t * p_utc_offset);

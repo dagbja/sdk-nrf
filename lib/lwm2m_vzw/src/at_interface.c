@@ -602,7 +602,7 @@ int at_read_model_number(lwm2m_string_t *p_model_number)
     return retval;
 }
 
-int at_read_radio_signal_strength(int32_t * p_signal_strength)
+int at_read_radio_signal_strength_and_link_quality(int32_t * p_signal_strength, int32_t * p_link_quality)
 {
     int retval = 0;
     struct at_param_list cesq_params;
@@ -611,6 +611,7 @@ int at_read_radio_signal_strength(int32_t * p_signal_strength)
     const char *at_cesq = "AT+CESQ";
 
     *p_signal_strength = 0;
+    *p_link_quality = 0;
 
     cesq_params.params = NULL;
 
@@ -619,6 +620,7 @@ int at_read_radio_signal_strength(int32_t * p_signal_strength)
     {
         if (at_send_command_and_parse_params(at_cesq, &cesq_params) == 0)
         {
+            // Radio signal strength
             u16_t rsrp;
             if (at_params_short_get(&cesq_params, 5, &rsrp) == 0)
             {
@@ -650,6 +652,55 @@ int at_read_radio_signal_strength(int32_t * p_signal_strength)
                 LWM2M_ERR("signal strength parse failed");
                 retval = -EINVAL;
             }
+
+            // Link Quality
+            u16_t rsrq;
+            if (at_params_short_get(&cesq_params, 4, &rsrq) == 0)
+            {
+                if (rsrq != 255)
+                {
+                    /*
+                     * 3GPP TS 136.133: RSRQ measurement report mapping
+                     *  Reported value   Measured quantity value   Unit
+                     *   RSRQ_-30            RSRQ < -34             dB
+                     *   RSRQ_-29        -34   =< RSRQ < -35.5      dB
+                     *   ...
+                     *   RSRQ_-02        -20.5 =< RSRQ < -20        dB
+                     *   RSRQ_-01        -20   =< RSRQ < -19.5      dB
+                     *   RSRQ_00             RSRQ < -19.5           dB
+                     *   RSRQ_01        -19.5 =< RSRQ < -19         dB
+                     *   RSRQ_02        -19   =< RSRQ < -18.5       dB
+                     *   ...
+                     *   RSRQ_32        -4    =< RSRQ < -3.5        dB
+                     *   RSRQ_33        -3.5  =< RSRQ < -3          dB
+                     *   RSRQ_34              -3 =< RSRQ            dB
+                     *   RSRQ_35        -3    =< RSRQ < -2.5        dB
+                     *   RSRQ_36        -2.5  =< RSRQ < -2          dB
+                     *   ...
+                     *   RSRQ_45         2    =< RSRQ < 2.5         dB
+                     *   RSRQ_46              2.5  =< RSRQ          dB
+                     *
+                     *   Note: The ranges from RSRQ_-30 to RSRQ_-01 and
+                     *   from RSRQ_35 to RSRQ_46 apply for the UE who
+                     *   can support extended RSRQ range
+                     *
+                     *   Since lwm2m supports only integer value for link quality,
+                     *   we store the reported value without mapping it.
+                     */
+                    *p_link_quality = rsrq;
+                }
+                else
+                {
+                    // 255 == Not known or not detectable
+                    retval = -EINVAL;
+                }
+            }
+            else
+            {
+                LWM2M_ERR("link quality parse failed");
+                retval = -EINVAL;
+            }
+
         }
         else
         {
@@ -828,3 +879,4 @@ int at_read_time(int32_t * p_time, int32_t * p_utc_offset)
 
     return retval;
 }
+
