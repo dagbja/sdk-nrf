@@ -1930,9 +1930,6 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     // Initialize debug settings from flash.
     app_debug_init();
 
-    // Enable logging before establishing LTE link.
-    lwm2m_debug_modem_logging_enable();
-
     // Provision certificates for DFU before turning the Modem on.
     cert_provision();
 

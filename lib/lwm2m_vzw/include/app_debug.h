@@ -16,7 +16,7 @@
 typedef struct {
     char dummy1[16];              /**< Currently unused value, previous used for static configured IMEI. */
     char dummy2[16];              /**< Currently unused value, previous used for static configured MSISDN. */
-    char modem_logging[65];       /**< Modem logging: 0=off, 1=fidoless, 2=fido, other=XMODEMTRACE bitmap */
+    char dummy3[65];              /**< Currently unused value, previous used for modem logging. */
     uint32_t flags;               /**< Flags to control application behaviour. */
 } debug_settings_t;
 
@@ -26,9 +26,5 @@ void lwm2m_debug_clear(void);
 bool lwm2m_debug_flag_is_set(uint32_t flag);
 int32_t lwm2m_debug_flag_set(uint32_t flag);
 int32_t lwm2m_debug_flag_clear(uint32_t flag);
-
-const char * lwm2m_debug_modem_logging_get(void);
-int32_t lwm2m_debug_modem_logging_set(const char * modem_logging);
-void lwm2m_debug_modem_logging_enable(void);
 
 #endif // APP_DEBUG_H__

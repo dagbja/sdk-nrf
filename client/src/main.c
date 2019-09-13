@@ -11,6 +11,7 @@
 #endif
 
 #include <lwm2m_carrier.h>
+#include <modem_logging.h>
 
 void lwm2m_carrier_event_handler(const lwm2m_carrier_event_t * event)
 {
@@ -61,16 +62,22 @@ int main(void)
 
 void lwm2m_vzw_thread_run(void)
 {
+    // Start FIDO trace first to ensure we capture lwm2m_carrier_init().
+    modem_trace_enable();
 
     const lwm2m_carrier_config_t carrier_config = {
         .bootstrap_uri = "coaps://xvzwcdpii.xdev.motive.com:5684"
     };
+
     int err = lwm2m_carrier_init(&carrier_config);
     __ASSERT(err == 0, "Failed to initialize VZW LWM2M");
 
     if(err != 0) {
         return;
     }
+
+    // Initialize logging.
+    modem_logging_init();
 
     // Non-return function.
     lwm2m_carrier_run();

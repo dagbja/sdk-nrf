@@ -204,33 +204,6 @@ int mdm_interface_init(void)
     return 0;
 }
 
-int lwm2m_at_write(const char *const cmd, bool do_logging)
-{
-    int ret = 0;
-    char read_buffer[APP_MAX_AT_READ_LENGTH];
-
-    if (cmd == NULL) {
-        ret = -1;
-    }
-    else {
-        // Send a null-terminated AT command.
-        ret = at_cmd_write(cmd, read_buffer, APP_MAX_AT_READ_LENGTH, NULL);
-    }
-
-    if (do_logging) {
-        if (ret == 0) {
-            printk("%s", read_buffer);
-        }
-        else {
-            // Unable to send the AT command or received an error response.
-            // This usually indicates that an error has been received in the AT response.
-            LWM2M_ERR("AT error %d", ret);
-        }
-    }
-
-    return ret;
-}
-
 int at_apn_setup_wait_for_ipv6(char * apn)
 {
     int apn_handle = -1;

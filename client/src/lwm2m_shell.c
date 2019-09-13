@@ -17,6 +17,7 @@
 #include <at_interface.h>
 #include <sms_receive.h>
 #include <lwm2m_vzw_main.h>
+#include <modem_logging.h>
 
 
 static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
@@ -26,7 +27,7 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
         return 0;
     }
 
-    (void)lwm2m_at_write(argv[1], true);
+    (void)modem_at_write(argv[1], true);
 
     return 0;
 }
@@ -141,7 +142,7 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     }
 
     shell_print(shell, "  SIM ICCID      %s", iccid);
-    shell_print(shell, "  Logging        %s", lwm2m_debug_modem_logging_get());
+    shell_print(shell, "  Logging        %s", modem_logging_get());
     shell_print(shell, "  IPv6 enabled   %s", lwm2m_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6) ? "No" : "Yes");
     shell_print(shell, "  IP Fallback    %s", lwm2m_debug_flag_is_set(DEBUG_FLAG_DISABLE_FALLBACK) ? "No" : "Yes");
     shell_print(shell, "  SMS Counter    %u", lwm2m_sms_receive_counter());
@@ -178,10 +179,11 @@ static int cmd_debug_logging(const struct shell *shell, size_t argc, char **argv
         return 0;
     }
 
-    lwm2m_debug_modem_logging_set(logging);
-    lwm2m_debug_modem_logging_enable();
+    modem_logging_set(logging);
+    modem_logging_enable();
 
     shell_print(shell, "Set logging value: %s", logging);
+    shell_print(shell, "Remember to do 'reboot' to store this value permanent!");
 
     return 0;
 }

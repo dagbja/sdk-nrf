@@ -37,15 +37,11 @@
 ^lwm2m_handler_error$
 
 # Other APIs that are needed for now
-^lwm2m_at_write$
 ^lwm2m_bootstrap_clear$
 ^lwm2m_debug_clear$
 ^lwm2m_debug_flag_clear$
 ^lwm2m_debug_flag_is_set$
 ^lwm2m_debug_flag_set$
-^lwm2m_debug_modem_logging_enable$
-^lwm2m_debug_modem_logging_get$
-^lwm2m_debug_modem_logging_set$
 ^lwm2m_device_get_sim_iccid$
 ^lwm2m_did_bootstrap$
 ^lwm2m_factory_reset$
