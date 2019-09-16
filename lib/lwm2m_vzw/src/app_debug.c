@@ -19,26 +19,26 @@ void app_debug_init(void)
     (void)lwm2m_debug_settings_load(&m_debug_settings);
 }
 
-void lwm2m_debug_clear(void)
+void lwm2m_debug_reset(void)
 {
     memset(&m_debug_settings, 0, sizeof(m_debug_settings));
 
     lwm2m_debug_settings_store(&m_debug_settings);
 }
 
-bool lwm2m_debug_flag_is_set(uint32_t flag)
+bool lwm2m_debug_is_set(uint32_t flag)
 {
     return ((m_debug_settings.flags & flag) == flag);
 }
 
-int32_t lwm2m_debug_flag_set(uint32_t flag)
+int32_t lwm2m_debug_set(uint32_t flag)
 {
     m_debug_settings.flags |= flag;
 
     return lwm2m_debug_settings_store(&m_debug_settings);
 }
 
-int32_t lwm2m_debug_flag_clear(uint32_t flag)
+int32_t lwm2m_debug_clear(uint32_t flag)
 {
     m_debug_settings.flags &= ~flag;
 

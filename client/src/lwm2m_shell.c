@@ -143,8 +143,9 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
 
     shell_print(shell, "  SIM ICCID      %s", iccid);
     shell_print(shell, "  Logging        %s", modem_logging_get());
-    shell_print(shell, "  IPv6 enabled   %s", lwm2m_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6) ? "No" : "Yes");
-    shell_print(shell, "  IP Fallback    %s", lwm2m_debug_flag_is_set(DEBUG_FLAG_DISABLE_FALLBACK) ? "No" : "Yes");
+    shell_print(shell, "  Carrier check  %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK) ? "No" : "Yes");
+    shell_print(shell, "  IPv6 enabled   %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6) ? "No" : "Yes");
+    shell_print(shell, "  IP fallback    %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_FALLBACK) ? "No" : "Yes");
     shell_print(shell, "  SMS Counter    %u", lwm2m_sms_receive_counter());
 
     return 0;
@@ -153,7 +154,7 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_debug_reset(const struct shell *shell, size_t argc, char **argv)
 {
-    lwm2m_debug_clear();
+    lwm2m_debug_reset();
 
     return 0;
 }
@@ -189,6 +190,33 @@ static int cmd_debug_logging(const struct shell *shell, size_t argc, char **argv
 }
 
 
+static int cmd_debug_carrier_check(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s <value>", argv[0]);
+        shell_print(shell, " 0 = disable");
+        shell_print(shell, " 1 = enable");
+        return 0;
+    }
+
+    int carrier_check = atoi(argv[1]);
+
+    if (carrier_check != 0 && carrier_check != 1) {
+        shell_print(shell, "invalid value, must be 0 or 1");
+        return 0;
+    }
+
+    if (carrier_check) {
+        lwm2m_debug_clear(LWM2M_DEBUG_DISABLE_CARRIER_CHECK);
+    } else {
+        lwm2m_debug_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK);
+    }
+
+    shell_print(shell, "Set carrier check: %d", carrier_check);
+
+    return 0;
+}
+
 static int cmd_debug_ipv6_enabled(const struct shell *shell, size_t argc, char **argv)
 {
     if (argc != 2) {
@@ -206,9 +234,9 @@ static int cmd_debug_ipv6_enabled(const struct shell *shell, size_t argc, char *
     }
 
     if (enable_ipv6) {
-        lwm2m_debug_flag_clear(DEBUG_FLAG_DISABLE_IPv6);
+        lwm2m_debug_clear(LWM2M_DEBUG_DISABLE_IPv6);
     } else {
-        lwm2m_debug_flag_set(DEBUG_FLAG_DISABLE_IPv6);
+        lwm2m_debug_set(LWM2M_DEBUG_DISABLE_IPv6);
     }
 
     shell_print(shell, "Set IPv6 enabled: %d", enable_ipv6);
@@ -233,9 +261,9 @@ static int cmd_debug_fallback_disabled(const struct shell *shell, size_t argc, c
     }
 
     if (enable_fallback) {
-        lwm2m_debug_flag_clear(DEBUG_FLAG_DISABLE_FALLBACK);
+        lwm2m_debug_clear(LWM2M_DEBUG_DISABLE_FALLBACK);
     } else {
-        lwm2m_debug_flag_set(DEBUG_FLAG_DISABLE_FALLBACK);
+        lwm2m_debug_set(LWM2M_DEBUG_DISABLE_FALLBACK);
     }
 
     shell_print(shell, "Set IP fallback: %d", enable_fallback);
@@ -453,6 +481,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(print, NULL, "Print configuration", cmd_debug_print),
     SHELL_CMD(reset, NULL, "Reset configuration", cmd_debug_reset),
     SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
+    SHELL_CMD(carrier_check, NULL, "Set carrier check", cmd_debug_carrier_check),
     SHELL_CMD(ipv6_enable, NULL, "Set IPv6 enabled", cmd_debug_ipv6_enabled),
     SHELL_CMD(fallback, NULL, "Set IP Fallback", cmd_debug_fallback_disabled),
     SHELL_SUBCMD_SET_END /* Array terminated. */

@@ -606,7 +606,7 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
 {
     bool start_retry_delay = true;
 
-    if (no_reply && !lwm2m_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6) && !lwm2m_debug_flag_is_set(DEBUG_FLAG_DISABLE_FALLBACK))
+    if (no_reply && !lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6) && !lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_FALLBACK))
     {
         // Fallback to the other IP version
         m_family_type[instance_id] = (m_family_type[instance_id] == AF_INET6) ? AF_INET : AF_INET6;
@@ -1945,7 +1945,7 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
         lwm2m_sms_receiver_init();
     }
 
-    if (lwm2m_debug_flag_is_set(DEBUG_FLAG_DISABLE_IPv6)) {
+    if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6)) {
         for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
             m_family_type[i] = AF_INET;
         }

@@ -9,8 +9,9 @@
 
 #include <stdint.h>
 
-#define DEBUG_FLAG_DISABLE_IPv6 0x08       /**< Set if disable IPv6. */
-#define DEBUG_FLAG_DISABLE_FALLBACK  0x10  /**< Set if disable IP fallback. */
+#define LWM2M_DEBUG_DISABLE_CARRIER_CHECK  0x04  /**< Set if disable carrier check. */
+#define LWM2M_DEBUG_DISABLE_IPv6           0x08  /**< Set if disable IPv6. */
+#define LWM2M_DEBUG_DISABLE_FALLBACK       0x10  /**< Set if disable IP fallback. */
 
 /**@brief Configurable device values. */
 typedef struct {
@@ -21,10 +22,10 @@ typedef struct {
 } debug_settings_t;
 
 void app_debug_init(void);
-void lwm2m_debug_clear(void);
+void lwm2m_debug_reset(void);
 
-bool lwm2m_debug_flag_is_set(uint32_t flag);
-int32_t lwm2m_debug_flag_set(uint32_t flag);
-int32_t lwm2m_debug_flag_clear(uint32_t flag);
+bool lwm2m_debug_is_set(uint32_t flag);
+int32_t lwm2m_debug_set(uint32_t flag);
+int32_t lwm2m_debug_clear(uint32_t flag);
 
 #endif // APP_DEBUG_H__

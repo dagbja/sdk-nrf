@@ -39,9 +39,9 @@
 # Other APIs that are needed for now
 ^lwm2m_bootstrap_clear$
 ^lwm2m_debug_clear$
-^lwm2m_debug_flag_clear$
-^lwm2m_debug_flag_is_set$
-^lwm2m_debug_flag_set$
+^lwm2m_debug_is_set$
+^lwm2m_debug_set$
+^lwm2m_debug_reset$
 ^lwm2m_device_get_sim_iccid$
 ^lwm2m_did_bootstrap$
 ^lwm2m_factory_reset$
