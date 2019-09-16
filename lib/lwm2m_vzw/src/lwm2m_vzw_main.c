@@ -891,6 +891,8 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
         lwm2m_instance_storage_server_store(i);
     }
 
+    app_event_notify(LWM2M_CARRIER_EVENT_BOOTSTRAPPED, NULL);
+
     m_app_state = LWM2M_STATE_IDLE;
     init_connection_update();
 
