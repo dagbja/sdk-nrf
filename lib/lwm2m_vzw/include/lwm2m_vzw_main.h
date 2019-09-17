@@ -12,7 +12,6 @@ typedef enum
 {
     LWM2M_STATE_BOOTING,
     LWM2M_STATE_IDLE,
-    LWM2M_STATE_IP_INTERFACE_UP,
     LWM2M_STATE_BS_CONNECT,
     LWM2M_STATE_BS_CONNECT_WAIT,
     LWM2M_STATE_BS_CONNECT_RETRY_WAIT,
@@ -30,6 +29,7 @@ typedef enum
     LWM2M_STATE_SERVER_DEREGISTER,
     LWM2M_STATE_SERVER_DEREGISTERING,
     LWM2M_STATE_DISCONNECT,
+    LWM2M_STATE_DISCONNECTED,
     LWM2M_STATE_MODEM_FIRMWARE_UPDATE,
     LWM2M_STATE_SHUTDOWN,
 } lwm2m_state_t;
@@ -42,13 +42,15 @@ void lwm2m_observable_pmin_set(uint32_t pmin);
 void lwm2m_observable_pmax_set(uint32_t pmax);
 
 lwm2m_state_t lwm2m_state_get(void);
-void lwm2m_state_set(lwm2m_state_t lwm2m_state);
+bool lwm2m_state_set(lwm2m_state_t lwm2m_state);
 char *lwm2m_imei_get(void);
 char *lwm2m_msisdn_get(void);
 
 bool lwm2m_is_admin_pdn_ready(void);
 
+bool lwm2m_request_register(void);
 void lwm2m_request_server_update(uint16_t instance_id, bool reconnect);
+void lwm2m_request_disconnect(void);
 bool lwm2m_did_bootstrap(void);
 uint16_t lwm2m_server_instance(void);
 sa_family_t lwm2m_family_type_get(uint16_t instance_id);

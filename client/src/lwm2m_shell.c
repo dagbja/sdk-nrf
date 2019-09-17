@@ -273,12 +273,8 @@ static int cmd_debug_fallback_disabled(const struct shell *shell, size_t argc, c
 
 static int cmd_lwm2m_register(const struct shell *shell, size_t argc, char **argv)
 {
-    if (lwm2m_state_get() == LWM2M_STATE_IP_INTERFACE_UP) {
-        if (lwm2m_security_bootstrapped_get(0)) {
-            lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT);
-        } else {
-            lwm2m_state_set(LWM2M_STATE_BS_CONNECT);
-        }
+    if (lwm2m_state_get() == LWM2M_STATE_DISCONNECTED) {
+        (void)lwm2m_request_register();
     } else if (lwm2m_state_get() == LWM2M_STATE_IDLE) {
         shell_print(shell, "Already registered");
     } else {
@@ -325,6 +321,18 @@ static int cmd_lwm2m_deregister(const struct shell *shell, size_t argc, char **a
 }
 
 
+static int cmd_lwm2m_disconnect(const struct shell *shell, size_t argc, char **argv)
+{
+    if (lwm2m_state_get() != LWM2M_STATE_DISCONNECTED) {
+        lwm2m_request_disconnect();
+    } else {
+        shell_print(shell, "Not connected");
+    }
+
+    return 0;
+}
+
+
 static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
 {
     char ip_version[] = "IPvX";
@@ -350,9 +358,6 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             break;
         case LWM2M_STATE_IDLE:
             // Already printed above
-            break;
-        case LWM2M_STATE_IP_INTERFACE_UP:
-            shell_print(shell, "Disconnected");
             break;
         case LWM2M_STATE_BS_CONNECT:
             shell_print(shell, "Bootstrap connecting [%s]", ip_version);
@@ -430,6 +435,9 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         case LWM2M_STATE_DISCONNECT:
             shell_print(shell, "Disconnect");
             break;
+        case LWM2M_STATE_DISCONNECTED:
+            shell_print(shell, "Disconnected");
+            break;
         case LWM2M_STATE_SHUTDOWN:
             shell_print(shell, "Shutdown");
             break;
@@ -493,6 +501,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_lwm2m,
     SHELL_CMD(register, NULL, "Register server", cmd_lwm2m_register),
     SHELL_CMD(update, NULL, "Update server", cmd_lwm2m_update),
     SHELL_CMD(deregister, NULL, "Deregister server", cmd_lwm2m_deregister),
+    SHELL_CMD(disconnect, NULL, "Disconnect server", cmd_lwm2m_disconnect),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );
 

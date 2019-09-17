@@ -31,16 +31,9 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
             lwm2m_bootstrap_clear();
             lwm2m_system_reset();
         }
-        else if (app_state == LWM2M_STATE_IP_INTERFACE_UP)
+        else if (app_state == LWM2M_STATE_DISCONNECTED)
         {
-            if (lwm2m_security_bootstrapped_get(0))
-            {
-                lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT);
-            }
-            else
-            {
-                lwm2m_state_set(LWM2M_STATE_BS_CONNECT);
-            }
+            lwm2m_request_register();
         }
         else if (app_state == LWM2M_STATE_IDLE)
         {
@@ -58,7 +51,7 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
         {
             app_state = LWM2M_STATE_SERVER_DEREGISTER;
         }
-        else if (app_state == LWM2M_STATE_IP_INTERFACE_UP)
+        else if (app_state == LWM2M_STATE_DISCONNECTED)
         {
             lwm2m_system_reset();
         }
@@ -76,7 +69,7 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
             *blink = DK_LED1_MSK;
             break;
 
-        case LWM2M_STATE_IP_INTERFACE_UP:
+        case LWM2M_STATE_DISCONNECTED:
             *on = DK_LED1_MSK;
             break;
 
