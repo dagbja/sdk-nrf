@@ -312,7 +312,7 @@ static int cmd_lwm2m_update(const struct shell *shell, size_t argc, char **argv)
 static int cmd_lwm2m_deregister(const struct shell *shell, size_t argc, char **argv)
 {
     if (lwm2m_state_get() == LWM2M_STATE_IDLE) {
-        lwm2m_state_set(LWM2M_STATE_SERVER_DEREGISTER);
+        lwm2m_request_deregister();
     } else {
         shell_print(shell, "Not registered");
     }

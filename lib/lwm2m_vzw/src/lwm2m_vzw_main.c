@@ -134,10 +134,17 @@ static uint32_t observable_pmax = 60;
 /* Structures for timers */
 static void *state_update_timer;
 
+typedef enum
+{
+    LWM2M_REQUEST_NONE,
+    LWM2M_REQUEST_UPDATE,
+    LWM2M_REQUEST_DEREGISTER
+} lwm2m_update_request_t;
+
 struct connection_update_t {
     void *timer;
     uint16_t instance_id;
-    bool requested;
+    lwm2m_update_request_t requested;
     bool reconnect;
 };
 
@@ -157,7 +164,6 @@ static volatile uint32_t tick_count = 0;
 
 static void app_init_connection_update(void);
 static void app_misc_data_set_bootstrapped(uint8_t bootstrapped);
-static void app_server_deregister(uint16_t instance_id);
 static void app_server_disconnect(uint16_t instance_id);
 static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
 static void app_provision_secret_keys(void);
@@ -197,8 +203,21 @@ static void app_offline(void)
 static bool lwm2m_is_registration_ready(void)
 {
     for (int i = 1; i < 1 + LWM2M_MAX_SERVERS; i++) {
-        if ((m_connection_update[i].instance_id != 0) && m_connection_update[i].requested) {
+        if ((m_connection_update[i].instance_id != 0) &&
+            (m_connection_update[i].requested == LWM2M_REQUEST_UPDATE)) {
             /* More registrations to come, not ready yet. */
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool lwm2m_is_deregistration_done(void)
+{
+    for (int i = 1; i < 1 + LWM2M_MAX_SERVERS; i++) {
+        if (lwm2m_server_registered_get(i)) {
+            // Still having registered servers
             return false;
         }
     }
@@ -227,7 +246,16 @@ bool lwm2m_request_register(void)
 void lwm2m_request_server_update(uint16_t instance_id, bool reconnect)
 {
     if (m_lwm2m_transport[instance_id] != -1 || reconnect) {
-        m_connection_update[instance_id].requested = true;
+        m_connection_update[instance_id].requested = LWM2M_REQUEST_UPDATE;
+    }
+}
+
+void lwm2m_request_deregister(void)
+{
+    for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
+        if (lwm2m_server_registered_get(i) && m_lwm2m_transport[i] != -1) {
+            m_connection_update[i].requested = LWM2M_REQUEST_DEREGISTER;
+        }
     }
 }
 
@@ -794,22 +822,10 @@ void lwm2m_notification(lwm2m_notification_type_t type,
         if (m_app_state == LWM2M_STATE_SERVER_DEREGISTERING)
         {
             LWM2M_INF("Deregistered (server %d)", instance_id);
-            uint8_t uri_len = 0;
-            for (int i = instance_id-1; i > 0; i--) {
-                if (m_lwm2m_transport[i] != -1) {
-                    // Only deregister from connected servers having a URI.
-                    (void)lwm2m_security_server_uri_get(i, &uri_len);
-                    if (uri_len > 0) {
-                        m_app_state = LWM2M_STATE_SERVER_DEREGISTER;
-                        m_server_instance = i;
-                        break;
-                    }
-                }
-            }
+            app_server_disconnect(instance_id);
 
-            if (uri_len == 0) {
-                // No more servers to deregister
-                m_app_state = LWM2M_STATE_DISCONNECT;
+            if (lwm2m_is_deregistration_done()) {
+                m_app_state = LWM2M_STATE_DISCONNECTED;
             }
         }
         else
@@ -1701,11 +1717,11 @@ static void app_check_server_update(void)
     }
 
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-        if (m_connection_update[i].requested) {
+        if (m_connection_update[i].requested != LWM2M_REQUEST_NONE) {
             if (m_lwm2m_transport[i] == -1) {
                 if (m_app_state == LWM2M_STATE_IDLE) {
                     m_server_instance = i;
-                    m_connection_update[i].requested = false;
+                    m_connection_update[i].requested = LWM2M_REQUEST_NONE;
 
 #if APP_USE_CONTABO
                     // On contabo we don't use client hold off timer
@@ -1724,9 +1740,16 @@ static void app_check_server_update(void)
 #endif
                 }
             } else if (lwm2m_server_registered_get(i)) {
-                LWM2M_INF("Server update (server %u)", i);
-                m_connection_update[i].requested = false;
-                app_server_update(i, false);
+                if (m_connection_update[i].requested == LWM2M_REQUEST_DEREGISTER) {
+                    m_server_instance = i;
+                    m_connection_update[i].requested = LWM2M_REQUEST_NONE;
+                    lwm2m_state_set(LWM2M_STATE_SERVER_DEREGISTER);
+                    break; // Break the loop to process the deregister
+                } else {
+                    LWM2M_INF("Server update (server %u)", i);
+                    m_connection_update[i].requested = LWM2M_REQUEST_NONE;
+                    app_server_update(i, false);
+                }
             }
         }
     }
