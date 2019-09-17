@@ -78,6 +78,9 @@
 
 #define APP_OPERATOR_ID_VZW             1                                                   /**< Operator id for Verizon SIM. */
 
+#define APP_NET_REG_STAT_HOME           1                                                   /**< Registered to home network. */
+#define APP_NET_REG_STAT_ROAM           5                                                   /**< Registered to roaming network. */
+
 static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
 
 /* Initialize config with default values. */
@@ -126,6 +129,7 @@ static volatile bool        m_did_bootstrap;
 static char m_imei[16];
 static char m_msisdn[16];
 static uint32_t m_operator_id;
+static uint32_t m_net_stat;
 
 // TODO: Use observable settings pr. resource
 static uint32_t observable_pmin = 15;
@@ -1970,6 +1974,42 @@ static void app_lwm2m_observer_process(void)
     lwm2m_firmware_observer_process();
 }
 
+uint32_t lwm2m_net_reg_stat_get(void)
+{
+    return m_net_stat;
+}
+
+void lwm2m_net_reg_stat_cb(uint32_t net_stat)
+{
+    if (m_net_stat != net_stat)
+    {
+        if (net_stat == APP_NET_REG_STAT_HOME)
+        {
+            // Home
+            // Check operator ID before connecting
+            at_read_operator_id(&m_operator_id);
+
+            if ((m_operator_id == APP_OPERATOR_ID_VZW) ||
+                lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK))
+            {
+                LWM2M_INF("Registered to home network: request register");
+                lwm2m_request_register();
+            }
+        }
+        else if (net_stat == APP_NET_REG_STAT_ROAM)
+        {
+            // Roaming
+            LWM2M_INF("Registered to roaming network: request disconnect");
+            lwm2m_request_disconnect();
+        }
+        m_net_stat = net_stat;
+    }
+    else
+    {
+        LWM2M_TRC("Network registration status (%d)", net_stat);
+    }
+}
+
 int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 {
     int err;
@@ -2037,20 +2077,6 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     // The lc module uses AT notifications.
     app_init_and_connect();
 
-    // Check operator ID
-    at_read_operator_id(&m_operator_id);
-
-    if (m_operator_id == APP_OPERATOR_ID_VZW) {
-        // Enable SMS.
-        lwm2m_sms_receiver_init();
-    }
-
-    if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6)) {
-        for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-            m_family_type[i] = AF_INET;
-        }
-    }
-
     // Initialize CoAP.
     app_coap_init();
 
@@ -2060,14 +2086,48 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     // Create LwM2M factory bootstraped objects.
     app_lwm2m_create_objects();
 
+    if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6)) {
+        for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+            m_family_type[i] = AF_INET;
+        }
+    }
+
+    // Check operator ID
+    at_read_operator_id(&m_operator_id);
+
+    if (m_operator_id == APP_OPERATOR_ID_VZW) {
+        // Enable SMS.
+        lwm2m_sms_receiver_init();
+    }
+
     if (m_operator_id == APP_OPERATOR_ID_VZW) {
         LWM2M_INF("PDN support enabled");
     } else {
         LWM2M_INF("PDN support disabled");
     }
 
+    // Check home or roam
+    (void)at_read_net_reg_stat(&m_net_stat);
+
+    at_subscribe_net_reg_stat(lwm2m_net_reg_stat_cb);
+
     m_app_state = LWM2M_STATE_DISCONNECTED;
-    (void) lwm2m_request_register();
+
+    if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK) == false) {
+        if (m_net_stat == APP_NET_REG_STAT_HOME && m_operator_id == APP_OPERATOR_ID_VZW)
+        {
+            // Registered to VZW home network, ok to connect
+            (void) lwm2m_request_register();
+        }
+        else
+        {
+            LWM2M_INF("Waiting for home network");
+        }
+    }
+    else
+    {
+        (void) lwm2m_request_register();
+    }
 
     return 0;
 }

@@ -10,6 +10,9 @@
 #include <stdbool.h>
 #include <lwm2m_api.h>
 
+
+typedef void (*at_net_reg_stat_cb_t)(uint32_t net_stat);
+
 /* TODO: Move APIs to modem interface modem with data model. */
 
 int mdm_interface_init(void);
@@ -33,5 +36,7 @@ int at_read_radio_signal_strength_and_link_quality(int32_t * p_signal_strength, 
 int at_read_cell_id(uint32_t * p_cell_id);
 int at_read_smnc_smcc(int32_t * p_smnc, int32_t *p_smcc);
 int at_read_time(int32_t * p_time, int32_t * p_utc_offset);
+
+void at_subscribe_net_reg_stat(at_net_reg_stat_cb_t net_reg_stat_cb);
 
 #endif // AT_INTERFACE_H__

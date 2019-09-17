@@ -62,4 +62,7 @@ void lwm2m_factory_reset(void);
 void lwm2m_system_shutdown(void);
 void lwm2m_system_reset(void);
 
+uint32_t lwm2m_net_reg_stat_get(void);
+void lwm2m_net_reg_stat_cb(uint32_t net_stat);
+
 #endif // LWM2M_VZW_MAIN_H__

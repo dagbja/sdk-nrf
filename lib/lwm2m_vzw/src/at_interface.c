@@ -47,11 +47,15 @@ static volatile bool cid_ipv6_table[12];
 typedef int (*at_notif_handler)(char* evt);
 
 static int at_cgev_handler(char *notif);
+static int at_cereg_handler(char *notif);
 
 static const at_notif_handler at_handlers[] = {
-    at_cgev_handler,         ///< Parse AT CGEV events for PDN/IPv6.
-    sms_receiver_notif_parse ///< Parse received SMS events.
+    at_cgev_handler,          ///< Parse AT CGEV events for PDN/IPv6.
+    sms_receiver_notif_parse, ///< Parse received SMS events.
+    at_cereg_handler          ///< Parse AT CEREG events
 };
+
+at_net_reg_stat_cb_t m_net_reg_stat_cb;
 
 static int at_send_command_and_parse_params(const char * p_at_command, struct at_param_list * p_param_list)
 {
@@ -70,7 +74,7 @@ static int at_send_command_and_parse_params(const char * p_at_command, struct at
         retval = at_parser_params_from_str(p_start, p_param_list);
         if (retval != 0)
         {
-            LWM2M_ERR("at_parser (%s) failed", p_at_command);
+            LWM2M_ERR("at_parser (%s) failed", lwm2m_os_log_strdup(p_at_command));
             retval = EINVAL;
         }
     } else {
@@ -158,6 +162,61 @@ static int at_cgev_handler(char *notif)
     }
 
     // Not a CGEV event.
+    return -1;
+}
+
+static int at_cereg_handler(char *notif)
+{
+    int retval = 0;
+    struct at_param_list cereg_params;
+
+    // Check if this is a CGEV event.
+    int length = strlen(notif);
+    if (length >= 8 && strncmp(notif, "+CEREG: ", 7) == 0)
+    {
+        cereg_params.params = NULL;
+        retval = at_params_list_init(&cereg_params, 2);
+
+        if (retval == 0) {
+            char * p_start = notif;
+            char * p_command_end = strchr(notif, ':');
+            if (p_command_end) {
+                p_start = p_command_end+1;
+            }
+            retval = at_parser_params_from_str(p_start, &cereg_params);
+            if (retval == 0)
+            {
+                u16_t net_reg_stat;
+                if (at_params_short_get(&cereg_params, 0, &net_reg_stat) == 0)
+                {
+                    if (m_net_reg_stat_cb != NULL)
+                    {
+                        m_net_reg_stat_cb((uint32_t)net_reg_stat);
+                    }
+                    else
+                    {
+                        LWM2M_ERR("No net stat cb");
+                    }
+                }
+                else
+                {
+                    LWM2M_ERR("failed to get net stat (%s)", lwm2m_os_log_strdup(notif));
+                }
+            }
+            else
+            {
+                LWM2M_ERR("at_parser (%s) failed", lwm2m_os_log_strdup(notif));
+                retval = EINVAL;
+            }
+        } else {
+            LWM2M_ERR("cereg param list init failed: %d", (int)retval);
+        }
+
+        // CEREG event parsed.
+        return 0;
+    }
+
+    // Not a CEREG event.
     return -1;
 }
 
@@ -534,6 +593,19 @@ int at_read_operator_id(uint32_t  *p_operator_id)
     }
 
     return retval;
+}
+
+void at_subscribe_net_reg_stat(at_net_reg_stat_cb_t net_reg_stat_cb)
+{
+    int retval = 0;
+
+    m_net_reg_stat_cb = net_reg_stat_cb;
+
+    retval = at_cmd_write("AT+CEREG=2", NULL, 0, NULL);
+
+    if (retval != 0) {
+        LWM2M_ERR("AT+CEREG=2 failed: %d", (int)retval);
+    }
 }
 
 int at_read_net_reg_stat(uint32_t * p_net_stat)

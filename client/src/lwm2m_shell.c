@@ -147,6 +147,7 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "  IPv6 enabled   %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6) ? "No" : "Yes");
     shell_print(shell, "  IP fallback    %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_FALLBACK) ? "No" : "Yes");
     shell_print(shell, "  SMS Counter    %u", lwm2m_sms_receive_counter());
+    shell_print(shell, "  Network status %u", lwm2m_net_reg_stat_get());
 
     return 0;
 }
@@ -213,6 +214,29 @@ static int cmd_debug_carrier_check(const struct shell *shell, size_t argc, char 
     }
 
     shell_print(shell, "Set carrier check: %d", carrier_check);
+
+    return 0;
+}
+
+static int cmd_debug_set_net_reg_stat(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s <value>", argv[0]);
+        shell_print(shell, " 1 = home");
+        shell_print(shell, " 5 = roam");
+        return 0;
+    }
+
+    int net_reg_stat = atoi(argv[1]);
+
+    if (net_reg_stat != 1 && net_reg_stat != 5) {
+        shell_print(shell, "invalid value, must be 1 or 5");
+        return 0;
+    }
+
+    lwm2m_net_reg_stat_cb(net_reg_stat);
+
+    shell_print(shell, "Set network registration status: %d", net_reg_stat);
 
     return 0;
 }
@@ -492,6 +516,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(carrier_check, NULL, "Set carrier check", cmd_debug_carrier_check),
     SHELL_CMD(ipv6_enable, NULL, "Set IPv6 enabled", cmd_debug_ipv6_enabled),
     SHELL_CMD(fallback, NULL, "Set IP Fallback", cmd_debug_fallback_disabled),
+    SHELL_CMD(net_reg_stat, NULL, "Set network registration status", cmd_debug_set_net_reg_stat),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );
 
