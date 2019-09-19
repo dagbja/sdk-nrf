@@ -151,8 +151,9 @@ uint32_t lwm2m_plain_text_device_decode(lwm2m_device_t * p_device,
     {
         case LWM2M_DEVICE_CURRENT_TIME:
         {
+            // Work around a bug in Motive framework by restricting to maximum 10 characters
             err_code = lwm2m_plain_text_to_int32(p_buffer,
-                                                 buffer_len,
+                                                 MIN(buffer_len, 10),
                                                  &p_device->current_time);
             break;
         }
