@@ -16,18 +16,42 @@ LOG_MODULE_REGISTER(LOG_MODULE_NAME);
 #include <at_cmd.h>
 #include <lwm2m_vzw_main.h>
 
-static uint32_t receive_count = 0;
+static bool sms_initialized;
+static uint32_t receive_count;
 
-int32_t lwm2m_sms_receiver_init(void)
+int32_t lwm2m_sms_receiver_enable(void)
 {
-    LOG_INF("Initializing SMS receiver.");
+    if (!sms_initialized) {
+        LOG_INF("Enable SMS receiver");
 
-    // Selects how new messages are indicated.
-    int err = at_cmd_write("AT+CNMI=3,2,0,1", NULL, 0, NULL);
+        // Selects how new messages are indicated.
+        int err = at_cmd_write("AT+CNMI=3,2,0,1", NULL, 0, NULL);
 
-    if (err) {
-        LOG_ERR("Unable to initializing SMS receiver AT error %d.", err);
-        return err;
+        if (err) {
+            LOG_ERR("Unable to enable SMS receiver, AT error %d", err);
+            return err;
+        }
+
+        sms_initialized = true;
+    }
+
+    return 0;
+}
+
+int32_t lwm2m_sms_receiver_disable(void)
+{
+    if (sms_initialized) {
+        LOG_INF("Disable SMS receiver");
+
+        // Turn off SMS indication.
+        int err = at_cmd_write("AT+CNMI=0", NULL, 0, NULL);
+
+        if (err) {
+            LOG_ERR("Unable to disable SMS receiver, AT error %d", err);
+            return err;
+        }
+
+        sms_initialized = false;
     }
 
     return 0;

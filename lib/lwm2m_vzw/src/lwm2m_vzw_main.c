@@ -79,9 +79,10 @@
 #define APP_OPERATOR_ID_VZW             1                                                   /**< Operator id for Verizon SIM. */
 
 #define APP_NET_REG_STAT_HOME           1                                                   /**< Registered to home network. */
+#define APP_NET_REG_STAT_SEARCHING      2                                                   /**< Searching an operator to register. */
 #define APP_NET_REG_STAT_ROAM           5                                                   /**< Registered to roaming network. */
 
-#define APP_CLIENT_ID_MIN_LENGTH        43                                                  /**< Minimum buffer size to store the Client ID. */
+#define APP_CLIENT_ID_LENGTH            128                                                 /**< Buffer size to store the Client ID. */
 
 static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
 
@@ -134,7 +135,7 @@ static char m_imei[16];
 /**
  * @brief Subscriber number (MSISDN) stored as a NULL-terminated String.
  * Number with max 15 digits. Length varies depending on the operator and country.
- * Motive test allows only 10 digits.
+ * VZW allows only 10 digits.
  */
 static char m_msisdn[16];
 
@@ -176,7 +177,6 @@ static struct sockaddr m_bs_remote_server;                                      
 static struct sockaddr m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
 static volatile uint32_t tick_count = 0;
 
-static void app_init_connection_update(void);
 static void app_misc_data_set_bootstrapped(uint8_t bootstrapped);
 static void app_server_disconnect(uint16_t instance_id);
 static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
@@ -197,6 +197,22 @@ static void app_event_notify(uint32_t type, void * data)
     lwm2m_carrier_event_handler(&event);
 }
 
+static bool lwm2m_state_set(lwm2m_state_t app_state)
+{
+    // Do not allow state change if network state has changed.
+    // This may have happened during a blocking socket operation, typically
+    // connect(), and then we must abort any ongoing state changes.
+    if ((m_app_state == LWM2M_STATE_REQUEST_CONNECT) ||
+        (m_app_state == LWM2M_STATE_REQUEST_DISCONNECT))
+    {
+        return false;
+    }
+
+    m_app_state = app_state;
+
+    return true;
+}
+
 static void app_init_and_connect(void)
 {
     lte_lc_init_and_connect();
@@ -206,11 +222,22 @@ static void app_init_and_connect(void)
     // and link controller module is done.
     // AT notifications are now process by the Modem AT interface.
     (void)mdm_interface_init();
+
+    // Because lte_lc_init_and_connect() will suspend net_reg_stat notifications
+    // this must be read again.
+    uint32_t net_stat;
+    (void)at_read_net_reg_stat(&net_stat);
+    lwm2m_net_reg_stat_cb(net_stat);
 }
 
 static void app_offline(void)
 {
     app_event_notify(LWM2M_CARRIER_EVENT_DISCONNECT, NULL);
+
+    // Set state to DISCONNECTED to avoid detecting "no registered network"
+    // when provisioning security keys.
+    lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
+
     lte_lc_offline();
 }
 
@@ -218,7 +245,8 @@ static bool lwm2m_is_registration_ready(void)
 {
     for (int i = 1; i < 1 + LWM2M_MAX_SERVERS; i++) {
         if ((m_connection_update[i].instance_id != 0) &&
-            (m_connection_update[i].requested == LWM2M_REQUEST_UPDATE)) {
+            (m_connection_update[i].requested == LWM2M_REQUEST_UPDATE))
+        {
             /* More registrations to come, not ready yet. */
             return false;
         }
@@ -240,21 +268,10 @@ static bool lwm2m_is_deregistration_done(void)
 }
 
 /** Functions available from shell access */
-bool lwm2m_request_register(void)
+
+void lwm2m_request_connect(void)
 {
-    if (m_app_state != LWM2M_STATE_DISCONNECTED) {
-        // Not disconnected
-        return false;
-    }
-
-    if (lwm2m_security_bootstrapped_get(0)) {
-        lwm2m_state_set(LWM2M_STATE_IDLE);
-        app_init_connection_update();
-    } else {
-        lwm2m_state_set(LWM2M_STATE_BS_CONNECT);
-    }
-
-    return true;
+    m_app_state = LWM2M_STATE_REQUEST_CONNECT;
 }
 
 void lwm2m_request_server_update(uint16_t instance_id, bool reconnect)
@@ -275,7 +292,10 @@ void lwm2m_request_deregister(void)
 
 void lwm2m_request_disconnect(void)
 {
-    m_app_state = LWM2M_STATE_DISCONNECT;
+    // Only request disconnect if not already disconnected
+    if (m_app_state != LWM2M_STATE_DISCONNECTED) {
+        m_app_state = LWM2M_STATE_REQUEST_DISCONNECT;
+    }
 }
 
 void lwm2m_observable_pmin_set(uint32_t pmin)
@@ -291,16 +311,6 @@ void lwm2m_observable_pmax_set(uint32_t pmax)
 lwm2m_state_t lwm2m_state_get(void)
 {
     return m_app_state;
-}
-
-bool lwm2m_state_set(lwm2m_state_t app_state)
-{
-    if (m_app_state != LWM2M_STATE_DISCONNECT) {
-        m_app_state = app_state;
-        return true;
-    }
-
-    return false;
 }
 
 char *lwm2m_imei_get(void)
@@ -326,7 +336,7 @@ char *lwm2m_msisdn_get(void)
         p_msisdn = &m_msisdn[len - 10];
     }
 
-    // MSISDN is used to generate the Client ID. Must be 10 digits for Motive testing.
+    // MSISDN is used to generate the Client ID. Must be 10 digits in VZW.
     __ASSERT(strlen(p_msisdn) == 10, "Invalid MSISDN length");
     return p_msisdn;
 }
@@ -421,56 +431,50 @@ static void app_vzw_sha256_psk(char *p_imei, uint16_t short_server_id, char *p_p
  * @brief Generate a unique Client ID using device IMEI and MSISDN if available.
  * Factory reset to start bootstrap if MSISDN is different than last start.
  */
-static int app_generate_client_id(char * const p_client_id, size_t client_id_len)
+static int app_generate_client_id(void)
 {
+    char client_id[APP_CLIENT_ID_LENGTH];
     char last_used_msisdn[128];
     bool provision_bs_psk = false;
     bool provision_diag_psk = false;
 
-    if (p_client_id == NULL || client_id_len < APP_CLIENT_ID_MIN_LENGTH)
-    {
-        return EINVAL;
-    }
+    // Read MSISDN, this may have changed since last LTE connect.
+    int ret = at_read_msisdn(m_msisdn, sizeof(m_msisdn));
 
-    int ret = at_read_imei(m_imei, sizeof(m_imei));
     if (ret != 0)
     {
-        // IMEI is required to generate a unique Client ID. Cannot continue.
-        LWM2M_ERR("Unable to read IMEI. Cannot generate Client ID. Exit!");
-        return EIO;
-    }
-
-    ret = at_read_msisdn(m_msisdn, sizeof(m_msisdn));
-    if (ret != 0)
-    {
-        if (m_operator_id == APP_OPERATOR_ID_VZW) {
+        if (m_operator_id == APP_OPERATOR_ID_VZW)
+        {
             // MSISDN is mandatory on VZW network. Cannot continue.
-            LWM2M_ERR("No MSISDN available on VZW network. Exit!");
+            LWM2M_ERR("No MSISDN available, cannot generate client ID");
             return EACCES;
         }
-        else if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
+        else if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK))
+        {
             // If no MSISDN is available, use part of IMEI to generate a unique Client ID.
             // This is not allowed on VZW network. Use for testing purposes only.
-            LWM2M_WRN("No MSISDN available. Generate a Client ID using part of IMEI instead.");
+            LWM2M_WRN("No MSISDN available, generating a client ID using part of IMEI");
             memcpy(m_msisdn, &m_imei[5], 10);
             m_msisdn[10] = '\0';
         }
-        else {
+        else
+        {
             // No MSISDN available to generate a unique Client ID.
-            // Project configuration has to be changed to disable carrier check.
+            LWM2M_ERR("No MSISDN available");
             return EACCES;
         }
     }
 
-    // Get the MSISDN with correct format for Motive.
+    // Get the MSISDN with correct format for VZW.
     char * p_msisdn = lwm2m_msisdn_get();
 
     int32_t len = lwm2m_last_used_msisdn_get(last_used_msisdn, sizeof(last_used_msisdn));
     if (len > 0) {
         if (strlen(p_msisdn) > 0 && strcmp(p_msisdn, last_used_msisdn) != 0) {
             // MSISDN has changed, factory reset and initiate bootstrap.
-            LWM2M_INF("New MSISDN detected: %s -> %s.", lwm2m_os_log_strdup(last_used_msisdn), lwm2m_os_log_strdup(p_msisdn));
+            LWM2M_INF("New MSISDN detected: %s -> %s", lwm2m_os_log_strdup(last_used_msisdn), lwm2m_os_log_strdup(p_msisdn));
             lwm2m_bootstrap_clear();
+            lwm2m_retry_delay_reset(0);
             lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
             provision_bs_psk = true;
         }
@@ -481,13 +485,13 @@ static int app_generate_client_id(char * const p_client_id, size_t client_id_len
     }
 
     // Generate a unique Client ID based on IMEI and MSISDN.
-    snprintf(p_client_id, client_id_len, "urn:imei-msisdn:%s-%s", lwm2m_imei_get(), p_msisdn);
-    LWM2M_INF("Client ID '%s'.", lwm2m_os_log_strdup(p_client_id));
+    snprintf(client_id, sizeof(client_id), "urn:imei-msisdn:%s-%s", lwm2m_imei_get(), p_msisdn);
+    LWM2M_INF("Client ID: %s", lwm2m_os_log_strdup(client_id));
 
     if (provision_bs_psk || provision_diag_psk) {
         app_offline();
         if (provision_bs_psk) {
-            app_provision_psk(APP_BOOTSTRAP_SEC_TAG, p_client_id, strlen(p_client_id),
+            app_provision_psk(APP_BOOTSTRAP_SEC_TAG, client_id, strlen(client_id),
                               m_app_config.psk, m_app_config.psk_length);
         }
         if (provision_diag_psk) {
@@ -498,6 +502,10 @@ static int app_generate_client_id(char * const p_client_id, size_t client_id_len
         }
         app_init_and_connect();
     }
+
+    memcpy(&m_client_id.value.imei_msisdn[0], client_id, strlen(client_id));
+    m_client_id.len  = strlen(client_id);
+    m_client_id.type = LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN;
 
     return 0;
 }
@@ -790,9 +798,9 @@ void lwm2m_notification(lwm2m_notification_type_t type,
 #endif
     LWM2M_INF("Got LWM2M notification %s  CoAP %d.%02d  err:%lu", str_type[type], coap_code >> 5, coap_code & 0x1f, err_code);
 
-    if ((m_app_state == LWM2M_STATE_DISCONNECT) ||
+    if ((m_app_state == LWM2M_STATE_REQUEST_DISCONNECT) ||
         (m_app_state == LWM2M_STATE_DISCONNECTED)) {
-        // Disconnecting or disconnected, ignore the notification
+        // Disconnect requested or disconnected, ignore the notification
         return;
     }
 
@@ -1028,9 +1036,6 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 
     app_event_notify(LWM2M_CARRIER_EVENT_BOOTSTRAPPED, NULL);
 
-    lwm2m_state_set(LWM2M_STATE_IDLE);
-    app_init_connection_update();
-
     return 0;
 }
 
@@ -1145,6 +1150,7 @@ static void app_misc_data_set_bootstrapped(uint8_t bootstrapped)
 void lwm2m_bootstrap_clear(void)
 {
     app_misc_data_set_bootstrapped(0);
+    lwm2m_security_bootstrapped_set(0, false);
 }
 
 void lwm2m_bootstrap_reset(void)
@@ -1248,7 +1254,7 @@ static void app_lwm2m_create_objects(void)
  *          of existing instances. If bootstrap is not performed, the registration to the server
  *          will use what is initialized in this function.
  */
-static int app_lwm2m_setup(void)
+static void app_lwm2m_setup(void)
 {
     (void)lwm2m_init(lwm2m_os_malloc, lwm2m_os_free);
     (void)lwm2m_remote_init();
@@ -1273,19 +1279,37 @@ static int app_lwm2m_setup(void)
 
     // Add firmware support.
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_firmware_get_object());
+}
 
-    // Generate a unique Client ID.
-    char client_id[APP_CLIENT_ID_MIN_LENGTH];
-    int err = app_generate_client_id(client_id, sizeof(client_id));
-    if (err)
+static void app_connect(void)
+{
+    // First ensure all existing connections are disconnected.
+    app_disconnect();
+
+    // Check if operator ID has changed.
+    at_read_operator_id(&m_operator_id);
+
+    if (((m_net_stat == APP_NET_REG_STAT_HOME) && (m_operator_id == APP_OPERATOR_ID_VZW)) ||
+         lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK))
     {
-        return err;
-    }
+        LWM2M_INF("Registered to home network");
+        if (m_operator_id == APP_OPERATOR_ID_VZW) {
+            lwm2m_sms_receiver_enable();
+        }
 
-    m_client_id.len = strlen(client_id);
-    m_client_id.type = LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN;
-    memcpy(m_client_id.value.imei_msisdn, client_id, m_client_id.len);
-    return 0;
+        // Generate a unique Client ID.
+        if (app_generate_client_id() != 0) {
+            lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
+        } else if (lwm2m_security_bootstrapped_get(0)) {
+            lwm2m_state_set(LWM2M_STATE_IDLE);
+            app_init_connection_update();
+        } else {
+            lwm2m_state_set(LWM2M_STATE_BS_CONNECT);
+        }
+    } else {
+        LWM2M_INF("Waiting for home network");
+        lwm2m_sms_receiver_disable();
+    }
 }
 
 static void app_bootstrap_connect(void)
@@ -1427,6 +1451,9 @@ static void app_server_connect(uint16_t instance_id)
 
     // Set the short server id of the server in the config.
     m_server_conf[instance_id].short_server_id = lwm2m_server_short_server_id_get(instance_id);
+
+    // Deregister the short_server_id in case it has been registered with a different address
+    (void) lwm2m_remote_deregister(m_server_conf[instance_id].short_server_id);
 
     uint8_t uri_len = 0;
     char * p_server_uri = lwm2m_security_server_uri_get(instance_id, &uri_len);
@@ -1636,6 +1663,7 @@ static void app_disconnect(void)
         app_server_disconnect(i);
     }
 
+    lwm2m_sms_receiver_disable();
     m_app_state = LWM2M_STATE_DISCONNECTED;
 }
 
@@ -1740,10 +1768,12 @@ static bool app_coap_socket_poll(void)
 
         if ((fds[i].revents & POLLERR) == POLLERR) {
             // Error condition.
+            lwm2m_state_t next_state;
+
             if (m_app_state == LWM2M_STATE_BS_CONNECT_WAIT) {
-                lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT);
+                next_state = LWM2M_STATE_BS_CONNECT_RETRY_WAIT;
             } else if (m_app_state == LWM2M_STATE_SERVER_CONNECT_WAIT) {
-                lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT);
+                next_state = LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT;
             } else {
                 // TODO handle?
                 LWM2M_ERR("POLLERR: %d", i);
@@ -1763,7 +1793,7 @@ static bool app_coap_socket_poll(void)
             LWM2M_INF("Connection failed (%d)", error);
             lwm2m_disconnect_admin_pdn(m_server_instance);
 
-            if (m_app_state != LWM2M_STATE_DISCONNECT) {
+            if (lwm2m_state_set(next_state)) {
                 // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
                 if (error == EINVAL || error == EOPNOTSUPP || error == ENETUNREACH) {
                     app_handle_connect_retry(m_server_instance, true);
@@ -1785,9 +1815,9 @@ static bool app_coap_socket_poll(void)
 
 static void app_check_server_update(void)
 {
-    if ((m_app_state == LWM2M_STATE_DISCONNECT) ||
+    if ((m_app_state == LWM2M_STATE_REQUEST_DISCONNECT) ||
         (m_app_state == LWM2M_STATE_DISCONNECTED)) {
-        // Disconnecting or disconnected, nothing to check
+        // Disconnect requested or disconnected, nothing to check
         return;
     }
 
@@ -1842,6 +1872,11 @@ static void app_lwm2m_process(void)
 
     switch (m_app_state)
     {
+        case LWM2M_STATE_REQUEST_CONNECT:
+        {
+            app_connect();
+            break;
+        }
         case LWM2M_STATE_BS_CONNECT:
         {
             LWM2M_INF("Bootstrap connect");
@@ -1903,7 +1938,7 @@ static void app_lwm2m_process(void)
             app_server_deregister(m_server_instance);
             break;
         }
-        case LWM2M_STATE_DISCONNECT:
+        case LWM2M_STATE_REQUEST_DISCONNECT:
         {
             LWM2M_INF("Disconnect");
             app_disconnect();
@@ -2052,22 +2087,21 @@ void lwm2m_net_reg_stat_cb(uint32_t net_stat)
         if (net_stat == APP_NET_REG_STAT_HOME)
         {
             // Home
-            // Check operator ID before connecting
-            at_read_operator_id(&m_operator_id);
-
-            if ((m_operator_id == APP_OPERATOR_ID_VZW) ||
-                lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK))
-            {
-                LWM2M_INF("Registered to home network: request register");
-                lwm2m_request_register();
-            }
+            lwm2m_request_connect();
         }
         else if (net_stat == APP_NET_REG_STAT_ROAM)
         {
             // Roaming
-            LWM2M_INF("Registered to roaming network: request disconnect");
+            LWM2M_INF("Registered to roaming network");
             lwm2m_request_disconnect();
         }
+        else if (net_stat != APP_NET_REG_STAT_SEARCHING)
+        {
+            // Not registered
+            LWM2M_INF("No network (%d)", net_stat);
+            lwm2m_request_disconnect();
+        }
+
         m_net_stat = net_stat;
     }
     else
@@ -2145,17 +2179,27 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 
     // Set-phone-functionality. Blocking call until we are connected.
     // The lc module uses AT notifications.
+    lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
     app_init_and_connect();
+
+    // Register network registration status changes
+    at_subscribe_net_reg_stat(lwm2m_net_reg_stat_cb);
+
+    // Read IMEI, which is a static value and will never change.
+    int ret = at_read_imei(m_imei, sizeof(m_imei));
+
+    if (ret != 0)
+    {
+        // IMEI is required to generate a unique Client ID. Cannot continue.
+        LWM2M_ERR("Unable to read IMEI, cannot generate client ID");
+        return EIO;
+    }
 
     // Initialize CoAP.
     app_coap_init();
 
     // Setup LWM2M endpoints.
-    err = app_lwm2m_setup();
-    if (err) {
-        LWM2M_ERR("Unable to generate a Client ID.");
-        return -err;
-    }
+    app_lwm2m_setup();
 
     // Create LwM2M factory bootstrapped objects.
     app_lwm2m_create_objects();
@@ -2164,43 +2208,6 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
         for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
             m_family_type[i] = AF_INET;
         }
-    }
-
-    // Check operator ID
-    at_read_operator_id(&m_operator_id);
-
-    if (m_operator_id == APP_OPERATOR_ID_VZW) {
-        // Enable SMS.
-        lwm2m_sms_receiver_init();
-    }
-
-    if (m_operator_id == APP_OPERATOR_ID_VZW) {
-        LWM2M_INF("PDN support enabled");
-    } else {
-        LWM2M_INF("PDN support disabled");
-    }
-
-    // Check home or roam
-    (void)at_read_net_reg_stat(&m_net_stat);
-
-    at_subscribe_net_reg_stat(lwm2m_net_reg_stat_cb);
-
-    m_app_state = LWM2M_STATE_DISCONNECTED;
-
-    if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK) == false) {
-        if (m_net_stat == APP_NET_REG_STAT_HOME && m_operator_id == APP_OPERATOR_ID_VZW)
-        {
-            // Registered to VZW home network, ok to connect
-            (void) lwm2m_request_register();
-        }
-        else
-        {
-            LWM2M_INF("Waiting for home network");
-        }
-    }
-    else
-    {
-        (void) lwm2m_request_register();
     }
 
     return 0;

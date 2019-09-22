@@ -15,7 +15,14 @@
  *
  * @return 0 if success or and error if the AT command to enable SMS failed.
  */
-int32_t lwm2m_sms_receiver_init(void);
+int32_t lwm2m_sms_receiver_enable(void);
+
+/**
+ * @brief Disable SMS support using an AT command.
+ *
+ * @return 0 if success or and error if the AT command to enable SMS failed.
+ */
+int32_t lwm2m_sms_receiver_disable(void);
 
 /**
  * @brief Parse an AT notification and decode its content if possible.

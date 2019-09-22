@@ -222,15 +222,17 @@ static int cmd_debug_set_net_reg_stat(const struct shell *shell, size_t argc, ch
 {
     if (argc != 2) {
         shell_print(shell, "%s <value>", argv[0]);
+        shell_print(shell, " 0 = offline");
         shell_print(shell, " 1 = home");
-        shell_print(shell, " 5 = roam");
+        shell_print(shell, " 2 = search");
+        shell_print(shell, " 5 = roaming");
         return 0;
     }
 
     int net_reg_stat = atoi(argv[1]);
 
-    if (net_reg_stat != 1 && net_reg_stat != 5) {
-        shell_print(shell, "invalid value, must be 1 or 5");
+    if (net_reg_stat < 0 || net_reg_stat > 5) {
+        shell_print(shell, "invalid value, must be between 0 and 5");
         return 0;
     }
 
@@ -298,7 +300,7 @@ static int cmd_debug_fallback_disabled(const struct shell *shell, size_t argc, c
 static int cmd_lwm2m_register(const struct shell *shell, size_t argc, char **argv)
 {
     if (lwm2m_state_get() == LWM2M_STATE_DISCONNECTED) {
-        (void)lwm2m_request_register();
+        lwm2m_request_connect();
     } else if (lwm2m_state_get() == LWM2M_STATE_IDLE) {
         shell_print(shell, "Already registered");
     } else {
@@ -383,6 +385,9 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         case LWM2M_STATE_IDLE:
             // Already printed above
             break;
+        case LWM2M_STATE_REQUEST_CONNECT:
+            shell_print(shell, "Request connect");
+            break;
         case LWM2M_STATE_BS_CONNECT:
             shell_print(shell, "Bootstrap connecting [%s]", ip_version);
             break;
@@ -456,8 +461,8 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         case LWM2M_STATE_SERVER_DEREGISTERING:
             shell_print(shell, "Server %d deregistering", lwm2m_server_instance());
             break;
-        case LWM2M_STATE_DISCONNECT:
-            shell_print(shell, "Disconnect");
+        case LWM2M_STATE_REQUEST_DISCONNECT:
+            shell_print(shell, "Request disconnect");
             break;
         case LWM2M_STATE_DISCONNECTED:
             shell_print(shell, "Disconnected");

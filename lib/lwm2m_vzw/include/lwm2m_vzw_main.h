@@ -12,6 +12,7 @@ typedef enum
 {
     LWM2M_STATE_BOOTING,
     LWM2M_STATE_IDLE,
+    LWM2M_STATE_REQUEST_CONNECT,
     LWM2M_STATE_BS_CONNECT,
     LWM2M_STATE_BS_CONNECT_WAIT,
     LWM2M_STATE_BS_CONNECT_RETRY_WAIT,
@@ -28,7 +29,7 @@ typedef enum
     LWM2M_STATE_SERVER_REGISTER_WAIT,
     LWM2M_STATE_SERVER_DEREGISTER,
     LWM2M_STATE_SERVER_DEREGISTERING,
-    LWM2M_STATE_DISCONNECT,
+    LWM2M_STATE_REQUEST_DISCONNECT,
     LWM2M_STATE_DISCONNECTED,
     LWM2M_STATE_MODEM_FIRMWARE_UPDATE,
     LWM2M_STATE_SHUTDOWN,
@@ -42,7 +43,6 @@ void lwm2m_observable_pmin_set(uint32_t pmin);
 void lwm2m_observable_pmax_set(uint32_t pmax);
 
 lwm2m_state_t lwm2m_state_get(void);
-bool lwm2m_state_set(lwm2m_state_t lwm2m_state);
 
 /**
  * @brief Get device IMEI that we can use as a unique serial number.
@@ -58,7 +58,7 @@ char *lwm2m_msisdn_get(void);
 
 bool lwm2m_is_admin_pdn_ready(void);
 
-bool lwm2m_request_register(void);
+void lwm2m_request_connect(void);
 void lwm2m_request_server_update(uint16_t instance_id, bool reconnect);
 void lwm2m_request_deregister(void);
 void lwm2m_request_disconnect(void);

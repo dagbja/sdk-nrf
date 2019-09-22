@@ -33,7 +33,7 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
         }
         else if (app_state == LWM2M_STATE_DISCONNECTED)
         {
-            lwm2m_request_register();
+            lwm2m_request_connect();
         }
         else if (app_state == LWM2M_STATE_IDLE)
         {
@@ -126,9 +126,10 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
             *on = (DK_LED1_MSK | DK_LED3_MSK);
             break;
 
+        case LWM2M_STATE_REQUEST_CONNECT:
         case LWM2M_STATE_SERVER_DEREGISTER:
         case LWM2M_STATE_SERVER_DEREGISTERING:
-        case LWM2M_STATE_DISCONNECT:
+        case LWM2M_STATE_REQUEST_DISCONNECT:
             *on = DK_LED3_MSK;
             *blink = DK_LED1_MSK;
             break;
