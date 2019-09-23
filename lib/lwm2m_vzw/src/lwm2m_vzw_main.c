@@ -157,7 +157,7 @@ static bool m_registration_ready;
 
 /* Resolved server addresses */
 #if APP_USE_CONTABO
-static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET, AF_INET, 0, AF_INET };     /**< Current IP versions, start using IPv6. */
+static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET, AF_INET, AF_INET, AF_INET };      /**< Current IP versions, start using IPv6. */
 #else
 static sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { AF_INET6, AF_INET6, AF_INET6, AF_INET6 };  /**< Current IP versions, start using IPv6. */
 #endif
@@ -1887,11 +1887,6 @@ static void app_coap_init(void)
     {
         m_lwm2m_transport[i] = -1;
     }
-
-#if APP_USE_CONTABO
-    m_lwm2m_transport[1] = local_port_list[1].transport;
-    ARG_UNUSED(m_lwm2m_transport);
-#endif
 }
 
 static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len)
@@ -2015,6 +2010,9 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     int err;
     enum lwm2m_firmware_update_state mdfu;
 
+#if APP_USE_CONTABO
+    // No support for setting custom bootstrap_uri.
+#else
     if ((config != NULL) && (config->bootstrap_uri != NULL)) {
         m_app_config.bootstrap_uri = config->bootstrap_uri;
     }
@@ -2023,6 +2021,7 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
         m_app_config.psk        = config->psk;
         m_app_config.psk_length = config->psk_length;
     }
+#endif
 
     app_timers_init();
 
