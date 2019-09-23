@@ -408,7 +408,9 @@ static void lwm2m_setup_admin_pdn(uint16_t instance_id)
 /**@brief Disconnect ADMIN PDN connection. */
 static void lwm2m_disconnect_admin_pdn(uint16_t instance_id)
 {
-    if (m_admin_pdn_handle != -1) {
+    if ((m_use_admin_pdn[instance_id]) &&
+        (m_admin_pdn_handle != -1))
+    {
         pdn_disconnect(m_admin_pdn_handle);
         m_admin_pdn_handle = -1;
     }
@@ -883,6 +885,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             // No response from update request
             LWM2M_INF("Update timeout, reconnect (server %d)", instance_id);
             app_server_disconnect(instance_id);
+            lwm2m_disconnect_admin_pdn(instance_id);
             lwm2m_request_server_update(instance_id, true);
         } else if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT) {
             // Update instead of register during connect
@@ -1604,6 +1607,7 @@ void app_server_update(uint16_t instance_id, bool connect_update)
         if (err_code != 0) {
             LWM2M_INF("Update failed: %ld (%d), reconnect (server %d)", err_code, errno, instance_id);
             app_server_disconnect(instance_id);
+            lwm2m_disconnect_admin_pdn(instance_id);
             lwm2m_request_server_update(instance_id, true);
         } else if (connect_update) {
             if (!lwm2m_state_set(LWM2M_STATE_SERVER_REGISTER_WAIT)) {
@@ -1652,8 +1656,6 @@ static void app_server_disconnect(uint16_t instance_id)
         coap_security_destroy(m_lwm2m_transport[instance_id]);
         m_lwm2m_transport[instance_id] = -1;
     }
-
-    lwm2m_disconnect_admin_pdn(instance_id);
 }
 
 static void app_disconnect(void)
@@ -1664,6 +1666,7 @@ static void app_disconnect(void)
     }
 
     lwm2m_sms_receiver_disable();
+    lwm2m_disconnect_admin_pdn(0);
     m_app_state = LWM2M_STATE_DISCONNECTED;
 }
 
