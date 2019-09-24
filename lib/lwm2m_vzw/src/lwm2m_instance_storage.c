@@ -14,7 +14,7 @@
 #include <lwm2m_device.h>
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_firmware.h>
-
+#include <lwm2m_remote.h>
 #include <lwm2m_os.h>
 
 #define LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET   0xFFFF
@@ -56,6 +56,7 @@ typedef struct __attribute__((__packed__))
 
     // Offsets into data post static sized values.
     uint16_t offset_binding;
+    uint16_t offset_location;
     uint16_t offset_carrier_specific;
     uint16_t offset_acl;
 } storage_server_t;
@@ -300,9 +301,34 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
     lwm2m_server_disable_timeout_set(instance_id, p_storage_server->disable_timeout);
     lwm2m_server_notif_storing_set(instance_id, p_storage_server->notif_storing);
 
+    uint8_t carrier_specific_len = 0;
+    if (p_storage_server->offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET) {
+        carrier_specific_len = (uint32_t)&p_scratch_buffer[read_count] - (uint32_t)&p_scratch_buffer[p_storage_server->offset_carrier_specific];
+    }
+
+    uint8_t location_len = 0;
+    if (p_storage_server->offset_location != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET) {
+        if (p_storage_server->offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET) {
+            location_len = p_storage_server->offset_carrier_specific - p_storage_server->offset_location;
+        } else {
+            location_len = (uint32_t)&p_scratch_buffer[read_count] - (uint32_t)&p_scratch_buffer[p_storage_server->offset_location];
+        }
+    }
+
     // Set binding.
-    uint8_t binding_len = p_storage_server->offset_carrier_specific - p_storage_server->offset_binding;
+    uint8_t binding_len = (uint32_t)&p_scratch_buffer[read_count - carrier_specific_len - location_len] - (uint32_t)&p_scratch_buffer[p_storage_server->offset_binding];
     lwm2m_server_binding_set(instance_id, &p_scratch_buffer[p_storage_server->offset_binding], binding_len);
+
+    // Set server location.
+    if (p_storage_server->offset_location != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET)
+    {
+        char * p_location = NULL;
+        p_location = (char *)&p_scratch_buffer[p_storage_server->offset_location];
+
+        (void)lwm2m_remote_location_save(p_location,
+                                         location_len,
+                                         p_storage_server->short_server_id);
+    }
 
     // Set carrier specific data if bootstrap server.
     if (p_storage_server->offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET)
@@ -360,14 +386,31 @@ int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
     temp_storage.notif_storing      = lwm2m_server_notif_storing_get(instance_id);
     temp_storage.offset_binding     = sizeof(storage_server_t); // Where storage_server_t ends.
 
+    char   * p_location   = NULL;
+    uint16_t location_len = 0;
+
     // if bootstrap server.
     if (instance_id == 0)
     {
         temp_storage.offset_carrier_specific = LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET;
+        temp_storage.offset_location         = LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET;
         temp_storage.offset_acl              = temp_storage.offset_binding + binding_len;
     } else {
+        if (lwm2m_server_registered_get(instance_id))
+        {
+            // Fetch location.
+            (void)lwm2m_remote_location_find(&p_location,
+                                             &location_len,
+                                             lwm2m_server_short_server_id_get(instance_id));
+        }
         total_entry_len += sizeof(vzw_server_settings_t);
-        temp_storage.offset_carrier_specific = temp_storage.offset_binding + binding_len;
+        total_entry_len += location_len;
+        if (location_len > 0) {
+            temp_storage.offset_location = temp_storage.offset_binding + binding_len;
+        } else {
+            temp_storage.offset_location = LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET;
+        }
+        temp_storage.offset_carrier_specific = temp_storage.offset_binding + binding_len + location_len;
         temp_storage.offset_acl              = temp_storage.offset_carrier_specific + sizeof(vzw_server_settings_t);
     }
 
@@ -375,6 +418,12 @@ int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
     memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_server_t));
     memcpy(&p_scratch_buffer[temp_storage.offset_binding], binding, binding_len);
     memcpy(&p_scratch_buffer[temp_storage.offset_acl], p_acl, sizeof(lwm2m_instance_acl_t));
+
+    // Only if location is available.
+    if (temp_storage.offset_location != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET)
+    {
+        memcpy(&p_scratch_buffer[temp_storage.offset_location], p_location, location_len);
+    }
 
     // If not bootstrap server.
     if (temp_storage.offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET)

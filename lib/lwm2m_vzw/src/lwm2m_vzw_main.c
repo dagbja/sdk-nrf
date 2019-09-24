@@ -868,6 +868,9 @@ void lwm2m_notification(lwm2m_notification_type_t type,
 
             lwm2m_state_set(LWM2M_STATE_IDLE);
 
+            // Refresh stored server object, to also include is_connected status and registration ID.
+            lwm2m_instance_storage_server_store(instance_id);
+
             if (!m_registration_ready && lwm2m_is_registration_ready()) {
                 m_use_client_holdoff_timer = false;
                 m_registration_ready = true;
@@ -900,6 +903,9 @@ void lwm2m_notification(lwm2m_notification_type_t type,
     {
         // We have successfully deregistered.
         lwm2m_server_registered_set(instance_id, false);
+
+        // Store server object to know that its not registered, and location should be cleared.
+        lwm2m_instance_storage_server_store(instance_id);
 
         if (m_app_state == LWM2M_STATE_SERVER_DEREGISTERING)
         {
@@ -1917,10 +1923,17 @@ static void app_lwm2m_process(void)
 
             /* If already registered and having a remote location then do update. */
             if (lwm2m_server_registered_get(m_server_instance)) {
-                char   * p_location;
-                uint16_t location_len = 0;
 
                 uint16_t short_server_id = lwm2m_server_short_server_id_get(m_server_instance);
+
+                // Register the remote.
+                lwm2m_remote_register(short_server_id, (struct sockaddr *)&m_remote_server[m_server_instance]);
+
+                // Load flash again, to retrieve the location.
+                lwm2m_instance_storage_server_load(m_server_instance);
+
+                char   * p_location;
+                uint16_t location_len = 0;
                 uint32_t err_code = lwm2m_remote_location_find(&p_location,
                                                                &location_len,
                                                                short_server_id);
