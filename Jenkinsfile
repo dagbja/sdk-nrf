@@ -36,41 +36,46 @@ pipeline {
         lib_Main.cloneCItools(JOB_NAME)
         dir('lwm2m') {
           checkout scm
-          CI_STATE.LWM2M.REPORT_SHA = lib_Main.checkoutRepo(
-                CI_STATE.LWM2M.GIT_URL, "LWM2M", CI_STATE.LWM2M, false)
-          lib_West.AddManifestUpdate("LWM2M", 'nrf',
-                CI_STATE.LWM2M.GIT_URL, CI_STATE.LWM2M.GIT_REF, CI_STATE)
+          // CI_STATE.LWM2M.REPORT_SHA = lib_Main.checkoutRepo(
+          //       CI_STATE.LWM2M.GIT_URL, "LWM2M", CI_STATE.LWM2M, false)
+          // lib_West.AddManifestUpdate("LWM2M", 'nrf',
+          //       CI_STATE.LWM2M.GIT_URL, CI_STATE.LWM2M.GIT_REF, CI_STATE)
         }
         lib_West.InitUpdate('lwm2m')
         lib_West.ApplyManifestUpdates(CI_STATE)
         sh "call build.sh"
+        dir ('build') {
+          sh "find . -name '*.a' -o -name '*.elf' | tar -zcvf lwm2m-lib-${compiler}.tar.gz -T -"
+          lib_Main.storeArtifacts("libs", '*.tar.gz', 'LWM2M', CI_STATE)
+          archiveArtifacts allowEmptyArchive: false, artifacts: "*.tar.gz"
+        }
       }
     }}}
 
-    stage('Trigger Downstream Jobs') {
-      when { expression { CI_STATE.LWM2M.RUN_DOWNSTREAM } }
-      steps { script {
-          CI_STATE.LWM2M.WAITING = true
-          def DOWNSTREAM_JOBS = lib_Main.getDownStreamJobs(JOB_NAME)
-          if (DOWNSTREAM_JOBS.size() == 1){
-            DOWNSTREAM_JOBS.add("thst/test-ci-nrfconnect-cfg-null/lib")
-          }
-          def jobs = [:]
-          DOWNSTREAM_JOBS.each {
-            jobs["${it}"] = {
-              build job: "${it}", propagate: CI_STATE.LWM2M.WAITING, wait: CI_STATE.LWM2M.WAITING,
-                  parameters: [string(name: 'jsonstr_CI_STATE', value: lib_Util.HashMap2Str(CI_STATE))]
-            }
-          }
-          parallel jobs
-      } }
-    }
-    stage('Report') {
-      when { expression { CI_STATE.LWM2M.RUN_TESTS } }
-      steps { script {
-          println 'no report generation yet'
-      } }
-    }
+    // stage('Trigger Downstream Jobs') {
+    //   when { expression { CI_STATE.LWM2M.RUN_DOWNSTREAM } }
+    //   steps { script {
+    //       CI_STATE.LWM2M.WAITING = true
+    //       def DOWNSTREAM_JOBS = lib_Main.getDownStreamJobs(JOB_NAME)
+    //       if (DOWNSTREAM_JOBS.size() == 1){
+    //         DOWNSTREAM_JOBS.add("thst/test-ci-nrfconnect-cfg-null/lib")
+    //       }
+    //       def jobs = [:]
+    //       DOWNSTREAM_JOBS.each {
+    //         jobs["${it}"] = {
+    //           build job: "${it}", propagate: CI_STATE.LWM2M.WAITING, wait: CI_STATE.LWM2M.WAITING,
+    //               parameters: [string(name: 'jsonstr_CI_STATE', value: lib_Util.HashMap2Str(CI_STATE))]
+    //         }
+    //       }
+    //       parallel jobs
+    //   } }
+    // }
+    // stage('Report') {
+    //   when { expression { CI_STATE.LWM2M.RUN_TESTS } }
+    //   steps { script {
+    //       println 'no report generation yet'
+    //   } }
+    // }
   }
   post {
     // This is the order that the methods are run. {always->success/abort/failure/unstable->cleanup}
