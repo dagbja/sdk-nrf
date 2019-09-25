@@ -34,6 +34,13 @@
 #define LWM2M_MODEM_FIRMWARE_URI               (LWM2M_OS_STORAGE_END - 10)
 #define LWM2M_INSTANCE_STORAGE_BASE_SECURITY   (LWM2M_OS_STORAGE_BASE)
 #define LWM2M_INSTANCE_STORAGE_BASE_SERVER     (LWM2M_OS_STORAGE_BASE + 10)
+#define LWM2M_OBSERVERS_BASE                   (LWM2M_OS_STORAGE_BASE + 20)
+/*
+ * The storage range base after LWM2M_OBSERVERS will start at
+ * LWM2M_OBSERVERS_BASE + CONFIG_NRF_COAP_OBSERVE_MAX_NUM_OBSERVERS.
+ * Make sure that LWM2M_OS_STORAGE_END and LWM2M_OS_STORAGE_BASE range is wide enough to accompany
+ * the full range of storage items.
+ */
 
 typedef struct __attribute__((__packed__))
 {
@@ -94,6 +101,11 @@ typedef struct __attribute__((__packed__))
 int32_t lwm2m_instance_storage_init(void)
 {
     // NVS subystem is initialized in lwm2m_os_init().
+
+    lwm2m_observer_storage_set_callbacks(lwm2m_observer_store,
+                                         lwm2m_observer_load,
+                                         lwm2m_observer_delete);
+
     return 0;
 }
 
@@ -921,3 +933,41 @@ int lwm2m_firmware_uri_set(char *uri, size_t len)
 
     return 0;
 }
+
+int lwm2m_observer_store(uint32_t sid, void * data, size_t size)
+{
+    ssize_t rc;
+
+    rc = lwm2m_os_storage_write(LWM2M_OBSERVERS_BASE + sid, data, size);
+    if (rc < 0)
+    {
+        return rc;
+    }
+
+    return 0;
+}
+
+int lwm2m_observer_load(uint32_t sid, void * data, size_t size)
+{
+    ssize_t rc;
+
+    rc = lwm2m_os_storage_read(LWM2M_OBSERVERS_BASE + sid, data, size);
+    if (rc < 0)
+    {
+        return rc;
+    }
+
+    return 0;
+}
+
+int lwm2m_observer_delete(uint32_t sid)
+{
+    int rc = lwm2m_os_storage_delete(LWM2M_OBSERVERS_BASE + sid);
+    if (rc < 0)
+    {
+        return rc;
+    }
+
+    return 0;
+}
+

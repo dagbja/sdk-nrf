@@ -208,6 +208,43 @@ typedef uint32_t (* lwm2m_object_callback_t)(lwm2m_object_t * p_object,
                                              uint8_t          op_code,
                                              coap_message_t * p_request);
 
+/**@brief Callback function to store observer information in non-volatile memory
+ * 
+ * @defails This function will be used by the observer restore to store observer
+ *          information in non-volatile memory.
+ *
+ * @param[in] sid  Unique ID that identifies this storage unit.
+ * @param[in] data Pointer to data to be stored.
+ * @param[in] size The size of the data to be stored.
+ *
+ * @retval    Non-zero value will tell the observer restore feature that the store failed.
+ */
+typedef int (*lwm2m_store_observer_cb_t)(uint32_t sid, void * data, size_t size);
+
+/**@brief Callback function to load observer information from non-volatile memory.
+ * 
+ * @details This function will be used by the observer restore to load observer
+ *          information in non-volatile memory.
+ *
+ * @param[in] sid  Unique ID that identifies a storage unit previously stored.
+ * @param[in] data Pointer to a buffer that the loaded data can be stored in.
+ * @param[in] size The size of the data buffer.
+ *
+ * @retval    Non-zero value will tell the observer restore feature that the load failed.
+ */
+typedef int (*lwm2m_load_observer_cb_t)(uint32_t sid, void * data, size_t size);
+
+/**@brief Callback function to delete observer information in non-volatile memory.
+ * 
+ * @details This function will be used by the observer restore to delete observer
+ *          information in non-volatile memory previously stored.
+ *
+ * @param[in] sid  Unique ID that identifies a storage unit previously stored.
+ *
+ * @retval    Non-zero value will tell the observer restore feature that the delete failed.
+ */
+typedef int (*lwm2m_del_observer_cb_t)(uint32_t sid);
+
 /**@brief LWM2M object prototype structure.
  *
  * @details Each instance will have this structure in the front of its instance structure.
@@ -387,6 +424,22 @@ uint32_t lwm2m_update(struct nrf_sockaddr     * p_remote,
  */
 uint32_t lwm2m_deregister(struct nrf_sockaddr * p_remote, coap_transport_handle_t transport);
 
+
+/**@brief Get reference to instance.
+ *
+ * @param[out] p_instance  Pointer to structure to instance.
+ * @param[in]  object_id   Object identifier of instance.
+ * @param[in]  instance_id Instance identifier of instance.
+ *
+ * @retval NRF_SUCCESS If instance is found.
+ * @retval EINVAL      If instance is not located.
+ * @retval EINVAL      If instance is not valid.
+ */
+
+uint32_t lwm2m_lookup_instance(lwm2m_instance_t ** p_instance,
+                               uint16_t object_id,
+                               uint16_t instance_id);
+
 /**@brief Add an instance to coap_handler in order to match requests to the given instance.
  *
  * @details Add a new LWM2M instance to the coap_handler. The application MUST initialize
@@ -477,13 +530,25 @@ uint32_t lwm2m_respond_with_payload(uint8_t             * p_payload,
  */
 uint32_t lwm2m_respond_with_code(coap_msg_code_t code, coap_message_t * p_request);
 
-
+/**@brief Register observer with initial value notification
+ *
+ * @param p_payload     Payload of reply message to observer request.
+ * @param payload_len   Length of payload buffer.
+ * @param max_age       Max time between notifications.
+ * @param p_request     Original coap message requesting to observe the resource.
+ * @param content_type  Type of the content being observed.
+ * @param resource      Resource number that identifies the resource to be observed or similar.
+ * @param p_instance    Pointer to instance of object being observed.
+ *
+ * @retval 0            If the observable resource was registered successfully.
+ */
 uint32_t lwm2m_observe_register(uint8_t             * p_payload,
                                 uint16_t              payload_len,
                                 uint16_t              max_age,
                                 coap_message_t      * p_request,
                                 coap_content_type_t   content_type,
-                                void                * p_resource);
+                                uint16_t              resource,
+                                lwm2m_instance_t    * p_instance);
 
 /**@brief Unregister observer if found.
  *
@@ -501,6 +566,59 @@ uint32_t lwm2m_notify(uint8_t         * p_payload,
                       uint16_t          payload_len,
                       coap_observer_t * p_observer,
                       coap_msg_type_t   type);
+
+/**@brief Store information about the observer so it can be restored later.
+ *
+ * @param p_observer Pointer to an observer object to store.
+ * @param p_instance Pointer to the instance being observed by the observer.
+ *
+ * @retval 0      If observer information has been stored successfully.
+ * @retval ENOMEM If not able to find a free slot to store the observer data.
+ * @retval EIO    If storage interface returned error on deletion operation.
+ */
+uint32_t lwm2m_observer_storage_store(coap_observer_t  * p_observer);
+
+/**@brief Restore observers for a specified server for the.
+ *
+ * @details This function will read the session data and restore any
+ *          observer for a specified server over the specified transport.
+ *
+ * @param short_server_id A unique identifier for the server owning the
+ *                        observers that will be restored.
+ * @param transport       The handle for the transport to be used for this
+ *                        server.
+ *
+ * @retval         Number of observers restored.
+ */
+uint32_t lwm2m_observer_storage_restore(uint16_t                  short_server_id,
+                                        coap_transport_handle_t   transport);
+
+/**@brief Delete an observer from storage.
+ *
+ * @details This function will delete the stored information about this observer.
+ *
+ * @param p_observer A pointer to an observer object.
+ *
+ * @retval 0      If delete process was successful.
+ * @retval ENOMEM If unable to allocate memory to store the observer data.
+ * @retval EIO    If storage interface returned error on deletion operation.
+ *
+ */
+uint32_t lwm2m_observer_storage_delete(coap_observer_t  * p_observer);
+
+/**@brief Register functions for store, load and delete operation.
+ *
+ * @details This function is used to register functions to store, load and 
+ *          delete data on the non-volatile storage backend.
+ *
+ * @retval 0      If callback functions was registered.
+ * @retval EINVAL If any of the callback functions pointers are NULL pointers.
+ *
+ */
+uint32_t lwm2m_observer_storage_set_callbacks(lwm2m_store_observer_cb_t store_cb,
+                                              lwm2m_load_observer_cb_t load_cb,
+                                              lwm2m_del_observer_cb_t del_cb);
+
 
 #ifdef __cplusplus
 }

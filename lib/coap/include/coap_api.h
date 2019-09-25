@@ -129,6 +129,9 @@ extern "C" {
 #define COAP_PERM_OBSERVE 0x0100
 /**@} */
 
+/** Max byte length of the message token */
+#define COAP_MESSAGE_TOKEN_MAX_LEN 8
+
 /**@cond */
 /* Forward declare structs. */
 typedef struct coap_message_t coap_message_t;
@@ -318,7 +321,7 @@ typedef struct {
 	/** Message token. token_len must be set to indicate how many of the
 	 *  bytes should be used in the token.
 	 */
-	uint8_t token[8];
+	u8_t token[COAP_MESSAGE_TOKEN_MAX_LEN];
 
 	/** Token size in bytes. */
 	uint8_t token_len;

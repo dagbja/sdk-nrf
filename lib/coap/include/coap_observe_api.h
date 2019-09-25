@@ -45,6 +45,9 @@ typedef struct {
 
 	/** Pointer to use when sending notifictions. */
 	coap_transport_handle_t transport;
+
+	/** Pointer to user defined data */
+	void * p_userdata;
 } coap_observer_t;
 
 /**@brief Struct for CoAP Client for holding an instance of a remote observable

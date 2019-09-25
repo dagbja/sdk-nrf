@@ -1169,6 +1169,10 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             LWM2M_INF("Updated after connect (server %d)", instance_id);
             lwm2m_retry_delay_reset(instance_id);
 
+            if (!m_registration_ready) {
+                lwm2m_observer_storage_restore(short_server_id, m_lwm2m_transport[instance_id]);
+            }
+
             // Reset connection update in case this has been requested while connecting
             m_connection_update[instance_id].requested = LWM2M_REQUEST_NONE;
 
@@ -1516,6 +1520,11 @@ void lwm2m_bootstrap_reset(void)
         lwm2m_server_short_server_id_set(i, 0);
 
         app_factory_bootstrap_server_object(i);
+    }
+
+    for (uint32_t i = 0; i < CONFIG_NRF_COAP_OBSERVE_MAX_NUM_OBSERVERS; i++)
+    {
+        lwm2m_observer_delete(i);
     }
 }
 
@@ -2686,6 +2695,9 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 
     // Setup LWM2M endpoints.
     app_lwm2m_setup();
+
+    // Setup LWM2M storage subsystem.
+    lwm2m_instance_storage_init();
 
     // Create LwM2M factory bootstrapped objects.
     app_lwm2m_create_objects();

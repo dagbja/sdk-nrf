@@ -108,7 +108,7 @@ uint32_t lwm2m_remote_deregister(uint16_t short_server_id)
 }
 
 
-uint32_t lwm2m_remote_short_server_id_find(uint16_t        * p_short_server_id,
+uint32_t lwm2m_remote_short_server_id_find(uint16_t            * p_short_server_id,
                                            struct nrf_sockaddr * p_remote)
 {
     NULL_PARAM_CHECK(p_short_server_id)

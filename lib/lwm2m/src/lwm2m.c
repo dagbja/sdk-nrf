@@ -112,7 +112,7 @@ static uint16_t internal_get_allowed_operations(lwm2m_instance_t * p_instance,
 
         if (err_code != 0)
         {
-             // Should not happen as instance_resolve should not return NULL.
+             // Should not happen as p_instance should not be NULL
         }
     }
 
@@ -128,9 +128,9 @@ static uint16_t internal_get_allowed_operations(lwm2m_instance_t * p_instance,
 }
 
 
-static uint32_t instance_resolve(lwm2m_instance_t  ** p_instance,
-                                 uint16_t             object_id,
-                                 uint16_t             instance_id)
+uint32_t lwm2m_lookup_instance(lwm2m_instance_t  ** p_instance,
+                               uint16_t             object_id,
+                               uint16_t             instance_id)
 {
     for (int i = 0; i < m_num_instances; ++i)
     {
@@ -876,7 +876,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
             lwm2m_instance_t * p_instance;
 
-            err_code = instance_resolve(&p_instance, p_path[0], p_path[1]);
+            err_code = lwm2m_lookup_instance(&p_instance, p_path[0], p_path[1]);
 
             if (err_code == EINVAL)
             {
@@ -1057,7 +1057,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
             lwm2m_instance_t * p_instance;
 
-            err_code = instance_resolve(&p_instance, p_path[0], p_path[1]);
+            err_code = lwm2m_lookup_instance(&p_instance, p_path[0], p_path[1]);
             if (err_code != 0)
             {
                 LWM2M_MUTEX_UNLOCK();

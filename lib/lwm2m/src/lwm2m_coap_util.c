@@ -9,6 +9,7 @@
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <coap_api.h>
+#include <lwm2m_remote.h>
 
 static uint32_t m_observer_sequence_num = 0;
 
@@ -71,30 +72,29 @@ uint32_t lwm2m_observe_register(uint8_t             * p_payload,
                                 uint16_t              max_age,
                                 coap_message_t      * p_request,
                                 coap_content_type_t   content_type,
-                                void                * p_resource)
+                                uint16_t              resource,
+                                lwm2m_instance_t    * p_instance)
 {
     NULL_PARAM_CHECK(p_request);
     NULL_PARAM_CHECK(p_payload);
+    NULL_PARAM_CHECK(p_instance);
 
-    uint32_t err_code;
-
-    // Register observer, and if successful, add the Observe option in the reply.
-    uint32_t handle;
+    uint32_t        err_code;
+    uint32_t        handle;
     coap_observer_t observer;
+    uint16_t      * p_resource_ids = (uint16_t *)((uint8_t *)p_instance + p_instance->resource_ids_offset);
 
-    // Set the token length.
-    observer.token_len              = p_request->header.token_len;
-    // Set the resource of interest.
-    observer.resource_of_interest = (coap_resource_t *)p_resource;
-    // Set the remote.
-    observer.remote = p_request->remote;
-    // Set the transport where to send notifications.
-    observer.transport = p_request->transport;
-    // Set the token.
+    observer.token_len            =  p_request->header.token_len;
+
+    /* !WARNING! This is not a coap_resource_t object !WARNING! */
+    observer.resource_of_interest = (coap_resource_t *)&p_resource_ids[resource];
+
+    observer.remote               = p_request->remote;
+    observer.transport            = p_request->transport;
+    observer.ct                   = content_type;
+    observer.p_userdata           = (void*)p_instance;
+
     memcpy(observer.token, p_request->token, observer.token_len);
-
-    // Set the content format to be used for subsequent notifications.
-    observer.ct = content_type;
 
     err_code = coap_observe_server_register(&handle, &observer);
 
@@ -104,6 +104,8 @@ uint32_t lwm2m_observe_register(uint8_t             * p_payload,
     }
     else
     {
+        lwm2m_observer_storage_store(&observer);
+
         // Application helper function, no need for mutex.
         coap_message_conf_t response_config;
         memset(&response_config, 0, sizeof(coap_message_conf_t));
@@ -120,7 +122,7 @@ uint32_t lwm2m_observe_register(uint8_t             * p_payload,
         // PIGGY BACKED RESPONSE
         response_config.code        = COAP_CODE_205_CONTENT;
         response_config.id          = p_request->header.id;
-        response_config.transport = p_request->transport;
+        response_config.transport   = p_request->transport;
 
         // Copy token.
         memcpy(&response_config.token[0], &p_request->token[0], p_request->header.token_len);
@@ -190,14 +192,31 @@ uint32_t lwm2m_observe_unregister(struct nrf_sockaddr  * p_remote,
                                   void                 * p_resource)
 {
     uint32_t handle;
+    coap_observer_t * p_observer;
 
     uint32_t err_code = coap_observe_server_search(&handle,
                                                    p_remote,
                                                    p_resource);
+    if (err_code == 0)
+    {
+        err_code = coap_observe_server_get(handle, &p_observer);
+    }
+
+    if (err_code == 0)
+    {
+        err_code = lwm2m_observer_storage_delete(p_observer);
+    }
 
     if (err_code == 0)
     {
         err_code = coap_observe_server_unregister(handle);
+    }
+
+    if (err_code != 0)
+    {
+        LWM2M_INF("Observer unregister failed: %s (%ld), %s (%d)",
+                  lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                  lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
     }
 
     return err_code;

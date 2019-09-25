@@ -34,4 +34,5 @@ zephyr_library_sources(
     src/lwm2m_register.c
     src/lwm2m_remote.c
     src/lwm2m_tlv.c
+    src/lwm2m_observer_storage.c
     )

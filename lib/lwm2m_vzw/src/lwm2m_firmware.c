@@ -188,7 +188,8 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
                                                           m_instance_firmware.proto.expire_time,
                                                           p_request,
                                                           COAP_CT_APP_LWM2M_TLV,
-                                                          (void *)&m_instance_firmware.resource_ids[resource_id]);
+                                                          resource_id,
+                                                          p_instance);
 
                         m_con_time_start[resource_id] = lwm2m_os_uptime_get();
                         break;
