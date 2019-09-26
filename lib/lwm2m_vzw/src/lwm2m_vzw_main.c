@@ -164,6 +164,7 @@ struct connection_update_t {
 };
 
 static struct connection_update_t m_connection_update[1+LWM2M_MAX_SERVERS];
+static bool m_use_client_holdoff_timer;
 static bool m_registration_ready;
 
 /* Resolved server addresses */
@@ -868,6 +869,7 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             lwm2m_state_set(LWM2M_STATE_IDLE);
 
             if (!m_registration_ready && lwm2m_is_registration_ready()) {
+                m_use_client_holdoff_timer = false;
                 m_registration_ready = true;
                 app_event_notify(LWM2M_CARRIER_EVENT_READY, NULL);
             }
@@ -1422,6 +1424,8 @@ static void app_bootstrap(void)
 {
     lwm2m_bootstrap_reset();
 
+    m_use_client_holdoff_timer = true;
+
     uint32_t err_code = lwm2m_bootstrap((struct sockaddr *)&m_bs_remote_server,
                                         &m_client_id,
                                         m_lwm2m_transport[0]);
@@ -1836,7 +1840,7 @@ static void app_check_server_update(void)
                     lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT);
 #else
                     int32_t client_hold_off_time = lwm2m_server_client_hold_off_timer_get(i);
-                    if (!m_registration_ready && client_hold_off_time > 0) {
+                    if (m_use_client_holdoff_timer && client_hold_off_time > 0) {
                         LWM2M_INF("Client hold off timer [%ld seconds] (server %u)", client_hold_off_time, i);
                         if (lwm2m_state_set(LWM2M_STATE_CLIENT_HOLD_OFF)) {
                             lwm2m_os_timer_start(state_update_timer, client_hold_off_time * 1000);
