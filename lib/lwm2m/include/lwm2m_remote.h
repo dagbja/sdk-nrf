@@ -88,6 +88,17 @@ uint32_t lwm2m_remote_location_save(char     * p_location,
                                     uint16_t   location_len,
                                     uint16_t   short_server_id);
 
+
+/**
+ * @brief      Delete a location associated with a short server id.
+ *
+ * @param[in]  short_server_id  Short server id to associate with.
+ *
+ * @return     NRF_SUCCESS         The location was deleted.
+ * @return     NRF_ERROR_NOT_FOUND The short_server_id was not found.
+ */
+uint32_t lwm2m_remote_location_delete(uint16_t short_server_id);
+
 /**
  * @brief      Find the location associated with a given remote.
  *

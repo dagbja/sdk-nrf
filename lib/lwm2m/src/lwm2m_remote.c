@@ -187,6 +187,21 @@ uint32_t lwm2m_remote_location_save(char   * p_location,
 }
 
 
+uint32_t lwm2m_remote_location_delete(uint16_t short_server_id)
+{
+    LWM2M_TRC("SSID: %u", short_server_id);
+
+    int index;
+    LWM2M_REMOTE_FIND_OR_RETURN_ERR(short_server_id, index)
+
+    m_location_len[index] = 0;
+
+    LWM2M_EXIT();
+
+    return 0;
+}
+
+
 uint32_t lwm2m_remote_location_find(char    ** pp_location,
                                     uint16_t * p_location_len,
                                     uint16_t   short_server_id)
