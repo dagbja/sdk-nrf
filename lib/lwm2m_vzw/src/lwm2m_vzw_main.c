@@ -892,7 +892,17 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             app_server_disconnect(instance_id);
             lwm2m_disconnect_admin_pdn(instance_id);
             lwm2m_request_server_update(instance_id, true);
-        } else if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT) {
+        }
+        else if ((coap_code == COAP_CODE_404_NOT_FOUND) || (coap_code == COAP_CODE_400_BAD_REQUEST))
+        {
+            // If not found, ignore.
+            (void)lwm2m_remote_location_delete(short_server_id);
+            lwm2m_server_registered_set(instance_id, 0);
+            lwm2m_instance_storage_server_store(instance_id);
+            // Reset state to get back to registration.
+            lwm2m_state_set(LWM2M_STATE_SERVER_CONNECTED);
+        }
+        else if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT) {
             // Update instead of register during connect
             LWM2M_INF("Update after connect (server %d)", instance_id);
             lwm2m_state_set(LWM2M_STATE_IDLE);
