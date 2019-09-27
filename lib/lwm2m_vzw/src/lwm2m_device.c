@@ -21,6 +21,8 @@
 #include <dfusock.h>
 #include <nrf_socket.h>
 #include <lwm2m_carrier.h>
+#include <coap_option.h>
+#include <coap_observe_api.h>
 
 #define VERIZON_RESOURCE 30000
 
@@ -32,6 +34,8 @@
 static lwm2m_object_t m_object_device;    /**< Device base object. */
 static lwm2m_device_t m_instance_device;  /**< Device object instance. */
 static lwm2m_string_t m_verizon_resources[2];
+
+void lwm2m_device_notify_resource(uint16_t resource_id); // Forward declare.
 
 static uint32_t tlv_device_verizon_encode(uint16_t instance_id, uint8_t * p_buffer, uint32_t * p_buffer_len)
 {
@@ -229,11 +233,59 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
         return 0;
     }
 
+    uint8_t  buffer[300];
+    uint32_t buffer_size = sizeof(buffer);
+
+    if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
+    {
+        u32_t observe_option = 0;
+        for (uint8_t index = 0; index < p_request->options_count; index++)
+        {
+            if (p_request->options[index].number == COAP_OPT_OBSERVE)
+            {
+                err_code = coap_opt_uint_decode(&observe_option,
+                                                p_request->options[index].length,
+                                                p_request->options[index].data);
+                break;
+            }
+        }
+
+        if (err_code == 0)
+        {
+            if (observe_option == 0) // Observe start
+            {
+                LWM2M_INF("Observe requested on object 3/%i/%i", p_instance->instance_id, resource_id);
+                err_code = lwm2m_tlv_device_encode(buffer,
+                                                   &buffer_size,
+                                                   resource_id,
+                                                   &m_instance_device);
+
+                err_code = lwm2m_observe_register(buffer,
+                                                  buffer_size,
+                                                  m_instance_device.proto.expire_time,
+                                                  p_request,
+                                                  COAP_CT_APP_LWM2M_TLV,
+                                                  (void *)&m_instance_device.resource_ids[resource_id]);
+            }
+            else if (observe_option == 1) // Observe stop
+            {
+                LWM2M_INF("Observe cancel on object 3/%i/%i", p_instance->instance_id, resource_id);
+                lwm2m_observe_unregister(p_request->remote, (void *)&m_instance_device.resource_ids[resource_id]);
+
+                // Process the GET request as usual.
+                op_code = LWM2M_OPERATION_CODE_READ;
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+                return 0;
+            }
+        }
+    }
+
+
     if (op_code == LWM2M_OPERATION_CODE_READ)
     {
-        uint8_t  buffer[300];
-        uint32_t buffer_size = sizeof(buffer);
-
         if (resource_id == VERIZON_RESOURCE)
         {
             err_code = tlv_device_verizon_encode(instance_id, buffer, &buffer_size);
@@ -402,6 +454,10 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
             }
         }
     }
+    else if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
+    {
+        // Already handled
+    }
     else
     {
         (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
@@ -425,7 +481,7 @@ void lwm2m_device_init(void)
     lwm2m_instance_device_init(&m_instance_device);
 
     m_object_device.object_id = LWM2M_OBJ_DEVICE;
-
+    m_instance_device.proto.expire_time = 60; // Default to 60 second notifications.
     (void)at_read_manufacturer(&m_instance_device.manufacturer);
     (void)at_read_model_number(&m_instance_device.model_number);
 
@@ -448,34 +504,26 @@ void lwm2m_device_init(void)
         return;
     }
 
-    m_instance_device.avail_power_sources.len = 2;
-    m_instance_device.avail_power_sources.val.p_uint8[0] = 0; // DC power
-    m_instance_device.avail_power_sources.val.p_uint8[1] = 2; // External Battery
-    m_instance_device.power_source_voltage.len = 2;
-    m_instance_device.power_source_voltage.val.p_int32[0] = 0;
-    m_instance_device.power_source_voltage.val.p_int32[1] = 0;
-    m_instance_device.power_source_current.len = 2;
-    m_instance_device.power_source_current.val.p_int32[0] = 0;
-    m_instance_device.power_source_current.val.p_int32[1] = 0;
+    // Declaration of default resource values.
+    lwm2m_device_power_source_t power_sources[] = { DEVICE_POWER_SOURCE_DC };
 
-    m_instance_device.battery_level = 0;
-    m_instance_device.battery_status = 5; // The battery is not installed
-    m_instance_device.memory_free = 0;
-    m_instance_device.memory_total = 0;
-    m_instance_device.error_code.len = 1;
-    m_instance_device.error_code.val.p_int32[0] = 0; // No error
-
+    // Assignment of default values to Device object resources.
     lwm2m_device_current_time_update();
     lwm2m_device_utc_offset_update();
     lwm2m_device_timezone_update();
-
+    (void)lwm2m_device_avail_power_sources_set(power_sources, ARRAY_SIZE(power_sources));
+    (void)lwm2m_device_power_source_voltage_set(DEVICE_POWER_SOURCE_DC, 0);
+    (void)lwm2m_device_power_source_current_set(DEVICE_POWER_SOURCE_DC, 0);
+    (void)lwm2m_device_battery_level_set(0);
+    (void)lwm2m_device_memory_total_set(0);
+    m_instance_device.memory_free = 0;
+    (void)lwm2m_device_error_code_add(DEVICE_ERROR_CODE_NO_ERROR);
     (void)lwm2m_bytebuffer_to_string("UQS", 3, &m_instance_device.supported_bindings);
-    m_instance_device.device_type.p_val = "Smart Device";
-    m_instance_device.device_type.len = strlen(m_instance_device.device_type.p_val);
+    (void)lwm2m_device_type_set("Smart Device");
     m_instance_device.hardware_version.p_val = "1.0";
     m_instance_device.hardware_version.len = strlen(m_instance_device.hardware_version.p_val);
-    m_instance_device.software_version.p_val = "LwM2M 0.6.0";
-    m_instance_device.software_version.len = strlen(m_instance_device.software_version.p_val);
+    (void)lwm2m_device_software_version_set("LwM2M 0.7.0");
+    (void)lwm2m_device_battery_status_set(DEVICE_BATTERY_STATUS_NOT_INSTALLED);
 
     m_instance_device.proto.callback = device_instance_callback;
 
@@ -529,4 +577,32 @@ void lwm2m_device_init(void)
 
     (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_device);
 
+}
+
+void lwm2m_device_notify_resource(uint16_t resource_id)
+{
+    coap_observer_t * p_observer = NULL;
+    while (coap_observe_server_next_get(&p_observer, p_observer, (void *)&m_instance_device.resource_ids[resource_id]) == 0)
+    {
+        LWM2M_TRC("Observer found");
+        uint8_t  buffer[200];
+        uint32_t buffer_size = sizeof(buffer);
+        uint32_t err_code = lwm2m_tlv_device_encode(buffer,
+                                                      &buffer_size,
+                                                      resource_id,
+                                                      &m_instance_device);
+        if (err_code)
+        {
+            LWM2M_ERR("Could not encode resource_id %u, error code: %lu", resource_id, err_code);
+        }
+
+        err_code =  lwm2m_notify(buffer,
+                                 buffer_size,
+                                 p_observer,
+                                 COAP_TYPE_CON);
+        if (err_code)
+        {
+            LWM2M_ERR("Could not notify observer, error code: %lu", err_code);
+        }
+    }
 }

@@ -18,6 +18,9 @@
 #include <sms_receive.h>
 #include <lwm2m_vzw_main.h>
 #include <modem_logging.h>
+#include <lwm2m_carrier.h>
+#include <lwm2m_objects.h>
+#include <stdio.h>
 
 
 static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
@@ -504,6 +507,408 @@ static int cmd_shutdown(const struct shell *shell, size_t argc, char **argv)
 }
 
 
+static int cmd_device_battery_level_set(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2)
+    {
+        shell_print(shell, "battery_level <battery level %>");
+        return 0;
+    }
+
+    switch(lwm2m_device_battery_level_set(atoi(argv[1])))
+    {
+        case 0:
+            shell_print(shell, "Battery level updated successfully");
+            break;
+        case EINVAL:
+            shell_print(shell, "Invalid value: %d", atoi(argv[1]));
+            break;
+        case ENODEV:
+            shell_print(shell, "No internal battery detected");
+            break;
+        default:
+            shell_print(shell, "Error: %d", errno);
+            break;
+    };
+
+    return 0;
+}
+
+
+static int cmd_device_type_set(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2)
+    {
+        shell_print(shell, "device_type <device type>");
+        return 0;
+    }
+
+    switch(lwm2m_device_type_set(argv[1]))
+    {
+        case 0:
+            shell_print(shell, "Device type set successfully");
+            break;
+        case ENOMEM:
+            shell_print(shell, "Memory allocation failure");
+            break;
+        case EINVAL:
+            shell_print(shell, "String cannot be NULL");
+            break;
+        case E2BIG:
+            shell_print(shell, "Input string too long");
+            break;
+        default:
+            shell_print(shell, "Error: %d", errno);
+            break;
+    };
+
+    return 0;
+}
+
+
+static int cmd_device_voltage_set(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 3)
+    {
+        shell_print(shell, "voltage_measurements <power source identifier> <voltage in mV>");
+        return 0;
+    }
+
+    lwm2m_device_power_source_t power_source = (lwm2m_device_power_source_t)atoi(argv[1]);
+    int32_t voltage = atoi(argv[2]);
+
+    switch(lwm2m_device_power_source_voltage_set(power_source, voltage))
+    {
+        case 0:
+            shell_print(shell, "Voltage measurement updated successfully");
+            break;
+        case ENODEV:
+            shell_print(shell, "Power source not detected");
+            break;
+        case EINVAL:
+            shell_print(shell, "Unsupported power source type");
+            break;
+        default:
+            shell_print(shell, "Error: %d", errno);
+            break;
+    };
+
+    return 0;
+}
+
+
+static int cmd_device_current_set(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 3)
+    {
+        shell_print(shell, "current_measurements <power source identifier> <current in mA>");
+        return 0;
+    }
+
+    lwm2m_device_power_source_t power_source = (lwm2m_device_power_source_t)atoi(argv[1]);
+    int32_t current = atoi(argv[2]);
+
+    switch(lwm2m_device_power_source_current_set(power_source, current))
+    {
+        case 0:
+            shell_print(shell, "Current measurements updated successfully");
+            break;
+        case ENODEV:
+            shell_print(shell, "Power source not detected");
+            break;
+        case EINVAL:
+            shell_print(shell, "Unsupported power source type");
+        default:
+            shell_print(shell, "Error: %d", errno);
+            break;
+    };
+
+    return 0;
+}
+
+
+static int cmd_device_battery_status_set(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, " 0 = Normal");
+        shell_print(shell, " 1 = Charging");
+        shell_print(shell, " 2 = Charge complete");
+        shell_print(shell, " 3 = Damaged");
+        shell_print(shell, " 4 = Low battery");
+        shell_print(shell, " 5 = Not installed");
+        shell_print(shell, " 6 = Unknown");
+        return 0;
+    }
+
+    lwm2m_device_battery_status_t status = (lwm2m_device_battery_status_t)atoi(argv[1]);
+
+    switch(lwm2m_device_battery_status_set(status))
+    {
+        case 0:
+            shell_print(shell, "Battery status updated successfully");
+            break;
+        case ENODEV:
+            shell_print(shell, "No internal battery detected");
+            break;
+        case EINVAL:
+            shell_print(shell, "Unsupported battery status");
+        default:
+            shell_print(shell, "Error: %d", errno);
+            break;
+    };
+
+    return 0;
+}
+
+
+static int cmd_device_memory_total_set(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2)
+    {
+        shell_print(shell, "memory_total <total memory in kB>");
+        return 0;
+    }
+
+    switch(lwm2m_device_memory_total_set(atoi(argv[1])))
+    {
+        case 0:
+            shell_print(shell, "Total amount of storage space set successfully");
+            break;
+        case EINVAL:
+            shell_print(shell, "Invalid value: %d", atoi(argv[1]));
+            break;
+        default:
+            shell_print(shell, "Error: %d", errno);
+            break;
+    }
+
+    return 0;
+}
+
+static int m_mem_free = 0;
+
+int lwm2m_device_memory_free_read(void)
+{
+    return m_mem_free;
+}
+
+static int cmd_device_memory_free_write(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2)
+    {
+        shell_print(shell, "memory_free <available memory in kB>");
+        return 0;
+    }
+
+    lwm2m_device_t *device_obj_instance = lwm2m_device_get_instance(0);
+
+    if (atoi(argv[1]) < 0)
+    {
+        shell_print(shell, "Memory free cannot be negative");
+        return 0;
+    }
+    else if (atoi(argv[1]) > device_obj_instance->memory_total)
+    {
+        shell_print(shell, "Memory free cannot be larger than memory total");
+        return 0;
+    }
+    else
+    {
+        m_mem_free = atoi(argv[1]);
+        shell_print(shell, "Estimated amount of storage space updated successfully");
+    }
+
+    return 0;
+}
+
+
+static int cmd_device_power_sources_set(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc < 2) {
+        shell_print(shell, " 0 = DC");
+        shell_print(shell, " 1 = Internal battery");
+        shell_print(shell, " 2 = External battery");
+        shell_print(shell, " 4 = Ethernet");
+        shell_print(shell, " 5 = USB");
+        shell_print(shell, " 6 = AC");
+        shell_print(shell, " 7 = Solar");
+        return 0;
+    }
+
+    uint8_t power_source_count = argc - 1;
+    lwm2m_device_power_source_t power_sources[power_source_count];
+
+    for (int i = 0; i < power_source_count; i++)
+    {
+        power_sources[i] = (lwm2m_device_power_source_t)atoi(argv[i + 1]);
+    }
+
+    switch(lwm2m_device_avail_power_sources_set(power_sources, power_source_count))
+    {
+        case 0:
+            shell_print(shell, "Available power sources set successfully");
+            break;
+        case EINVAL:
+            shell_print(shell, "Unsupported power source");
+            break;
+        case E2BIG:
+            shell_print(shell, "Unsupported number of power sources");
+            break;
+        default:
+            shell_print(shell, "Error: %d", errno);
+            break;
+    };
+
+    return 0;
+}
+
+
+static int cmd_device_software_version_set(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2)
+    {
+        shell_print(shell, "software_version <software version>");
+        return 0;
+    }
+
+    switch(lwm2m_device_software_version_set(argv[1]))
+    {
+        case 0:
+            shell_print(shell, "Software version set successfully");
+            break;
+        case ENOMEM:
+            shell_print(shell, "Memory allocation failure");
+            break;
+        case EINVAL:
+            shell_print(shell, "String cannot be NULL");
+            break;
+        case E2BIG:
+            shell_print(shell, "Input string too long");
+            break;
+        default:
+            shell_print(shell, "Error: %d", errno);
+            break;
+    };
+
+    return 0;
+}
+
+
+static int cmd_device_error_code_add(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, " 0 = No error");
+        shell_print(shell, " 1 = Low charge");
+        shell_print(shell, " 2 = External supply off");
+        shell_print(shell, " 3 = GPS failure");
+        shell_print(shell, " 4 = Low signal");
+        shell_print(shell, " 5 = Out of memory");
+        shell_print(shell, " 6 = SMS failure");
+        shell_print(shell, " 7 = IP connectivity failure");
+        shell_print(shell, " 8 = Peripheral malfunction");
+        return 0;
+    }
+
+    switch(lwm2m_device_error_code_add((lwm2m_device_error_code_t)atoi(argv[1])))
+    {
+        case 0:
+            shell_print(shell, "Error code added successfully");
+            break;
+        case EINVAL:
+            shell_print(shell, "Unsupported error code");
+            break;
+        default:
+            shell_print(shell, "Error: %d", errno);
+            break;
+    }
+
+    return 0;
+}
+
+
+static int cmd_device_error_code_remove(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, " 0 = No error");
+        shell_print(shell, " 1 = Low charge");
+        shell_print(shell, " 2 = External supply off");
+        shell_print(shell, " 3 = GPS failure");
+        shell_print(shell, " 4 = Low signal");
+        shell_print(shell, " 5 = Out of memory");
+        shell_print(shell, " 6 = SMS failure");
+        shell_print(shell, " 7 = IP connectivity failure");
+        shell_print(shell, " 8 = Peripheral malfunction");
+        return 0;
+    }
+
+    switch(lwm2m_device_error_code_remove((lwm2m_device_error_code_t)atoi(argv[1])))
+    {
+        case 0:
+            shell_print(shell, "Error code removed successfully");
+            break;
+        case ENOENT:
+            shell_print(shell, "Error code not found");
+            break;
+        case EINVAL:
+            shell_print(shell, "Unsupported error code");
+            break;
+        default:
+            shell_print(shell, "Error: %d", errno);
+            break;
+    }
+
+    return 0;
+}
+
+
+static int cmd_device_print(const struct shell *shell, size_t argc, char **argv)
+{
+    lwm2m_device_t *device_obj_instance = lwm2m_device_get_instance(0);
+    char buf[128];
+    int offset = 0;
+
+    for (int i = 0; i < device_obj_instance->avail_power_sources.len; i++)
+    {
+        offset += snprintf(&buf[offset], sizeof(buf) - offset, " %d       ",
+                           device_obj_instance->avail_power_sources.val.p_uint8[i]);
+    }
+    shell_print(shell, "Power sources    %s", buf);
+
+    offset = 0;
+    for (int i = 0; i < device_obj_instance->power_source_voltage.len; i++)
+    {
+        offset += snprintf(&buf[offset], sizeof(buf) - offset, "%4d mV  ",
+                           device_obj_instance->power_source_voltage.val.p_int32[i]);
+    }
+    shell_print(shell, "  Voltage         %s", buf);
+
+    offset = 0;
+    for (int i = 0; i < device_obj_instance->power_source_current.len; i++)
+    {
+        offset += snprintf(&buf[offset], sizeof(buf) - offset, "%4d mA  ",
+                           device_obj_instance->power_source_current.val.p_int32[i]);
+    }
+    shell_print(shell, "  Current         %s", buf);
+
+    shell_print(shell, "Battery level     %d%%", device_obj_instance->battery_level);
+    shell_print(shell, "Battery status    %d", device_obj_instance->battery_status);
+    shell_print(shell, "Device type       %s", device_obj_instance->device_type.p_val);
+    shell_print(shell, "Software version  %s", device_obj_instance->software_version.p_val);
+    shell_print(shell, "Total memory      %d kB", device_obj_instance->memory_total);
+    shell_print(shell, "Memory free       %d kB", lwm2m_device_memory_free_read());
+
+    offset = 0;
+    for (int i = 0; i < device_obj_instance->error_code.len; i++)
+    {
+        offset += snprintf(&buf[offset], sizeof(buf) - offset, "%d ",
+                           device_obj_instance->error_code.val.p_int32[i]);
+    }
+    shell_print(shell, "Error codes       %s", buf);
+
+    return 0;
+}
+
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_config,
     SHELL_CMD(print, NULL, "Print configuration", cmd_config_print),
     SHELL_CMD(clear, NULL, "Clear bootstrapped values", cmd_config_clear),
@@ -536,11 +941,30 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_lwm2m,
 );
 
 
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_device,
+    SHELL_CMD(battery_level, NULL, "Set battery level", cmd_device_battery_level_set),
+    SHELL_CMD(battery_status, NULL, "Set battery status", cmd_device_battery_status_set),
+    SHELL_CMD(current, NULL, "Set current measurement on a power source", cmd_device_current_set),
+    SHELL_CMD(device_type, NULL, "Set device type", cmd_device_type_set),
+    SHELL_CMD(error_code_add, NULL, "Add individual error code", cmd_device_error_code_add),
+    SHELL_CMD(error_code_remove, NULL, "Remove individual error code", cmd_device_error_code_remove),
+    SHELL_CMD(memory_free, NULL, "Set available amount of storage space", cmd_device_memory_free_write),
+    SHELL_CMD(memory_total, NULL, "Set total amount of storage space", cmd_device_memory_total_set),
+    SHELL_CMD(power_sources, NULL, "Set available device power sources", cmd_device_power_sources_set),
+    SHELL_CMD(print, NULL, "Print all values set", cmd_device_print),
+    SHELL_CMD(software_version, NULL, "Set software version", cmd_device_software_version_set),
+    SHELL_CMD(voltage, NULL, "Set voltage measurement on a power source", cmd_device_voltage_set),
+    SHELL_SUBCMD_SET_END
+);
+
+
 SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
 SHELL_CMD_REGISTER(config, &sub_config, "Instance configuration", NULL);
 SHELL_CMD_REGISTER(debug, &sub_debug, "Debug configuration", NULL);
+SHELL_CMD_REGISTER(device, &sub_device, "Update or retrieve device information", NULL);
 SHELL_CMD_REGISTER(lwm2m, &sub_lwm2m, "LwM2M operations", NULL);
 SHELL_CMD_REGISTER(reboot, NULL, "Reboot", cmd_reboot);
 SHELL_CMD_REGISTER(shutdown, NULL, "Shutdown", cmd_shutdown);
+
 
 #endif // CONFIG_SHELL

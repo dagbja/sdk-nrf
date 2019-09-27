@@ -14,3 +14,5 @@ lwm2m_device_t * lwm2m_device_get_instance(uint16_t instance_id);
 lwm2m_object_t * lwm2m_device_get_object(void);
 
 char * lwm2m_device_get_sim_iccid(uint32_t * iccid_len);
+
+void lwm2m_device_notify_resource(uint16_t resource_id);
