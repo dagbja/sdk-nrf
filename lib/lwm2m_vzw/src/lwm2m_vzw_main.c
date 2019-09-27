@@ -1611,6 +1611,8 @@ void app_server_update(uint16_t instance_id, bool connect_update)
     {
         uint32_t err_code;
 
+        m_server_conf[instance_id].lifetime = lwm2m_server_lifetime_get(instance_id);
+
         err_code = lwm2m_update((struct sockaddr *)&m_remote_server[instance_id],
                                 &m_server_conf[instance_id],
                                 m_lwm2m_transport[instance_id]);
