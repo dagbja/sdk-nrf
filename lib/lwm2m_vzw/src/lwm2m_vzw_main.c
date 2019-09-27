@@ -1677,7 +1677,6 @@ static void app_disconnect(void)
         app_server_disconnect(i);
     }
 
-    lwm2m_sms_receiver_disable();
     lwm2m_disconnect_admin_pdn(0);
     m_app_state = LWM2M_STATE_DISCONNECTED;
 }
@@ -1964,6 +1963,7 @@ static void app_lwm2m_process(void)
         {
             LWM2M_INF("Disconnect");
             app_disconnect();
+            lwm2m_sms_receiver_disable();
             break;
         }
         default:
