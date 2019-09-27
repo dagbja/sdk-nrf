@@ -1317,6 +1317,12 @@ static void app_connect(void)
     // First ensure all existing connections are disconnected.
     app_disconnect();
 
+    // Read and set SIM ICCID.
+    char iccid[20];
+    uint32_t len = sizeof(iccid);
+    (void)at_read_sim_iccid(iccid, &len);
+    lwm2m_device_set_sim_iccid(iccid, len);
+
     // Check if operator ID has changed.
     at_read_operator_id(&m_operator_id);
 

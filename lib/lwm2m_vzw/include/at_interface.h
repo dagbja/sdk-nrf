@@ -50,6 +50,17 @@ int at_read_imei(char * const p_imei, int imei_len);
  */
 int at_read_msisdn(char * const p_msisdn, int msisdn_len);
 
+/**
+ * @brief Read SIM Integrated Circuit Card Identifier (ICCID).
+ *
+ * @param p_iccid[in] Buffer to store ICCID. Store a NULL-terminated String with max 20 digits.
+ * @param p_iccid_len[in] Size of the buffer. Must be at least 20 bytes.
+ *
+ * @return Result of the ICCID read AT command.
+ * @retval EINVAL Invalid parameters.
+ * @retval EIO AT command error.
+ * @retval 0 Success.
+ */
 int at_read_sim_iccid(char *p_iccid, uint32_t * p_iccid_len);
 
 /**

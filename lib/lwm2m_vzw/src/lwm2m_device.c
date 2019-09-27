@@ -11,6 +11,7 @@
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
 #include <lwm2m_acl.h>
+#include <lwm2m_device.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
 #include <lwm2m_os.h>
@@ -188,6 +189,16 @@ static int lwm2m_device_utc_offset_write(lwm2m_device_t * p_device)
 }
 
 
+int lwm2m_device_set_sim_iccid(char *p_iccid, uint32_t iccid_len)
+{
+    if (p_iccid == NULL) {
+        return EINVAL;
+    }
+
+    return lwm2m_bytebuffer_to_string(p_iccid, iccid_len, &m_verizon_resources[0]);
+}
+
+
 char * lwm2m_device_get_sim_iccid(uint32_t * iccid_len)
 {
     if (iccid_len == NULL) {
@@ -197,6 +208,7 @@ char * lwm2m_device_get_sim_iccid(uint32_t * iccid_len)
     *iccid_len = m_verizon_resources[0].len;
     return m_verizon_resources[0].p_val;
 }
+
 
 /**@brief Callback function for device instances. */
 uint32_t device_instance_callback(lwm2m_instance_t * p_instance,

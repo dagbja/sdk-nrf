@@ -476,48 +476,35 @@ static int copy_and_convert_iccid(const char *src, uint32_t src_len, char *dst, 
 
 int at_read_sim_iccid(char *p_iccid, uint32_t * p_iccid_len)
 {
-    char write_buffer[APP_MAX_AT_WRITE_LENGTH];
     char read_buffer[APP_MAX_AT_READ_LENGTH];
+    int retval = EIO;
 
-    int at_socket_fd;
-    int length;
-    int retval = 0;
-
-    at_socket_fd = socket(AF_LTE, 0, NPROTO_AT);
-    if (at_socket_fd < 0) {
-        LWM2M_ERR("socket() failed");
-        return EIO;
+    if (p_iccid == NULL || p_iccid_len == NULL || *p_iccid_len < 20) {
+        return EINVAL;
     }
 
-    // Read SIM ICCID
-    const char *at_crsm = "AT+CRSM=176,12258,0,0,10";
-    snprintf(write_buffer, APP_MAX_AT_WRITE_LENGTH, "%s", at_crsm);
-    length = send(at_socket_fd, write_buffer, strlen(write_buffer), 0);
-
-    if (length == strlen(write_buffer)) {
-        length = recv(at_socket_fd, read_buffer, APP_MAX_AT_READ_LENGTH, 0);
-        if (length > 0) {
-            char * p_start = strstr(read_buffer, "\"");
-            if (p_start) {
-                char * p_end = strstr(p_start + 1, "\"");
-                if (p_end) {
-                    retval = copy_and_convert_iccid(p_start + 1, p_end - p_start - 1, p_iccid, p_iccid_len);
-                }
+    // Read SIM Integrated Circuit Card Identifier (ICCID)
+    int err = at_cmd_write("AT+CRSM=176,12258,0,0,10", read_buffer, APP_MAX_AT_READ_LENGTH, NULL);
+    if (err == 0) {
+        // OK response from the Modem. Extract and convert the ICCID.
+        // +CRSM: 144,0,\"981380398101342451F7\"\r\n
+        char * p_start = strstr(read_buffer, "\"");
+        if (p_start) {
+            char * p_end = strstr(p_start + 1, "\"");
+            if (p_end) {
+                retval = copy_and_convert_iccid(p_start + 1, p_end - p_start - 1, p_iccid, p_iccid_len);
             }
-        } else {
-            LWM2M_ERR("recv(%s) failed", lwm2m_os_log_strdup(at_crsm));
-            retval = EIO;
         }
-    } else {
-        LWM2M_ERR("send(%s) failed", lwm2m_os_log_strdup(at_crsm));
+    }
+
+    if (retval != 0) {
+        // AT command read error or invalid AT response format
+        LWM2M_ERR("Unable to read ICCID. AT command error.");
         retval = EIO;
     }
 
-    close(at_socket_fd);
-
     return retval;
 }
-
 
 int at_read_firmware_version(char *p_fw_version, uint32_t *p_fw_version_len)
 {
@@ -557,7 +544,6 @@ int at_read_firmware_version(char *p_fw_version, uint32_t *p_fw_version_len)
 
     return retval;
 }
-
 
 int at_read_operator_id(uint32_t  *p_operator_id)
 {
