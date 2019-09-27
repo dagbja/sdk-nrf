@@ -322,7 +322,12 @@ char *lwm2m_imei_get(void)
 /** Return a 10 digits MSISDN. */
 char *lwm2m_msisdn_get(void)
 {
-    char * p_msisdn;
+    char * p_msisdn = m_msisdn;
+
+    if (strlen(p_msisdn) == 0) {
+        // MSISDN has not been read from SIM yet. We need to be connected first.
+        return p_msisdn;
+    }
 
     if (m_operator_id == APP_OPERATOR_ID_VZW) {
         // MSISDN is read from Modem and includes country code.
