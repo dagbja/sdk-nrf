@@ -286,6 +286,8 @@ void lwm2m_instance_connectivity_statistics_init(lwm2m_connectivity_statistics_t
     p_instance->operations[4] = LWM2M_OPERATION_CODE_READ;
     p_instance->operations[5] = LWM2M_OPERATION_CODE_READ;
     p_instance->operations[6] = LWM2M_OPERATION_CODE_EXECUTE;
+    p_instance->operations[7] = LWM2M_OPERATION_CODE_EXECUTE;
+    p_instance->operations[8] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
 
     // Set resource IDs.
     p_instance->resource_ids[0] = LWM2M_CONN_STAT_SMS_TX_COUNTER;
@@ -294,7 +296,9 @@ void lwm2m_instance_connectivity_statistics_init(lwm2m_connectivity_statistics_t
     p_instance->resource_ids[3] = LWM2M_CONN_STAT_RX_DATA;
     p_instance->resource_ids[4] = LWM2M_CONN_STAT_MAX_MSG_SIZE;
     p_instance->resource_ids[5] = LWM2M_CONN_STAT_AVG_MSG_SIZE;
-    p_instance->resource_ids[6] = LWM2M_CONN_STAT_START_RESET;
+    p_instance->resource_ids[6] = LWM2M_CONN_STAT_START;
+    p_instance->resource_ids[7] = LWM2M_CONN_STAT_STOP;
+    p_instance->resource_ids[8] = LWM2M_CONN_STAT_COLLECTION_PERIOD;
 }
 
 

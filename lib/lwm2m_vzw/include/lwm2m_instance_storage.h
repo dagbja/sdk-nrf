@@ -48,6 +48,10 @@ int32_t lwm2m_instance_storage_firmware_load(uint16_t instance_id);
 int32_t lwm2m_instance_storage_firmware_store(uint16_t instance_id);
 int32_t lwm2m_instance_storage_firmware_delete(uint16_t instance_id);
 
+int32_t lwm2m_instance_storage_conn_stat_load(uint16_t instance_id);
+int32_t lwm2m_instance_storage_conn_stat_store(uint16_t instance_id);
+int32_t lwm2m_instance_storage_conn_stat_delete(uint16_t instance_id);
+
 int32_t lwm2m_last_used_msisdn_get(char * p_msisdn, uint8_t max_len);
 int32_t lwm2m_last_used_msisdn_set(const char * p_msisdn, uint8_t len);
 

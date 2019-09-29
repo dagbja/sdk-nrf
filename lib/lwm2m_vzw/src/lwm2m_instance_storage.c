@@ -14,6 +14,7 @@
 #include <lwm2m_device.h>
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_firmware.h>
+#include <lwm2m_conn_stat.h>
 #include <lwm2m_remote.h>
 #include <lwm2m_os.h>
 
@@ -24,6 +25,7 @@
 #define LWM2M_INSTANCE_STORAGE_DEVICE          2
 #define LWM2M_INSTANCE_STORAGE_CONN_MON        3
 #define LWM2M_INSTANCE_STORAGE_FIRMWARE        4
+#define LWM2M_INSTANCE_STORAGE_CONN_STAT       5
 #define LWM2M_INSTANCE_STORAGE_MSISDN          8
 #define LWM2M_INSTANCE_STORAGE_DEBUG_SETTINGS  9
 #define LWM2M_INSTANCE_STORAGE_BASE_SECURITY  (1 * LWM2M_INSTANCE_STORAGE_TYPE_MAX_COUNT)
@@ -82,6 +84,13 @@ typedef struct __attribute__((__packed__))
     uint16_t offset_acl;
 } storage_firmware_t;
 
+typedef struct __attribute__((__packed__))
+{
+    // Offsets into data post static sized values.
+    uint16_t offset_carrier_specific;
+    uint16_t offset_acl;
+} storage_conn_stat_t;
+
 int32_t lwm2m_instance_storage_init(void)
 {
     // NVS subystem is initialized in lwm2m_os_init().
@@ -107,6 +116,7 @@ int32_t lwm2m_instance_storage_all_objects_load(void)
     lwm2m_instance_storage_device_load(0);
     lwm2m_instance_storage_conn_mon_load(0);
     lwm2m_instance_storage_firmware_load(0);
+    lwm2m_instance_storage_conn_stat_load(0);
 
     return 0;
 }
@@ -122,6 +132,7 @@ int32_t lwm2m_instance_storage_all_objects_store(void)
     lwm2m_instance_storage_device_store(0);
     lwm2m_instance_storage_conn_mon_store(0);
     lwm2m_instance_storage_firmware_store(0);
+    lwm2m_instance_storage_conn_stat_store(0);
 
     return 0;
 }
@@ -137,6 +148,7 @@ int32_t lwm2m_instance_storage_all_objects_delete(void)
     lwm2m_instance_storage_device_delete(0);
     lwm2m_instance_storage_conn_mon_delete(0);
     lwm2m_instance_storage_firmware_delete(0);
+    lwm2m_instance_storage_conn_stat_delete(0);
 
     return 0;
 }
@@ -686,6 +698,86 @@ int32_t lwm2m_instance_storage_firmware_delete(uint16_t instance_id)
 {
     // Only one instance for now.
     u16_t id = LWM2M_INSTANCE_STORAGE_FIRMWARE;
+    lwm2m_os_storage_delete(id);
+    return 0;
+}
+
+int32_t lwm2m_instance_storage_conn_stat_load(uint16_t instance_id)
+{
+    u16_t id = LWM2M_INSTANCE_STORAGE_CONN_STAT + instance_id;
+
+    // Peek file size.
+    char peak_buffer[1];
+    ssize_t read_count = lwm2m_os_storage_read(id, peak_buffer, 1);
+
+    if (read_count <= 0) {
+        return -read_count;
+    }
+
+    // Read full entry.
+    uint8_t * p_scratch_buffer = lwm2m_os_malloc(read_count);
+    read_count = lwm2m_os_storage_read(id, p_scratch_buffer, read_count);
+    (void)read_count;
+
+    storage_conn_stat_t * p_storage_conn_stat = (storage_conn_stat_t *)p_scratch_buffer;
+
+    // Set carrier specific data if bootstrap server.
+    if (p_storage_conn_stat->offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET)
+    {
+        // If there is any carrier specific data. Handle it here.
+    }
+
+    // Write the ACL of the instance.
+    lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_conn_stat_get_instance(instance_id);
+    lwm2m_instance_acl_t * p_acl = (lwm2m_instance_acl_t *)&p_scratch_buffer[p_storage_conn_stat->offset_acl];
+
+    uint32_t err_code = lwm2m_acl_permissions_init(p_instance, p_acl->owner);
+    for (uint8_t i = 0; i < (1 + LWM2M_MAX_SERVERS); i++)
+    {
+        err_code = lwm2m_acl_permissions_add(p_instance, p_acl->access[i], p_acl->server[i]);
+    }
+
+    // Override instance id. Experimental.
+    lwm2m_instance_acl_t * p_real_acl = &p_instance->acl;
+    p_real_acl->id = p_acl->id;
+
+    lwm2m_os_free(p_scratch_buffer);
+
+    return err_code;
+}
+
+int32_t lwm2m_instance_storage_conn_stat_store(uint16_t instance_id)
+{
+    u16_t id = LWM2M_INSTANCE_STORAGE_CONN_STAT + instance_id;
+
+    // Locate the ACL of the instance.
+    lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_conn_stat_get_instance(instance_id);
+    lwm2m_instance_acl_t * p_acl = &p_instance->acl;
+
+    uint16_t total_entry_len = 0;
+    total_entry_len += sizeof(storage_conn_stat_t);
+    // TODO: If carrier specific data, add len of it here.
+    total_entry_len += sizeof(lwm2m_instance_acl_t); // Full ACL to be dumped. Due to default ACL index 0.
+
+    storage_conn_stat_t temp_storage;
+
+    temp_storage.offset_carrier_specific = LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET;
+    temp_storage.offset_acl              = sizeof(storage_conn_stat_t);
+
+    uint8_t * p_scratch_buffer = lwm2m_os_malloc(total_entry_len);
+    memcpy(p_scratch_buffer, &temp_storage, sizeof(storage_conn_stat_t));
+    memcpy(&p_scratch_buffer[temp_storage.offset_acl], p_acl, sizeof(lwm2m_instance_acl_t));
+
+    lwm2m_os_storage_write(id, p_scratch_buffer, total_entry_len);
+
+    lwm2m_os_free(p_scratch_buffer);
+
+    return 0;
+}
+
+int32_t lwm2m_instance_storage_conn_stat_delete(uint16_t instance_id)
+{
+    u16_t id = LWM2M_INSTANCE_STORAGE_CONN_STAT + instance_id;
     lwm2m_os_storage_delete(id);
     return 0;
 }

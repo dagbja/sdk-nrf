@@ -32,6 +32,7 @@ zephyr_library_sources(
     src/common.c
     src/dfusock.c
     src/lwm2m_conn_mon.c
+    src/lwm2m_conn_stat.c
     src/lwm2m_vzw_main.c
     src/lwm2m_device.c
     src/lwm2m_gsma_objects.c

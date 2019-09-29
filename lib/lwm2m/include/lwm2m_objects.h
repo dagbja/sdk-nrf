@@ -142,7 +142,9 @@ extern "C" {
 #define LWM2M_CONN_STAT_RX_DATA                 3
 #define LWM2M_CONN_STAT_MAX_MSG_SIZE            4
 #define LWM2M_CONN_STAT_AVG_MSG_SIZE            5
-#define LWM2M_CONN_STAT_START_RESET             6
+#define LWM2M_CONN_STAT_START                   6
+#define LWM2M_CONN_STAT_STOP                    7
+#define LWM2M_CONN_STAT_COLLECTION_PERIOD       8
 
 /* LWM2M Device */
 #define LWM2M_DEVICE_MANUFACTURER               0
@@ -277,8 +279,8 @@ typedef struct
 typedef struct
 {
     lwm2m_instance_t           proto;
-    uint8_t                    operations[7];
-    uint16_t                   resource_ids[7];
+    uint8_t                    operations[9];
+    uint16_t                   resource_ids[9];
 
     /* Public members. */
     uint32_t                   sms_tx_counter;
@@ -287,7 +289,9 @@ typedef struct
     uint32_t                   rx_data;              // Unit: kilo-bytes
     uint32_t                   max_message_size;     // Unit: byte
     uint32_t                   average_message_size; // Unit: byte
-    /* StartOrReset is Execute only */
+    /* Start is Execute only */
+    /* Stop is Execute only */
+    uint32_t                   collection_period;    // Unit: seconds
 
 } lwm2m_connectivity_statistics_t;
 

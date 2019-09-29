@@ -15,6 +15,7 @@
 #include <lwm2m_api.h>
 #include <lwm2m_carrier.h>
 #include <lwm2m_conn_mon.h>
+#include <lwm2m_conn_stat.h>
 #include <lwm2m_vzw_main.h>
 #include <lwm2m_device.h>
 #include <lwm2m_firmware.h>
@@ -1272,6 +1273,7 @@ static void app_lwm2m_create_objects(void)
     lwm2m_conn_mon_init();
     lwm2m_firmware_init();
     lwm2m_firmware_download_init();
+    lwm2m_conn_stat_init();
 }
 
 /**@brief LWM2M initialization.
@@ -1305,6 +1307,9 @@ static void app_lwm2m_setup(void)
 
     // Add firmware support.
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_firmware_get_object());
+
+    // Add connectivity statistics support.
+    (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_conn_stat_get_object());
 }
 
 static void app_connect(void)

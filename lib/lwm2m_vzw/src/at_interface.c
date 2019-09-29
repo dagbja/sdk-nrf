@@ -15,7 +15,6 @@
 #include <at_cmd_parser.h>
 #include <at_params.h>
 #include <lwm2m_api.h>
-#include <lwm2m_objects.h>
 
 /* For logging API. */
 #include <lwm2m.h>
@@ -1064,4 +1063,56 @@ int at_read_ipaddr(lwm2m_list_t * p_ipaddr_list)
     }
 
     return retval;
+}
+
+int at_read_connstat(lwm2m_connectivity_statistics_t * p_conn_stat)
+{
+    struct at_param_list xconnstat_params;
+    int retval;
+
+    const char *at_xconnstat = "AT%XCONNSTAT?";
+
+    xconnstat_params.params = NULL;
+
+    retval = at_params_list_init(&xconnstat_params, 6);
+    if (retval == 0)
+    {
+        if (at_send_command_and_parse_params(at_xconnstat, &xconnstat_params) == 0)
+        {
+            if ((at_params_int_get(&xconnstat_params, 0, &p_conn_stat->sms_tx_counter) != 0) ||
+                (at_params_int_get(&xconnstat_params, 1, &p_conn_stat->sms_rx_counter) != 0) ||
+                (at_params_int_get(&xconnstat_params, 2, &p_conn_stat->tx_data) != 0) ||
+                (at_params_int_get(&xconnstat_params, 3, &p_conn_stat->rx_data) != 0) ||
+                (at_params_int_get(&xconnstat_params, 4, &p_conn_stat->max_message_size) != 0) ||
+                (at_params_int_get(&xconnstat_params, 5, &p_conn_stat->average_message_size) != 0))
+            {
+                LWM2M_ERR("failed to get xconstat");
+                retval = -EINVAL;
+            }
+        }
+        else
+        {
+            LWM2M_ERR("at_send_command_and_parse_params failed");
+            retval = -EIO;
+        }
+
+        at_params_list_free(&xconnstat_params);
+    }
+    else
+    {
+        LWM2M_ERR("at_params_list_init failed");
+        retval = -EINVAL;
+    }
+
+    return retval;
+}
+
+int at_start_connstat(void)
+{
+    return at_cmd_write("AT%XCONNSTAT=1", NULL, 0, NULL);
+}
+
+int at_stop_connstat(void)
+{
+    return at_cmd_write("AT%XCONNSTAT=0", NULL, 0, NULL);
 }

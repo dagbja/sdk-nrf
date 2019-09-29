@@ -9,6 +9,7 @@
 
 #include <stdbool.h>
 #include <lwm2m_api.h>
+#include <lwm2m_objects.h>
 
 
 typedef void (*at_net_reg_stat_cb_t)(uint32_t net_stat);
@@ -78,5 +79,9 @@ int at_read_time(int32_t * p_time, int32_t * p_utc_offset);
 int at_read_ipaddr(lwm2m_list_t * p_ipaddr_list);
 
 void at_subscribe_net_reg_stat(at_net_reg_stat_cb_t net_reg_stat_cb);
+
+int at_read_connstat(lwm2m_connectivity_statistics_t * p_conn_stat);
+int at_start_connstat(void);
+int at_stop_connstat(void);
 
 #endif // AT_INTERFACE_H__

@@ -83,6 +83,15 @@ uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
                                                      (lwm2m_firmware_t *)p_instance);
                 break;
 
+            case LWM2M_OBJ_CONN_STAT:
+            {
+                err_code = lwm2m_tlv_connectivity_statistics_encode(p_buffer + index,
+                                                                    p_buffer_len,
+                                                                    p_resource_ids[i],
+                                                                    (lwm2m_connectivity_statistics_t *)p_instance);
+                break;
+            }
+
             default:
             {
                 err_code = ENOENT;
@@ -1245,6 +1254,152 @@ uint32_t lwm2m_tlv_firmware_encode(uint8_t          * p_buffer,
             err_code = lwm2m_tlv_instance_encode(p_buffer,
                                                  p_buffer_len,
                                                  (lwm2m_instance_t *)p_firmware);
+            break;
+        }
+
+        default:
+        {
+            err_code = ENOENT;
+            break;
+        }
+    }
+
+    return err_code;
+}
+
+uint32_t lwm2m_tlv_connectivity_statistics_decode(lwm2m_connectivity_statistics_t * p_conn_stat,
+                                                  uint8_t                         * p_buffer,
+                                                  uint32_t                          buffer_len,
+                                                  lwm2m_tlv_callback_t              resource_callback)
+{
+    NULL_PARAM_CHECK(p_conn_stat);
+    NULL_PARAM_CHECK(p_buffer);
+
+    uint32_t     err_code;
+    uint32_t     index = 0;
+    lwm2m_tlv_t  tlv;
+
+    while (index < buffer_len)
+    {
+        err_code = lwm2m_tlv_decode(&tlv, &index, p_buffer, buffer_len);
+
+        if (err_code != 0)
+        {
+            return err_code;
+        }
+
+        switch (tlv.id)
+        {
+            case LWM2M_CONN_STAT_COLLECTION_PERIOD:
+            {
+                err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
+                                                         tlv.length,
+                                                         &p_conn_stat->collection_period);
+                break;
+            }
+
+            default:
+            {
+                if (resource_callback)
+                {
+                    err_code = resource_callback(((lwm2m_instance_t *)p_conn_stat)->instance_id, &tlv);
+                }
+                break;
+            }
+        }
+
+        if (err_code != 0)
+        {
+            return EINVAL;
+        }
+    }
+
+    return 0;
+}
+
+
+uint32_t lwm2m_tlv_connectivity_statistics_encode(uint8_t                         * p_buffer,
+                                                  uint32_t                        * p_buffer_len,
+                                                  uint16_t                          resource_id,
+                                                  lwm2m_connectivity_statistics_t * p_conn_stat)
+{
+    NULL_PARAM_CHECK(p_buffer);
+    NULL_PARAM_CHECK(p_buffer_len);
+    NULL_PARAM_CHECK(p_conn_stat);
+
+    uint32_t err_code;
+
+    switch (resource_id)
+    {
+        case LWM2M_CONN_STAT_SMS_TX_COUNTER:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                resource_id,
+                                                p_conn_stat->sms_tx_counter);
+            break;
+        }
+
+        case LWM2M_CONN_STAT_SMS_RX_COUNTER:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                resource_id,
+                                                p_conn_stat->sms_rx_counter);
+            break;
+        }
+
+        case LWM2M_CONN_STAT_TX_DATA:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                resource_id,
+                                                p_conn_stat->tx_data);
+            break;
+        }
+
+        case LWM2M_CONN_STAT_RX_DATA:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                resource_id,
+                                                p_conn_stat->rx_data);
+            break;
+        }
+
+        case LWM2M_CONN_STAT_MAX_MSG_SIZE:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                resource_id,
+                                                p_conn_stat->max_message_size);
+            break;
+        }
+
+        case LWM2M_CONN_STAT_AVG_MSG_SIZE:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                resource_id,
+                                                p_conn_stat->average_message_size);
+            break;
+        }
+
+        case LWM2M_CONN_STAT_COLLECTION_PERIOD:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                resource_id,
+                                                p_conn_stat->collection_period);
+            break;
+        }
+
+        case LWM2M_NAMED_OBJECT:
+        {
+            // This is a callback to the instance, not a specific resource.
+            err_code = lwm2m_tlv_instance_encode(p_buffer,
+                                                 p_buffer_len,
+                                                 (lwm2m_instance_t *)p_conn_stat);
             break;
         }
 
