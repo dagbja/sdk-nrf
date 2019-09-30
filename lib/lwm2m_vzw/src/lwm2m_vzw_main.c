@@ -1335,7 +1335,21 @@ static void app_connect(void)
             lwm2m_state_set(LWM2M_STATE_IDLE);
             app_init_connection_update();
         } else {
+#if APP_USE_CONTABO
+            // On contabo we don't use hold off timer
             lwm2m_state_set(LWM2M_STATE_BS_CONNECT);
+#else
+            int32_t hold_off_time = lwm2m_security_hold_off_timer_get(0);
+            if (hold_off_time > 0) {
+                if (lwm2m_state_set(LWM2M_STATE_BS_HOLD_OFF)) {
+                    LWM2M_INF("Bootstrap hold off timer [%ld seconds]", hold_off_time);
+                    lwm2m_os_timer_start(state_update_timer, hold_off_time * 1000);
+                }
+            } else {
+                // No hold off timer
+                lwm2m_state_set(LWM2M_STATE_BS_CONNECT);
+            }
+#endif
         }
     } else {
         LWM2M_INF("Waiting for home network");
@@ -1707,6 +1721,11 @@ static void app_wait_state_update(void *timer)
 
     switch (m_app_state)
     {
+        case LWM2M_STATE_BS_HOLD_OFF:
+            // Bootstrap hold off timer expired
+            lwm2m_state_set(LWM2M_STATE_BS_CONNECT);
+            break;
+
         case LWM2M_STATE_BS_CONNECT_RETRY_WAIT:
             // Timeout waiting for DTLS connection to bootstrap server
             lwm2m_state_set(LWM2M_STATE_BS_CONNECT);
@@ -1868,8 +1887,8 @@ static void app_check_server_update(void)
 #else
                     int32_t client_hold_off_time = lwm2m_server_client_hold_off_timer_get(i);
                     if (m_use_client_holdoff_timer && client_hold_off_time > 0) {
-                        LWM2M_INF("Client hold off timer [%ld seconds] (server %u)", client_hold_off_time, i);
                         if (lwm2m_state_set(LWM2M_STATE_CLIENT_HOLD_OFF)) {
+                            LWM2M_INF("Client hold off timer [%ld seconds] (server %u)", client_hold_off_time, i);
                             lwm2m_os_timer_start(state_update_timer, client_hold_off_time * 1000);
                         }
                     } else {

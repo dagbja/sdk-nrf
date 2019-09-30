@@ -391,6 +391,9 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         case LWM2M_STATE_REQUEST_CONNECT:
             shell_print(shell, "Request connect");
             break;
+        case LWM2M_STATE_BS_HOLD_OFF:
+            shell_print(shell, "Bootstrap hold off");
+            break;
         case LWM2M_STATE_BS_CONNECT:
             shell_print(shell, "Bootstrap connecting [%s]", ip_version);
             break;

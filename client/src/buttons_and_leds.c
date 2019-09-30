@@ -99,6 +99,7 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
             *blink = DK_LED4_MSK;
             break;
 
+        case LWM2M_STATE_BS_HOLD_OFF:
         case LWM2M_STATE_CLIENT_HOLD_OFF:
             *on = (DK_LED1_MSK | DK_LED2_MSK);
             break;
