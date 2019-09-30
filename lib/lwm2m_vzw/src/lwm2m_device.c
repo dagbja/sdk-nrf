@@ -527,26 +527,13 @@ void lwm2m_device_init(void)
 
     m_instance_device.proto.callback = device_instance_callback;
 
-    // Verizon specific SIM ICCID and HomeOrRoaming
+    // Verizon specific SIM ICCID
     m_verizon_resources[0].len = 20;
     m_verizon_resources[0].p_val = lwm2m_os_malloc(m_verizon_resources[0].len);
     (void)at_read_sim_iccid(m_verizon_resources[0].p_val, &m_verizon_resources[0].len);
-    uint32_t net_stat = '0';
-    (void)at_read_net_reg_stat(&net_stat);
-    if (net_stat == 1)
-    {
-        char * home_or_roaming = "Home";
-        (void)lwm2m_bytebuffer_to_string(home_or_roaming, strlen(home_or_roaming), &m_verizon_resources[1]);
-    }
-    else if (net_stat == 5)
-    {
-        char * home_or_roaming = "Roam";
-        (void)lwm2m_bytebuffer_to_string(home_or_roaming, strlen(home_or_roaming), &m_verizon_resources[1]);
-    }
-    else
-    {
-        // TODO what if not registered to network, is this even possible at this stage?
-    }
+
+    // nRF9160 does not support Roaming in VZW, so this is always Home.
+    (void)lwm2m_bytebuffer_to_string("Home", 4, &m_verizon_resources[1]);
 
     // Set bootstrap server as owner.
     (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_device,
