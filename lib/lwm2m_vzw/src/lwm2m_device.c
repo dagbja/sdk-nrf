@@ -505,25 +505,25 @@ void lwm2m_device_init(void)
     }
 
     // Declaration of default resource values.
-    lwm2m_device_power_source_t power_sources[] = { DEVICE_POWER_SOURCE_DC };
+    lwm2m_carrier_power_source_t power_sources[] = { LWM2M_CARRIER_POWER_SOURCE_DC };
 
     // Assignment of default values to Device object resources.
     lwm2m_device_current_time_update();
     lwm2m_device_utc_offset_update();
     lwm2m_device_timezone_update();
-    (void)lwm2m_device_avail_power_sources_set(power_sources, ARRAY_SIZE(power_sources));
-    (void)lwm2m_device_power_source_voltage_set(DEVICE_POWER_SOURCE_DC, 0);
-    (void)lwm2m_device_power_source_current_set(DEVICE_POWER_SOURCE_DC, 0);
-    (void)lwm2m_device_battery_level_set(0);
-    (void)lwm2m_device_memory_total_set(0);
+    (void)lwm2m_carrier_avail_power_sources_set(power_sources, ARRAY_SIZE(power_sources));
+    (void)lwm2m_carrier_power_source_voltage_set(LWM2M_CARRIER_POWER_SOURCE_DC, 0);
+    (void)lwm2m_carrier_power_source_current_set(LWM2M_CARRIER_POWER_SOURCE_DC, 0);
+    (void)lwm2m_carrier_battery_level_set(0);
+    (void)lwm2m_carrier_memory_total_set(0);
     m_instance_device.memory_free = 0;
-    (void)lwm2m_device_error_code_add(DEVICE_ERROR_CODE_NO_ERROR);
+    (void)lwm2m_carrier_error_code_add(LWM2M_CARRIER_ERROR_CODE_NO_ERROR);
     (void)lwm2m_bytebuffer_to_string("UQS", 3, &m_instance_device.supported_bindings);
-    (void)lwm2m_device_type_set("Smart Device");
+    (void)lwm2m_carrier_device_type_set("Smart Device");
     m_instance_device.hardware_version.p_val = "1.0";
     m_instance_device.hardware_version.len = strlen(m_instance_device.hardware_version.p_val);
-    (void)lwm2m_device_software_version_set("LwM2M 0.7.0");
-    (void)lwm2m_device_battery_status_set(DEVICE_BATTERY_STATUS_NOT_INSTALLED);
+    (void)lwm2m_carrier_software_version_set("LwM2M 0.7.0");
+    (void)lwm2m_carrier_battery_status_set(LWM2M_CARRIER_BATTERY_STATUS_NOT_INSTALLED);
 
     m_instance_device.proto.callback = device_instance_callback;
 

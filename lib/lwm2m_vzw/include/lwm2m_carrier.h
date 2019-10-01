@@ -54,29 +54,29 @@ typedef struct {
  * @brief LWM2M device power sources type.
  */
 typedef enum {
-    DEVICE_POWER_SOURCE_DC                        = 0,
-    DEVICE_POWER_SOURCE_INTERNAL_BATTERY          = 1,
-    DEVICE_POWER_SOURCE_EXTERNAL_BATTERY          = 2,
-    DEVICE_POWER_SOURCE_ETHERNET                  = 4,
-    DEVICE_POWER_SOURCE_USB                       = 5,
-    DEVICE_POWER_SOURCE_AC                        = 6,
-    DEVICE_POWER_SOURCE_SOLAR                     = 7
-} lwm2m_device_power_source_t;
+    LWM2M_CARRIER_POWER_SOURCE_DC                        = 0,
+    LWM2M_CARRIER_POWER_SOURCE_INTERNAL_BATTERY          = 1,
+    LWM2M_CARRIER_POWER_SOURCE_EXTERNAL_BATTERY          = 2,
+    LWM2M_CARRIER_POWER_SOURCE_ETHERNET                  = 4,
+    LWM2M_CARRIER_POWER_SOURCE_USB                       = 5,
+    LWM2M_CARRIER_POWER_SOURCE_AC                        = 6,
+    LWM2M_CARRIER_POWER_SOURCE_SOLAR                     = 7
+} lwm2m_carrier_power_source_t;
 
 /**
  * @brief LWM2M device error code type.
  */
 typedef enum {
-    DEVICE_ERROR_CODE_NO_ERROR                  = 0,
-    DEVICE_ERROR_CODE_LOW_CHARGE                = 1,
-    DEVICE_ERROR_CODE_EXTERNAL_SUPPLY_OFF       = 2,
-    DEVICE_ERROR_CODE_GPS_FAILURE               = 3,
-    DEVICE_ERROR_CODE_LOW_SIGNAL                = 4,
-    DEVICE_ERROR_CODE_OUT_OF_MEMORY             = 5,
-    DEVICE_ERROR_CODE_SMS_FAILURE               = 6,
-    DEVICE_ERROR_CODE_IP_CONNECTIVITY_FAILURE   = 7,
-    DEVICE_ERROR_CODE_PERIPHERAL_MALFUNCTION    = 8
-} lwm2m_device_error_code_t;
+    LWM2M_CARRIER_ERROR_CODE_NO_ERROR                  = 0,
+    LWM2M_CARRIER_ERROR_CODE_LOW_CHARGE                = 1,
+    LWM2M_CARRIER_ERROR_CODE_EXTERNAL_SUPPLY_OFF       = 2,
+    LWM2M_CARRIER_ERROR_CODE_GPS_FAILURE               = 3,
+    LWM2M_CARRIER_ERROR_CODE_LOW_SIGNAL                = 4,
+    LWM2M_CARRIER_ERROR_CODE_OUT_OF_MEMORY             = 5,
+    LWM2M_CARRIER_ERROR_CODE_SMS_FAILURE               = 6,
+    LWM2M_CARRIER_ERROR_CODE_IP_CONNECTIVITY_FAILURE   = 7,
+    LWM2M_CARRIER_ERROR_CODE_PERIPHERAL_MALFUNCTION    = 8
+} lwm2m_carrier_error_code_t;
 
 /**
  * @brief LWM2M device battery status type.
@@ -84,14 +84,14 @@ typedef enum {
  * @note These values are only valid for the LWM2M Device INTERNAL_BATTERY if present.
  */
 typedef enum {
-    DEVICE_BATTERY_STATUS_NORMAL                    = 0,
-    DEVICE_BATTERY_STATUS_CHARGING                  = 1,
-    DEVICE_BATTERY_STATUS_CHARGE_COMPLETE           = 2,
-    DEVICE_BATTERY_STATUS_DAMAGED                   = 3,
-    DEVICE_BATTERY_STATUS_LOW_BATTERY               = 4,
-    DEVICE_BATTERY_STATUS_NOT_INSTALLED             = 5,
-    DEVICE_BATTERY_STATUS_UNKNOWN                   = 6
-} lwm2m_device_battery_status_t;
+    LWM2M_CARRIER_BATTERY_STATUS_NORMAL                    = 0,
+    LWM2M_CARRIER_BATTERY_STATUS_CHARGING                  = 1,
+    LWM2M_CARRIER_BATTERY_STATUS_CHARGE_COMPLETE           = 2,
+    LWM2M_CARRIER_BATTERY_STATUS_DAMAGED                   = 3,
+    LWM2M_CARRIER_BATTERY_STATUS_LOW_BATTERY               = 4,
+    LWM2M_CARRIER_BATTERY_STATUS_NOT_INSTALLED             = 5,
+    LWM2M_CARRIER_BATTERY_STATUS_UNKNOWN                   = 6
+} lwm2m_carrier_battery_status_t;
 
 /**
  * @brief Initialize the LWM2M carrier library.
@@ -206,11 +206,11 @@ void lwm2m_carrier_event_handler(const lwm2m_carrier_event_t *event);
  * @param[in]  power_sources          Array of available device power sources.
  * @param[in]  power_source_count     Number of power sources currently used by the device.
  *
- * @return     E2BIG    If the reported number of power sources is bigger than the maximum supported.
- * @return     EINVAL   If one or more of the power sources are not supported.
- * @return     0        If the available power sources have been set successfully.
+ * @return     -E2BIG    If the reported number of power sources is bigger than the maximum supported.
+ * @return     -EINVAL   If one or more of the power sources are not supported.
+ * @return     0         If the available power sources have been set successfully.
  */
-int lwm2m_device_avail_power_sources_set(lwm2m_device_power_source_t * power_sources, uint8_t power_source_count);
+int lwm2m_carrier_avail_power_sources_set(lwm2m_carrier_power_source_t * power_sources, uint8_t power_source_count);
 
 /**
  * @brief      Set or update the latest voltage measurements made on one of the available device power sources.
@@ -221,11 +221,11 @@ int lwm2m_device_avail_power_sources_set(lwm2m_device_power_source_t * power_sou
  * @param[in]  power_source           Power source to which the measurement corresponds.
  * @param[in]  value                  Voltage measurement expressed in mV.
  *
- * @return     EINVAL   If the power source is not supported.
- * @return     ENODEV   If the power source is not listed as an available power source.
- * @return     0        If the voltage measurements have been updated successfully.
+ * @return     -EINVAL   If the power source is not supported.
+ * @return     -ENODEV   If the power source is not listed as an available power source.
+ * @return     0         If the voltage measurements have been updated successfully.
  */
-int lwm2m_device_power_source_voltage_set(lwm2m_device_power_source_t power_source, int32_t value);
+int lwm2m_carrier_power_source_voltage_set(lwm2m_carrier_power_source_t power_source, int32_t value);
 
 /**
  * @brief      Set or update the latest current measurements made on one of the available device power sources.
@@ -236,11 +236,11 @@ int lwm2m_device_power_source_voltage_set(lwm2m_device_power_source_t power_sour
  * @param[in]  power_source           Power source to which the measurement corresponds.
  * @param[in]  value                  Current measurement expressed in mA.
  *
- * @return     EINVAL   If the power source is not supported.
- * @return     ENODEV   If the power source is not listed as an available power source.
- * @return     0        If the current measurements have been updated successfully.
+ * @return     -EINVAL   If the power source is not supported.
+ * @return     -ENODEV   If the power source is not listed as an available power source.
+ * @return     0         If the current measurements have been updated successfully.
  */
-int lwm2m_device_power_source_current_set(lwm2m_device_power_source_t power_source, int32_t value);
+int lwm2m_carrier_power_source_current_set(lwm2m_carrier_power_source_t power_source, int32_t value);
 
 /**
  * @brief      Set or update the latest battery level (internal battery).
@@ -252,11 +252,11 @@ int lwm2m_device_power_source_current_set(lwm2m_device_power_source_t power_sour
  *
  * @param[in]  battery_level          Internal battery level percentage to be updated.
  *
- * @return     EINVAL   If the specified battery level lies outside the 0-100% range.
- * @return     ENODEV   If internal battery is not listed as an available power source.
- * @return     0        If the battery level has been updated successfully.
+ * @return     -EINVAL   If the specified battery level lies outside the 0-100% range.
+ * @return     -ENODEV   If internal battery is not listed as an available power source.
+ * @return     0         If the battery level has been updated successfully.
  */
-int lwm2m_device_battery_level_set(uint8_t battery_level);
+int lwm2m_carrier_battery_level_set(uint8_t battery_level);
 
 /**
  * @brief      Set or update the latest battery status (internal battery).
@@ -265,25 +265,25 @@ int lwm2m_device_battery_level_set(uint8_t battery_level);
  *
  * @param[in]  battery_status         Internal battery status to be reported.
  *
- * @return     EINVAL   If the battery status is not supported.
- * @return     ENODEV   If internal battery is not listed as an available power source.
- * @return     0        If the battery status has been updated successfully.
+ * @return     -EINVAL   If the battery status is not supported.
+ * @return     -ENODEV   If internal battery is not listed as an available power source.
+ * @return     0         If the battery status has been updated successfully.
  */
-int lwm2m_device_battery_status_set(lwm2m_device_battery_status_t battery_status);
+int lwm2m_carrier_battery_status_set(lwm2m_carrier_battery_status_t battery_status);
 
 /**
  * @brief      Set the LWM2M device type.
  *
  * @note       Type of the LWM2M device specified by the manufacturer.
  *
- * @param[in]  device_type     Null terminated string specifying the type of the LWM2M device.
+ * @param[in]  device_type      Null terminated string specifying the type of the LWM2M device.
  *
- * @return     EINVAL          If the input argument is a NULL pointer.
- * @return     E2BIG           If the input string is too long.
- * @return     ENOMEM          If it was not possible to allocate memory storage to hold the string.
- * @return     0               If the device type has been set successfully.
+ * @return     -EINVAL          If the input argument is a NULL pointer.
+ * @return     -E2BIG           If the input string is too long.
+ * @return     -ENOMEM          If it was not possible to allocate memory storage to hold the string.
+ * @return     0                If the device type has been set successfully.
  */
-int lwm2m_device_type_set(char * device_type);
+int lwm2m_carrier_device_type_set(char * device_type);
 
 /**
  * @brief      Set the LWM2M device software version.
@@ -293,12 +293,12 @@ int lwm2m_device_type_set(char * device_type);
  * @param[in]  software_version    Null terminated string specifying the current software version
  *                                 of the LWM2M device.
  *
- * @return     EINVAL              If the input argument is a NULL pointer.
- * @return     E2BIG               If the input string is too long.
- * @return     ENOMEM              If it was not possible to allocate memory storage to hold the string.
- * @return     0                   If the software version has been set successfully.
+ * @return     -EINVAL              If the input argument is a NULL pointer.
+ * @return     -E2BIG               If the input string is too long.
+ * @return     -ENOMEM              If it was not possible to allocate memory storage to hold the string.
+ * @return     0                    If the software version has been set successfully.
  */
-int lwm2m_device_software_version_set(char * software_version);
+int lwm2m_carrier_software_version_set(char * software_version);
 
 /**
  * @brief      Update the device object instance error code by adding an individual error.
@@ -308,12 +308,12 @@ int lwm2m_device_software_version_set(char * software_version);
  * @note       If the reported error is NO_ERROR, all existing error codes will be reset.
  * @note       If the reported error is already present, the error code will remain unchanged.
  *
- * @param[in]  error               Individual error to be added.
+ * @param[in]  error                Individual error to be added.
  *
- * @return     EINVAL              If the error code is not supported.
- * @return     0                   If the error code has been added successfully.
+ * @return     -EINVAL              If the error code is not supported.
+ * @return     0                    If the error code has been added successfully.
  */
-int lwm2m_device_error_code_add(lwm2m_device_error_code_t error);
+int lwm2m_carrier_error_code_add(lwm2m_carrier_error_code_t error);
 
 /**
  * @brief      Update the device object instance error code by removing and individual error.
@@ -323,26 +323,26 @@ int lwm2m_device_error_code_add(lwm2m_device_error_code_t error);
  *             present. When all the errors are removed, the error code is specified as 0, hence
  *             indicating no error again.
  *
- * @param[in]  error           Individual error code to be removed.
+ * @param[in]  error            Individual error code to be removed.
  *
- * @return     EINVAL          If the error code is not supported.
- * @return     ENOENT          If the error to be removed is not present on the error code list.
- * @return     0               If the error has been removed successfully.
+ * @return     -EINVAL          If the error code is not supported.
+ * @return     -ENOENT          If the error to be removed is not present on the error code list.
+ * @return     0                If the error has been removed successfully.
  */
-int lwm2m_device_error_code_remove(lwm2m_device_error_code_t error);
+int lwm2m_carrier_error_code_remove(lwm2m_carrier_error_code_t error);
 
 /**
  * @brief      Set the total amount of storage space to store data and software in the LWM2M Device.
  *
  * @note       The value is expressed in kilobytes (kB).
  *
- * @param[in]  memory_total    Total amount of storage space in kilobytes.
+ * @param[in]  memory_total     Total amount of storage space in kilobytes.
  *
- * @return     EINVAL          If the reported value of total amount of storage space is a negative
- *                             value.
- * @return     0               If the total amount of storage space has been set successfully.
+ * @return     -EINVAL          If the reported value of total amount of storage space is a negative
+ *                              value.
+ * @return     0                If the total amount of storage space has been set successfully.
  */
-int lwm2m_device_memory_total_set(int32_t memory_total);
+int lwm2m_carrier_memory_total_set(int32_t memory_total);
 
 /**
  * @brief      Read the estimated current available amount of storage space to store data and
@@ -352,7 +352,7 @@ int lwm2m_device_memory_total_set(int32_t memory_total);
  *
  * @return     Available amount of storage space expressed in kB.
  */
-int lwm2m_device_memory_free_read(void);
+int lwm2m_carrier_memory_free_read(void);
 
 
 #endif /* LWM2M_CARRIER_H__ */

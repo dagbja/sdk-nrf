@@ -518,15 +518,15 @@ static int cmd_device_battery_level_set(const struct shell *shell, size_t argc, 
         return 0;
     }
 
-    switch(lwm2m_device_battery_level_set(atoi(argv[1])))
+    switch(lwm2m_carrier_battery_level_set(atoi(argv[1])))
     {
         case 0:
             shell_print(shell, "Battery level updated successfully");
             break;
-        case EINVAL:
+        case -EINVAL:
             shell_print(shell, "Invalid value: %d", atoi(argv[1]));
             break;
-        case ENODEV:
+        case -ENODEV:
             shell_print(shell, "No internal battery detected");
             break;
         default:
@@ -546,18 +546,18 @@ static int cmd_device_type_set(const struct shell *shell, size_t argc, char **ar
         return 0;
     }
 
-    switch(lwm2m_device_type_set(argv[1]))
+    switch(lwm2m_carrier_device_type_set(argv[1]))
     {
         case 0:
             shell_print(shell, "Device type set successfully");
             break;
-        case ENOMEM:
+        case -ENOMEM:
             shell_print(shell, "Memory allocation failure");
             break;
-        case EINVAL:
+        case -EINVAL:
             shell_print(shell, "String cannot be NULL");
             break;
-        case E2BIG:
+        case -E2BIG:
             shell_print(shell, "Input string too long");
             break;
         default:
@@ -577,18 +577,18 @@ static int cmd_device_voltage_set(const struct shell *shell, size_t argc, char *
         return 0;
     }
 
-    lwm2m_device_power_source_t power_source = (lwm2m_device_power_source_t)atoi(argv[1]);
+    lwm2m_carrier_power_source_t power_source = (lwm2m_carrier_power_source_t)atoi(argv[1]);
     int32_t voltage = atoi(argv[2]);
 
-    switch(lwm2m_device_power_source_voltage_set(power_source, voltage))
+    switch(lwm2m_carrier_power_source_voltage_set(power_source, voltage))
     {
         case 0:
             shell_print(shell, "Voltage measurement updated successfully");
             break;
-        case ENODEV:
+        case -ENODEV:
             shell_print(shell, "Power source not detected");
             break;
-        case EINVAL:
+        case -EINVAL:
             shell_print(shell, "Unsupported power source type");
             break;
         default:
@@ -608,19 +608,20 @@ static int cmd_device_current_set(const struct shell *shell, size_t argc, char *
         return 0;
     }
 
-    lwm2m_device_power_source_t power_source = (lwm2m_device_power_source_t)atoi(argv[1]);
+    lwm2m_carrier_power_source_t power_source = (lwm2m_carrier_power_source_t)atoi(argv[1]);
     int32_t current = atoi(argv[2]);
 
-    switch(lwm2m_device_power_source_current_set(power_source, current))
+    switch(lwm2m_carrier_power_source_current_set(power_source, current))
     {
         case 0:
             shell_print(shell, "Current measurements updated successfully");
             break;
-        case ENODEV:
+        case -ENODEV:
             shell_print(shell, "Power source not detected");
             break;
-        case EINVAL:
+        case -EINVAL:
             shell_print(shell, "Unsupported power source type");
+            break;
         default:
             shell_print(shell, "Error: %d", errno);
             break;
@@ -643,18 +644,19 @@ static int cmd_device_battery_status_set(const struct shell *shell, size_t argc,
         return 0;
     }
 
-    lwm2m_device_battery_status_t status = (lwm2m_device_battery_status_t)atoi(argv[1]);
+    lwm2m_carrier_battery_status_t status = (lwm2m_carrier_battery_status_t)atoi(argv[1]);
 
-    switch(lwm2m_device_battery_status_set(status))
+    switch(lwm2m_carrier_battery_status_set(status))
     {
         case 0:
             shell_print(shell, "Battery status updated successfully");
             break;
-        case ENODEV:
+        case -ENODEV:
             shell_print(shell, "No internal battery detected");
             break;
-        case EINVAL:
+        case -EINVAL:
             shell_print(shell, "Unsupported battery status");
+            break;
         default:
             shell_print(shell, "Error: %d", errno);
             break;
@@ -672,12 +674,12 @@ static int cmd_device_memory_total_set(const struct shell *shell, size_t argc, c
         return 0;
     }
 
-    switch(lwm2m_device_memory_total_set(atoi(argv[1])))
+    switch(lwm2m_carrier_memory_total_set(atoi(argv[1])))
     {
         case 0:
             shell_print(shell, "Total amount of storage space set successfully");
             break;
-        case EINVAL:
+        case -EINVAL:
             shell_print(shell, "Invalid value: %d", atoi(argv[1]));
             break;
         default:
@@ -739,22 +741,22 @@ static int cmd_device_power_sources_set(const struct shell *shell, size_t argc, 
     }
 
     uint8_t power_source_count = argc - 1;
-    lwm2m_device_power_source_t power_sources[power_source_count];
+    lwm2m_carrier_power_source_t power_sources[power_source_count];
 
     for (int i = 0; i < power_source_count; i++)
     {
-        power_sources[i] = (lwm2m_device_power_source_t)atoi(argv[i + 1]);
+        power_sources[i] = (lwm2m_carrier_power_source_t)atoi(argv[i + 1]);
     }
 
-    switch(lwm2m_device_avail_power_sources_set(power_sources, power_source_count))
+    switch(lwm2m_carrier_avail_power_sources_set(power_sources, power_source_count))
     {
         case 0:
             shell_print(shell, "Available power sources set successfully");
             break;
-        case EINVAL:
+        case -EINVAL:
             shell_print(shell, "Unsupported power source");
             break;
-        case E2BIG:
+        case -E2BIG:
             shell_print(shell, "Unsupported number of power sources");
             break;
         default:
@@ -774,18 +776,18 @@ static int cmd_device_software_version_set(const struct shell *shell, size_t arg
         return 0;
     }
 
-    switch(lwm2m_device_software_version_set(argv[1]))
+    switch(lwm2m_carrier_software_version_set(argv[1]))
     {
         case 0:
             shell_print(shell, "Software version set successfully");
             break;
-        case ENOMEM:
+        case -ENOMEM:
             shell_print(shell, "Memory allocation failure");
             break;
-        case EINVAL:
+        case -EINVAL:
             shell_print(shell, "String cannot be NULL");
             break;
-        case E2BIG:
+        case -E2BIG:
             shell_print(shell, "Input string too long");
             break;
         default:
@@ -812,12 +814,12 @@ static int cmd_device_error_code_add(const struct shell *shell, size_t argc, cha
         return 0;
     }
 
-    switch(lwm2m_device_error_code_add((lwm2m_device_error_code_t)atoi(argv[1])))
+    switch(lwm2m_carrier_error_code_add((lwm2m_carrier_error_code_t)atoi(argv[1])))
     {
         case 0:
             shell_print(shell, "Error code added successfully");
             break;
-        case EINVAL:
+        case -EINVAL:
             shell_print(shell, "Unsupported error code");
             break;
         default:
@@ -844,15 +846,15 @@ static int cmd_device_error_code_remove(const struct shell *shell, size_t argc, 
         return 0;
     }
 
-    switch(lwm2m_device_error_code_remove((lwm2m_device_error_code_t)atoi(argv[1])))
+    switch(lwm2m_carrier_error_code_remove((lwm2m_carrier_error_code_t)atoi(argv[1])))
     {
         case 0:
             shell_print(shell, "Error code removed successfully");
             break;
-        case ENOENT:
+        case -ENOENT:
             shell_print(shell, "Error code not found");
             break;
-        case EINVAL:
+        case -EINVAL:
             shell_print(shell, "Unsupported error code");
             break;
         default:
