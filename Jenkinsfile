@@ -1,4 +1,10 @@
-
+//
+// Copyright (c) 2019 Nordic Semiconductor ASA. All Rights Reserved.
+//
+// The information contained herein is confidential property of Nordic Semiconductor ASA.
+// The use, copying, transfer or disclosure of such information is prohibited except by
+// express written agreement with Nordic Semiconductor ASA.
+//
 @Library("CI_LIB") _
 
 def AGENT_LABELS = lib_Main.getAgentLabels(JOB_NAME)
@@ -6,6 +12,8 @@ def IMAGE_TAG    = lib_Main.getDockerImage(JOB_NAME)
 def TIMEOUT      = lib_Main.getTimeout(JOB_NAME)
 def INPUT_STATE  = lib_Main.getInputState(JOB_NAME)
 def CI_STATE     = new HashMap()
+
+def ciUtils = null
 
 pipeline {
 
@@ -15,7 +23,13 @@ pipeline {
     booleanParam(name: 'RUN_BUILD', description: 'if false skip building', defaultValue: true)
     string(name: 'jsonstr_CI_STATE', description: 'Default State if no upstream job', defaultValue: INPUT_STATE)
   }
-  agent { label AGENT_LABELS }
+
+  agent {
+    docker {
+      image IMAGE_TAG
+      label AGENT_LABELS
+    }
+  }
 
   options {
     checkoutToSubdirectory('lwm2m')
@@ -23,64 +37,96 @@ pipeline {
     timeout(time: TIMEOUT.time, unit: TIMEOUT.unit)
   }
 
-  // environment {
-  // }
+//  triggers {
+//    // Build master branch periodically
+//    cron(env.BRANCH_NAME == 'master' ? '0 */12 * * 1-7' : '')
+//  }
 
   stages {
-    stage('Load') { steps { script { CI_STATE = lib_Stage.load('LWM2M') }}}
-    // stage('Specification') { steps { script {
-    // }}}
 
-    stage('Execution') { steps { script {
-      docker.image("$DOCKER_REG/$IMAGE_TAG").inside {
+    stage('Load') {
+      steps { script { CI_STATE = lib_Stage.load('LWM2M') }}
+    }
+
+    stage('Checkout') {
+      steps { script {
         lib_Main.cloneCItools(JOB_NAME)
         dir('lwm2m') {
           checkout scm
-          // CI_STATE.LWM2M.REPORT_SHA = lib_Main.checkoutRepo(
-          //       CI_STATE.LWM2M.GIT_URL, "LWM2M", CI_STATE.LWM2M, false)
-          // lib_West.AddManifestUpdate("LWM2M", 'nrf',
-          //       CI_STATE.LWM2M.GIT_URL, CI_STATE.LWM2M.GIT_REF, CI_STATE)
         }
         lib_West.InitUpdate('lwm2m')
         lib_West.ApplyManifestUpdates(CI_STATE)
-        sh "call build.sh"
-        dir ('build') {
-          sh "find . -name '*.a' -o -name '*.elf' | tar -zcvf lwm2m-lib-${compiler}.tar.gz -T -"
-          lib_Main.storeArtifacts("libs", '*.tar.gz', 'LWM2M', CI_STATE)
-          archiveArtifacts allowEmptyArchive: false, artifacts: "*.tar.gz"
-        }
-      }
-    }}}
 
-    // stage('Trigger Downstream Jobs') {
-    //   when { expression { CI_STATE.LWM2M.RUN_DOWNSTREAM } }
-    //   steps { script {
-    //       CI_STATE.LWM2M.WAITING = true
-    //       def DOWNSTREAM_JOBS = lib_Main.getDownStreamJobs(JOB_NAME)
-    //       if (DOWNSTREAM_JOBS.size() == 1){
-    //         DOWNSTREAM_JOBS.add("thst/test-ci-nrfconnect-cfg-null/lib")
-    //       }
-    //       def jobs = [:]
-    //       DOWNSTREAM_JOBS.each {
-    //         jobs["${it}"] = {
-    //           build job: "${it}", propagate: CI_STATE.LWM2M.WAITING, wait: CI_STATE.LWM2M.WAITING,
-    //               parameters: [string(name: 'jsonstr_CI_STATE', value: lib_Util.HashMap2Str(CI_STATE))]
-    //         }
-    //       }
-    //       parallel jobs
-    //   } }
-    // }
-    // stage('Report') {
-    //   when { expression { CI_STATE.LWM2M.RUN_TESTS } }
-    //   steps { script {
-    //       println 'no report generation yet'
-    //   } }
-    // }
+        ciUtils = load("lwm2m/scripts/ci/ciutils.groovy")
+        ciUtils.lwm2mCreateLogFile()
+
+        def buildType = lib_Main.getBuildType(CI_STATE.NRF).toLowerCase();
+
+        switch(buildType) {
+          case "pr":
+            // If we're a pull request, compare the target branch against the current HEAD (the PR), and also report issues to the PR
+            COMMIT_RANGE = "$CI_STATE.NRF.MERGE_BASE..$CI_STATE.NRF.REPORT_SHA"
+            ciUtils.lwm2mLog("Building a PR [$CHANGE_ID]: $COMMIT_RANGE")
+            break
+
+          case "tag":
+            COMMIT_RANGE = "tags/${env.BRANCH_NAME}..tags/${env.BRANCH_NAME}"
+            ciUtils.lwm2mLog("Building a Tag: $COMMIT_RANGE")
+            break
+
+          case "branch":
+            // If not a PR, it's a non-PR-branch or master build. Compare against the origin.
+            COMMIT_RANGE = "origin/${env.BRANCH_NAME}..HEAD"
+            ciUtils.lwm2mLog("Building a Branch: $COMMIT_RANGE")
+            break
+
+          default:
+            assert condition : "Build type is unknown."
+            break
+        }
+
+        def gitSha = ciUtils.getGitCommitSha('lwm2m');
+
+        ciUtils.lwm2mLog("LWM2M git SHA '${gitSha}'.")
+
+        dir('lwm2m') {
+          WEST_LIST = sh (
+            script: 'west list',
+            returnStdout: true
+          )
+          ciUtils.lwm2mLog("West modules:\r\n${WEST_LIST}")
+        }
+      }}
+    }
+
+    stage('Build client app') {
+      steps { script {
+
+        /* Build the client application using library source files. */
+        dir('lwm2m/client') {
+          try {
+            ciUtils.lwm2mLog("Building client application using library source files...")
+            sh "rm -rf build && west build -b nrf9160_pca10090ns ."
+            ciUtils.lwm2mLog("Done")
+
+            /* Store compiled files as artifacts. */
+            archiveArtifacts artifacts: 'build/zephyr/*.hex'
+            archiveArtifacts artifacts: 'build/zephyr/*.elf'
+          }
+          catch (err) {
+            ciUtils.lwm2mLog("Build failed: ${err}")
+          }
+        }
+      }}
+    }
+
   }
+
   post {
     // This is the order that the methods are run. {always->success/abort/failure/unstable->cleanup}
     always {
-      echo "Pipeline Post: always"
+      /* Store custom output log file. */
+      archiveArtifacts artifacts: '*.log'
     }
     success {
       echo "Pipeline Post: success"
