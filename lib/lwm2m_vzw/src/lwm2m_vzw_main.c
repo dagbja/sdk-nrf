@@ -437,18 +437,25 @@ static void app_vzw_sha256_psk(char *p_imei, uint16_t short_server_id, char *p_p
 }
 
 /**
- * @brief Generate a unique Client ID using device IMEI and MSISDN if available.
- * Factory reset to start bootstrap if MSISDN is different than last start.
+ * @brief Read ICCID and MSISDN from SIM.
  */
-static int app_generate_client_id(void)
+static int app_read_sim_values(void)
 {
-    char client_id[APP_CLIENT_ID_LENGTH];
-    char last_used_msisdn[128];
-    bool provision_bs_psk = false;
-    bool provision_diag_psk = false;
+    // Read ICCID.
+    char iccid[20];
+    uint32_t len = sizeof(iccid);
+    int ret = at_read_sim_iccid(iccid, &len);
 
-    // Read MSISDN, this may have changed since last LTE connect.
-    int ret = at_read_msisdn(m_msisdn, sizeof(m_msisdn));
+    if (ret != 0) {
+        LWM2M_ERR("No SIM ICCID available");
+        return EACCES;
+    }
+
+    // Update Device object with current ICCID.
+    lwm2m_device_set_sim_iccid(iccid, len);
+
+    // Read MSISDN.
+    ret = at_read_msisdn(m_msisdn, sizeof(m_msisdn));
 
     if (ret != 0)
     {
@@ -462,7 +469,6 @@ static int app_generate_client_id(void)
         {
             // If no MSISDN is available, use part of IMEI to generate a unique Client ID.
             // This is not allowed on VZW network. Use for testing purposes only.
-            LWM2M_WRN("No MSISDN available, generating a client ID using part of IMEI");
             memcpy(m_msisdn, &m_imei[5], 10);
             m_msisdn[10] = '\0';
         }
@@ -472,6 +478,27 @@ static int app_generate_client_id(void)
             LWM2M_ERR("No MSISDN available");
             return EACCES;
         }
+    }
+
+    return 0;
+}
+
+/**
+ * @brief Generate a unique Client ID using device IMEI and MSISDN if available.
+ * Factory reset to start bootstrap if MSISDN is different than last start.
+ */
+static int app_generate_client_id(void)
+{
+    char client_id[APP_CLIENT_ID_LENGTH];
+    char last_used_msisdn[128];
+    bool provision_bs_psk = false;
+    bool provision_diag_psk = false;
+
+    // Read SIM values, this may have changed since last LTE connect.
+    int ret = app_read_sim_values();
+
+    if (ret != 0) {
+        return ret;
     }
 
     // Get the MSISDN with correct format for VZW.
@@ -1316,12 +1343,6 @@ static void app_connect(void)
 {
     // First ensure all existing connections are disconnected.
     app_disconnect();
-
-    // Read and set SIM ICCID.
-    char iccid[20];
-    uint32_t len = sizeof(iccid);
-    (void)at_read_sim_iccid(iccid, &len);
-    lwm2m_device_set_sim_iccid(iccid, len);
 
     // Check if operator ID has changed.
     at_read_operator_id(&m_operator_id);
