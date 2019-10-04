@@ -1093,12 +1093,20 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     return 0;
 }
 
-static void app_init_server_acl(uint16_t instance_id, lwm2m_instance_acl_t *acl)
+static void app_init_server_acl(uint16_t instance_id)
 {
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
 
     // Initialize ACL on the instance.
-    (void)lwm2m_acl_permissions_init(p_instance, acl->owner);
+    (void)lwm2m_acl_permissions_init(p_instance, LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
+}
+
+static void app_set_server_acl(uint16_t instance_id, lwm2m_instance_acl_t *acl)
+{
+    lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
+
+    // Reset ACL on the instance.
+    (void)lwm2m_acl_permissions_reset(p_instance, acl->owner);
 
     // Set default access to LWM2M_PERMISSION_READ.
     (void)lwm2m_acl_permissions_add(p_instance,
@@ -1141,7 +1149,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
 
             acl.access[0] = rwde_access;
             acl.server[0] = 102;
-            app_init_server_acl(0, &acl);
+            app_set_server_acl(0, &acl);
             break;
         }
 
@@ -1153,7 +1161,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             acl.server[1] = 102;
             acl.access[2] = rwde_access;
             acl.server[2] = 1000;
-            app_init_server_acl(1, &acl);
+            app_set_server_acl(1, &acl);
             break;
         }
 
@@ -1172,7 +1180,7 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             acl.access[0] = rwde_access;
             acl.server[0] = 102;
             acl.owner = 101;
-            app_init_server_acl(2, &acl);
+            app_set_server_acl(2, &acl);
             break;
         }
 
@@ -1184,12 +1192,18 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             acl.server[1] = 102;
             acl.access[2] = rwde_access;
             acl.server[2] = 1000;
-            app_init_server_acl(3, &acl);
+            app_set_server_acl(3, &acl);
             break;
         }
 
         default:
             break;
+    }
+
+    if (lwm2m_server_short_server_id_get(instance_id) > 0)
+    {
+        lwm2m_instance_storage_security_store(instance_id);
+        lwm2m_instance_storage_server_store(instance_id);
     }
 }
 
@@ -1222,15 +1236,14 @@ void lwm2m_bootstrap_reset(void)
 
     app_misc_data_set_bootstrapped(0);
 
-    // Remove DM server
-    lwm2m_instance_storage_security_delete(1);
-    lwm2m_instance_storage_server_delete(1);
-    lwm2m_server_short_server_id_set(1, 0);
+    // Delete existing servers and init factory defaults
+    for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
+        lwm2m_instance_storage_security_delete(i);
+        lwm2m_instance_storage_server_delete(i);
+        lwm2m_server_short_server_id_set(i, 0);
 
-    // Remove Repository server
-    lwm2m_instance_storage_security_delete(3);
-    lwm2m_instance_storage_server_delete(3);
-    lwm2m_server_short_server_id_set(3, 0);
+        app_factory_bootstrap_server_object(i);
+    }
 }
 
 void lwm2m_factory_reset(void)
@@ -1264,13 +1277,12 @@ static void app_load_flash_objects(void)
 
         if (lwm2m_server_short_server_id_get(i) == 0)
         {
-            // Instance not loaded from flash, init factory defaults
-            app_factory_bootstrap_server_object(i);
+            // Instance not loaded from flash, init server ACL
+            app_init_server_acl(i);
 
-            if (lwm2m_server_short_server_id_get(i) > 0)
-            {
-                lwm2m_instance_storage_security_store(i);
-                lwm2m_instance_storage_server_store(i);
+            if (i == 0) {
+                // Init factory defaults for bootstrap server
+                app_factory_bootstrap_server_object(i);
             }
         }
     }

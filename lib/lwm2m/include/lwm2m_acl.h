@@ -91,6 +91,18 @@ uint32_t lwm2m_acl_permissions_remove(lwm2m_instance_t * p_instance,
                                       uint16_t           short_server_id);
 
 /**
+ * @brief Reset the access control list of the instance, keep the ACL unique id.
+ *
+ * @param[in] p_instance  Instance to reset.
+ * @param[in] owner       Owner of the instance (short server id).
+ *
+ * @retval NRF_SUCCESS    Reset succeeded.
+ * @retval NRF_ERROR_NULL The p_instance parameter was NULL.
+ */
+uint32_t lwm2m_acl_permissions_reset(lwm2m_instance_t * p_instance,
+                                     uint16_t           owner);
+
+/**
  * @brief Serialize the ACL of the instance into TLV.
  *
  * @param[out] p_buffer     Buffer to serialize the ACL instance into.

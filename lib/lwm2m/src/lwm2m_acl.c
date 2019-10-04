@@ -66,14 +66,10 @@ uint32_t lwm2m_acl_permissions_init(lwm2m_instance_t * p_instance,
 {
     NULL_PARAM_CHECK(p_instance);
 
-    memset(p_instance->acl.access, 0, sizeof(uint16_t) * (1+LWM2M_MAX_SERVERS));
-    memset(p_instance->acl.server, 0, sizeof(uint16_t) * (1+LWM2M_MAX_SERVERS));
-
-    p_instance->acl.id        = m_index_counter;
-    p_instance->acl.owner     = owner;
+    p_instance->acl.id = m_index_counter;
     m_index_counter++;
 
-    return 0;
+    return lwm2m_acl_permissions_reset(p_instance, owner);
 }
 
 
@@ -177,6 +173,20 @@ uint32_t lwm2m_acl_permissions_remove(lwm2m_instance_t * p_instance,
 
     p_instance->acl.server[index] = 0;
     p_instance->acl.access[index] = 0;
+
+    return 0;
+}
+
+
+uint32_t lwm2m_acl_permissions_reset(lwm2m_instance_t * p_instance,
+                                     uint16_t           owner)
+{
+    NULL_PARAM_CHECK(p_instance);
+
+    memset(p_instance->acl.access, 0, sizeof(uint16_t) * (1+LWM2M_MAX_SERVERS));
+    memset(p_instance->acl.server, 0, sizeof(uint16_t) * (1+LWM2M_MAX_SERVERS));
+
+    p_instance->acl.owner = owner;
 
     return 0;
 }
