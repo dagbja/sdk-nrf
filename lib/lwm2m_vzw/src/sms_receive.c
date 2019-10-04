@@ -7,11 +7,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#define LOG_MODULE_NAME lwm2m_sms
-
-#include <logging/log.h>
-LOG_MODULE_REGISTER(LOG_MODULE_NAME);
-
+#include <lwm2m.h>
 #include <sms_receive.h>
 #include <at_cmd.h>
 #include <lwm2m_vzw_main.h>
@@ -22,13 +18,13 @@ static uint32_t receive_count;
 int32_t lwm2m_sms_receiver_enable(void)
 {
     if (!sms_initialized) {
-        LOG_INF("Enable SMS receiver");
+        LWM2M_INF("Enable SMS receiver");
 
         // Selects how new messages are indicated.
         int err = at_cmd_write("AT+CNMI=3,2,0,1", NULL, 0, NULL);
 
         if (err) {
-            LOG_ERR("Unable to enable SMS receiver, AT error %d", err);
+            LWM2M_ERR("Unable to enable SMS receiver, AT error %d", err);
             return err;
         }
 
@@ -41,13 +37,13 @@ int32_t lwm2m_sms_receiver_enable(void)
 int32_t lwm2m_sms_receiver_disable(void)
 {
     if (sms_initialized) {
-        LOG_INF("Disable SMS receiver");
+        LWM2M_INF("Disable SMS receiver");
 
         // Turn off SMS indication.
         int err = at_cmd_write("AT+CNMI=0", NULL, 0, NULL);
 
         if (err) {
-            LOG_ERR("Unable to disable SMS receiver, AT error %d", err);
+            LWM2M_ERR("Unable to disable SMS receiver, AT error %d", err);
             return err;
         }
 
@@ -64,13 +60,12 @@ int sms_receiver_notif_parse(char *notif)
     if (length > 12 && strncmp(notif, "+CMT:", 5) == 0) {
 
         receive_count++;
-        //LOG_INF("SMS received (count=%lu)", receive_count);
 
         // Send new message ACK in PDU mode.
         int err = at_cmd_write("AT+CNMA=1", NULL, 0, NULL);
         if(err != 0) {
             // Ignore error and continue
-            LOG_ERR("Unable to ACK SMS notification.");
+            LWM2M_ERR("Unable to ACK SMS notification.");
         }
 
         // Manually decode the last bytes to get CoAP URI (ignore trailing \r\n)
@@ -80,19 +75,19 @@ int sms_receiver_notif_parse(char *notif)
 
         if (object == 1 && instance >= 0 && instance < 4 && resource == 8) {
             // Server Registration Update Trigger
-            LOG_INF("Server Registration Update Trigger (server %u)", instance);
+            LWM2M_INF("SMS: Server Registration Update Trigger (server %u)", instance);
             lwm2m_request_server_update(instance, false);
         } else if (object == 3 && instance == 0 && resource == 4) {
             // Device Reboot
-            LOG_INF("Device Reboot");
+            LWM2M_INF("SMS: Device Reboot");
             lwm2m_system_reset();
         } else if (object == 3 && instance == 0 && resource == 5) {
             // Device Factory Reset
-            LOG_INF("Device Factory Reset");
+            LWM2M_INF("SMS: Device Factory Reset");
             lwm2m_factory_reset();
             lwm2m_system_reset();
         } else {
-            LOG_ERR("Execute /%d/%d/%d not handled", object, instance, resource);
+            LWM2M_ERR("SMS: Execute /%d/%d/%d not handled", object, instance, resource);
         }
 
         // CMT notification has been parsed.
