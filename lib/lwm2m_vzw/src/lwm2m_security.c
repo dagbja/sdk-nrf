@@ -396,3 +396,22 @@ void lwm2m_security_init(void)
         m_instance_security[i].proto.instance_id = i;
     }
 }
+
+void lwm2m_security_reset(uint16_t instance_id)
+{
+    lwm2m_security_t * p_instance = lwm2m_security_get_instance(instance_id);
+
+    p_instance->bootstrap_server = false;
+    p_instance->security_mode = 0;
+    p_instance->sms_security_mode = 0;
+    p_instance->short_server_id = 0;
+    p_instance->client_hold_off_time = 0;
+
+    lwm2m_string_free(&p_instance->server_uri);
+    lwm2m_opaque_free(&p_instance->public_key);
+    lwm2m_opaque_free(&p_instance->server_public_key);
+    lwm2m_opaque_free(&p_instance->secret_key);
+    lwm2m_opaque_free(&p_instance->sms_binding_key_param);
+    lwm2m_opaque_free(&p_instance->sms_binding_secret_keys);
+    lwm2m_string_free(&p_instance->sms_number);
+}

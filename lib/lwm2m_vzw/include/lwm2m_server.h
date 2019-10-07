@@ -54,6 +54,8 @@ void lwm2m_server_short_server_id_set(uint16_t instance_id, uint16_t value);
 
 void lwm2m_server_init(void);
 
+void lwm2m_server_reset(uint16_t instance_id);
+
 lwm2m_server_t * lwm2m_server_get_instance(uint16_t instance_id);
 
 lwm2m_object_t * lwm2m_server_get_object(void);

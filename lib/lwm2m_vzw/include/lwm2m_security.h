@@ -54,6 +54,8 @@ void lwm2m_security_short_server_id_set(uint16_t instance_id, uint16_t value);
 
 void lwm2m_security_init(void);
 
+void lwm2m_security_reset(uint16_t instance_id);
+
 lwm2m_security_t * lwm2m_security_get_instance(uint16_t instance_id);
 
 lwm2m_object_t * lwm2m_security_get_object(void);

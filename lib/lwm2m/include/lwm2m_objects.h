@@ -384,7 +384,6 @@ uint32_t lwm2m_bytebuffer_to_string(char * p_payload, uint16_t payload_len, lwm2
  */
 uint32_t lwm2m_bytebuffer_to_opaque(char * p_payload, uint16_t payload_len, lwm2m_opaque_t * p_opaque);
 
-
 /**@brief Allocate lwm2m_list_t memory to hold a list.
  *
  * @param[in]  p_payload Buffer which holds a list.
@@ -395,6 +394,22 @@ uint32_t lwm2m_bytebuffer_to_opaque(char * p_payload, uint16_t payload_len, lwm2
  * @retval NRF_ERROR_NO_MEM  If allocation was unsuccessful
  */
 uint32_t lwm2m_bytebuffer_to_list(char * p_payload, uint16_t payload_len, lwm2m_list_t * p_list);
+
+/**@brief Free allocated memory in lwm2m_string_t.
+ *
+ * @param[in] p_string By reference pointer to the lwm2m_string_t.
+ *
+ * @return NRF_SUCCESS  If deallocation was successful
+ */
+uint32_t lwm2m_string_free(lwm2m_string_t * p_string);
+
+/**@brief Free allocated memory in lwm2m_opaque_t.
+ *
+ * @param[in] p_opaque By reference pointer to the lwm2m_opaque_t.
+ *
+ * @return NRF_SUCCESS  If deallocation was successful
+ */
+uint32_t lwm2m_opaque_free(lwm2m_opaque_t * p_opaque);
 
 /**@brief Initialize a LWM2M security object instance.
  *

@@ -1135,6 +1135,9 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
         .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID
     };
 
+    lwm2m_security_reset(instance_id);
+    lwm2m_server_reset(instance_id);
+
     switch (instance_id)
     {
         case 0: // Bootstrap server
@@ -1149,7 +1152,6 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
 
             acl.access[0] = rwde_access;
             acl.server[0] = 102;
-            app_set_server_acl(0, &acl);
             break;
         }
 
@@ -1161,7 +1163,6 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             acl.server[1] = 102;
             acl.access[2] = rwde_access;
             acl.server[2] = 1000;
-            app_set_server_acl(1, &acl);
             break;
         }
 
@@ -1180,7 +1181,6 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             acl.access[0] = rwde_access;
             acl.server[0] = 102;
             acl.owner = 101;
-            app_set_server_acl(2, &acl);
             break;
         }
 
@@ -1192,13 +1192,14 @@ static void app_factory_bootstrap_server_object(uint16_t instance_id)
             acl.server[1] = 102;
             acl.access[2] = rwde_access;
             acl.server[2] = 1000;
-            app_set_server_acl(3, &acl);
             break;
         }
 
         default:
             break;
     }
+
+    app_set_server_acl(instance_id, &acl);
 
     if (lwm2m_server_short_server_id_get(instance_id) > 0)
     {

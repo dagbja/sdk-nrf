@@ -84,6 +84,24 @@ uint32_t lwm2m_bytebuffer_to_list(char * p_payload, uint16_t payload_len, lwm2m_
     return 0;
 }
 
+uint32_t lwm2m_string_free(lwm2m_string_t * p_string)
+{
+    if (p_string->p_val)
+    {
+        lwm2m_os_free(p_string->p_val);
+    }
+
+    p_string->p_val = NULL;
+    p_string->len   = 0;
+
+    return 0;
+}
+
+uint32_t lwm2m_opaque_free(lwm2m_opaque_t * p_opaque)
+{
+    return lwm2m_string_free((lwm2m_string_t *)p_opaque);
+}
+
 void lwm2m_instance_security_init(lwm2m_security_t * p_instance)
 {
     // Set prototype variables.

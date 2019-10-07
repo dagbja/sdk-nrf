@@ -449,3 +449,17 @@ void lwm2m_server_init(void)
         (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[i]);
     }
 }
+
+void lwm2m_server_reset(uint16_t instance_id)
+{
+    lwm2m_server_t * p_instance = lwm2m_server_get_instance(instance_id);
+
+    p_instance->short_server_id = 0;
+    p_instance->lifetime = 0;
+    p_instance->default_minimum_period = 0;
+    p_instance->default_maximum_period = 0;
+    p_instance->disable_timeout = 0;
+    p_instance->notification_storing_on_disabled = false;
+
+    lwm2m_string_free(&p_instance->binding);
+}
