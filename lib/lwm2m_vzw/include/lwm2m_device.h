@@ -16,4 +16,6 @@ lwm2m_object_t * lwm2m_device_get_object(void);
 char * lwm2m_device_get_sim_iccid(uint32_t * iccid_len);
 int lwm2m_device_set_sim_iccid(char *p_iccid, uint32_t iccid_len);
 
+int32_t lwm2m_device_battery_status_get(void);
+
 void lwm2m_device_notify_resource(uint16_t resource_id);

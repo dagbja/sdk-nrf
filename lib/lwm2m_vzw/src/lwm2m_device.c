@@ -242,6 +242,20 @@ char * lwm2m_device_get_sim_iccid(uint32_t * iccid_len)
     return m_verizon_resources[0].p_val;
 }
 
+int32_t lwm2m_device_battery_status_get(void)
+{
+    lwm2m_device_t *device_obj_instance = lwm2m_device_get_instance(0);
+
+    // Iterate the list of available power sources to verify that an Internal Battery (1) is present.
+    for (int i = 0; i < (device_obj_instance->avail_power_sources.len); i++)
+    {
+        if (device_obj_instance->avail_power_sources.val.p_uint8[i] == (uint8_t)LWM2M_CARRIER_POWER_SOURCE_INTERNAL_BATTERY)
+        {
+            return device_obj_instance->battery_status;
+        }
+    }
+    return LWM2M_CARRIER_BATTERY_STATUS_NOT_INSTALLED;
+}
 
 /**@brief Callback function for device instances. */
 uint32_t device_instance_callback(lwm2m_instance_t * p_instance,

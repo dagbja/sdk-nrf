@@ -13,10 +13,13 @@
 #include <lwm2m.h>
 #include <lwm2m_objects.h>
 #include <lwm2m_carrier.h>
+#include <lwm2m_server.h>
 #include <lwm2m_firmware.h>
+#include <lwm2m_firmware_download.h>
 #include <lwm2m_vzw_main.h>
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_instance_storage.h>
+#include <lwm2m_device.h>
 
 #include <dfusock.h>
 
@@ -46,6 +49,7 @@ static char *img_state_str[] = {
 };
 
 static void *download_dwork;
+static void *reboot_dwork;
 static struct lwm2m_os_download_cfg config = {
 	.sec_tag = CONFIG_NRF_LWM2M_VZW_SEC_TAG,
 };
@@ -317,6 +321,26 @@ static void download_task(void *w)
 	}
 }
 
+static void reboot_task(void *w)
+{
+	if (lwm2m_device_battery_status_get() != LWM2M_CARRIER_BATTERY_STATUS_LOW_BATTERY) {
+		LWM2M_INF("Firmware update scheduled at boot");
+		lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_UPDATING);
+		/* Temporary fix:
+		 * deregister in order to register at boot instead of doing
+		 * a server update; this will trigger the observe request
+		 * on the firmware resources needed by the FOTA update test.
+		 */
+		lwm2m_server_registered_set(1, false);
+		lwm2m_instance_storage_server_store(1);
+		/* Reset to continue FOTA update */
+		lwm2m_request_reset();
+	} else {
+		LWM2M_INF("Battery low - firmware update boot delayed by 5 minutes");
+		lwm2m_os_timer_start(reboot_dwork, K_MINUTES(5));
+	}
+}
+
 int lwm2m_firmware_download_init(void)
 {
 	int err;
@@ -332,6 +356,11 @@ int lwm2m_firmware_download_init(void)
 		return -1;
 	}
 
+	reboot_dwork = lwm2m_os_timer_get(reboot_task);
+	if (!reboot_dwork) {
+		return -1;
+	}
+	
 	err = lwm2m_os_download_init(callback);
 	if (err) {
 		return err;
@@ -479,6 +508,13 @@ int lwm2m_firmware_download_uri(char *package_uri, size_t len)
 
 	lwm2m_os_timer_start(download_dwork, K_NO_WAIT);
 
+	return 0;
+}
+
+int lwm2m_firmware_download_reboot_schedule(void)
+{
+	lwm2m_os_timer_start(reboot_dwork, K_NO_WAIT);
+	
 	return 0;
 }
 
