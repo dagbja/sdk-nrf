@@ -903,17 +903,17 @@ int at_read_connstat(lwm2m_connectivity_statistics_t * p_conn_stat)
 
     const char *at_xconnstat = "AT%XCONNSTAT?";
 
-    retval = at_params_list_init(&xconnstat_params, 6);
+    retval = at_params_list_init(&xconnstat_params, 7);
     if (retval == 0)
     {
         if (at_send_command_and_parse_params(at_xconnstat, &xconnstat_params) == 0)
         {
-            if ((at_params_int_get(&xconnstat_params, 0, &p_conn_stat->sms_tx_counter) != 0) ||
-                (at_params_int_get(&xconnstat_params, 1, &p_conn_stat->sms_rx_counter) != 0) ||
-                (at_params_int_get(&xconnstat_params, 2, &p_conn_stat->tx_data) != 0) ||
-                (at_params_int_get(&xconnstat_params, 3, &p_conn_stat->rx_data) != 0) ||
-                (at_params_int_get(&xconnstat_params, 4, &p_conn_stat->max_message_size) != 0) ||
-                (at_params_int_get(&xconnstat_params, 5, &p_conn_stat->average_message_size) != 0))
+            if ((at_params_int_get(&xconnstat_params, 1, &p_conn_stat->sms_tx_counter) != 0) ||
+                (at_params_int_get(&xconnstat_params, 2, &p_conn_stat->sms_rx_counter) != 0) ||
+                (at_params_int_get(&xconnstat_params, 3, &p_conn_stat->tx_data) != 0) ||
+                (at_params_int_get(&xconnstat_params, 4, &p_conn_stat->rx_data) != 0) ||
+                (at_params_int_get(&xconnstat_params, 5, &p_conn_stat->max_message_size) != 0) ||
+                (at_params_int_get(&xconnstat_params, 6, &p_conn_stat->average_message_size) != 0))
             {
                 LWM2M_ERR("failed to get xconstat");
                 retval = -EINVAL;
