@@ -89,19 +89,24 @@ static uint32_t internal_server_config_set(coap_message_t * msg, lwm2m_server_co
 
     if (err_code == 0)
     {
-        if (p_config->msisdn > 0)
+        if (p_config->msisdn.p_val != NULL && p_config->msisdn.len != 0)
         {
-            int retval = snprintf(buffer, sizeof(buffer), "sms=%010llu", p_config->msisdn);
-            if (retval < 0)
+            if (p_config->msisdn.len < sizeof(buffer) - 4)
             {
-                err_code = EINVAL;
-            }
-            else
-            {
+                buffer[0] = 's';
+                buffer[1] = 'm';
+                buffer[2] = 's';
+                buffer[3] = '=';
+                memcpy(buffer + 4, p_config->msisdn.p_val, p_config->msisdn.len);
+
                 err_code = coap_message_opt_str_add(msg,
                                                     COAP_OPT_URI_QUERY,
                                                     (uint8_t *)buffer,
-                                                    strlen(buffer));
+                                                    p_config->msisdn.len + 4);
+            }
+            else
+            {
+                err_code = ENOMEM;
             }
         }
     }

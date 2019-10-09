@@ -1537,8 +1537,8 @@ static void app_server_connect(uint16_t instance_id)
         m_server_conf[instance_id].binding.len = 3;
 
         if (instance_id) {
-            char *endptr;
-            m_server_conf[instance_id].msisdn = strtoull(lwm2m_msisdn_get(), &endptr, 10);
+            m_server_conf[instance_id].msisdn.p_val = lwm2m_msisdn_get();
+            m_server_conf[instance_id].msisdn.len = strlen(lwm2m_msisdn_get());
         }
     }
 

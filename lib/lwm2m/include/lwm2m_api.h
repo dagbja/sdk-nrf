@@ -82,7 +82,7 @@ typedef enum
 typedef struct
 {
     uint32_t       lifetime;            /**< Lifetime parameter. */
-    uint64_t       msisdn;              /**< SMS number MSISDN. */
+    lwm2m_string_t msisdn;              /**< SMS number MSISDN. */
     uint8_t        lwm2m_version_major; /**< LWM2M major version number. */
     uint8_t        lwm2m_version_minor; /**< LWM2M minor version number. */
     uint16_t       short_server_id;     /**< Short server id. */
