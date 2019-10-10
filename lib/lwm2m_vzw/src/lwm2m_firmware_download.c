@@ -8,7 +8,6 @@
 #include <stdint.h>
 
 #include <nrf_socket.h>
-#include <net/download_client.h>
 
 #include <lwm2m.h>
 #include <lwm2m_objects.h>
@@ -40,14 +39,13 @@ static char *img_state_str[] = {
 };
 
 static void *download_dwork;
-static struct download_client http_downloader;
-static struct download_client_cfg config = {
+static struct lwm2m_os_download_cfg config = {
 	.sec_tag = CONFIG_NRF_LWM2M_VZW_SEC_TAG,
 };
 
 int lwm2m_firmware_download_uri(char *package_uri, size_t len);
 
-static int on_fragment(const struct download_client_evt *event)
+static int on_fragment(const struct lwm2m_os_download_evt *event)
 {
 	int err;
 	nrf_dfu_err_t dfu_err;
@@ -63,7 +61,7 @@ static int on_fragment(const struct download_client_evt *event)
 	 * Disconnect the HTTP socket regardless of whether we will reattempt
 	 * the download, since we'll open it again anyway if and when we do.
 	 */
-	download_client_disconnect(&http_downloader);
+	lwm2m_os_download_disconnect();
 
 	if (err == -ENOEXEC) {
 		/* Let's fetch the RPC error reason. */
@@ -101,11 +99,11 @@ static int on_fragment(const struct download_client_evt *event)
 	return -1;
 }
 
-static int on_done(const struct download_client_evt *event)
+static int on_done(const struct lwm2m_os_download_evt *event)
 {
 	LWM2M_INF("Download completed");
 
-	download_client_disconnect(&http_downloader);
+	lwm2m_os_download_disconnect();
 
 	/* Save state and notify the server */
 	lwm2m_firmware_image_state_set(FIRMWARE_READY);
@@ -124,12 +122,12 @@ static int on_done(const struct download_client_evt *event)
 	return 0;
 }
 
-static int on_error(const struct download_client_evt *event)
+static int on_error(const struct lwm2m_os_download_evt *event)
 {
 	int err;
 
 	LWM2M_WRN("Download interrupted");
-	err = download_client_disconnect(&http_downloader);
+	err = lwm2m_os_download_disconnect();
 	if (err) {
 		LWM2M_ERR("Failed to resume download");
 		lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_IDLE);
@@ -153,14 +151,14 @@ static int on_error(const struct download_client_evt *event)
 	return 0;
 }
 
-static int callback(const struct download_client_evt *event)
+static int callback(const struct lwm2m_os_download_evt *event)
 {
 	switch (event->id) {
-	case DOWNLOAD_CLIENT_EVT_FRAGMENT:
+	case LWM2M_OS_DOWNLOAD_EVT_FRAGMENT:
 		return on_fragment(event);
-	case DOWNLOAD_CLIENT_EVT_DONE:
+	case LWM2M_OS_DOWNLOAD_EVT_DONE:
 		return on_done(event);
-	case DOWNLOAD_CLIENT_EVT_ERROR:
+	case LWM2M_OS_DOWNLOAD_EVT_ERROR:
 		return on_error(event);
 	default:
 		return 0;
@@ -239,14 +237,14 @@ static void download_task(void *w)
 	 * to minimize the idle time on the socket and prevent the peer from
 	 * closing the connection before we get a chance to begin downloading.
 	 */
-	err = download_client_connect(&http_downloader, host, &config);
+	err = lwm2m_os_download_connect(host, &config);
 	if (err) {
 		lwm2m_firmware_update_result_set(
 			0, LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI);
 		return;
 	}
 
-	err = download_client_start(&http_downloader, file, off);
+	err = lwm2m_os_download_start(file, off);
 	if (err) {
 		lwm2m_firmware_update_result_set(
 			0, LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI);
@@ -269,7 +267,7 @@ int lwm2m_firmware_download_init(void)
 		return -1;
 	}
 
-	err = download_client_init(&http_downloader, callback);
+	err = lwm2m_os_download_init(callback);
 	if (err) {
 		return err;
 	}

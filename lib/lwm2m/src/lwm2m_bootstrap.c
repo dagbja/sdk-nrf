@@ -45,7 +45,7 @@ static uint32_t internal_message_new(coap_message_t         ** pp_msg,
 
 
 /**@brief Function to be used as callback function upon a bootstrap request. */
-static void lwm2m_bootstrap_cb(u32_t status, void * p_arg, coap_message_t * p_message)
+static void lwm2m_bootstrap_cb(uint32_t status, void * p_arg, coap_message_t * p_message)
 {
     struct sockaddr *p_remote = NULL;
     uint8_t coap_code = 0;
@@ -128,7 +128,7 @@ uint32_t lwm2m_bootstrap(struct sockaddr         * p_remote,
 
     if (err_code == 0)
     {
-        u32_t msg_handle;
+        uint32_t msg_handle;
         err_code = coap_message_send(&msg_handle, p_msg);
     }
 

@@ -9,12 +9,8 @@
 #include <at_interface.h>
 
 #include <nrf_socket.h>
-#include <pdn_management.h>
+#include <lwm2m_os.h>
 #include <sms_receive.h>
-#include <at_cmd.h>
-#include <at_notif.h>
-#include <at_cmd_parser/at_cmd_parser.h>
-#include <at_cmd_parser/at_params.h>
 #include <lwm2m_api.h>
 
 /* For logging API. */
@@ -53,34 +49,34 @@ static const at_notif_handler at_handlers[] = {
 
 at_net_reg_stat_cb_t m_net_reg_stat_cb;
 
-static int at_send_command_and_parse_params(const char * p_at_command, struct at_param_list * p_param_list)
+static int at_send_command_and_parse_params(const char * p_at_command, struct lwm2m_os_at_param_list * p_param_list)
 {
     char read_buffer[APP_MAX_AT_READ_LENGTH];
 
     int retval = 0;
 
-    retval = at_cmd_write(p_at_command, read_buffer, APP_MAX_AT_READ_LENGTH, NULL);
+    retval = lwm2m_os_at_cmd_write(p_at_command, read_buffer, APP_MAX_AT_READ_LENGTH);
 
     if (retval == 0) {
-        retval = at_parser_params_from_str(read_buffer, NULL, p_param_list);
+        retval = lwm2m_os_at_parser_params_from_str(read_buffer, NULL, p_param_list);
     }
 
     return retval;
 }
 
-static int at_response_param_to_lwm2m_string(const char * p_at_command, lwm2m_string_t *p_string)
+static int at_response_param_to_lwm2m_string(const char * p_at_command, lwm2m_string_t * p_string)
 {
     int retval = 0;
-    struct at_param_list params;
+    struct lwm2m_os_at_param_list params;
 
     char read_buf[APP_MAX_AT_READ_LENGTH];
     size_t buf_len = sizeof(read_buf);
 
-    if (at_params_list_init(&params, 1) == 0)
+    if (lwm2m_os_at_params_list_init(&params, 1) == 0)
     {
         if (at_send_command_and_parse_params(p_at_command, &params) == 0)
         {
-            retval = at_params_string_get(&params, 0, read_buf, &buf_len);
+            retval = lwm2m_os_at_params_string_get(&params, 0, read_buf, &buf_len);
             if (retval == 0)
             {
                 (void)lwm2m_bytebuffer_to_string(read_buf, buf_len, p_string);
@@ -97,7 +93,7 @@ static int at_response_param_to_lwm2m_string(const char * p_at_command, lwm2m_st
             retval = -EIO;
         }
 
-        at_params_list_free(&params);
+        lwm2m_os_at_params_list_free(&params);
     }
     else
     {
@@ -113,17 +109,17 @@ static int at_response_param_to_string(const char * p_at_command, int param_coun
                                         size_t *p_buffer_len)
 {
     int retval = 0;
-    struct at_param_list params;
+    struct lwm2m_os_at_param_list params;
 
-    if (at_params_list_init(&params, param_count) == 0)
+    if (lwm2m_os_at_params_list_init(&params, param_count) == 0)
     {
         int err = at_send_command_and_parse_params(p_at_command, &params);
         if (err == 0 || err == -EAGAIN || err ==-E2BIG)
         {
-            err = at_params_string_get(&params, param_idx, p_string_buffer, p_buffer_len);
+            err = lwm2m_os_at_params_string_get(&params, param_idx, p_string_buffer, p_buffer_len);
             if (err == 0)
             {
-                /* at_params_string_get will return an error if tmp_len is not smaller than param len.
+                /* lwm2m_os_at_params_string_get will return an error if tmp_len is not smaller than param len.
                  * No need to check size in this level. */
                 p_string_buffer[*p_buffer_len] = '\0';
             }
@@ -138,11 +134,11 @@ static int at_response_param_to_string(const char * p_at_command, int param_coun
             retval = err;
         }
 
-        at_params_list_free(&params);
+        lwm2m_os_at_params_list_free(&params);
     }
     else
     {
-        LWM2M_ERR("at_params_list_init failed");
+        LWM2M_ERR("lwm2m_os_at_params_list_init failed");
         retval = -EINVAL;
     }
 
@@ -201,20 +197,20 @@ static int at_cgev_handler(char *notif)
 static int at_cereg_handler(char *notif)
 {
     int retval = 0;
-    struct at_param_list cereg_params;
+    struct lwm2m_os_at_param_list cereg_params;
 
     // Check if this is a CGEV event.
     int length = strlen(notif);
     if (length >= 8 && strncmp(notif, "+CEREG: ", 7) == 0)
     {
-        retval = at_params_list_init(&cereg_params, 2);
+        retval = lwm2m_os_at_params_list_init(&cereg_params, 2);
 
         if (retval == 0) {
-            retval = at_parser_params_from_str(notif, NULL, &cereg_params);
+            retval = lwm2m_os_at_parser_params_from_str(notif, NULL, &cereg_params);
             if (retval == 0 || retval == -E2BIG)
             {
-                u16_t net_reg_stat;
-                if (at_params_short_get(&cereg_params, 1, &net_reg_stat) == 0)
+                uint16_t net_reg_stat;
+                if (lwm2m_os_at_params_short_get(&cereg_params, 1, &net_reg_stat) == 0)
                 {
                     if (m_net_reg_stat_cb != NULL)
                     {
@@ -290,22 +286,17 @@ int at_if_init(void)
 {
     int err;
 
-    err = at_cmd_init();
+    err = lwm2m_os_at_init();
     if (err) {
-            return err;
-    }
-
-    err = at_notif_init();
-    if (err) {
-        LWM2M_ERR("Failed to initialize at_notif, err %d", err);
-        return err;
+            LWM2M_ERR("Failed to initialize AT interface");
+            return -1;
     }
 
     // Set handler for AT notifications and events (SMS, CESQ, etc.).
-    err = at_notif_register_handler(NULL, at_response_handler);
+    err = lwm2m_os_at_notif_register_handler(NULL, at_response_handler);
     if (err) {
-        LWM2M_ERR("Failed to register AT handler, err %d", err);
-        return err;
+        LWM2M_ERR("Failed to register AT handler");
+        return -1;
     }
 
     return 0;
@@ -323,7 +314,7 @@ int at_apn_setup_wait_for_ipv6(const char * const apn)
 
     // Register for packet domain event reporting +CGEREP.
     // The unsolicited result code is +CGEV: XXX.
-    int err = at_cmd_write("AT+CGEREP=1", NULL, 0, NULL);
+    int err = lwm2m_os_at_cmd_write("AT+CGEREP=1", NULL, 0);
 
     if (err != 0)
     {
@@ -333,7 +324,7 @@ int at_apn_setup_wait_for_ipv6(const char * const apn)
     }
 
     // Set up APN which implicitly creates a CID.
-    int apn_handle = pdn_init_and_connect((char *)apn);
+    int apn_handle = lwm2m_os_pdn_init_and_connect(apn);
 
     if (apn_handle > -1)
     {
@@ -355,7 +346,7 @@ int at_apn_setup_wait_for_ipv6(const char * const apn)
             if (timeout_ms <= 0)
             {
                 LWM2M_ERR("Timeout while waiting for IPv6 (cid=%u)", cid_number);
-                pdn_disconnect(apn_handle); // Cleanup socket
+                lwm2m_os_pdn_disconnect(apn_handle); // Cleanup socket
                 apn_handle = -1;
             }
             else
@@ -366,13 +357,13 @@ int at_apn_setup_wait_for_ipv6(const char * const apn)
         else
         {
             LWM2M_ERR("Unable to get PDN context ID on socket %d, errno=%d", apn_handle, errno);
-            pdn_disconnect(apn_handle); // Cleanup socket
+            lwm2m_os_pdn_disconnect(apn_handle); // Cleanup socket
             apn_handle = -1;
         }
     }
 
     // Unregister from packet domain events.
-    (void)at_cmd_write("AT+CGEREP=0", NULL, 0, NULL);
+    (void)lwm2m_os_at_cmd_write("AT+CGEREP=0", NULL, 0);
 
     return apn_handle;
 }
@@ -484,14 +475,14 @@ int at_read_firmware_version(lwm2m_string_t *p_manufacturer_id)
 int at_read_operator_id(uint32_t  *p_operator_id)
 {
     int retval = 0;
-    struct at_param_list operid_params;
+    struct lwm2m_os_at_param_list operid_params;
 
     *p_operator_id = 0;
 
     // Read network registration status
     const char *at_operid = "AT%XOPERID";
 
-    if (at_params_list_init(&operid_params, 2))
+    if (lwm2m_os_at_params_list_init(&operid_params, 2))
     {
         LWM2M_ERR("operid_params list init failed");
         retval = EINVAL;
@@ -501,8 +492,8 @@ int at_read_operator_id(uint32_t  *p_operator_id)
         int ret = at_send_command_and_parse_params(at_operid, &operid_params);
         if (ret == 0)
         {
-            u32_t operator_id;
-            if (at_params_int_get(&operid_params, 1, &operator_id) == 0)
+            uint32_t operator_id;
+            if (lwm2m_os_at_params_int_get(&operid_params, 1, &operator_id) == 0)
             {
                 *p_operator_id = (uint32_t)operator_id;
             }
@@ -518,7 +509,7 @@ int at_read_operator_id(uint32_t  *p_operator_id)
             retval = EIO;
         }
 
-        at_params_list_free(&operid_params);
+        lwm2m_os_at_params_list_free(&operid_params);
     }
 
     return retval;
@@ -530,7 +521,7 @@ void at_subscribe_net_reg_stat(at_net_reg_stat_cb_t net_reg_stat_cb)
 
     m_net_reg_stat_cb = net_reg_stat_cb;
 
-    retval = at_cmd_write("AT+CEREG=2", NULL, 0, NULL);
+    retval = lwm2m_os_at_cmd_write("AT+CEREG=2", NULL, 0);
 
     if (retval != 0) {
         LWM2M_ERR("AT+CEREG=2 failed: %d", (int)retval);
@@ -540,19 +531,19 @@ void at_subscribe_net_reg_stat(at_net_reg_stat_cb_t net_reg_stat_cb)
 int at_read_net_reg_stat(uint32_t * p_net_stat)
 {
     int retval = 0;
-    struct at_param_list cereg_params;
+    struct lwm2m_os_at_param_list cereg_params;
 
     // Read network registration status
     const char *at_cereg = "AT+CEREG?";
 
-    retval = at_params_list_init(&cereg_params, 3);
+    retval = lwm2m_os_at_params_list_init(&cereg_params, 3);
     if (retval == 0)
     {
         int ret = at_send_command_and_parse_params(at_cereg, &cereg_params);
         if (ret == 0 || ret == -E2BIG)
         {
-            u32_t net_stat;
-            if (at_params_int_get(&cereg_params, 2, &net_stat) == 0)
+            uint32_t net_stat;
+            if (lwm2m_os_at_params_int_get(&cereg_params, 2, &net_stat) == 0)
             {
                 *p_net_stat = (uint32_t)net_stat;
             }
@@ -568,7 +559,7 @@ int at_read_net_reg_stat(uint32_t * p_net_stat)
             retval = -EINVAL;
         }
 
-        at_params_list_free(&cereg_params);
+        lwm2m_os_at_params_list_free(&cereg_params);
     }
     else
     {
@@ -606,7 +597,7 @@ int at_read_model_number(lwm2m_string_t *p_model_number)
 int at_read_radio_signal_strength_and_link_quality(int32_t * p_signal_strength, int32_t * p_link_quality)
 {
     int retval = 0;
-    struct at_param_list cesq_params;
+    struct lwm2m_os_at_param_list cesq_params;
 
     // Read network registration status
     const char *at_cesq = "AT+CESQ";
@@ -614,14 +605,14 @@ int at_read_radio_signal_strength_and_link_quality(int32_t * p_signal_strength, 
     *p_signal_strength = 0;
     *p_link_quality = 0;
 
-    retval = at_params_list_init(&cesq_params, 7);
+    retval = lwm2m_os_at_params_list_init(&cesq_params, 7);
     if (retval == 0)
     {
         if (at_send_command_and_parse_params(at_cesq, &cesq_params) == 0)
         {
             // Radio signal strength
-            u32_t rsrp;
-            if (at_params_int_get(&cesq_params, 6, &rsrp) == 0)
+            uint32_t rsrp;
+            if (lwm2m_os_at_params_int_get(&cesq_params, 6, &rsrp) == 0)
             {
                 if (rsrp != 255)
                 {
@@ -653,8 +644,8 @@ int at_read_radio_signal_strength_and_link_quality(int32_t * p_signal_strength, 
             }
 
             // Link Quality
-            u16_t rsrq;
-            if (at_params_short_get(&cesq_params, 5, &rsrq) == 0)
+            uint16_t rsrq;
+            if (lwm2m_os_at_params_short_get(&cesq_params, 5, &rsrq) == 0)
             {
                 if (rsrq != 255)
                 {
@@ -707,7 +698,7 @@ int at_read_radio_signal_strength_and_link_quality(int32_t * p_signal_strength, 
             retval = -EIO;
         }
 
-        at_params_list_free(&cesq_params);
+        lwm2m_os_at_params_list_free(&cesq_params);
     }
     else
     {
@@ -781,9 +772,9 @@ int at_read_time(int32_t *p_time, int32_t *p_utc_offset, int32_t *p_dst_adjustme
     *p_dst_adjustment = 0;
 
     // Read modem time with DST
-    struct at_param_list cclk_params;
+    struct lwm2m_os_at_param_list cclk_params;
 
-    int err = at_params_list_init(&cclk_params, 3);
+    int err = lwm2m_os_at_params_list_init(&cclk_params, 3);
     if (err == 0)
     {
         err = at_send_command_and_parse_params("AT%CCLK?", &cclk_params);
@@ -795,7 +786,7 @@ int at_read_time(int32_t *p_time, int32_t *p_utc_offset, int32_t *p_dst_adjustme
         // Get time string
         if (err == 0)
         {
-            err = at_params_string_get(&cclk_params, 1, string_buf, &len);
+            err = lwm2m_os_at_params_string_get(&cclk_params, 1, string_buf, &len);
             if (err == 0)
             {
                 string_buf[len] = '\0';
@@ -804,10 +795,10 @@ int at_read_time(int32_t *p_time, int32_t *p_utc_offset, int32_t *p_dst_adjustme
         }
 
         // Get DST if available
-        if (err == 0 && at_params_valid_count_get(&cclk_params) == 3)
+        if (err == 0 && lwm2m_os_at_params_valid_count_get(&cclk_params) == 3)
         {
-            u32_t dst_hrs;
-            err = at_params_int_get(&cclk_params, 2, &dst_hrs);
+            uint32_t dst_hrs;
+            err = lwm2m_os_at_params_int_get(&cclk_params, 2, &dst_hrs);
             if (err == 0)
             {
                 *p_dst_adjustment = (int32_t)dst_hrs;
@@ -876,22 +867,22 @@ int at_read_ipaddr(lwm2m_list_t * p_ipaddr_list)
 
 int at_read_connstat(lwm2m_connectivity_statistics_t * p_conn_stat)
 {
-    struct at_param_list xconnstat_params;
+    struct lwm2m_os_at_param_list xconnstat_params;
     int retval;
 
     const char *at_xconnstat = "AT%XCONNSTAT?";
 
-    retval = at_params_list_init(&xconnstat_params, 7);
+    retval = lwm2m_os_at_params_list_init(&xconnstat_params, 7);
     if (retval == 0)
     {
         if (at_send_command_and_parse_params(at_xconnstat, &xconnstat_params) == 0)
         {
-            if ((at_params_int_get(&xconnstat_params, 1, &p_conn_stat->sms_tx_counter) != 0) ||
-                (at_params_int_get(&xconnstat_params, 2, &p_conn_stat->sms_rx_counter) != 0) ||
-                (at_params_int_get(&xconnstat_params, 3, &p_conn_stat->tx_data) != 0) ||
-                (at_params_int_get(&xconnstat_params, 4, &p_conn_stat->rx_data) != 0) ||
-                (at_params_int_get(&xconnstat_params, 5, &p_conn_stat->max_message_size) != 0) ||
-                (at_params_int_get(&xconnstat_params, 6, &p_conn_stat->average_message_size) != 0))
+            if ((lwm2m_os_at_params_int_get(&xconnstat_params, 1, &p_conn_stat->sms_tx_counter) != 0) ||
+                (lwm2m_os_at_params_int_get(&xconnstat_params, 2, &p_conn_stat->sms_rx_counter) != 0) ||
+                (lwm2m_os_at_params_int_get(&xconnstat_params, 3, &p_conn_stat->tx_data) != 0) ||
+                (lwm2m_os_at_params_int_get(&xconnstat_params, 4, &p_conn_stat->rx_data) != 0) ||
+                (lwm2m_os_at_params_int_get(&xconnstat_params, 5, &p_conn_stat->max_message_size) != 0) ||
+                (lwm2m_os_at_params_int_get(&xconnstat_params, 6, &p_conn_stat->average_message_size) != 0))
             {
                 LWM2M_ERR("failed to get xconstat");
                 retval = -EINVAL;
@@ -903,7 +894,7 @@ int at_read_connstat(lwm2m_connectivity_statistics_t * p_conn_stat)
             retval = -EIO;
         }
 
-        at_params_list_free(&xconnstat_params);
+        lwm2m_os_at_params_list_free(&xconnstat_params);
     }
     else
     {
@@ -916,10 +907,10 @@ int at_read_connstat(lwm2m_connectivity_statistics_t * p_conn_stat)
 
 int at_start_connstat(void)
 {
-    return at_cmd_write("AT%XCONNSTAT=1", NULL, 0, NULL);
+    return lwm2m_os_at_cmd_write("AT%XCONNSTAT=1", NULL, 0);
 }
 
 int at_stop_connstat(void)
 {
-    return at_cmd_write("AT%XCONNSTAT=0", NULL, 0, NULL);
+    return lwm2m_os_at_cmd_write("AT%XCONNSTAT=0", NULL, 0);
 }

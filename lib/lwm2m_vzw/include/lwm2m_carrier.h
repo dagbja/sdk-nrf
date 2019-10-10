@@ -121,7 +121,7 @@ int32_t lwm2m_carrier_utc_time_read(void);
 /**
  * @brief Function to read offset to UTC time
  *
- * @note This function can be implemented by the application, if custom time 
+ * @note This function can be implemented by the application, if custom time
  *       management is needed.
  *
  * @return  UTC offset in minutes
@@ -131,10 +131,10 @@ int lwm2m_carrier_utc_offset_read(void);
 /**
  * @brief Function to read timezone
  *
- * @note This function can be implemented by the application, if custom time 
+ * @note This function can be implemented by the application, if custom time
  *       management is needed.
  *
- * @return  Null-terminated timezone string pointer, IANA Timezone (TZ) 
+ * @return  Null-terminated timezone string pointer, IANA Timezone (TZ)
  *          database format
  */
 const char *lwm2m_carrier_timezone_read(void);
@@ -142,7 +142,7 @@ const char *lwm2m_carrier_timezone_read(void);
 /**
  * @brief Function to write current UTC time (LWM2M server write operation)
  *
- * @note This function can be implemented by the application, if custom time 
+ * @note This function can be implemented by the application, if custom time
  *       management is needed.
  *
  * @param[in] time Time since Epoch in seconds
@@ -154,7 +154,7 @@ int lwm2m_carrier_utc_time_write(int32_t time);
 /**
  * @brief Function to write UTC offset (LWM2M server write operation)
  *
- * @note This function can be implemented by the application, if custom time 
+ * @note This function can be implemented by the application, if custom time
  *       management is needed.
  *
  * @param[in] offset UTC offset in minutes
@@ -166,7 +166,7 @@ int lwm2m_carrier_utc_offset_write(int offset);
 /**
  * @brief Function to write timezone (LWM2M server write operation)
  *
- * @note This function can be implemented by the application, if custom time 
+ * @note This function can be implemented by the application, if custom time
  *       management is needed.
  *
  * @param[in] p_tz Null-terminated timezone string pointer
@@ -189,49 +189,49 @@ void lwm2m_carrier_event_handler(const lwm2m_carrier_event_t *event);
 /**@} */
 
 /**
- * @brief      Set the available power sources supported and used by the LWM2M 
+ * @brief      Set the available power sources supported and used by the LWM2M
  *             device.
  *
- * @note       It is necessary to call this function before any other device 
- *             power source related functions listed in this file, as any 
- *             updates of voltage/current measurements performed on power 
+ * @note       It is necessary to call this function before any other device
+ *             power source related functions listed in this file, as any
+ *             updates of voltage/current measurements performed on power
  *             sources that have not been reported will be discarded.
- * @note       Upon consecutive calls of this function, the corresponding 
+ * @note       Upon consecutive calls of this function, the corresponding
  *             current and voltage measurements will be reset to 0. Similarly,
- *             the battery status will be set to UNKNOWN and the battery 
+ *             the battery status will be set to UNKNOWN and the battery
  *             level to 0%.
  *
  * @param[in]  power_sources          Array of available device power sources.
- * @param[in]  power_source_count     Number of power sources currently used 
+ * @param[in]  power_source_count     Number of power sources currently used
  *                                    by the device.
  *
  * @retval     -E2BIG    If the reported number of power sources is bigger than
  *                       the maximum supported.
  * @retval     -EINVAL   If one or more of the power sources are not supported.
- * @retval     0         If the available power sources have been set 
+ * @retval     0         If the available power sources have been set
  *                       successfully.
  */
-int lwm2m_carrier_avail_power_sources_set(const uint8_t *power_sources, 
+int lwm2m_carrier_avail_power_sources_set(const uint8_t *power_sources,
                                           uint8_t power_source_count);
 
 /**
- * @brief      Set or update the latest voltage measurements made on one of 
+ * @brief      Set or update the latest voltage measurements made on one of
  *             the available device power sources.
  *
  * @note       The voltage measurement needs to be specified in milivolts (mV)
  *             and is to be assigned to one of the available power sources.
  *
- * @param[in]  power_source           Power source to which the measurement 
+ * @param[in]  power_source           Power source to which the measurement
  *                                    corresponds.
  * @param[in]  value                  Voltage measurement expressed in mV.
  *
  * @retval     -EINVAL   If the power source is not supported.
- * @retval     -ENODEV   If the power source is not listed as an available 
+ * @retval     -ENODEV   If the power source is not listed as an available
  *                       power source.
- * @retval     0         If the voltage measurements have been updated 
+ * @retval     0         If the voltage measurements have been updated
  *                       successfully.
  */
-int lwm2m_carrier_power_source_voltage_set(uint8_t power_source, 
+int lwm2m_carrier_power_source_voltage_set(uint8_t power_source,
                                            int32_t value);
 
 /**
@@ -241,17 +241,17 @@ int lwm2m_carrier_power_source_voltage_set(uint8_t power_source,
  * @note       The current measurement needs to be specified in miliampers (mA)
  *             and is to be assigned to one of the available power sources.
  *
- * @param[in]  power_source           Power source to which the measurement 
+ * @param[in]  power_source           Power source to which the measurement
  *                                    corresponds.
  * @param[in]  value                  Current measurement expressed in mA.
  *
  * @retval     -EINVAL   If the power source is not supported.
  * @retval     -ENODEV   If the power source is not listed as an available
  *                       power source.
- * @retval     0         If the current measurements have been updated 
+ * @retval     0         If the current measurements have been updated
  *                       successfully.
  */
-int lwm2m_carrier_power_source_current_set(uint8_t power_source, 
+int lwm2m_carrier_power_source_current_set(uint8_t power_source,
                                            int32_t value);
 
 /**
@@ -386,7 +386,7 @@ int lwm2m_carrier_error_code_remove(int32_t error);
  * @note       The value is expressed in kilobytes (kB).
  *
  * @param[in]  memory_total     Total amount of storage space in kilobytes.
- * 
+ *
  * @retval     -EINVAL  	    It the reported value is bigger than INT32_MAX.
  * @retval     0 			    If the total amount of storage space has been
  * 								set successfully.
@@ -397,7 +397,7 @@ int lwm2m_carrier_memory_total_set(uint32_t memory_total);
  * @brief      Read the estimated current available amount of storage space to
  *             store data and software in the LWM2M Device.
  *
- * @note       This function must be implemented by the application in order to 
+ * @note       This function must be implemented by the application in order to
  * 			   support the reporting of memory free, otherwise the returned
  * 			   value will be 0.
  *

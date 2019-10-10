@@ -10,14 +10,13 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <errno.h>
-#include <zephyr.h>
 #include <at_interface.h>
 #include <lwm2m.h>
 
 #define MAX_TIMEZONE_LEN 64
 
-static s64_t m_current_time_msecs;
-static s64_t m_time_base_msecs;
+static int64_t m_current_time_msecs;
+static int64_t m_time_base_msecs;
 
 static int m_utc_offset;
 static char m_timezone[MAX_TIMEZONE_LEN];
@@ -121,7 +120,7 @@ static int lwm2m_time_modem_time_get(void)
     {
         if (m_time_set == false)
         {
-            m_current_time_msecs = (s64_t) time * 1000;
+            m_current_time_msecs = (int64_t) time * 1000;
             m_time_set = true;
         }
 
@@ -171,13 +170,13 @@ static void lwm2m_time_current_time_update(void)
         }
         else
         {
-            s64_t delta_time = k_uptime_delta(&m_time_base_msecs);
+            int64_t delta_time = k_uptime_delta(&m_time_base_msecs);
             m_current_time_msecs += delta_time;
         }
     }
     else
     {
-        s64_t delta_time = k_uptime_delta(&m_time_base_msecs);
+        int64_t delta_time = k_uptime_delta(&m_time_base_msecs);
         m_current_time_msecs += delta_time;
     }
 }
@@ -193,7 +192,7 @@ int __WEAK lwm2m_carrier_utc_time_write(int32_t time)
 {
     if (time >= 0)
     {
-        m_current_time_msecs = (s64_t)time * 1000;
+        m_current_time_msecs = (int64_t)time * 1000;
         m_time_base_msecs = k_uptime_get();
         m_time_set = true;
     }

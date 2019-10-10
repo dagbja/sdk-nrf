@@ -8,7 +8,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#include <at_cmd.h>
 #include <at_interface.h>
 #include <lwm2m_os.h>
 #include <modem_logging.h>
@@ -49,7 +48,7 @@ int modem_at_write(const char *const cmd, bool do_logging)
         ret = -1;
     } else {
         // Send a null-terminated AT command.
-        ret = at_cmd_write(cmd, read_buffer, APP_MAX_AT_READ_LENGTH, NULL);
+        ret = lwm2m_os_at_cmd_write(cmd, read_buffer, APP_MAX_AT_READ_LENGTH);
     }
 
     if (do_logging) {

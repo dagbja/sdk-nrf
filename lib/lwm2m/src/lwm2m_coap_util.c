@@ -53,7 +53,7 @@ uint32_t lwm2m_respond_with_code(coap_msg_code_t code, coap_message_t * p_reques
         return err_code;
     }
 
-    u32_t msg_handle;
+    uint32_t msg_handle;
     err_code = coap_message_send(&msg_handle, p_response);
     if (err_code != 0)
     {
@@ -79,7 +79,7 @@ uint32_t lwm2m_observe_register(uint8_t             * p_payload,
     uint32_t err_code;
 
     // Register observer, and if successful, add the Observe option in the reply.
-    u32_t handle;
+    uint32_t handle;
     coap_observer_t observer;
 
     // Set the token length.
@@ -172,7 +172,7 @@ uint32_t lwm2m_observe_register(uint8_t             * p_payload,
             return err_code;
         }
 
-        u32_t msg_handle;
+        uint32_t msg_handle;
         err_code = coap_message_send(&msg_handle, p_response);
         if (err_code != 0)
         {
@@ -189,7 +189,7 @@ uint32_t lwm2m_observe_register(uint8_t             * p_payload,
 uint32_t lwm2m_observe_unregister(struct sockaddr  * p_remote,
                                   void             * p_resource)
 {
-    u32_t handle;
+    uint32_t handle;
 
     uint32_t err_code = coap_observe_server_search(&handle,
                                                    p_remote,
@@ -203,7 +203,7 @@ uint32_t lwm2m_observe_unregister(struct sockaddr  * p_remote,
     return err_code;
 }
 
-static void observer_con_message_callback(u32_t status, void * arg, coap_message_t * p_response)
+static void observer_con_message_callback(uint32_t status, void * arg, coap_message_t * p_response)
 {
     uint32_t err_code;
     switch (status)
@@ -300,7 +300,7 @@ uint32_t lwm2m_notify(uint8_t         * p_payload,
         return err_code;
     }
 
-    u32_t msg_handle;
+    uint32_t msg_handle;
     err_code = coap_message_send(&msg_handle, p_response);
     if (err_code != 0)
     {
@@ -375,7 +375,7 @@ uint32_t lwm2m_respond_with_payload(uint8_t             * p_payload,
         return err_code;
     }
 
-    u32_t msg_handle;
+    uint32_t msg_handle;
     err_code = coap_message_send(&msg_handle, p_response);
     if (err_code != 0)
     {

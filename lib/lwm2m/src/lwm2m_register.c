@@ -144,7 +144,7 @@ uint32_t internal_lwm2m_register_init(void)
 }
 
 
-static void lwm2m_register_cb(u32_t status, void * p_arg, coap_message_t * p_message)
+static void lwm2m_register_cb(uint32_t status, void * p_arg, coap_message_t * p_message)
 {
     struct sockaddr *p_remote = NULL;
     uint8_t coap_code = 0;
@@ -275,7 +275,7 @@ uint32_t lwm2m_register(struct sockaddr         * p_remote,
 
     if (err_code == 0)
     {
-        u32_t msg_handle;
+        uint32_t msg_handle;
         err_code = coap_message_send(&msg_handle, p_msg);
     }
 
@@ -298,7 +298,7 @@ uint32_t lwm2m_register(struct sockaddr         * p_remote,
 }
 
 
-void lwm2m_update_cb(u32_t status, void * p_arg, coap_message_t * p_message)
+void lwm2m_update_cb(uint32_t status, void * p_arg, coap_message_t * p_message)
 {
     struct sockaddr *p_remote = NULL;
     uint8_t coap_code = 0;
@@ -385,7 +385,7 @@ uint32_t lwm2m_update(struct sockaddr         * p_remote,
 
     if (err_code == 0)
     {
-        u32_t msg_handle;
+        uint32_t msg_handle;
         err_code = coap_message_send(&msg_handle, p_msg);
     }
 
@@ -408,7 +408,7 @@ uint32_t lwm2m_update(struct sockaddr         * p_remote,
 }
 
 
-void lwm2m_deregister_cb(u32_t status, void * p_arg, coap_message_t * p_message)
+void lwm2m_deregister_cb(uint32_t status, void * p_arg, coap_message_t * p_message)
 {
     struct sockaddr *p_remote = NULL;
     uint8_t coap_code = 0;
@@ -507,7 +507,7 @@ uint32_t lwm2m_deregister(struct sockaddr * p_remote, coap_transport_handle_t tr
 
     if (err_code == 0)
     {
-        u32_t msg_handle;
+        uint32_t msg_handle;
         err_code = coap_message_send(&msg_handle, p_msg);
     }
 

@@ -48,6 +48,28 @@
 ^lwm2m_os_timer_remaining$
 ^lwm2m_os_timer_start$
 ^lwm2m_os_uptime_get$
+^lwm2m_os_bsdlib_init$
+^lwm2m_os_bsdlib_shutdown$
+^lwm2m_os_at_init$
+^lwm2m_os_at_notif_register_handler$
+^lwm2m_os_at_cmd_write$
+^lwm2m_os_at_params_list_free$
+^lwm2m_os_at_params_list_init$
+^lwm2m_os_at_params_int_get$
+^lwm2m_os_at_params_short_get$
+^lwm2m_os_at_params_string_get$
+^lwm2m_os_at_params_list_clear$
+^lwm2m_os_at_parser_params_from_str$
+^lwm2m_os_at_params_valid_count_get$
+^lwm2m_os_download_connect$
+^lwm2m_os_download_disconnect$
+^lwm2m_os_download_init$
+^lwm2m_os_download_start$
+^lwm2m_os_lte_link_up$
+^lwm2m_os_lte_link_down$
+^lwm2m_os_lte_power_down$
+^lwm2m_os_pdn_disconnect$
+^lwm2m_os_pdn_init_and_connect$
 
 # Callbacks
 ^lwm2m_coap_handler_root$

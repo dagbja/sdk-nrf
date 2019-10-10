@@ -177,7 +177,7 @@ int32_t lwm2m_instance_storage_misc_data_delete(void)
 
 int32_t lwm2m_instance_storage_security_load(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_BASE_SECURITY + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_BASE_SECURITY + instance_id;
 
     // Peek file size.
     char peak_buffer[1];
@@ -223,7 +223,7 @@ int32_t lwm2m_instance_storage_security_load(uint16_t instance_id)
 
 int32_t lwm2m_instance_storage_security_store(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_BASE_SECURITY + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_BASE_SECURITY + instance_id;
 
     // Fetch URI.
     uint8_t uri_len;
@@ -281,14 +281,14 @@ int32_t lwm2m_instance_storage_security_store(uint16_t instance_id)
 
 int32_t lwm2m_instance_storage_security_delete(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_BASE_SECURITY + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_BASE_SECURITY + instance_id;
     lwm2m_os_storage_delete(id);
     return 0;
 }
 
 int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_BASE_SERVER + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_BASE_SERVER + instance_id;
 
     // Peek file size.
     char peak_buffer[1];
@@ -372,7 +372,7 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
 
 int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_BASE_SERVER + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_BASE_SERVER + instance_id;
 
     // Fetch binding.
     uint8_t binding_len;
@@ -456,14 +456,14 @@ int32_t lwm2m_instance_storage_server_store(uint16_t instance_id)
 
 int32_t lwm2m_instance_storage_server_delete(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_BASE_SERVER + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_BASE_SERVER + instance_id;
     lwm2m_os_storage_delete(id);
     return 0;
 }
 
 int32_t lwm2m_instance_storage_device_load(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_DEVICE + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_DEVICE + instance_id;
 
     // Peek file size.
     char peak_buffer[1];
@@ -507,7 +507,7 @@ int32_t lwm2m_instance_storage_device_load(uint16_t instance_id)
 
 int32_t lwm2m_instance_storage_device_store(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_DEVICE + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_DEVICE + instance_id;
 
     // Locate the ACL of the instance.
     lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_device_get_instance(instance_id);
@@ -536,14 +536,14 @@ int32_t lwm2m_instance_storage_device_store(uint16_t instance_id)
 
 int32_t lwm2m_instance_storage_device_delete(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_DEVICE + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_DEVICE + instance_id;
     lwm2m_os_storage_delete(id);
     return 0;
 }
 
 int32_t lwm2m_instance_storage_conn_mon_load(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_CONN_MON + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_CONN_MON + instance_id;
 
     // Peek file size.
     char peak_buffer[1];
@@ -587,7 +587,7 @@ int32_t lwm2m_instance_storage_conn_mon_load(uint16_t instance_id)
 
 int32_t lwm2m_instance_storage_conn_mon_store(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_CONN_MON + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_CONN_MON + instance_id;
 
     // Locate the ACL of the instance.
     lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_conn_mon_get_instance(instance_id);
@@ -616,14 +616,14 @@ int32_t lwm2m_instance_storage_conn_mon_store(uint16_t instance_id)
 
 int32_t lwm2m_instance_storage_conn_mon_delete(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_CONN_MON + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_CONN_MON + instance_id;
     lwm2m_os_storage_delete(id);
     return 0;
 }
 
 int32_t lwm2m_instance_storage_firmware_load(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_FIRMWARE + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_FIRMWARE + instance_id;
 
     // Peek file size.
     char peak_buffer[1];
@@ -667,7 +667,7 @@ int32_t lwm2m_instance_storage_firmware_load(uint16_t instance_id)
 
 int32_t lwm2m_instance_storage_firmware_store(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_FIRMWARE + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_FIRMWARE + instance_id;
 
     // Locate the ACL of the instance.
     lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_firmware_get_instance(instance_id);
@@ -697,14 +697,14 @@ int32_t lwm2m_instance_storage_firmware_store(uint16_t instance_id)
 int32_t lwm2m_instance_storage_firmware_delete(uint16_t instance_id)
 {
     // Only one instance for now.
-    u16_t id = LWM2M_INSTANCE_STORAGE_FIRMWARE;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_FIRMWARE;
     lwm2m_os_storage_delete(id);
     return 0;
 }
 
 int32_t lwm2m_instance_storage_conn_stat_load(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_CONN_STAT + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_CONN_STAT + instance_id;
 
     // Peek file size.
     char peak_buffer[1];
@@ -748,7 +748,7 @@ int32_t lwm2m_instance_storage_conn_stat_load(uint16_t instance_id)
 
 int32_t lwm2m_instance_storage_conn_stat_store(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_CONN_STAT + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_CONN_STAT + instance_id;
 
     // Locate the ACL of the instance.
     lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_conn_stat_get_instance(instance_id);
@@ -777,7 +777,7 @@ int32_t lwm2m_instance_storage_conn_stat_store(uint16_t instance_id)
 
 int32_t lwm2m_instance_storage_conn_stat_delete(uint16_t instance_id)
 {
-    u16_t id = LWM2M_INSTANCE_STORAGE_CONN_STAT + instance_id;
+    uint16_t id = LWM2M_INSTANCE_STORAGE_CONN_STAT + instance_id;
     lwm2m_os_storage_delete(id);
     return 0;
 }

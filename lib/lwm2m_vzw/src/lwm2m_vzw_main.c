@@ -8,8 +8,6 @@
 #include <string.h>
 
 #include <lwm2m.h>
-#include <bsd.h>
-#include <net/bsdlib.h>
 #include <lwm2m_tlv.h>
 #include <lwm2m_acl.h>
 #include <lwm2m_api.h>
@@ -28,10 +26,8 @@
 #include <lwm2m_os.h>
 
 #include <app_debug.h>
-#include <lte_lc.h>
 #include <at_interface.h>
 #include <nrf_inbuilt_key.h>
-#include <pdn_management.h>
 #include <sms_receive.h>
 
 #include <sha256.h>
@@ -217,7 +213,7 @@ static bool lwm2m_state_set(lwm2m_state_t app_state)
 
 static void app_init_and_connect(void)
 {
-    lte_lc_init_and_connect();
+    lwm2m_os_lte_link_up();
     app_event_notify(LWM2M_CARRIER_EVENT_CONNECT, NULL);
 
     // Because lte_lc_init_and_connect() will suspend net_reg_stat notifications
@@ -235,7 +231,7 @@ static void app_offline(void)
     // when provisioning security keys.
     lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
 
-    lte_lc_offline();
+    lwm2m_os_lte_link_down();
 }
 
 static bool lwm2m_is_registration_ready(void)
@@ -392,8 +388,8 @@ void lwm2m_system_shutdown(void)
 {
     app_disconnect();
 
-    lte_lc_power_off();
-    bsdlib_shutdown();
+    lwm2m_os_lte_power_down();
+    lwm2m_os_bsdlib_shutdown();
 
     m_app_state = LWM2M_STATE_SHUTDOWN;
 
@@ -443,7 +439,7 @@ static void lwm2m_disconnect_admin_pdn(uint16_t instance_id)
     if ((m_use_admin_pdn[instance_id]) &&
         (m_admin_pdn_handle != -1))
     {
-        pdn_disconnect(m_admin_pdn_handle);
+        lwm2m_os_pdn_disconnect(m_admin_pdn_handle);
         m_admin_pdn_handle = -1;
     }
 }
@@ -586,7 +582,7 @@ uint32_t lwm2m_coap_handler_root(uint8_t op_code, coap_message_t * p_request)
     return 0;
 }
 
-static void app_init_sockaddr_in(struct sockaddr *addr, sa_family_t ai_family, u16_t port)
+static void app_init_sockaddr_in(struct sockaddr *addr, sa_family_t ai_family, uint16_t port)
 {
     memset(addr, 0, sizeof(struct sockaddr));
 
@@ -636,7 +632,7 @@ static void app_printable_ip_address(struct sockaddr * addr, char * ip_buffer, s
     switch (addr->sa_family) {
     case AF_INET:
     {
-        u32_t val = ((struct sockaddr_in *)addr)->sin_addr.s_addr;
+        uint32_t val = ((struct sockaddr_in *)addr)->sin_addr.s_addr;
         snprintf(ip_buffer, ip_buffer_len, "%u.%u.%u.%u",
                 ((uint8_t *)&val)[0], ((uint8_t *)&val)[1], ((uint8_t *)&val)[2], ((uint8_t *)&val)[3]);
         break;
@@ -648,8 +644,8 @@ static void app_printable_ip_address(struct sockaddr * addr, char * ip_buffer, s
         bool elided = false;
 
         // Poor man's elided IPv6 address print.
-        for (u8_t i = 0; i < 16; i += 2) {
-            u16_t val = (((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[i] << 8) +
+        for (uint8_t i = 0; i < 16; i += 2) {
+            uint16_t val = (((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[i] << 8) +
                         (((struct sockaddr_in6 *)addr)->sin6_addr.s6_addr[i+1]);
 
             if (elided || val != 0) {
@@ -2294,34 +2290,19 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
         lwm2m_state_set(LWM2M_STATE_MODEM_FIRMWARE_UPDATE);
     }
 
-    err = bsdlib_init();
-    if (err) {
-        switch (err) {
-        case MODEM_DFU_RESULT_OK:
-            LWM2M_INF("Modem firmware update successful.");
-            LWM2M_INF("Modem will run the new firmware after reboot.");
-            break;
-        case MODEM_DFU_RESULT_UUID_ERROR:
-        case MODEM_DFU_RESULT_AUTH_ERROR:
-            LWM2M_ERR("Modem firmware update failed.");
-            LWM2M_ERR("Modem will run non-updated firmware on reboot.");
-            break;
-        case MODEM_DFU_RESULT_HARDWARE_ERROR:
-        case MODEM_DFU_RESULT_INTERNAL_ERROR:
-            LWM2M_ERR("Modem firmware update failed.");
-            LWM2M_ERR("Fatal error.");
-            break;
-        case -1:
-            LWM2M_ERR("Could not initialize bsdlib.");
-            LWM2M_ERR("Fatal error.");
-            return -EFAULT;
-        default:
-            break;
-        }
+    err = lwm2m_os_bsdlib_init();
+    if (err < 0) {
+        /* bsdlib failed to initialize, fatal error */
+        return -1;
+    }
 
-        // Whatever the result, reboot and change the state.
+    if (err > 0) {
+        /* We have completed a modem firmware update.
+         * Whatever the result, update the state and reboot.
+         */
         lwm2m_firmware_update_state_set(UPDATE_EXECUTED);
         lwm2m_os_sys_reset();
+        CODE_UNREACHABLE;
     }
 
     app_event_notify(LWM2M_CARRIER_EVENT_BSDLIB_INIT, NULL);

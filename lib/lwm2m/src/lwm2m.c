@@ -59,7 +59,7 @@ static uint16_t           m_num_objects;
 static uint16_t           m_num_instances;
 
 
-static void coap_error_handler(u32_t error_code, coap_message_t * p_message)
+static void coap_error_handler(uint32_t error_code, coap_message_t * p_message)
 {
     // LWM2M_ERR("[CoAP]: Unhandled CoAP message received. Error code: %u", error_code);
 }
@@ -702,7 +702,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 {
     uint32_t err_code;
     uint8_t  operation    = LWM2M_OPERATION_CODE_NONE;
-    u32_t content_type = 0;
+    uint32_t content_type = 0;
 
     err_code = coap_message_ct_mask_get(p_request, &content_type);
     if (err_code != 0)
@@ -1135,7 +1135,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 }
 
 
-static u32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
+static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
 {
     LWM2M_ENTRY();
 

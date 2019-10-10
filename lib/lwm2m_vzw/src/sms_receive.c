@@ -9,7 +9,6 @@
 
 #include <lwm2m.h>
 #include <sms_receive.h>
-#include <at_cmd.h>
 #include <lwm2m_vzw_main.h>
 
 static bool sms_initialized;
@@ -21,7 +20,7 @@ int32_t lwm2m_sms_receiver_enable(void)
         LWM2M_INF("Enable SMS receiver");
 
         // Selects how new messages are indicated.
-        int err = at_cmd_write("AT+CNMI=3,2,0,1", NULL, 0, NULL);
+        int err = lwm2m_os_at_cmd_write("AT+CNMI=3,2,0,1", NULL, 0);
 
         if (err) {
             LWM2M_ERR("Unable to enable SMS receiver, AT error %d", err);
@@ -40,7 +39,7 @@ int32_t lwm2m_sms_receiver_disable(void)
         LWM2M_INF("Disable SMS receiver");
 
         // Turn off SMS indication.
-        int err = at_cmd_write("AT+CNMI=0", NULL, 0, NULL);
+        int err = lwm2m_os_at_cmd_write("AT+CNMI=0", NULL, 0);
 
         if (err) {
             LWM2M_ERR("Unable to disable SMS receiver, AT error %d", err);
@@ -62,7 +61,7 @@ int sms_receiver_notif_parse(char *notif)
         receive_count++;
 
         // Send new message ACK in PDU mode.
-        int err = at_cmd_write("AT+CNMA=1", NULL, 0, NULL);
+        int err = lwm2m_os_at_cmd_write("AT+CNMA=1", NULL, 0);
         if(err != 0) {
             // Ignore error and continue
             LWM2M_ERR("Unable to ACK SMS notification.");
