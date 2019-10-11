@@ -18,10 +18,8 @@ def ciUtils = null
 pipeline {
 
   parameters {
-    booleanParam(name: 'RUN_DOWNSTREAM', description: 'if false skip downstream jobs', defaultValue: true)
-    booleanParam(name: 'RUN_TESTS', description: 'if false skip testing', defaultValue: true)
-    booleanParam(name: 'RUN_BUILD', description: 'if false skip building', defaultValue: true)
-    string(name: 'jsonstr_CI_STATE', description: 'Default State if no upstream job', defaultValue: INPUT_STATE)
+    string(name: 'jsonstr_CI_STATE', defaultValue: INPUT_STATE, description: 'Default State if no upstream job')
+    booleanParam(name: 'GENERATE_OBFUSCATED_LIB', defaultValue: false, description: 'if true generate an obfuscated version of the library')
   }
 
   agent {
@@ -37,10 +35,12 @@ pipeline {
     timeout(time: TIMEOUT.time, unit: TIMEOUT.unit)
   }
 
-//  triggers {
-//    // Build master branch periodically
-//    cron(env.BRANCH_NAME == 'master' ? '0 */12 * * 1-7' : '')
-//  }
+  environment {
+    // Environment variables for building.
+    // GNUARMEMB_TOOLCHAIN_PATH is set in the Docker image.
+    ZEPHYR_TOOLCHAIN_VARIANT = 'gnuarmemb' // Or 'zephyr' to use Zephyr SDK.
+    ZEPHYR_BASE = "${env.WORKSPACE}/zephyr"
+  }
 
   stages {
 
@@ -48,7 +48,7 @@ pipeline {
       steps { script { CI_STATE = lib_Stage.load('LWM2M') }}
     }
 
-    stage('Checkout') {
+    stage('West') {
       steps { script {
         lib_Main.cloneCItools(JOB_NAME)
         dir('lwm2m') {
@@ -66,18 +66,18 @@ pipeline {
           case "pr":
             // If we're a pull request, compare the target branch against the current HEAD (the PR), and also report issues to the PR
             COMMIT_RANGE = "$CI_STATE.NRF.MERGE_BASE..$CI_STATE.NRF.REPORT_SHA"
-            ciUtils.lwm2mLog("Building a PR [$CHANGE_ID]: $COMMIT_RANGE")
+            ciUtils.lwm2mLog("Building PR [$CHANGE_ID]: $COMMIT_RANGE")
             break
 
           case "tag":
             COMMIT_RANGE = "tags/${env.BRANCH_NAME}..tags/${env.BRANCH_NAME}"
-            ciUtils.lwm2mLog("Building a Tag: $COMMIT_RANGE")
+            ciUtils.lwm2mLog("Building tag: $COMMIT_RANGE")
             break
 
           case "branch":
             // If not a PR, it's a non-PR-branch or master build. Compare against the origin.
             COMMIT_RANGE = "origin/${env.BRANCH_NAME}..HEAD"
-            ciUtils.lwm2mLog("Building a Branch: $COMMIT_RANGE")
+            ciUtils.lwm2mLog("Building branch: $COMMIT_RANGE")
             break
 
           default:
@@ -85,8 +85,7 @@ pipeline {
             break
         }
 
-        def gitSha = ciUtils.getGitCommitSha('lwm2m');
-
+        def gitSha = ciUtils.getGitCommitSha('lwm2m/');
         ciUtils.lwm2mLog("LWM2M git SHA '${gitSha}'.")
 
         dir('lwm2m') {
@@ -105,13 +104,19 @@ pipeline {
         /* Build the client application using library source files. */
         dir('lwm2m/client') {
           try {
-            ciUtils.lwm2mLog("Building client application using library source files...")
+            ciUtils.lwm2mLoadZephyrEnv()
+
+            ciUtils.lwm2mLog("Building client application using library source files.")
+
+            // Use West to built the application. West finds the ZEPHYR_BASE folder automatically.
             sh "rm -rf build && west build -b nrf9160_pca10090ns ."
-            ciUtils.lwm2mLog("Done")
 
             /* Store compiled files as artifacts. */
-            archiveArtifacts artifacts: 'build/zephyr/*.hex'
-            archiveArtifacts artifacts: 'build/zephyr/*.elf'
+            sh 'mkdir output/'
+            sh 'find build/zephyr/ -type f \\( -iname \\*.hex -o -iname \\*.elf -o -iname \\*.map \\) -exec cp {} output/ \\;'
+            sh 'cd output/ && tar -zcvf client_app.tar.gz *'
+
+            archiveArtifacts artifacts: 'output/*.tar.gz'
           }
           catch (err) {
             ciUtils.lwm2mLog("Build failed: ${err}")
@@ -120,6 +125,36 @@ pipeline {
       }}
     }
 
+    stage('Build carrier library') {
+      when {
+        expression {
+          def runObf = (env.BRANCH_NAME ==~ /(master|release)/) || (params.GENERATE_OBFUSCATED_LIB == true)
+          if (!runObf) {
+            ciUtils.lwm2mLog("Skip library compilation step on branch '${env.BRANCH_NAME}'.")
+          }
+          else {
+            ciUtils.lwm2mLog("Generate an obfuscated library version on branch '${env.BRANCH_NAME}' (force=${params.GENERATE_OBFUSCATED_LIB}).")
+          }
+          return runObf
+        }
+      }
+
+      steps { script {
+        dir('lwm2m/project') {
+          /* Compile an obfuscated version of the LWM2M carrier library. */
+          ciUtils.lwm2mCompileLib()
+        }
+      }}
+    }
+
+    stage('Build debug carrier library') {
+      steps { script {
+        dir('lwm2m/project') {
+          /* Compile a debug version of the LWM2M carrier library. */
+          ciUtils.lwm2mCompileLib(true)
+        }
+      }}
+    }
   }
 
   post {

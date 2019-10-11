@@ -146,7 +146,7 @@ do
 done
 
 # TODO This is not needed at the moment, we do not make other headers public
-# Replace Kconfig macros with acual values
+# Replace Kconfig macros with actual values
 
 # autoconf_file="$project_dir/build-${lib_variants[0]}/zephyr/include/generated/autoconf.h"
 # target_file="$project_dir/$temp_dir/nrf_lwm2m/include/lwm2m_cfg.h"
