@@ -935,12 +935,18 @@ void lwm2m_notification(lwm2m_notification_type_t type,
             // Reset state to get back to registration.
             lwm2m_state_set(LWM2M_STATE_SERVER_CONNECTED);
         }
-        else if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT) {
+        else if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT)
+        {
             // Update instead of register during connect
             LWM2M_INF("Update after connect (server %d)", instance_id);
             lwm2m_state_set(LWM2M_STATE_IDLE);
-        }
 
+            if (!m_registration_ready && lwm2m_is_registration_ready()) {
+                m_use_client_holdoff_timer = false;
+                m_registration_ready = true;
+                app_event_notify(LWM2M_CARRIER_EVENT_READY, NULL);
+            }
+        }
     }
     else if (type == LWM2M_NOTIFCATION_TYPE_DEREGISTER)
     {
