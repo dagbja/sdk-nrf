@@ -393,7 +393,7 @@ void lwm2m_system_reset(void)
 }
 
 /**@brief Setup ADMIN PDN connection */
-static void lwm2m_setup_admin_pdn(uint16_t instance_id)
+static bool lwm2m_setup_admin_pdn(uint16_t instance_id)
 {
     if ((m_operator_id == APP_OPERATOR_ID_VZW) &&
         (m_use_admin_pdn[instance_id]) &&
@@ -409,7 +409,13 @@ static void lwm2m_setup_admin_pdn(uint16_t instance_id)
 
         LWM2M_INF("APN setup: %s", lwm2m_os_log_strdup(apn_name_zero_terminated));
         m_admin_pdn_handle = at_apn_setup_wait_for_ipv6(apn_name_zero_terminated);
+
+        if (m_admin_pdn_handle == -1) {
+            return false;
+        }
     }
+
+    return true;
 }
 
 /**@brief Disconnect ADMIN PDN connection. */
@@ -1408,7 +1414,11 @@ static void app_bootstrap_connect(void)
     uint32_t err_code;
     bool secure;
 
-    lwm2m_setup_admin_pdn(0);
+    if (!lwm2m_setup_admin_pdn(0)) {
+        // Setup ADMIN PDN connection failed, try again
+        lwm2m_os_timer_start(state_update_timer, 1);
+        return;
+    }
 
     // Save the remote address of the bootstrap server.
     uint8_t uri_len = 0;
@@ -1526,10 +1536,15 @@ static void app_server_connect(uint16_t instance_id)
     uint32_t err_code;
     bool secure;
 
+    if (!lwm2m_setup_admin_pdn(instance_id)) {
+        // Setup ADMIN PDN connection failed, try again
+        lwm2m_os_timer_start(state_update_timer, 1);
+        return;
+    }
+
     // Initialize server configuration structure.
     memset(&m_server_conf[instance_id], 0, sizeof(lwm2m_server_config_t));
     m_server_conf[instance_id].lifetime = lwm2m_server_lifetime_get(instance_id);
-
 
     if (m_operator_id == APP_OPERATOR_ID_VZW)
     {
@@ -1550,8 +1565,6 @@ static void app_server_connect(uint16_t instance_id)
 
     uint8_t uri_len = 0;
     char * p_server_uri = lwm2m_security_server_uri_get(instance_id, &uri_len);
-
-    lwm2m_setup_admin_pdn(instance_id);
 
     err_code = app_resolve_server_uri(p_server_uri,
                                       uri_len,

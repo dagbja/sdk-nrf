@@ -171,6 +171,13 @@ static int at_cgev_handler(char *notif)
         // IPv6 link is up for the default bearer.
         if (strncmp(cgev_evt, "IPV6 ", 5) == 0)
         {
+            int timeout_ms = 100; // 100 millisecond timeout.
+            while (cid_number == -1 && timeout_ms > 0) {
+                // Wait for nrf_getsockopt() to set cid_number.
+                 lwm2m_os_sleep(10);
+                 timeout_ms -= 10;
+            }
+
             // Match CID with PDN socket context.
             int cid = strtol(&cgev_evt[5], NULL, 0);
             if (cid >= 0 && cid == cid_number)
