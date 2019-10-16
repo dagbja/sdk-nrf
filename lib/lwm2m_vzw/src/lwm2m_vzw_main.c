@@ -2221,6 +2221,10 @@ void lwm2m_net_reg_stat_cb(uint32_t net_stat)
             LWM2M_INF("No network (%d)", net_stat);
             lwm2m_request_disconnect();
         }
+        else
+        {
+            LWM2M_INF("Searching for network...");
+        }
 
         m_net_stat = net_stat;
     }
