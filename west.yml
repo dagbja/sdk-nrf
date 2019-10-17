@@ -5,10 +5,6 @@
 # defines the folder that contains west.yml. The path is relative to the folder
 # that contains .west. See the west documentation for more information.
 
-west:
-  url: https://github.com/zephyrproject-rtos/west
-  revision: v0.5.8
-
 manifest:
   defaults:
     remote: ncs
@@ -26,18 +22,22 @@ manifest:
   projects:
     - name: fw-nrfconnect-nrf
       path: nrf
-      revision: dd25b1ccaf7b30d165d67f4b6de51bfa61d7cefb
+      revision: 460c4309d1886d1d73b257169a009fac54318a57
     - name: fw-nrfconnect-zephyr
       path: zephyr
       west-commands: scripts/west-commands.yml
       revision: d6e67554cfeb28df5525e53c073f61a00836f283
     - name: nrfxlib
       path: nrfxlib
-      revision: 0f140413f675b802f408a547bf66e74ae6ac4ed1
+      revision: ef8bb6a9f4901d3ce51dcfa8883c2ad164c2c320
+    - name: mbedtls
+      repo-path: fw-nrfconnect-mbedtls
+      path: modules/crypto/mbedtls
+      revision: c3be1b52f5e56aaba6039c423478cfaf62a91622
     - name: mbedtls-nrf
       path: mbedtls
       repo-path: mbedtls
-      revision: mbedtls-2.13.1
+      revision: mbedtls-2.16.3
       remote: armmbed
     - name: hal_nordic
       path: modules/hal/nordic
