@@ -273,7 +273,12 @@ static bool lwm2m_is_deregistration_done(void)
 
 void lwm2m_request_connect(void)
 {
-    m_app_state = LWM2M_STATE_REQUEST_CONNECT;
+    // Request connect only if not in a connect retry wait
+    if ((m_app_state != LWM2M_STATE_BS_CONNECT_RETRY_WAIT) &&
+        (m_app_state != LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT))
+    {
+        m_app_state = LWM2M_STATE_REQUEST_CONNECT;
+    }
 }
 
 void lwm2m_request_server_update(uint16_t instance_id, bool reconnect)
