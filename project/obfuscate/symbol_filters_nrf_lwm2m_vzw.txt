@@ -10,6 +10,7 @@
 ^lwm2m_carrier_avail_power_sources_set$
 ^lwm2m_carrier_battery_level_set$
 ^lwm2m_carrier_battery_status_set$
+^lwm2m_carrier_device_type_set$
 ^lwm2m_carrier_error_code_add$
 ^lwm2m_carrier_error_code_remove$
 ^lwm2m_carrier_event_handler$
@@ -50,16 +51,18 @@
 
 # Callbacks
 ^lwm2m_coap_handler_root$
-^lwm2m_notification$
 ^lwm2m_handler_error$
+^lwm2m_notification$
 
 # Other APIs that are needed for now
 ^lwm2m_bootstrap_clear$
 ^lwm2m_debug_clear$
 ^lwm2m_debug_is_set$
-^lwm2m_debug_set$
 ^lwm2m_debug_reset$
+^lwm2m_debug_set$
+^lwm2m_device_get_instance$
 ^lwm2m_device_get_sim_iccid$
+^lwm2m_device_notify_resource$
 ^lwm2m_did_bootstrap$
 ^lwm2m_factory_reset$
 ^lwm2m_family_type_get$
@@ -69,18 +72,14 @@
 ^lwm2m_msisdn_get$
 ^lwm2m_plain_text_firmware_decode$
 ^lwm2m_remote_location_find$
-^lwm2m_retry_delay_get$
 ^lwm2m_request_connect$
 ^lwm2m_request_disconnect$
 ^lwm2m_request_server_update$
-^lwm2m_server_instance$
-^lwm2m_state_get$
-^lwm2m_state_update_delay$
-^lwm2m_system_reset$
-^lwm2m_system_shutdown$
+^lwm2m_retry_delay_get$
 ^lwm2m_security_server_uri_get$
 ^lwm2m_security_server_uri_set$
 ^lwm2m_server_get_instance$
+^lwm2m_server_instance$
 ^lwm2m_server_lifetime_get$
 ^lwm2m_server_lifetime_set$
 ^lwm2m_server_registered_get$
@@ -88,6 +87,10 @@
 ^lwm2m_sms_receive_counter$
 ^lwm2m_sms_receiver_disable$
 ^lwm2m_sms_receiver_enable$
+^lwm2m_state_get$
+^lwm2m_state_update_delay$
+^lwm2m_system_reset$
+^lwm2m_system_shutdown$
 
 # External symbols we should not modify
 
@@ -97,8 +100,8 @@
 ^__sprintf_chk$
 ^abs$
 ^atoi$
-^memcpy$
 ^memcmp$
+^memcpy$
 ^memset$
 ^snprintf$
 ^sprintf$
@@ -109,13 +112,17 @@
 ^strncmp$
 ^strncpy$
 ^strstr$
+^strtok$
 ^strtol$
 ^strtoull$
 
 # zephyr
+^__aeabi_ldivmod$
 ^__errno$
-^socket_ops$
+^__strncpy_chk$
 ^printk$
+^socket_ops$
+^z_impl_k_uptime_get$
 
 # coap
 ^coap_init$
@@ -132,6 +139,7 @@
 ^lwm2m_acl_permissions_add$
 ^lwm2m_acl_permissions_check$
 ^lwm2m_acl_permissions_init$
+^lwm2m_acl_permissions_reset$
 ^lwm2m_bootstrap$
 ^lwm2m_bytebuffer_to_list$
 ^lwm2m_bytebuffer_to_opaque$
@@ -143,25 +151,35 @@
 ^lwm2m_deregister$
 ^lwm2m_init$
 ^lwm2m_instance_connectivity_monitoring_init$
+^lwm2m_instance_connectivity_statistics_init$
 ^lwm2m_instance_device_init$
 ^lwm2m_instance_firmware_init$
 ^lwm2m_instance_security_init$
 ^lwm2m_instance_server_init$
+^lwm2m_net_reg_stat_cb$
+^lwm2m_net_reg_stat_get$
 ^lwm2m_notify$
 ^lwm2m_observe_register$
 ^lwm2m_observe_unregister$
+^lwm2m_opaque_free$
 ^lwm2m_plain_text_device_decode$
 ^lwm2m_plain_text_server_decode$
 ^lwm2m_register$
 ^lwm2m_remote_deregister$
 ^lwm2m_remote_init$
+^lwm2m_remote_location_delete$
+^lwm2m_remote_location_save$
 ^lwm2m_remote_register$
 ^lwm2m_remote_short_server_id_find$
+^lwm2m_request_deregister$
 ^lwm2m_respond_with_code$
 ^lwm2m_respond_with_payload$
+^lwm2m_string_free$
 ^lwm2m_tlv_bytebuffer_to_int32$
 ^lwm2m_tlv_connectivity_monitoring_decode$
 ^lwm2m_tlv_connectivity_monitoring_encode$
+^lwm2m_tlv_connectivity_statistics_decode$
+^lwm2m_tlv_connectivity_statistics_encode$
 ^lwm2m_tlv_decode$
 ^lwm2m_tlv_device_decode$
 ^lwm2m_tlv_device_encode$
@@ -177,10 +195,12 @@
 ^at_cmd_init$
 ^at_cmd_set_notification_handler$
 ^at_cmd_write$
+^at_params_int_get$
 ^at_params_list_free$
 ^at_params_list_init$
 ^at_params_short_get$
 ^at_params_string_get$
+^at_params_valid_count_get$
 ^at_parser_params_from_str$
 ^bsdlib_init$
 ^bsdlib_shutdown$
@@ -199,6 +219,7 @@
 ^nrf_close$
 ^nrf_getsockopt$
 ^nrf_inbuilt_key_delete$
+^nrf_inbuilt_key_exists$
 ^nrf_inbuilt_key_write$
 ^nrf_setsockopt$
 ^nrf_socket$

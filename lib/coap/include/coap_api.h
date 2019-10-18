@@ -28,7 +28,7 @@ extern "C" {
 /* TODO Temporary workaround, as we still have dependencies for internal
  * headers in the app (lwm2m_shell & buttons_and_leds).
  */
-#if defined(CONFIG_NRFXLIB_LWM2M_CARRIER)
+#if defined(CONFIG_LWM2M_CARRIER)
 #define CONFIG_NRF_COAP_ACK_RANDOM_FACTOR 1
 #define CONFIG_NRF_COAP_ACK_TIMEOUT 2
 #define CONFIG_NRF_COAP_ENABLE_OBSERVE_SERVER 1

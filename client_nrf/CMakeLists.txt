@@ -23,8 +23,7 @@ project(NONE)
 target_sources(app PRIVATE ../client/src/buttons_and_leds.c)
 target_sources(app PRIVATE ../client/src/lwm2m_shell.c)
 target_sources(app PRIVATE ../client/src/main.c)
-
-target_sources(app PRIVATE ../lib/lwm2m_vzw/src/lwm2m_os.c)
+target_sources(app PRIVATE ../client/src/modem_logging.c)
 
 zephyr_include_directories(../client/src)
 

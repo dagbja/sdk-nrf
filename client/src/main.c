@@ -54,6 +54,7 @@ int main(void)
     return 0;
 }
 
+#if !defined(CONFIG_LWM2M_CARRIER)
 /* LWM2M background thread - should become a separate module. */
 
 /* These should be configurable. */
@@ -86,3 +87,4 @@ void lwm2m_vzw_thread_run(void)
 K_THREAD_DEFINE(lwm2m_vzw_thread, LWM2M_VZW_THREAD_STACK_SIZE,
                 lwm2m_vzw_thread_run, NULL, NULL, NULL,
                 LWLM2_VZW_THREAD_PRIORITY, 0, K_NO_WAIT);
+#endif
