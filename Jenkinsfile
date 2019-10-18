@@ -155,6 +155,34 @@ pipeline {
         }
       }}
     }
+
+    stage('Build nrf client app') {
+      steps { script {
+
+        /* Build the client application using library source files. */
+        dir('lwm2m/client_nrf') {
+          try {
+            ciUtils.lwm2mLoadZephyrEnv()
+
+            ciUtils.lwm2mLog("Building nrf client application using library.")
+
+            // Use West to built the application. West finds the ZEPHYR_BASE folder automatically.
+            sh "rm -rf build && west build -b nrf9160_pca10090ns ."
+
+            /* Store compiled files as artifacts. */
+            sh 'mkdir output/'
+            sh 'find build/zephyr/ -type f \\( -iname \\*.hex -o -iname \\*.elf -o -iname \\*.map \\) -exec cp {} output/ \\;'
+            sh 'cd output/ && tar -zcvf client_app.tar.gz *'
+
+            archiveArtifacts artifacts: 'output/*.tar.gz'
+          }
+          catch (err) {
+            ciUtils.lwm2mLog("Build failed: ${err}")
+          }
+        }
+      }}
+    }
+
   }
 
   post {
