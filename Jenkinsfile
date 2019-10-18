@@ -128,7 +128,7 @@ pipeline {
     stage('Build carrier library') {
       when {
         expression {
-          def runObf = (env.BRANCH_NAME ==~ /(master|release)/) || (params.GENERATE_OBFUSCATED_LIB == true)
+          def runObf = (env.BRANCH_NAME ==~ /(master|release.*)/) || (params.GENERATE_OBFUSCATED_LIB == true)
           if (!runObf) {
             ciUtils.lwm2mLog("Skip library compilation step on branch '${env.BRANCH_NAME}'.")
           }

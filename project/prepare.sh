@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 usage() { echo "Usage $0 [-d]" 1>&2; exit 1; }
 
 debug=false
@@ -59,7 +61,7 @@ function obfuscate {
 	relinked_name=lib$1_relinked.a
 	mapping_name=lib$1_mapping.txt
 
-	python $script_dir/obfuscate_symbols.py \
+	python3 $script_dir/obfuscate_symbols.py \
 	--input_archive $target_dir/$name \
 	--output_archive $target_dir/$obfuscated_name \
 	--relinked_archive $target_dir/$relinked_name \

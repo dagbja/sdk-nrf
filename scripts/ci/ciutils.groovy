@@ -33,14 +33,22 @@ def lwm2mCompileLib(boolean debug = false) {
      */
     lwm2mLog("Build ${debug ? "debug" : "obfuscated"} version of the LWM2M carrier library.")
 
-    sh"""
+    def statusCode = sh script:"""
     export PATH="${'$'}{GNUARMEMB_TOOLCHAIN_PATH}/bin/:${'$'}PATH" && \
     rm -rf output/ && \
     ./prepare.sh ${debug ? "-d" : ""}
-    """
+    """, returnStatus:true
+
+    if (statusCode != 0) {
+      currentBuild.result = 'FAILURE'
+    }
 
     lwm2mLog("Export generated files.")
-    sh "./export.sh"
+    statusCode = sh script:"./export.sh", returnStatus:true
+
+    if (statusCode != 0) {
+      currentBuild.result = 'FAILURE'
+    }
 
     lwm2mLog("Create archive to store artifacts.")
     def archiveName = "liblwm2m_carrier${debug ? "_debug" : ""}.tar.gz"
