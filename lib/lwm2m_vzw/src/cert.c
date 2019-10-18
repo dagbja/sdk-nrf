@@ -10,8 +10,11 @@
 #include <toolchain.h>
 
 static const char ca_chain[] = {
+#if 1
 	#include "../certs/DigiCertGlobalRootG2.pem" /* Motive */
+#else
 	#include "../certs/DigiCertGlobalRootCA.pem" /* VzW    */
+#endif
 };
 
 BUILD_ASSERT_MSG(sizeof(ca_chain) < 4096, "CA is too large");
