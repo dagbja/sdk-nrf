@@ -148,7 +148,7 @@ int lwm2m_carrier_device_type_set(char * device_type)
     lwm2m_device_t *device_obj_instance = lwm2m_device_get_instance(0);
     int retval = 0;
 
-    if (device_type == NULL)
+    if (device_type == NULL || device_type[0] == '\0')
     {
         return -EINVAL;
     }
@@ -157,8 +157,28 @@ int lwm2m_carrier_device_type_set(char * device_type)
         return -E2BIG;
     }
 
-    retval = (int)lwm2m_bytebuffer_to_string(device_type, strlen(device_type) + 1, &(device_obj_instance->device_type));
+    retval = (int)lwm2m_bytebuffer_to_string(device_type, strlen(device_type), &(device_obj_instance->device_type));
     lwm2m_device_notify_resource(LWM2M_DEVICE_DEVICE_TYPE);
+
+    return -retval;
+}
+
+int lwm2m_carrier_hardware_version_set(char * hardware_version)
+{
+    lwm2m_device_t *device_obj_instance = lwm2m_device_get_instance(0);
+    int retval = 0;
+
+    if (hardware_version == NULL || hardware_version[0] == '\0')
+    {
+        return -EINVAL;
+    }
+    if (strlen(hardware_version) > LWM2M_CARRIER_STRING_MAX_LEN)
+    {
+        return -E2BIG;
+    }
+
+    retval = (int)lwm2m_bytebuffer_to_string(hardware_version, strlen(hardware_version), &(device_obj_instance->hardware_version));
+    lwm2m_device_notify_resource(LWM2M_DEVICE_HARDWARE_VERSION);
 
     return -retval;
 }
@@ -168,7 +188,7 @@ int lwm2m_carrier_software_version_set(char * software_version)
     lwm2m_device_t *device_obj_instance = lwm2m_device_get_instance(0);
     int retval = 0;
 
-    if (software_version == NULL)
+    if (software_version == NULL || software_version[0] == '\0')
     {
         return -EINVAL;
     }
@@ -177,7 +197,7 @@ int lwm2m_carrier_software_version_set(char * software_version)
         return -E2BIG;
     }
 
-    retval = (int)lwm2m_bytebuffer_to_string(software_version, strlen(software_version) + 1, &(device_obj_instance->software_version));
+    retval = (int)lwm2m_bytebuffer_to_string(software_version, strlen(software_version), &(device_obj_instance->software_version));
     lwm2m_device_notify_resource(LWM2M_DEVICE_SOFTWARE_VERSION);
 
     return -retval;

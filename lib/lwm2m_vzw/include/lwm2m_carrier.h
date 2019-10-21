@@ -278,7 +278,7 @@ int lwm2m_carrier_battery_status_set(lwm2m_carrier_battery_status_t battery_stat
  *
  * @param[in]  device_type      Null terminated string specifying the type of the LWM2M device.
  *
- * @return     -EINVAL          If the input argument is a NULL pointer.
+ * @return     -EINVAL          If the input argument is a NULL pointer or an empty string.
  * @return     -E2BIG           If the input string is too long.
  * @return     -ENOMEM          If it was not possible to allocate memory storage to hold the string.
  * @return     0                If the device type has been set successfully.
@@ -286,14 +286,29 @@ int lwm2m_carrier_battery_status_set(lwm2m_carrier_battery_status_t battery_stat
 int lwm2m_carrier_device_type_set(char * device_type);
 
 /**
+ * @brief      Set the LWM2M device hardware version.
+ *
+ * @note       LWM2M device hardware version.
+ *
+ * @param[in]  hardware_version     Null terminated string specifying the hardware version of the
+ *                                  LWM2M device.
+ *
+ * @return     -EINVAL              If the input argument is a NULL pointer or an empty string.
+ * @return     -E2BIG               If the input string is too long.
+ * @return     -ENOMEM              If it was not possible to allocate memory storage to hold the string.
+ * @return     0                    If the hardware version has been set successfully.
+ */
+int lwm2m_carrier_hardware_version_set(char * hardware_version);
+
+/**
  * @brief      Set the LWM2M device software version.
  *
  * @note       High level device software version (application).
  *
- * @param[in]  software_version    Null terminated string specifying the current software version
- *                                 of the LWM2M device.
+ * @param[in]  software_version     Null terminated string specifying the current software version
+ *                                  of the LWM2M device.
  *
- * @return     -EINVAL              If the input argument is a NULL pointer.
+ * @return     -EINVAL              If the input argument is a NULL pointer or an empty string.
  * @return     -E2BIG               If the input string is too long.
  * @return     -ENOMEM              If it was not possible to allocate memory storage to hold the string.
  * @return     0                    If the software version has been set successfully.

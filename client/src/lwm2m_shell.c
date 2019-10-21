@@ -9,6 +9,7 @@
 #include <shell/shell.h>
 #include <fcntl.h>
 
+#include <lwm2m_api.h>
 #include <lwm2m_instance_storage.h>
 #include <lwm2m_security.h>
 #include <lwm2m_server.h>
@@ -555,7 +556,7 @@ static int cmd_device_type_set(const struct shell *shell, size_t argc, char **ar
             shell_print(shell, "Memory allocation failure");
             break;
         case -EINVAL:
-            shell_print(shell, "String cannot be NULL");
+            shell_print(shell, "String cannot be NULL or empty");
             break;
         case -E2BIG:
             shell_print(shell, "Input string too long");
@@ -785,7 +786,38 @@ static int cmd_device_software_version_set(const struct shell *shell, size_t arg
             shell_print(shell, "Memory allocation failure");
             break;
         case -EINVAL:
-            shell_print(shell, "String cannot be NULL");
+            shell_print(shell, "String cannot be NULL or empty");
+            break;
+        case -E2BIG:
+            shell_print(shell, "Input string too long");
+            break;
+        default:
+            shell_print(shell, "Error: %d", errno);
+            break;
+    };
+
+    return 0;
+}
+
+
+static int cmd_device_hardware_version_set(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2)
+    {
+        shell_print(shell, "hardware_version <hardware version>");
+        return 0;
+    }
+
+    switch(lwm2m_carrier_hardware_version_set(argv[1]))
+    {
+        case 0:
+            shell_print(shell, "Hardware version set successfully");
+            break;
+        case -ENOMEM:
+            shell_print(shell, "Memory allocation failure");
+            break;
+        case -EINVAL:
+            shell_print(shell, "String cannot be NULL or empty");
             break;
         case -E2BIG:
             shell_print(shell, "Input string too long");
@@ -866,6 +898,21 @@ static int cmd_device_error_code_remove(const struct shell *shell, size_t argc, 
 }
 
 
+static char *lwm2m_string_get(const lwm2m_string_t *string)
+{
+    static char string_buf[200];
+    
+    if (string->len >= 200)
+    {
+        return "<error>";
+    }
+    memcpy(string_buf, string->p_val, string->len);
+    string_buf[string->len] = '\0';
+
+    return string_buf;
+}
+
+
 static int cmd_device_print(const struct shell *shell, size_t argc, char **argv)
 {
     lwm2m_device_t *device_obj_instance = lwm2m_device_get_instance(0);
@@ -897,8 +944,9 @@ static int cmd_device_print(const struct shell *shell, size_t argc, char **argv)
 
     shell_print(shell, "Battery level     %d%%", device_obj_instance->battery_level);
     shell_print(shell, "Battery status    %d", device_obj_instance->battery_status);
-    shell_print(shell, "Device type       %s", device_obj_instance->device_type.p_val);
-    shell_print(shell, "Software version  %s", device_obj_instance->software_version.p_val);
+    shell_print(shell, "Device type       %s", lwm2m_string_get(&device_obj_instance->device_type));
+    shell_print(shell, "Hardware version  %s", lwm2m_string_get(&device_obj_instance->hardware_version));
+    shell_print(shell, "Software version  %s", lwm2m_string_get(&device_obj_instance->software_version));
     shell_print(shell, "Total memory      %d kB", device_obj_instance->memory_total);
     shell_print(shell, "Memory free       %d kB", lwm2m_device_memory_free_read());
 
@@ -953,6 +1001,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_device,
     SHELL_CMD(device_type, NULL, "Set device type", cmd_device_type_set),
     SHELL_CMD(error_code_add, NULL, "Add individual error code", cmd_device_error_code_add),
     SHELL_CMD(error_code_remove, NULL, "Remove individual error code", cmd_device_error_code_remove),
+    SHELL_CMD(hardware_version, NULL, "Set hardware version", cmd_device_hardware_version_set),
     SHELL_CMD(memory_free, NULL, "Set available amount of storage space", cmd_device_memory_free_write),
     SHELL_CMD(memory_total, NULL, "Set total amount of storage space", cmd_device_memory_total_set),
     SHELL_CMD(power_sources, NULL, "Set available device power sources", cmd_device_power_sources_set),

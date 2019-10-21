@@ -7,26 +7,27 @@
 # Symbol filter list used by obfuscate_symbols.py on VZW LWM2M
 
 # lwm2m_carrier.h
+^lwm2m_carrier_avail_power_sources_set$
+^lwm2m_carrier_battery_level_set$
+^lwm2m_carrier_battery_status_set$
+^lwm2m_carrier_error_code_add$
+^lwm2m_carrier_error_code_remove$
 ^lwm2m_carrier_event_handler$
+^lwm2m_carrier_hardware_version_set$
 ^lwm2m_carrier_init$
+^lwm2m_carrier_memory_free_read$
+^lwm2m_carrier_memory_total_set$
+^lwm2m_carrier_power_source_current_set$
+^lwm2m_carrier_power_source_voltage_set$
 ^lwm2m_carrier_run$
+^lwm2m_carrier_software_version_set$
 ^lwm2m_carrier_timezone_read$
 ^lwm2m_carrier_timezone_write$
+^lwm2m_carrier_type_set$
 ^lwm2m_carrier_utc_offset_read$
 ^lwm2m_carrier_utc_offset_write$
 ^lwm2m_carrier_utc_time_read$
 ^lwm2m_carrier_utc_time_write$
-^lwm2m_device_avail_power_sources_set$
-^lwm2m_device_battery_level_set$
-^lwm2m_device_battery_status_set$
-^lwm2m_device_error_code_add$
-^lwm2m_device_error_code_remove$
-^lwm2m_device_memory_free_read$
-^lwm2m_device_memory_total_set$
-^lwm2m_device_power_source_current_set$
-^lwm2m_device_power_source_voltage_set$
-^lwm2m_device_software_version_set$
-^lwm2m_device_type_set$
 
 # lwm2m_os.h
 ^lwm2m_os_free$
