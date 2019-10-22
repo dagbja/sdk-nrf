@@ -305,6 +305,11 @@ void lwm2m_request_disconnect(void)
     }
 }
 
+void lwm2m_request_reset(void)
+{
+    m_app_state = LWM2M_STATE_RESET;
+}
+
 void lwm2m_observable_pmin_set(uint32_t pmin)
 {
     observable_pmin = pmin;
@@ -393,7 +398,11 @@ void lwm2m_system_shutdown(void)
 void lwm2m_system_reset(void)
 {
     app_event_notify(LWM2M_CARRIER_EVENT_REBOOT, NULL);
-    lwm2m_system_shutdown();
+
+    if (m_app_state != LWM2M_STATE_SHUTDOWN) {
+        lwm2m_system_shutdown();
+    }
+
     lwm2m_os_sys_reset();
 }
 
@@ -2068,6 +2077,10 @@ static void app_lwm2m_process(void)
             app_disconnect();
             lwm2m_sms_receiver_disable();
             break;
+        }
+        case LWM2M_STATE_RESET:
+        {
+            lwm2m_system_reset();
         }
         default:
         {

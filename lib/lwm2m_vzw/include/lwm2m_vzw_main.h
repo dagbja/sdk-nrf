@@ -34,6 +34,7 @@ typedef enum
     LWM2M_STATE_DISCONNECTED,
     LWM2M_STATE_MODEM_FIRMWARE_UPDATE,
     LWM2M_STATE_SHUTDOWN,
+    LWM2M_STATE_RESET
 } lwm2m_state_t;
 
 /*
@@ -63,6 +64,7 @@ void lwm2m_request_connect(void);
 void lwm2m_request_server_update(uint16_t instance_id, bool reconnect);
 void lwm2m_request_deregister(void);
 void lwm2m_request_disconnect(void);
+void lwm2m_request_reset(void);
 bool lwm2m_did_bootstrap(void);
 uint16_t lwm2m_server_instance(void);
 sa_family_t lwm2m_family_type_get(uint16_t instance_id);

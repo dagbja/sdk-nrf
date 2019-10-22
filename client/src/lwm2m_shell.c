@@ -489,7 +489,7 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
 static int cmd_factory_reset(const struct shell *shell, size_t argc, char **argv)
 {
     lwm2m_factory_reset();
-    lwm2m_system_reset();
+    lwm2m_request_reset();
 
     return 0;
 }

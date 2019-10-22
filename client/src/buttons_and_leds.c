@@ -29,7 +29,7 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
         {
             printk("Reset bootstrap!\n");
             lwm2m_bootstrap_clear();
-            lwm2m_system_reset();
+            lwm2m_request_reset();
         }
         else if (app_state == LWM2M_STATE_DISCONNECTED)
         {
@@ -53,7 +53,7 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
         }
         else if (app_state == LWM2M_STATE_DISCONNECTED)
         {
-            lwm2m_system_reset();
+            lwm2m_request_reset();
         }
     }
 }
@@ -140,6 +140,7 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
             break;
 
         case LWM2M_STATE_SHUTDOWN:
+        case LWM2M_STATE_RESET:
             *blink = DK_LED4_MSK;
             break;
     }

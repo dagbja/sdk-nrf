@@ -331,7 +331,7 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
                 lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_UPDATING);
                 LWM2M_INF("Firmware update scheduled at boot");
-                lwm2m_system_reset();
+                lwm2m_request_reset();
                 break;
             }
 

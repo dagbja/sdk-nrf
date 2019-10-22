@@ -446,7 +446,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
                 // FIXME: This sleep is needed to ensure the response is sent before closing the socket.
                 lwm2m_os_sleep(1000);
 
-                lwm2m_system_reset();
+                lwm2m_request_reset();
                 break;
             }
 

@@ -80,12 +80,12 @@ int sms_receiver_notif_parse(char *notif)
         } else if (object == 3 && instance == 0 && resource == 4) {
             // Device Reboot
             LWM2M_INF("SMS: Device Reboot");
-            lwm2m_system_reset();
+            lwm2m_request_reset();
         } else if (object == 3 && instance == 0 && resource == 5) {
             // Device Factory Reset
             LWM2M_INF("SMS: Device Factory Reset");
             lwm2m_factory_reset();
-            lwm2m_system_reset();
+            lwm2m_request_reset();
         } else {
             LWM2M_ERR("SMS: Execute /%d/%d/%d not handled", object, instance, resource);
         }
