@@ -20,20 +20,20 @@
 
 #define LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET   0xFFFF
 
-#define LWM2M_INSTANCE_STORAGE_TYPE_MAX_COUNT 10
-#define LWM2M_INSTANCE_STORAGE_MISC_DATA       1
-#define LWM2M_INSTANCE_STORAGE_DEVICE          2
-#define LWM2M_INSTANCE_STORAGE_CONN_MON        3
-#define LWM2M_INSTANCE_STORAGE_FIRMWARE        4
-#define LWM2M_INSTANCE_STORAGE_CONN_STAT       5
-#define LWM2M_INSTANCE_STORAGE_MSISDN          8
-#define LWM2M_INSTANCE_STORAGE_DEBUG_SETTINGS  9
-#define LWM2M_INSTANCE_STORAGE_BASE_SECURITY  (1 * LWM2M_INSTANCE_STORAGE_TYPE_MAX_COUNT)
-#define LWM2M_INSTANCE_STORAGE_BASE_SERVER    (2 * LWM2M_INSTANCE_STORAGE_TYPE_MAX_COUNT)
-#define MODEM_FIRMWARE_VERSION                 0xBEEF
-#define MODEM_FIRMWARE_READY                   0xF0F0
-#define MODEM_FIRMWARE_UPDATE                  0x0F0F
-#define LWM2M_FIRMWARE_URI                     0xFAFA
+#define LWM2M_INSTANCE_STORAGE_TYPE_MAX_COUNT  10
+#define LWM2M_INSTANCE_STORAGE_MISC_DATA       (LWM2M_OS_STORAGE_END)
+#define LWM2M_INSTANCE_STORAGE_DEVICE          (LWM2M_OS_STORAGE_END - 1)
+#define LWM2M_INSTANCE_STORAGE_CONN_MON        (LWM2M_OS_STORAGE_END - 2)
+#define LWM2M_INSTANCE_STORAGE_FIRMWARE        (LWM2M_OS_STORAGE_END - 3)
+#define LWM2M_INSTANCE_STORAGE_CONN_STAT       (LWM2M_OS_STORAGE_END - 4)
+#define LWM2M_INSTANCE_STORAGE_MSISDN          (LWM2M_OS_STORAGE_END - 5)
+#define LWM2M_INSTANCE_STORAGE_DEBUG_SETTINGS  (LWM2M_OS_STORAGE_END - 6)
+#define LWM2M_MODEM_FIRMWARE_VERSION           (LWM2M_OS_STORAGE_END - 7)
+#define LWM2M_MODEM_FIRMWARE_READY             (LWM2M_OS_STORAGE_END - 8)
+#define LWM2M_MODEM_FIRMWARE_UPDATE            (LWM2M_OS_STORAGE_END - 9)
+#define LWM2M_MODEM_FIRMWARE_URI               (LWM2M_OS_STORAGE_END - 10)
+#define LWM2M_INSTANCE_STORAGE_BASE_SECURITY   (LWM2M_OS_STORAGE_BASE)
+#define LWM2M_INSTANCE_STORAGE_BASE_SERVER     (LWM2M_OS_STORAGE_BASE + 10)
 
 typedef struct __attribute__((__packed__))
 {
@@ -809,7 +809,7 @@ int lwm2m_last_firmware_version_get(uint8_t *ver, size_t len)
     __ASSERT_NO_MSG(len == sizeof(nrf_dfu_fw_version_t));
 
     len = sizeof(nrf_dfu_fw_version_t);
-    rc = lwm2m_os_storage_read(MODEM_FIRMWARE_VERSION, ver, len);
+    rc = lwm2m_os_storage_read(LWM2M_MODEM_FIRMWARE_VERSION, ver, len);
     if (rc < 0)
     {
         LWM2M_TRC("Unable to read modem firmware version to flash, err %d", rc);
@@ -826,7 +826,7 @@ int lwm2m_last_firmware_version_set(uint8_t *ver, size_t len)
     __ASSERT_NO_MSG(len == sizeof(nrf_dfu_fw_version_t));
 
     len = sizeof(nrf_dfu_fw_version_t);
-    rc = lwm2m_os_storage_write(MODEM_FIRMWARE_VERSION, ver, len);
+    rc = lwm2m_os_storage_write(LWM2M_MODEM_FIRMWARE_VERSION, ver, len);
     if (rc < 0)
     {
         LWM2M_ERR("Unable to write modem firmware version to flash, err %d", rc);
@@ -842,7 +842,7 @@ int lwm2m_firmware_image_state_get(enum lwm2m_firmware_image_state *state)
 {
     ssize_t rc;
 
-    rc = lwm2m_os_storage_read(MODEM_FIRMWARE_READY, state, sizeof(*state));
+    rc = lwm2m_os_storage_read(LWM2M_MODEM_FIRMWARE_READY, state, sizeof(*state));
     if (rc < 0)
     {
         LWM2M_TRC("Unable to find modem firmware state in flash, err %d", rc);
@@ -856,7 +856,7 @@ int lwm2m_firmware_image_state_set(enum lwm2m_firmware_image_state state)
 {
     ssize_t rc;
 
-    rc = lwm2m_os_storage_write(MODEM_FIRMWARE_READY, &state, sizeof(state));
+    rc = lwm2m_os_storage_write(LWM2M_MODEM_FIRMWARE_READY, &state, sizeof(state));
     if (rc < 0)
     {
         LWM2M_ERR("Unable to write modem firmware state to flash, err %d", rc);
@@ -870,7 +870,7 @@ int lwm2m_firmware_update_state_get(enum lwm2m_firmware_update_state *state)
 {
     ssize_t rc;
 
-    rc = lwm2m_os_storage_read(MODEM_FIRMWARE_UPDATE, state, sizeof(*state));
+    rc = lwm2m_os_storage_read(LWM2M_MODEM_FIRMWARE_UPDATE, state, sizeof(*state));
     if (rc < 0)
     {
         LWM2M_TRC("lwm2m_firmware_update_ready_get() not found, err %d", rc);
@@ -884,7 +884,7 @@ int lwm2m_firmware_update_state_set(enum lwm2m_firmware_update_state state)
 {
     ssize_t rc;
 
-    rc = lwm2m_os_storage_write(MODEM_FIRMWARE_UPDATE, &state, sizeof(state));
+    rc = lwm2m_os_storage_write(LWM2M_MODEM_FIRMWARE_UPDATE, &state, sizeof(state));
     if (rc < 0)
     {
         LWM2M_ERR("Unable to write modem firmware info to flash, err %d", rc);
@@ -898,7 +898,7 @@ int lwm2m_firmware_uri_get(char *uri, size_t len)
 {
     ssize_t rc;
 
-    rc = lwm2m_os_storage_read(LWM2M_FIRMWARE_URI, uri, len);
+    rc = lwm2m_os_storage_read(LWM2M_MODEM_FIRMWARE_URI, uri, len);
     if (rc < 0)
     {
         LWM2M_TRC("lwm2m_firmware_uri_get(), err %d", rc);
@@ -912,7 +912,7 @@ int lwm2m_firmware_uri_set(char *uri, size_t len)
 {
     ssize_t rc;
 
-    rc = lwm2m_os_storage_write(LWM2M_FIRMWARE_URI, uri, len);
+    rc = lwm2m_os_storage_write(LWM2M_MODEM_FIRMWARE_URI, uri, len);
     if (rc < 0)
     {
         LWM2M_ERR("lwm2m_firmware_uri_set(), err %d", rc);

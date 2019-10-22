@@ -27,6 +27,16 @@
 #define LWM2M_LOG_LEVEL_TRC  4
 
 /**
+ * @brief Range of the non-volatile storage identifiers used by the library.
+ * 
+ * @note  The application MUST NOT use the values within this range for its 
+ *        own non-volatile storage management as it could potentially delete
+ *        or overwrite entries used by the library.
+ */
+#define LWM2M_OS_STORAGE_BASE 0xCA00
+#define LWM2M_OS_STORAGE_END  0xCAFF
+
+/**
  * @brief Timer callback function.
  */
 typedef void (*lwm2m_os_timer_handler_t)(void *timer);

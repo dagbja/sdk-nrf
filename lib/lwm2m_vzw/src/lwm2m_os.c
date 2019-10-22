@@ -76,16 +76,22 @@ uint32_t lwm2m_os_rand_get(void)
 
 int lwm2m_os_storage_delete(uint16_t id)
 {
+	__ASSERT((id >= LWM2M_OS_STORAGE_BASE) || (id <= LWM2M_OS_STORAGE_END), "Storage ID out of range");
+
 	return nvs_delete(&fs, id);
 }
 
 int lwm2m_os_storage_read(uint16_t id, void *data, size_t len)
 {
+	__ASSERT((id >= LWM2M_OS_STORAGE_BASE) || (id <= LWM2M_OS_STORAGE_END), "Storage ID out of range");
+	
 	return nvs_read(&fs, id, data, len);
 }
 
 int lwm2m_os_storage_write(uint16_t id, const void *data, size_t len)
 {
+	__ASSERT((id >= LWM2M_OS_STORAGE_BASE) || (id <= LWM2M_OS_STORAGE_END), "Storage ID out of range");
+	
 	return nvs_write(&fs, id, data, len);
 }
 
