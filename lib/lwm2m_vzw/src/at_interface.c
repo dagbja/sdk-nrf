@@ -304,12 +304,8 @@ int at_if_init(void)
     return 0;
 }
 
-int at_apn_setup_wait_for_ipv6(const char * const apn)
+int at_apn_register_for_packet_events(void)
 {
-    if (apn == NULL) {
-        return -1;
-    }
-
     // Clear previous state before registering for packet domain events.
     cid_number = -1;
     cid_ipv6_link_up = false;
@@ -318,56 +314,67 @@ int at_apn_setup_wait_for_ipv6(const char * const apn)
     // The unsolicited result code is +CGEV: XXX.
     int err = lwm2m_os_at_cmd_write("AT+CGEREP=1", NULL, 0);
 
-    if (err != 0)
+    if (err != 0) 
     {
         // Check if subscription went OK.
         LWM2M_ERR("Unable to register to CGEV events for IPv6 APN");
         return -1;
     }
 
-    // Set up APN which implicitly creates a CID.
-    int apn_handle = lwm2m_os_pdn_init_and_connect(apn);
+    return 0;
+}
 
-    if (apn_handle > -1)
-    {
-        nrf_socklen_t len = sizeof(cid_number);
-        int error = nrf_getsockopt(apn_handle, NRF_SOL_PDN, NRF_SO_PDN_CONTEXT_ID, (void *)&cid_number, &len);
-
-        if (error == 0)
-        {
-            LWM2M_INF("PDN cid %d found. Wait for IPv6 link...", cid_number);
-
-            int timeout_ms = 1 * 60 * 1000; // One minute timeout.
-
-            // Wait until IPv6 link is up or timeout.
-            while (cid_ipv6_link_up == false && timeout_ms > 0) {
-                lwm2m_os_sleep(100);
-                timeout_ms -= 100;
-            }
-
-            if (timeout_ms <= 0)
-            {
-                LWM2M_ERR("Timeout while waiting for IPv6 (cid=%u)", cid_number);
-                lwm2m_os_pdn_disconnect(apn_handle); // Cleanup socket
-                apn_handle = -1;
-            }
-            else
-            {
-                LWM2M_INF("IPv6 link ready for cid %d", cid_number);
-            }
-        }
-        else
-        {
-            LWM2M_ERR("Unable to get PDN context ID on socket %d, errno=%d", apn_handle, errno);
-            lwm2m_os_pdn_disconnect(apn_handle); // Cleanup socket
-            apn_handle = -1;
-        }
-    }
-
+int at_apn_unregister_from_packet_events(void)
+{
     // Unregister from packet domain events.
     (void)lwm2m_os_at_cmd_write("AT+CGEREP=0", NULL, 0);
 
-    return apn_handle;
+    return 0;
+}
+
+
+int at_apn_setup_wait_for_ipv6(int *fd, const char *apn)
+{
+    int err;
+    int cid;
+    int timeout_ms = K_MINUTES(1);
+    nrf_socklen_t len = sizeof(cid);
+
+    if (fd == NULL || apn == NULL) {
+        return -1;
+    }
+
+    err = nrf_getsockopt(*fd, NRF_SOL_PDN, NRF_SO_PDN_CONTEXT_ID, &cid, &len);
+    if (err) {
+        LWM2M_ERR("Unable to get PDN context ID on socket %d, errno=%d",
+                  *fd, lwm2m_os_errno());
+
+        nrf_close(*fd);
+        *fd = -1;
+        return -1;
+    }
+
+    LWM2M_INF("PDN cid %d found. Wait for IPv6 link...", cid);
+
+    // Save the CID, looked up in the CGEV parser loop.
+    cid_number = cid;
+
+     // Wait until IPv6 link is up or timeout.
+    while (cid_ipv6_link_up == false && timeout_ms > 0) {
+        lwm2m_os_sleep(100);
+        timeout_ms -= 100;
+    }
+
+    if (timeout_ms <= 0) {
+        LWM2M_ERR("Timeout while waiting for IPv6 (cid=%u)", cid);
+        nrf_close(*fd);
+        *fd = -1;
+    }
+    else {
+        LWM2M_INF("IPv6 link ready for cid %d", cid);
+    }
+
+    return 0;
 }
 
 int at_read_apn_class(uint8_t apn_class, char * const p_apn, int * p_apn_len)

@@ -18,7 +18,6 @@
 #include <lte_lc.h>
 #include <net/bsdlib.h>
 #include <net/download_client.h>
-#include <pdn_management.h>
 #include <misc/reboot.h>
 #include <misc/util.h>
 #include <toolchain.h>
@@ -627,18 +626,6 @@ int lwm2m_os_lte_link_down(void)
 int lwm2m_os_lte_power_down(void)
 {
 	return lte_lc_power_off();
-}
-
-/* PDN management module abstractions. */
-
-void lwm2m_os_pdn_disconnect(int pdn_fd)
-{
-	pdn_disconnect(pdn_fd);
-}
-
-int lwm2m_os_pdn_init_and_connect(const char *apn_name)
-{
-	return pdn_init_and_connect((char *)apn_name);
 }
 
 #ifndef ENOKEY

@@ -296,16 +296,6 @@ int lwm2m_os_lte_link_down(void);
  */
 int lwm2m_os_lte_power_down(void);
 
-/*
- * @brief Diconnect the PDN connection.
- */
-void lwm2m_os_pdn_disconnect(int pdn_fd);
-
-/*
- * @brief Initialize and connect PDN to APN 'apn_name'.
- */
-int lwm2m_os_pdn_init_and_connect(const char *apn_name);
-
 /**
  * @brief Translate the error number.
  */

@@ -19,14 +19,29 @@ typedef void (*at_net_reg_stat_cb_t)(uint32_t net_stat);
 int at_if_init(void);
 
 /**
+ * @brief Register for packet domain events
+ *
+ * @return Zero on success, -1 otherwise.
+ */
+int at_apn_register_for_packet_events(void);
+
+/**
+ * @brief Unregister from packet domain events
+ *
+ * @return Zero on success, -1 otherwise.
+ */
+int at_apn_unregister_from_packet_events(void);
+
+/**
  * @brief Wait for IPV6 link on APN.
  * Wait until IPv6 link is ready. Return an error after a timeout of one minute.
  *
- * @param[in] apn APN name.
+ * @param[in,out] fd PDN socket handle.
+ * @param[in] apn Access point name.
  *
- * @return PDN socket handle or an invalid handle in case of error or timeout.
+ * @return Zero on success, -1 otherwise.
  */
-int at_apn_setup_wait_for_ipv6(const char * const apn);
+int at_apn_setup_wait_for_ipv6(int *fd, const char * apn);
 
 /**
  * @brief Read APN class name.

@@ -24,6 +24,7 @@
 #include <lwm2m_retry_delay.h>
 #include <lwm2m_security.h>
 #include <lwm2m_server.h>
+#include <lwm2m_pdn.h>
 #include <lwm2m_os.h>
 
 #include <app_debug.h>
@@ -80,6 +81,8 @@
 #define APP_NET_REG_STAT_ROAM           5                                                   /**< Registered to roaming network. */
 
 #define APP_CLIENT_ID_LENGTH            128                                                 /**< Buffer size to store the Client ID. */
+
+#define APP_APN_NAME_BUF_LENGTH         64                                                  /**< Buffer size to store APN name. */
 
 static char m_app_bootstrap_psk[] = APP_BOOTSTRAP_SEC_PSK;
 
@@ -445,39 +448,98 @@ void lwm2m_system_reset(bool force_reset)
 
 }
 
-/**@brief Setup ADMIN PDN connection */
-static bool lwm2m_setup_admin_pdn(uint16_t instance_id)
+/* Read the access point name into a buffer, and null-terminate it.
+ * Returns the length of the access point name.
+ */
+static int admin_apn_get(char *buf, size_t len)
 {
-    if ((m_operator_id == APP_OPERATOR_ID_VZW) &&
-        (m_use_admin_pdn[instance_id]) &&
-        (m_admin_pdn_handle == -1))
-    {
-        // Set up APN for Bootstrap and DM server.
-        uint8_t class_apn_len = 0;
-        char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
-        char apn_name_zero_terminated[64];
+    char *apn_name;
+    uint8_t read = 0;
 
-        memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
-        apn_name_zero_terminated[class_apn_len] = '\0';
-
-        LWM2M_INF("APN setup: %s", lwm2m_os_log_strdup(apn_name_zero_terminated));
-        m_admin_pdn_handle = at_apn_setup_wait_for_ipv6(apn_name_zero_terminated);
-
-        if (m_admin_pdn_handle == -1) {
-            return false;
-        }
+    apn_name = lwm2m_conn_mon_class_apn_get(2, &read);
+    if (len < read + 1) {
+        return -1;
     }
 
-    return true;
+    memcpy(buf, apn_name, read);
+    buf[read] = '\0';
+
+    return read;
+}
+
+/**@brief Setup ADMIN PDN connection, if necessary */
+int lwm2m_admin_pdn_activate(uint16_t instance_id)
+{
+    int rc;
+    char apn[APP_APN_NAME_BUF_LENGTH];
+
+    static int32_t pdn_retry_delay[] = { K_SECONDS(2), K_SECONDS(60), K_SECONDS(1800) };
+    static int32_t pdn_retry_count;
+
+    if ((m_operator_id != APP_OPERATOR_ID_VZW) ||
+        !m_use_admin_pdn[instance_id]) {
+        /* Nothing to do */
+        pdn_retry_count = 0;
+        return 0;
+    }
+
+    admin_apn_get(apn, sizeof(apn));
+    LWM2M_INF("PDN setup: %s", lwm2m_os_log_strdup(apn));
+
+    /* Register for packet domain events before activating ADMIN PDN */
+    at_apn_register_for_packet_events();
+
+    rc = lwm2m_pdn_activate(&m_admin_pdn_handle, apn);
+    if (rc < 0) {
+        LWM2M_ERR("Could not setup the PDN err %d, errno %d", rc, errno);
+        at_apn_unregister_from_packet_events();
+        
+        int retry_delay = pdn_retry_delay[pdn_retry_count];
+
+        if (pdn_retry_count < (ARRAY_SIZE(pdn_retry_delay) - 1)) {
+            pdn_retry_count++;
+        }
+
+        return retry_delay;
+    }
+
+    /* PDN was active */
+    if (rc == 0) {
+        at_apn_unregister_from_packet_events();
+        pdn_retry_count = 0;
+        return 0;
+    }
+
+    LWM2M_INF("Activating %s", lwm2m_os_log_strdup(apn));
+
+    /* PDN was reactived, wait for IPv6 */
+    rc = at_apn_setup_wait_for_ipv6(&m_admin_pdn_handle, apn);
+
+    /* Unregister from packet domain events after waiting for IPv6 */
+    at_apn_unregister_from_packet_events();
+    
+    if (rc) {
+        int retry_delay = pdn_retry_delay[pdn_retry_count];
+
+        if (pdn_retry_count < (ARRAY_SIZE(pdn_retry_delay) - 1)) {
+            pdn_retry_count++;
+        }
+
+        return retry_delay;
+    }
+
+    pdn_retry_count = 0;
+
+    return 0;
 }
 
 /**@brief Disconnect ADMIN PDN connection. */
-static void lwm2m_disconnect_admin_pdn(uint16_t instance_id)
+static void lwm2m_admin_pdn_deactivate(uint16_t instance_id)
 {
     if ((m_use_admin_pdn[instance_id]) &&
         (m_admin_pdn_handle != -1))
     {
-        lwm2m_os_pdn_disconnect(m_admin_pdn_handle);
+        nrf_close(m_admin_pdn_handle);
         m_admin_pdn_handle = -1;
     }
 }
@@ -494,7 +556,6 @@ void lwm2m_request_remote_reconnect(struct nrf_sockaddr *p_remote)
             (m_lwm2m_transport[instance_id] != -1))
         {
             app_server_disconnect(instance_id);
-            lwm2m_disconnect_admin_pdn(instance_id);
             lwm2m_request_server_update(instance_id, true);
             lwm2m_remote_reconnecting_set(short_server_id);
         }
@@ -790,28 +851,24 @@ static uint32_t app_resolve_server_uri(char                * server_uri,
     };
 
     // Structures that might be pointed to by APN hints.
+    char apn[64];
     struct nrf_addrinfo apn_hints;
-    char apn_name_zero_terminated[64];
 
     if (pdn_handle > -1)
     {
-        uint8_t class_apn_len = 0;
-        char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
-
-        memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
-        apn_name_zero_terminated[class_apn_len] = '\0';
+        admin_apn_get(apn, sizeof(apn));
 
         apn_hints.ai_family    = NRF_AF_LTE;
         apn_hints.ai_socktype  = NRF_SOCK_MGMT;
         apn_hints.ai_protocol  = NRF_PROTO_PDN;
-        apn_hints.ai_canonname = apn_name_zero_terminated;
+        apn_hints.ai_canonname = apn;
 
         hints.ai_next = &apn_hints;
     }
 
     LWM2M_INF("Doing DNS lookup using %s (APN %s)",
             (family_type == NRF_AF_INET6) ? "IPv6" : "IPv4",
-            (pdn_handle > -1) ? lwm2m_os_log_strdup(apn_name_zero_terminated) : "default");
+            (pdn_handle > -1) ? lwm2m_os_log_strdup(apn) : "default");
 
     struct nrf_addrinfo *result;
     int ret_val = -1;
@@ -822,18 +879,25 @@ static uint32_t app_resolve_server_uri(char                * server_uri,
     //  22 = NRF_EINVAL is invalid argument, but may also indicate no address found in the DNS query response.
     //  60 = NRF_ETIMEDOUT is a timeout waiting for DNS query response.
 
-    while (ret_val != 0 && ret_val != 22 && ret_val != 60 && cnt <= 5) {
+    while (ret_val != 0 && cnt <= 5) {
         ret_val = nrf_getaddrinfo(hostname, NULL, &hints, &result);
-        if (ret_val != 0 && ret_val != 22 && ret_val != 60 && cnt < 5) {
+        if (ret_val != 0) {
+            if(ret_val == NRF_EINVAL || ret_val == NRF_ETIMEDOUT || ret_val == NRF_ENETDOWN) {
+                break;
+            }
             lwm2m_os_sleep(1000 * cnt);
         }
         cnt++;
     }
 
-    if (ret_val == 22 || ret_val == 60) {
+    if (ret_val == NRF_EINVAL || ret_val == NRF_ETIMEDOUT) {
         LWM2M_WRN("No %s address found for \"%s\"", (family_type == NRF_AF_INET6) ? "IPv6" : "IPv4", lwm2m_os_log_strdup(hostname));
         lwm2m_os_free(p_server_uri_val);
         return EINVAL;
+    } else if (ret_val == NRF_ENETDOWN) {
+        LWM2M_ERR("Failed to lookup \"%s\": PDN down", lwm2m_os_log_strdup(hostname));
+        lwm2m_os_free(p_server_uri_val);
+        return ENETDOWN;
     } else if (ret_val != 0) {
         LWM2M_ERR("Failed to lookup \"%s\": %d", lwm2m_os_log_strdup(hostname), ret_val);
         lwm2m_os_free(p_server_uri_val);
@@ -1018,7 +1082,6 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             // No response from update request
             LWM2M_INF("Update timeout, reconnect (server %d)", instance_id);
             app_server_disconnect(instance_id);
-            lwm2m_disconnect_admin_pdn(instance_id);
             lwm2m_request_server_update(instance_id, true);
 
             if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT) {
@@ -1515,9 +1578,12 @@ static void app_bootstrap_connect(void)
     uint32_t err_code;
     bool secure;
 
-    if (!lwm2m_setup_admin_pdn(0)) {
+    int32_t pdn_retry_delay  = lwm2m_admin_pdn_activate(0);
+    if (pdn_retry_delay > 0) {
         // Setup ADMIN PDN connection failed, try again
-        lwm2m_os_timer_start(state_update_timer, 1);
+        if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT)) {
+            lwm2m_os_timer_start(state_update_timer, pdn_retry_delay);
+        }
         return;
     }
 
@@ -1530,7 +1596,10 @@ static void app_bootstrap_connect(void)
                                                    &secure,
                                                    (struct nrf_sockaddr *)&m_bs_remote_server);
     if (err_code != 0) {
-        lwm2m_disconnect_admin_pdn(0);
+        if (err_code == ENETDOWN) {
+            // PDN disconnected, just return to come back activating it immediately
+            return;
+        }
 
         if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT)) {
             if (err_code == EINVAL) {
@@ -1567,20 +1636,15 @@ static void app_bootstrap_connect(void)
             .protocol     = NRF_SPROTO_DTLS1v2
         };
 
-        char apn_name_zero_terminated[64];
+        char apn[64];
         if (m_use_admin_pdn[0] && m_admin_pdn_handle != -1)
         {
-            uint8_t class_apn_len = 0;
-            char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
-
-            memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
-            apn_name_zero_terminated[class_apn_len] = '\0';
-
-            local_port.interface = apn_name_zero_terminated;
+            admin_apn_get(apn, sizeof(apn));
+            local_port.interface = apn;
         }
 
         LWM2M_INF("Setup secure DTLS session (server 0) (APN %s)",
-                  (local_port.interface) ? lwm2m_os_log_strdup(apn_name_zero_terminated) : "default");
+                  (local_port.interface) ? lwm2m_os_log_strdup(apn) : "default");
 
         err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_bs_remote_server);
 
@@ -1595,12 +1659,19 @@ static void app_bootstrap_connect(void)
             lwm2m_state_set(LWM2M_STATE_BS_CONNECT_WAIT);
             m_lwm2m_transport[0] = local_port.transport;
         }
+        else if (err_code == EIO && (lwm2m_os_errno() == NRF_ENETDOWN)) {
+            LWM2M_INF("Connection failed (PDN down): %s (%ld), %s (%d)",
+                      lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                      lwm2m_os_log_strdup(strerror(lwm2m_os_errno())), lwm2m_os_errno());
+
+            // Just return, so we come back setup PDN again
+            return;
+        }
         else
         {
             LWM2M_INF("Connection failed: %s (%ld), %s (%d)",
                       lwm2m_os_log_strdup(strerror(err_code)), err_code,
                       lwm2m_os_log_strdup(strerror(lwm2m_os_errno())), lwm2m_os_errno());
-            lwm2m_disconnect_admin_pdn(0);
 
             if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT)) {
                 // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
@@ -1608,7 +1679,7 @@ static void app_bootstrap_connect(void)
                                         lwm2m_os_errno() == NRF_EOPNOTSUPP ||
                                         lwm2m_os_errno() == NRF_ENETUNREACH)) {
                     app_handle_connect_retry(0, true);
-                } else {
+                 } else {
                     app_handle_connect_retry(0, false);
                 }
             }
@@ -1640,10 +1711,13 @@ static void app_server_connect(uint16_t instance_id)
 {
     uint32_t err_code;
     bool secure;
-
-    if (!lwm2m_setup_admin_pdn(instance_id)) {
+    
+    int32_t pdn_retry_delay  = lwm2m_admin_pdn_activate(0);
+    if (pdn_retry_delay > 0) {
         // Setup ADMIN PDN connection failed, try again
-        lwm2m_os_timer_start(state_update_timer, 1);
+        if(lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
+            lwm2m_os_timer_start(state_update_timer, pdn_retry_delay);
+        }
         return;
     }
 
@@ -1679,7 +1753,10 @@ static void app_server_connect(uint16_t instance_id)
                                       m_use_admin_pdn[instance_id] ? m_admin_pdn_handle : -1);
     if (err_code != 0)
     {
-        lwm2m_disconnect_admin_pdn(instance_id);
+        if (err_code == ENETDOWN) {
+            // PDN disconnected, just return to come back activating it immediately
+            return;
+        }
 
         if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
             if (err_code == EINVAL) {
@@ -1717,21 +1794,16 @@ static void app_server_connect(uint16_t instance_id)
             .protocol     = NRF_SPROTO_DTLS1v2
         };
 
-        char apn_name_zero_terminated[64];
+        char apn[APP_APN_NAME_BUF_LENGTH];
         if (m_use_admin_pdn[instance_id] && m_admin_pdn_handle != -1)
         {
-            uint8_t class_apn_len = 0;
-            char * apn_name = lwm2m_conn_mon_class_apn_get(2, &class_apn_len);
-
-            memcpy(apn_name_zero_terminated, apn_name, class_apn_len);
-            apn_name_zero_terminated[class_apn_len] = '\0';
-
-            local_port.interface = apn_name_zero_terminated;
+            admin_apn_get(apn, sizeof(apn));
+            local_port.interface = apn;
         }
 
         LWM2M_INF("Setup secure DTLS session (server %u) (APN %s)",
                   instance_id,
-                  (local_port.interface) ? lwm2m_os_log_strdup(apn_name_zero_terminated) : "default");
+                  (local_port.interface) ? lwm2m_os_log_strdup(apn) : "default");
 
         err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_remote_server[instance_id]);
 
@@ -1747,12 +1819,20 @@ static void app_server_connect(uint16_t instance_id)
             lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_WAIT);
             m_lwm2m_transport[instance_id] = local_port.transport;
         }
+        else if (err_code == EIO && (lwm2m_os_errno() == NRF_ENETDOWN))
+        {
+            LWM2M_INF("Connection failed (PDN down): %s (%ld), %s (%d)",
+                      lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                      lwm2m_os_log_strdup(strerror(lwm2m_os_errno())), lwm2m_os_errno());
+
+            // Just return, so we come back setup PDN again
+            return;
+        }
         else
         {
             LWM2M_INF("Connection failed: %s (%ld), %s (%d)",
                       lwm2m_os_log_strdup(strerror(err_code)), err_code,
                       lwm2m_os_log_strdup(strerror(lwm2m_os_errno())), lwm2m_os_errno());
-            lwm2m_disconnect_admin_pdn(instance_id);
 
             if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
                 // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
@@ -1825,7 +1905,6 @@ void app_server_update(uint16_t instance_id, bool connect_update)
                       lwm2m_os_log_strdup(strerror(errno)), errno,
                       instance_id);
             app_server_disconnect(instance_id);
-            lwm2m_disconnect_admin_pdn(instance_id);
             lwm2m_request_server_update(instance_id, true);
 
             if (connect_update) {
@@ -1893,7 +1972,6 @@ static void app_disconnect(void)
         app_server_disconnect(i);
     }
 
-    lwm2m_disconnect_admin_pdn(0);
     m_app_state = LWM2M_STATE_DISCONNECTED;
 }
 
@@ -2020,18 +2098,21 @@ static bool app_coap_socket_poll(void)
             int len = sizeof(error);
             nrf_getsockopt(fds[i].fd, NRF_SOL_SOCKET, NRF_SO_ERROR, &error, &len);
 
-            uint32_t err_code = coap_security_destroy(fds[i].fd);
-            ARG_UNUSED(err_code);
+            uint32_t coap_err_code = coap_security_destroy(fds[i].fd);
+            ARG_UNUSED(coap_err_code);
 
             // NOTE: This works because we are only connecting to one server at a time.
             m_lwm2m_transport[m_server_instance] = -1;
 
             LWM2M_INF("Connection failed: %s (%d)", lwm2m_os_log_strdup(strerror(error)), errno);
-            lwm2m_disconnect_admin_pdn(m_server_instance);
+
+            if (error == NRF_ENETDOWN) {
+                return data_ready;
+            }
 
             if (lwm2m_state_set(next_state)) {
                 // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
-                if (error == EINVAL || error == EOPNOTSUPP || error == ENETUNREACH) {
+                if (error == NRF_EINVAL || error == NRF_EOPNOTSUPP || error == NRF_ENETUNREACH) {
                     app_handle_connect_retry(m_server_instance, true);
                 } else {
                     app_handle_connect_retry(m_server_instance, false);
@@ -2185,6 +2266,7 @@ static int app_lwm2m_process(void)
         {
             LWM2M_INF("Disconnect");
             app_disconnect();
+            lwm2m_admin_pdn_deactivate(0);
             lwm2m_sms_receiver_disable();
             break;
         }

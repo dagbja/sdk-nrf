@@ -251,6 +251,14 @@ static void download_task(void *w)
 	 */
 	err = lwm2m_os_download_connect(host, &config);
 	if (err) {
+		LWM2M_ERR("Failed to connect %d", lwm2m_os_errno());
+		if (lwm2m_os_errno() == NRF_ENETDOWN) {
+			/* PDN is down. */
+			int32_t pdn_retry_delay = lwm2m_admin_pdn_activate(0);
+			lwm2m_os_timer_start(download_dwork, pdn_retry_delay);
+			return;
+		}
+
 		lwm2m_firmware_update_result_set(
 			0, LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI);
 		return;

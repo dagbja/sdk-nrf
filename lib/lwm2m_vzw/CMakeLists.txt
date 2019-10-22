@@ -46,6 +46,7 @@ zephyr_library_sources(
     src/sha256.c
     src/sms_receive.c
     src/lwm2m_carrier_api.c
+    src/lwm2m_pdn.c
 )
 
 if (NOT CONFIG_NRF_LWM2M_VZW_STANDALONE_LIBRARY)
