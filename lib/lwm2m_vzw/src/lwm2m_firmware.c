@@ -9,8 +9,11 @@
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
 #include <lwm2m_acl.h>
+#include <lwm2m_server.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
+#include <lwm2m_firmware_download.h>
+#include <lwm2m_instance_storage.h>
 #include <lwm2m_vzw_main.h>
 
 #include <coap_option.h>
@@ -333,8 +336,17 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
                 }
 
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-                lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_UPDATING);
+
                 LWM2M_INF("Firmware update scheduled at boot");
+                lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_UPDATING);
+                /* Temporary fix:
+                 * deregister in order to register at boot instead of doing
+                 * a server update; this will trigger the observe request
+                 * on the firmware resources needed by the FOTA update test.
+                 */
+                lwm2m_server_registered_set(1, false);
+                lwm2m_instance_storage_server_store(1);
+                /* Reset to continue FOTA update */
                 lwm2m_request_reset();
                 break;
             }
