@@ -522,7 +522,7 @@ void lwm2m_device_init(void)
     }
 
     // Declaration of default resource values.
-    lwm2m_carrier_power_source_t power_sources[] = { LWM2M_CARRIER_POWER_SOURCE_DC };
+    uint8_t power_sources[] = { LWM2M_CARRIER_POWER_SOURCE_DC };
 
     // Assignment of default values to Device object resources.
     lwm2m_device_current_time_update();

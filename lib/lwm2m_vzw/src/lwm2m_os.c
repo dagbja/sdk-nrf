@@ -100,12 +100,12 @@ int lwm2m_os_storage_write(uint16_t id, const void *data, size_t len)
 struct lwm2m_work {
 	struct k_delayed_work work_item;
 	lwm2m_os_timer_handler_t handler;
-	int32_t remaining_timeout_ms;
+	s32_t remaining_timeout_ms;
 };
 
 static struct lwm2m_work lwm2m_works[LWM2M_OS_MAX_TIMER_COUNT];
 
-static int32_t get_timeout_value(int32_t timeout,
+static int32_t get_timeout_value(s32_t timeout,
 				 struct lwm2m_work *lwm2m_work)
 {
 	/* Zephyr's timing subsystem uses positive integers so the
@@ -113,7 +113,7 @@ static int32_t get_timeout_value(int32_t timeout,
 	 *
 	 * max_timeout_ms = (int max - 1 / ticks per sec) * 1000
 	 */
-	static const int32_t max_timeout_ms =
+	static const s32_t max_timeout_ms =
 		K_SECONDS((INT32_MAX - 1) / CONFIG_SYS_CLOCK_TICKS_PER_SEC);
 
 	/* Avoid requesting timeouts larger than max_timeout_ms,
@@ -141,7 +141,8 @@ static void work_handler(struct k_work *work)
 		timeout = get_timeout_value(timeout, lwm2m_work);
 
 		/* FIXME: handle error return from k_delayed_work_submit(). */
-		(void)k_delayed_work_submit(&lwm2m_work->work_item, K_MSEC(timeout));
+		(void)k_delayed_work_submit(&lwm2m_work->work_item,
+									K_MSEC(timeout));
 	} else {
 		lwm2m_work->handler(lwm2m_work);
 	}
