@@ -18,13 +18,13 @@ static coap_resource_t *root_resource;
 static char scratch_buffer[(COAP_RESOURCE_MAX_NAME_LEN + 1) *
 			   COAP_RESOURCE_MAX_DEPTH + 6];
 
-u32_t coap_resource_init(void)
+uint32_t coap_resource_init(void)
 {
 	root_resource = NULL;
 	return 0;
 }
 
-u32_t coap_resource_create(coap_resource_t *resource, const char *name)
+uint32_t coap_resource_create(coap_resource_t *resource, const char *name)
 {
 	NULL_PARAM_CHECK(resource);
 	NULL_PARAM_CHECK(name);
@@ -44,7 +44,7 @@ u32_t coap_resource_create(coap_resource_t *resource, const char *name)
 	return 0;
 }
 
-u32_t coap_resource_child_add(coap_resource_t *parent, coap_resource_t *child)
+uint32_t coap_resource_child_add(coap_resource_t *parent, coap_resource_t *child)
 {
 	NULL_PARAM_CHECK(parent);
 	NULL_PARAM_CHECK(child);
@@ -64,10 +64,10 @@ u32_t coap_resource_child_add(coap_resource_t *parent, coap_resource_t *child)
 	return 0;
 }
 
-static u32_t generate_path(u16_t buffer_pos, coap_resource_t *current_resource,
-			   char *parent_path, u8_t *string, u16_t *length)
+static uint32_t generate_path(uint16_t buffer_pos, coap_resource_t *current_resource,
+			   char *parent_path, uint8_t *string, uint16_t *length)
 {
-	u32_t err_code = 0;
+	uint32_t err_code = 0;
 
 	if (parent_path == NULL) {
 		scratch_buffer[buffer_pos++] = '<';
@@ -86,7 +86,7 @@ static u32_t generate_path(u16_t buffer_pos, coap_resource_t *current_resource,
 			} while (next_child != NULL);
 		}
 	} else {
-		u16_t size = strlen(current_resource->name);
+		uint16_t size = strlen(current_resource->name);
 
 		scratch_buffer[buffer_pos++] = '/';
 		memcpy(&scratch_buffer[buffer_pos], current_resource->name,
@@ -129,7 +129,7 @@ static u32_t generate_path(u16_t buffer_pos, coap_resource_t *current_resource,
 	return err_code;
 }
 
-u32_t coap_resource_well_known_generate(u8_t *string, u16_t *length)
+uint32_t coap_resource_well_known_generate(uint8_t *string, uint16_t *length)
 {
 	NULL_PARAM_CHECK(string);
 	NULL_PARAM_CHECK(length);
@@ -140,7 +140,7 @@ u32_t coap_resource_well_known_generate(u8_t *string, u16_t *length)
 
 	memset(string, 0, *length);
 
-	u32_t err_code = generate_path(0, root_resource, NULL, string, length);
+	uint32_t err_code = generate_path(0, root_resource, NULL, string, length);
 
 	string[strlen((char *)string) - 1] = '\0'; /* remove the last comma */
 
@@ -170,8 +170,8 @@ static coap_resource_t *coap_resource_child_resolve(coap_resource_t *parent,
 	return result;
 }
 
-u32_t coap_resource_get(coap_resource_t **resource, u8_t **uri_pointers,
-			u8_t num_of_uris)
+uint32_t coap_resource_get(coap_resource_t **resource, uint8_t **uri_pointers,
+			uint8_t num_of_uris)
 {
 	if (root_resource == NULL) {
 		/* Make sure pointer is set to NULL before returning. */
@@ -182,7 +182,7 @@ u32_t coap_resource_get(coap_resource_t **resource, u8_t **uri_pointers,
 	coap_resource_t *current_resource = root_resource;
 
 	/* Every node should start at root. */
-	for (u8_t i = 0; i < num_of_uris; i++) {
+	for (uint8_t i = 0; i < num_of_uris; i++) {
 		current_resource = coap_resource_child_resolve(
 				current_resource, (char *)uri_pointers[i]);
 
@@ -204,7 +204,7 @@ u32_t coap_resource_get(coap_resource_t **resource, u8_t **uri_pointers,
 	return ENOENT;
 }
 
-u32_t coap_resource_root_get(coap_resource_t **resource)
+uint32_t coap_resource_root_get(coap_resource_t **resource)
 {
 	NULL_PARAM_CHECK(resource);
 

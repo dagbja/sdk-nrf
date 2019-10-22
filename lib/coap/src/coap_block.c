@@ -40,14 +40,14 @@
 /** Maximum block number. 20 bits max value is (1 << 20) - 1. */
 #define BLOCK_NUMBER_MAX   0xFFFFF
 
-static u32_t block_opt_encode(u8_t more, u16_t size, u32_t number,
-			      u32_t *encoded)
+static uint32_t block_opt_encode(uint8_t more, uint16_t size, uint32_t number,
+			      uint32_t *encoded)
 {
 	if ((number > BLOCK_NUMBER_MAX) || (more > BLOCK_MORE_BIT_MAX)) {
 		return EINVAL;
 	}
 
-	u32_t val = 0;
+	uint32_t val = 0;
 
 	switch (size) {
 	case 16:
@@ -94,8 +94,8 @@ static u32_t block_opt_encode(u8_t more, u16_t size, u32_t number,
 	return 0;
 }
 
-static u32_t block_opt_decode(u32_t encoded, u8_t  *more, u16_t *size,
-			      u32_t *number)
+static uint32_t block_opt_decode(uint32_t encoded, uint8_t  *more, uint16_t *size,
+			      uint32_t *number)
 {
 	if ((encoded & BLOCK_SIZE_MASK) == BLOCK_SIZE_2048_RESERVED) {
 		return EINVAL;
@@ -113,7 +113,7 @@ static u32_t block_opt_decode(u32_t encoded, u8_t  *more, u16_t *size,
 	return 0;
 }
 
-u32_t coap_block_opt_block1_encode(u32_t *encoded, coap_block_opt_block1_t *opt)
+uint32_t coap_block_opt_block1_encode(uint32_t *encoded, coap_block_opt_block1_t *opt)
 {
 	NULL_PARAM_CHECK(encoded);
 	NULL_PARAM_CHECK(opt);
@@ -121,14 +121,14 @@ u32_t coap_block_opt_block1_encode(u32_t *encoded, coap_block_opt_block1_t *opt)
 	return block_opt_encode(opt->more, opt->size, opt->number, encoded);
 }
 
-u32_t coap_block_opt_block1_decode(coap_block_opt_block1_t *opt, u32_t encoded)
+uint32_t coap_block_opt_block1_decode(coap_block_opt_block1_t *opt, uint32_t encoded)
 {
 	NULL_PARAM_CHECK(opt);
 
 	return block_opt_decode(encoded, &opt->more, &opt->size, &opt->number);
 }
 
-u32_t coap_block_opt_block2_encode(u32_t *encoded, coap_block_opt_block2_t *opt)
+uint32_t coap_block_opt_block2_encode(uint32_t *encoded, coap_block_opt_block2_t *opt)
 {
 	NULL_PARAM_CHECK(encoded);
 	NULL_PARAM_CHECK(opt);
@@ -136,7 +136,7 @@ u32_t coap_block_opt_block2_encode(u32_t *encoded, coap_block_opt_block2_t *opt)
 	return block_opt_encode(opt->more, opt->size, opt->number, encoded);
 }
 
-u32_t coap_block_opt_block2_decode(coap_block_opt_block2_t *opt, u32_t encoded)
+uint32_t coap_block_opt_block2_decode(coap_block_opt_block2_t *opt, uint32_t encoded)
 {
 	NULL_PARAM_CHECK(opt);
 

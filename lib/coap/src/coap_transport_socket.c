@@ -200,7 +200,7 @@ static int local_endpoint_find(coap_transport_handle_t handle)
  *
  * @retval true if the endpoint was secure else false.
  */
-static bool secure_endpoint_check(u32_t index)
+static bool secure_endpoint_check(uint32_t index)
 {
 	return index < COAP_PORT_COUNT ? false : true;
 }
@@ -216,7 +216,7 @@ static bool secure_endpoint_check(u32_t index)
  *
  * @retval -1 if the menthod failed, else, the socket descriptor.
  */
-static coap_transport_handle_t socket_create_and_bind(u32_t index,
+static coap_transport_handle_t socket_create_and_bind(uint32_t index,
 						      coap_local_t *local)
 {
 	/* Request new socket creation. */
@@ -287,9 +287,9 @@ static coap_transport_handle_t socket_create_and_bind(u32_t index,
 }
 
 
-u32_t coap_transport_init(coap_transport_init_t *param)
+uint32_t coap_transport_init(coap_transport_init_t *param)
 {
-	u32_t index;
+	uint32_t index;
 
 	NULL_PARAM_CHECK(param);
 	NULL_PARAM_CHECK(param->port_table);
@@ -317,11 +317,11 @@ u32_t coap_transport_init(coap_transport_init_t *param)
 }
 
 
-u32_t coap_transport_write(const coap_transport_handle_t transport,
-			   const struct nrf_sockaddr *remote, const u8_t *data,
-			   u16_t datalen)
+uint32_t coap_transport_write(const coap_transport_handle_t transport,
+			   const struct nrf_sockaddr *remote, const uint8_t *data,
+			   uint16_t datalen)
 {
-	u32_t err_code = ENOENT;
+	uint32_t err_code = ENOENT;
 	int retval;
 	int index;
 
@@ -366,7 +366,7 @@ void coap_transport_process(void)
 }
 
 
-u32_t coap_security_setup(coap_local_t *local, struct nrf_sockaddr const *remote)
+uint32_t coap_security_setup(coap_local_t *local, struct nrf_sockaddr const *remote)
 {
 	NULL_PARAM_CHECK(local);
 	NULL_PARAM_CHECK(remote);
@@ -442,7 +442,7 @@ u32_t coap_security_setup(coap_local_t *local, struct nrf_sockaddr const *remote
 }
 
 
-u32_t coap_security_destroy(coap_transport_handle_t transport)
+uint32_t coap_security_destroy(coap_transport_handle_t transport)
 {
 #if (COAP_SESSION_COUNT > 0)
 	int index = local_endpoint_find(transport);
@@ -475,10 +475,10 @@ void coap_transport_input(void)
 	struct nrf_sockaddr *local;
 	transport_t *port;
 
-	static u8_t read_mem[COAP_MESSAGE_DATA_MAX_SIZE];
+	static uint8_t read_mem[COAP_MESSAGE_DATA_MAX_SIZE];
 
 #if (COAP_SESSION_COUNT > 0)
-	for (u32_t index = 0; index < COAP_SESSION_COUNT; index++) {
+	for (uint32_t index = 0; index < COAP_SESSION_COUNT; index++) {
 		const int port_entry = index + COAP_PORT_COUNT;
 
 		port = &port_table[port_entry];
@@ -494,7 +494,7 @@ void coap_transport_input(void)
 					port->socket_fd,
 					(struct nrf_sockaddr *)&session->remote,
 					(struct nrf_sockaddr *)&port->local,
-					0, read_mem, (u16_t)bytes_read);
+					0, read_mem, (uint16_t)bytes_read);
 
 			/* Nothing much to do if CoAP could not interpret the
 			 * datagram.
@@ -504,7 +504,7 @@ void coap_transport_input(void)
 	}
 #endif /* (COAP_SESSION_COUNT > 0) */
 
-	for (u32_t index = 0; index < COAP_PORT_COUNT; index++) {
+	for (uint32_t index = 0; index < COAP_PORT_COUNT; index++) {
 		port = &port_table[index];
 		local = (struct nrf_sockaddr *)&port->local;
 
@@ -527,7 +527,7 @@ void coap_transport_input(void)
 			int retval = coap_transport_read(
 					port->socket_fd,
 					remote, local, 0, read_mem,
-					(u16_t)bytes_read);
+					(uint16_t)bytes_read);
 
 			/* Nothing much to do if CoAP could not interpret the
 			 * datagram.

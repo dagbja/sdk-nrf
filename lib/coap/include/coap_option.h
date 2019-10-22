@@ -72,8 +72,8 @@ typedef enum {
  * @retval EMSGSIZE Indicates that the buffer provided was not sufficient to
  *                  successfully encode the data.
  */
-u32_t coap_opt_string_encode(u8_t *encoded, u16_t *length, u8_t *string,
-			     u16_t str_len);
+uint32_t coap_opt_string_encode(uint8_t *encoded, uint16_t *length, uint8_t *string,
+			     uint16_t str_len);
 
 /**@brief Decode a utf-8 string into a zero-terminated string.
  *
@@ -85,9 +85,9 @@ u32_t coap_opt_string_encode(u8_t *encoded, u16_t *length, u8_t *string,
  *
  * @retval 0 Indicates that decoding was successful.
  */
-u32_t coap_opt_string_decode(u8_t *string, u16_t *length, u8_t *encoded);
+uint32_t coap_opt_string_decode(uint8_t *string, uint16_t *length, uint8_t *encoded);
 
-/**@brief Encode a uint value into a u8_t buffer in network byte order.
+/**@brief Encode a uint value into a uint8_t buffer in network byte order.
  *
  * @param[out]   encoded Pointer to buffer that will be used to fill the
  *                       encoded uint into.
@@ -100,19 +100,19 @@ u32_t coap_opt_string_decode(u8_t *string, u16_t *length, u8_t *encoded);
  * @retval EMSGSIZE Indicates that the buffer provided was not sufficient to
  *                  successfully encode the data.
  */
-u32_t coap_opt_uint_encode(u8_t *encoded, u16_t *length, u32_t data);
+uint32_t coap_opt_uint_encode(uint8_t *encoded, uint16_t *length, uint32_t data);
 
-/**@brief Decode a uint encoded value in network byte order to a u32_t value.
+/**@brief Decode a uint encoded value in network byte order to a uint32_t value.
  *
- * @param[out]   data    Pointer to the u32_t value where the decoded uint will
+ * @param[out]   data    Pointer to the uint32_t value where the decoded uint will
  *                       be placed.
  * @param[inout] length  Size of the encoded value.
- * @param[in]    encoded uint value to be decoded into a u32_t value.
+ * @param[in]    encoded uint value to be decoded into a uint32_t value.
  *
  * @retval 0      Indicates that decoding was successful.
  * @retval EINVAL If data or encoded pointer is NULL.
  */
-u32_t coap_opt_uint_decode(u32_t *data, u16_t length, u8_t *encoded);
+uint32_t coap_opt_uint_decode(uint32_t *data, uint16_t length, uint8_t *encoded);
 
 #ifdef __cplusplus
 }

@@ -29,7 +29,7 @@ static void observe_server_init(void)
 	COAP_EXIT();
 }
 
-u32_t internal_coap_observe_server_register(u32_t *handle,
+uint32_t internal_coap_observe_server_register(uint32_t *handle,
 					    coap_observer_t *observer)
 {
 	NULL_PARAM_CHECK(handle);
@@ -47,8 +47,8 @@ u32_t internal_coap_observe_server_register(u32_t *handle,
 	/* Check if there is already a registered observer in the list to be
 	 * reused.
 	 */
-	u32_t i;
-	u32_t err_code = coap_observe_server_search(
+	uint32_t i;
+	uint32_t err_code = coap_observe_server_search(
 			&i, observer->remote, observer->resource_of_interest);
 
 
@@ -90,9 +90,9 @@ u32_t internal_coap_observe_server_register(u32_t *handle,
 }
 
 
-u32_t internal_coap_observe_server_unregister(u32_t handle)
+uint32_t internal_coap_observe_server_unregister(uint32_t handle)
 {
-	u32_t ret = 0;
+	uint32_t ret = 0;
 
 	COAP_ENTRY();
 
@@ -112,7 +112,7 @@ u32_t internal_coap_observe_server_unregister(u32_t handle)
 }
 
 
-u32_t internal_coap_observe_server_search(u32_t *handle,
+uint32_t internal_coap_observe_server_search(uint32_t *handle,
 					  struct nrf_sockaddr *observer_addr,
 					  coap_resource_t *resource)
 {
@@ -120,7 +120,7 @@ u32_t internal_coap_observe_server_search(u32_t *handle,
 	NULL_PARAM_CHECK(observer_addr);
 	NULL_PARAM_CHECK(resource);
 
-	for (u32_t i = 0; i < COAP_OBSERVE_MAX_NUM_OBSERVERS; i++) {
+	for (uint32_t i = 0; i < COAP_OBSERVE_MAX_NUM_OBSERVERS; i++) {
 		if (observers[i].observer.resource_of_interest == resource) {
 			const struct nrf_sockaddr *remote =
 				(struct nrf_sockaddr *)&observers[i].remote;
@@ -162,7 +162,7 @@ u32_t internal_coap_observe_server_search(u32_t *handle,
 }
 
 
-u32_t internal_coap_observe_server_next_get(coap_observer_t **observer,
+uint32_t internal_coap_observe_server_next_get(coap_observer_t **observer,
 					    coap_observer_t *start,
 					    coap_resource_t *resource)
 {
@@ -170,7 +170,7 @@ u32_t internal_coap_observe_server_next_get(coap_observer_t **observer,
 	NULL_PARAM_CHECK(observer);
 
 	if (start == NULL) {
-		for (u32_t i = 0; i < COAP_OBSERVE_MAX_NUM_OBSERVERS; i++) {
+		for (uint32_t i = 0; i < COAP_OBSERVE_MAX_NUM_OBSERVERS; i++) {
 			if (observers[i].observer.resource_of_interest ==
 								resource) {
 				(*observer) = &observers[i].observer;
@@ -178,11 +178,11 @@ u32_t internal_coap_observe_server_next_get(coap_observer_t **observer,
 			}
 		}
 	} else {
-		u32_t index_to_previous =
-				(u8_t)(((u32_t)start - (u32_t)observers) /
-				(u32_t)sizeof(internal_coap_observer_t));
+		uint32_t index_to_previous =
+				(uint8_t)(((uint32_t)start - (uint32_t)observers) /
+				(uint32_t)sizeof(internal_coap_observer_t));
 
-		for (u32_t i = index_to_previous + 1;
+		for (uint32_t i = index_to_previous + 1;
 		     i < COAP_OBSERVE_MAX_NUM_OBSERVERS; i++) {
 			if (observers[i].observer.resource_of_interest ==
 								resource) {
@@ -197,7 +197,7 @@ u32_t internal_coap_observe_server_next_get(coap_observer_t **observer,
 	return ENOENT;
 }
 
-u32_t internal_coap_observe_server_get(u32_t handle, coap_observer_t **observer)
+uint32_t internal_coap_observe_server_get(uint32_t handle, coap_observer_t **observer)
 {
 	NULL_PARAM_CHECK(observer);
 
@@ -235,7 +235,7 @@ static void observe_client_init(void)
 }
 
 
-u32_t internal_coap_observe_client_register(u32_t *handle,
+uint32_t internal_coap_observe_client_register(uint32_t *handle,
 					    coap_observable_t *observable)
 {
 	NULL_PARAM_CHECK(handle);
@@ -251,7 +251,7 @@ u32_t internal_coap_observe_client_register(u32_t *handle,
 	COAP_ENTRY();
 
 	/* Check if there is an available spot in the observer list. */
-	for (u32_t i = 0; i < COAP_OBSERVE_MAX_NUM_OBSERVABLES; i++) {
+	for (uint32_t i = 0; i < COAP_OBSERVE_MAX_NUM_OBSERVABLES; i++) {
 		if (observables[i].observable.response_callback == NULL) {
 			memcpy(&(observables[i].observable), observable,
 			       sizeof(coap_observable_t));
@@ -279,9 +279,9 @@ u32_t internal_coap_observe_client_register(u32_t *handle,
 }
 
 
-u32_t internal_coap_observe_client_unregister(u32_t handle)
+uint32_t internal_coap_observe_client_unregister(uint32_t handle)
 {
-	u32_t ret = 0;
+	uint32_t ret = 0;
 
 	COAP_ENTRY();
 
@@ -301,13 +301,13 @@ u32_t internal_coap_observe_client_unregister(u32_t handle)
 }
 
 
-u32_t internal_coap_observe_client_search(u32_t *handle, u8_t *token,
-					  u16_t token_len)
+uint32_t internal_coap_observe_client_search(uint32_t *handle, uint8_t *token,
+					  uint16_t token_len)
 {
 	NULL_PARAM_CHECK(handle);
 	NULL_PARAM_CHECK(token);
 
-	for (u32_t i = 0; i < COAP_OBSERVE_MAX_NUM_OBSERVABLES; i++) {
+	for (uint32_t i = 0; i < COAP_OBSERVE_MAX_NUM_OBSERVABLES; i++) {
 		if ((observables[i].observable.response_callback != NULL) &&
 		    (observables[i].observable.token_len != 0) &&
 		    (memcmp(observables[i].observable.token, token,
@@ -321,7 +321,7 @@ u32_t internal_coap_observe_client_search(u32_t *handle, u8_t *token,
 }
 
 
-u32_t internal_coap_observe_client_get(u32_t handle,
+uint32_t internal_coap_observe_client_get(uint32_t handle,
 				       coap_observable_t **observable)
 {
 	NULL_PARAM_CHECK(observable);
@@ -339,14 +339,14 @@ u32_t internal_coap_observe_client_get(u32_t handle,
 	return 0;
 }
 
-u32_t internal_coap_observe_client_next_get(coap_observable_t **observable,
-					    u32_t *handle,
+uint32_t internal_coap_observe_client_next_get(coap_observable_t **observable,
+					    uint32_t *handle,
 					    coap_observable_t *start)
 {
 	NULL_PARAM_CHECK(observable);
 
 	if (start == NULL) {
-		for (u32_t i = 0; i < COAP_OBSERVE_MAX_NUM_OBSERVABLES; i++) {
+		for (uint32_t i = 0; i < COAP_OBSERVE_MAX_NUM_OBSERVABLES; i++) {
 			if (observables[i].observable.response_callback !=
 									NULL) {
 				(*observable) = &observables[i].observable;
@@ -355,11 +355,11 @@ u32_t internal_coap_observe_client_next_get(coap_observable_t **observable,
 			}
 		}
 	} else {
-		u32_t index_to_previous =
-			(u8_t)(((u32_t)start - (u32_t)observables) /
-			(u32_t)sizeof(internal_coap_observables_t));
+		uint32_t index_to_previous =
+			(uint8_t)(((uint32_t)start - (uint32_t)observables) /
+			(uint32_t)sizeof(internal_coap_observables_t));
 
-		for (u32_t i = index_to_previous + 1;
+		for (uint32_t i = index_to_previous + 1;
 		     i < COAP_OBSERVE_MAX_NUM_OBSERVABLES; i++) {
 			if (observables[i].observable.response_callback !=
 									NULL) {
@@ -377,9 +377,9 @@ u32_t internal_coap_observe_client_next_get(coap_observable_t **observable,
 	return ENOENT;
 }
 
-static u32_t observe_opt_present(coap_message_t *message)
+static uint32_t observe_opt_present(coap_message_t *message)
 {
-	u8_t index;
+	uint8_t index;
 
 	for (index = 0; index < message->options_count; index++) {
 		if (message->options[index].number == COAP_OPT_OBSERVE) {
@@ -391,11 +391,11 @@ static u32_t observe_opt_present(coap_message_t *message)
 
 static void set_max_age(coap_observable_t *observable, coap_message_t *response)
 {
-	u8_t index;
+	uint8_t index;
 
 	for (index = 0; index < response->options_count; index++) {
 		if (response->options[index].number == COAP_OPT_MAX_AGE) {
-			u32_t max_age;
+			uint32_t max_age;
 
 			observable->max_age = coap_opt_u_decode(
 				&max_age, response->options[index].length,
@@ -414,17 +414,17 @@ void coap_observe_client_send_handle(coap_message_t *request)
 	COAP_ENTRY();
 
 	if (request->header.code == COAP_CODE_GET) {
-		u32_t observe_option = 0;
+		uint32_t observe_option = 0;
 
 		if (observe_opt_present(request) == 0) {
 			/* Locate option and check value. */
-			u8_t index;
+			uint8_t index;
 
 			for (index = 0; index < request->options_count;
 			     index++) {
 				if (request->options[index].number ==
 							COAP_OPT_OBSERVE) {
-					u32_t err_code = coap_opt_u_decode(
+					uint32_t err_code = coap_opt_u_decode(
 						&observe_option,
 						request->options[index].length,
 						request->options[index].data);
@@ -438,8 +438,8 @@ void coap_observe_client_send_handle(coap_message_t *request)
 
 		if (observe_option == 1) {
 			/* Un-register observable instance. */
-			u32_t handle;
-			u32_t err_code = internal_coap_observe_client_search(
+			uint32_t handle;
+			uint32_t err_code = internal_coap_observe_client_search(
 						&handle, request->token,
 						request->header.token_len);
 
@@ -464,8 +464,8 @@ void coap_observe_client_response_handle(coap_message_t *response,
 	if (observe_opt_present(response) == 0) {
 		if (item == NULL) {
 			/* Search for the token in the observable list. */
-			u32_t handle;
-			u32_t err_code = internal_coap_observe_client_search(
+			uint32_t handle;
+			uint32_t err_code = internal_coap_observe_client_search(
 					&handle, response->token,
 					response->header.token_len);
 
@@ -523,8 +523,8 @@ void coap_observe_client_response_handle(coap_message_t *response,
 			/* If there is no observable instance created yet for
 			 * this token, add it.
 			 */
-			u32_t handle;
-			u32_t err_code = internal_coap_observe_client_search(
+			uint32_t handle;
+			uint32_t err_code = internal_coap_observe_client_search(
 					&handle, response->token,
 					response->header.token_len);
 
@@ -558,7 +558,7 @@ void coap_observe_client_response_handle(coap_message_t *response,
 					set_max_age(&observable, response);
 
 					/* Register the observable. */
-					u32_t observable_resource_handle;
+					uint32_t observable_resource_handle;
 
 					internal_coap_observe_client_register(
 						&observable_resource_handle,
@@ -573,8 +573,8 @@ void coap_observe_client_response_handle(coap_message_t *response,
 			}
 		}
 	} else {  /* COAP_OPT_OBSERVE not present */
-		u32_t handle;
-		u32_t err_code = internal_coap_observe_client_search(
+		uint32_t handle;
+		uint32_t err_code = internal_coap_observe_client_search(
 						&handle, response->token,
 						response->header.token_len);
 
@@ -601,11 +601,11 @@ void internal_coap_observe_init(void)
 
 #if (COAP_ENABLE_OBSERVE_SERVER == 1)
 
-u32_t coap_observe_server_register(u32_t *handle, coap_observer_t *observer)
+uint32_t coap_observe_server_register(uint32_t *handle, coap_observer_t *observer)
 {
 	COAP_MUTEX_UNLOCK();
 
-	u32_t err_code = internal_coap_observe_server_register(handle,
+	uint32_t err_code = internal_coap_observe_server_register(handle,
 							       observer);
 
 	COAP_MUTEX_UNLOCK();
@@ -613,23 +613,23 @@ u32_t coap_observe_server_register(u32_t *handle, coap_observer_t *observer)
 	return err_code;
 }
 
-u32_t coap_observe_server_unregister(u32_t handle)
+uint32_t coap_observe_server_unregister(uint32_t handle)
 {
 	COAP_MUTEX_UNLOCK();
 
-	u32_t err_code = internal_coap_observe_server_unregister(handle);
+	uint32_t err_code = internal_coap_observe_server_unregister(handle);
 
 	COAP_MUTEX_UNLOCK();
 
 	return err_code;
 }
 
-u32_t coap_observe_server_search(u32_t *handle, struct nrf_sockaddr *observer_addr,
+uint32_t coap_observe_server_search(uint32_t *handle, struct nrf_sockaddr *observer_addr,
 				 coap_resource_t *resource)
 {
 	COAP_MUTEX_UNLOCK();
 
-	u32_t err_code = internal_coap_observe_server_search(
+	uint32_t err_code = internal_coap_observe_server_search(
 					handle, observer_addr, resource);
 
 	COAP_MUTEX_UNLOCK();
@@ -637,13 +637,13 @@ u32_t coap_observe_server_search(u32_t *handle, struct nrf_sockaddr *observer_ad
 	return err_code;
 }
 
-u32_t coap_observe_server_next_get(coap_observer_t **observer,
+uint32_t coap_observe_server_next_get(coap_observer_t **observer,
 				   coap_observer_t *start,
 				   coap_resource_t *resource)
 {
 	COAP_MUTEX_UNLOCK();
 
-	u32_t err_code = internal_coap_observe_server_next_get(observer,
+	uint32_t err_code = internal_coap_observe_server_next_get(observer,
 							       start, resource);
 
 	COAP_MUTEX_UNLOCK();
@@ -651,11 +651,11 @@ u32_t coap_observe_server_next_get(coap_observer_t **observer,
 	return err_code;
 }
 
-u32_t coap_observe_server_get(u32_t handle, coap_observer_t **observer)
+uint32_t coap_observe_server_get(uint32_t handle, coap_observer_t **observer)
 {
 	COAP_MUTEX_UNLOCK();
 
-	u32_t err_code = internal_coap_observe_server_get(handle, observer);
+	uint32_t err_code = internal_coap_observe_server_get(handle, observer);
 
 	COAP_MUTEX_UNLOCK();
 
@@ -666,11 +666,11 @@ u32_t coap_observe_server_get(u32_t handle, coap_observer_t **observer)
 
 #if (COAP_ENABLE_OBSERVE_CLIENT == 1)
 
-u32_t coap_observe_client_register(u32_t *handle, coap_observable_t *observable)
+uint32_t coap_observe_client_register(uint32_t *handle, coap_observable_t *observable)
 {
 	COAP_MUTEX_UNLOCK();
 
-	u32_t err_code = internal_coap_observe_client_register(handle,
+	uint32_t err_code = internal_coap_observe_client_register(handle,
 							       observable);
 
 	COAP_MUTEX_UNLOCK();
@@ -678,22 +678,22 @@ u32_t coap_observe_client_register(u32_t *handle, coap_observable_t *observable)
 	return err_code;
 }
 
-u32_t coap_observe_client_unregister(u32_t handle)
+uint32_t coap_observe_client_unregister(uint32_t handle)
 {
 	COAP_MUTEX_UNLOCK();
 
-	u32_t err_code = internal_coap_observe_client_unregister(handle);
+	uint32_t err_code = internal_coap_observe_client_unregister(handle);
 
 	COAP_MUTEX_UNLOCK();
 
 	return err_code;
 }
 
-u32_t coap_observe_client_search(u32_t *handle, u8_t *token, u16_t token_len)
+uint32_t coap_observe_client_search(uint32_t *handle, uint8_t *token, uint16_t token_len)
 {
 	COAP_MUTEX_UNLOCK();
 
-	u32_t err_code = internal_coap_observe_client_search(handle, token,
+	uint32_t err_code = internal_coap_observe_client_search(handle, token,
 							     token_len);
 
 	COAP_MUTEX_UNLOCK();
@@ -701,24 +701,24 @@ u32_t coap_observe_client_search(u32_t *handle, u8_t *token, u16_t token_len)
 	return err_code;
 }
 
-u32_t coap_observe_client_get(u32_t handle, coap_observable_t **observable)
+uint32_t coap_observe_client_get(uint32_t handle, coap_observable_t **observable)
 {
 	COAP_MUTEX_UNLOCK();
 
-	u32_t err_code = internal_coap_observe_client_get(handle, observable);
+	uint32_t err_code = internal_coap_observe_client_get(handle, observable);
 
 	COAP_MUTEX_UNLOCK();
 
 	return err_code;
 }
 
-u32_t coap_observe_client_next_get(coap_observable_t **observable,
-				   u32_t *handle,
+uint32_t coap_observe_client_next_get(coap_observable_t **observable,
+				   uint32_t *handle,
 				   coap_observable_t *start)
 {
 	COAP_MUTEX_UNLOCK();
 
-	u32_t err_code = internal_coap_observe_client_next_get(observable,
+	uint32_t err_code = internal_coap_observe_client_next_get(observable,
 							       handle, start);
 
 	COAP_MUTEX_UNLOCK();

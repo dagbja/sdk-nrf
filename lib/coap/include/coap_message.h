@@ -42,7 +42,7 @@ extern "C" {
  *                initialization of the message went successfully.
  * @retval EINVAL Either the message or init_config parameter was NULL.
  */
-u32_t coap_message_create(coap_message_t *message,
+uint32_t coap_message_create(coap_message_t *message,
 			  coap_message_conf_t *init_config);
 
 /**@brief Decode a message from a raw buffer.
@@ -65,8 +65,8 @@ u32_t coap_message_create(coap_message_t *message,
  * @retval EMSGSIZE If the message is less than 4 bytes, not containing a full
  *                  header.
  */
-u32_t coap_message_decode(coap_message_t *message, const u8_t *raw_message,
-			  u16_t message_len);
+uint32_t coap_message_decode(coap_message_t *message, const uint8_t *raw_message,
+			  uint16_t message_len);
 
 /**@brief Encode a CoAP message into a byte buffer.
  *
@@ -95,7 +95,7 @@ u32_t coap_message_decode(coap_message_t *message, const u8_t *raw_message,
  * @retval EMSGSIZE If the provided buffer is not sufficient for the encoded
  *                  message.
  */
-u32_t coap_message_encode(coap_message_t *message, u8_t *buffer, u16_t *length);
+uint32_t coap_message_encode(coap_message_t *message, uint8_t *buffer, uint16_t *length);
 
 /**@brief Get the content format mask of the message.
  *
@@ -107,7 +107,7 @@ u32_t coap_message_encode(coap_message_t *message, u8_t *buffer, u16_t *length);
  * @retval 0      If the mask could be generated.
  * @retval EINVAL If the message pointer or the mask pointer given was NULL.
  */
-u32_t coap_message_ct_mask_get(coap_message_t *message, u32_t *mask);
+uint32_t coap_message_ct_mask_get(coap_message_t *message, uint32_t *mask);
 
 /**@brief Get the accept mask of the message.
  *
@@ -119,7 +119,7 @@ u32_t coap_message_ct_mask_get(coap_message_t *message, u32_t *mask);
  * @retval 0      If the mask could be generated.
  * @retval EINVAL If the message pointer or the mask pointer given was NULL.
  */
-u32_t coap_message_accept_mask_get(coap_message_t *message, u32_t *mask);
+uint32_t coap_message_accept_mask_get(coap_message_t *message, uint32_t *mask);
 
 #ifdef __cplusplus
 }

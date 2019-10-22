@@ -26,9 +26,9 @@
 
 /** Token seed provided by application to be used for generating token numbers.
  */
-static u32_t token_seed;
+static uint32_t token_seed;
 /** Message ID counter, used to generate unique message IDs. */
-static u32_t message_id_counter;
+static uint32_t message_id_counter;
 /** Function pointer to an application CoAP error handler. */
 static coap_error_callback_t error_callback;
 
@@ -87,17 +87,17 @@ static inline bool is_non(coap_message_t *message)
 	return (message->header.type == COAP_TYPE_NON);
 }
 
-static inline bool is_request(u8_t message_code)
+static inline bool is_request(uint8_t message_code)
 {
 	return (message_code >= 1) && (message_code < 32);
 }
 
-static inline bool is_response(u8_t message_code)
+static inline bool is_response(uint8_t message_code)
 {
 	return (message_code >= 64) && (message_code < 192);
 }
 
-static inline void app_error_notify(u32_t err_code, coap_message_t *message)
+static inline void app_error_notify(uint32_t err_code, coap_message_t *message)
 {
 	if (error_callback != NULL) {
 		COAP_MUTEX_UNLOCK();
@@ -108,7 +108,7 @@ static inline void app_error_notify(u32_t err_code, coap_message_t *message)
 	}
 }
 
-u32_t coap_init(u32_t token_rand_seed,
+uint32_t coap_init(uint32_t token_rand_seed,
 		coap_transport_init_t *transport_param,
 		coap_alloc_t alloc_fn,
 		coap_free_t free_fn)
@@ -119,7 +119,7 @@ u32_t coap_init(u32_t token_rand_seed,
 
 	COAP_ENTRY();
 
-	u32_t err_code;
+	uint32_t err_code;
 
 	COAP_MUTEX_LOCK();
 
@@ -130,7 +130,7 @@ u32_t coap_init(u32_t token_rand_seed,
 	(void)token_seed;
 
 	internal_coap_observe_init();
-	message_id_counter = (u16_t)token_rand_seed;
+	message_id_counter = (uint16_t)token_rand_seed;
 
 	err_code = coap_transport_init(transport_param);
 	if (err_code != 0) {
@@ -154,7 +154,7 @@ u32_t coap_init(u32_t token_rand_seed,
 
 }
 
-u32_t coap_error_handler_register(coap_error_callback_t callback)
+uint32_t coap_error_handler_register(coap_error_callback_t callback)
 {
 	/* TODO: error handling, null pointer, module initialized etc. */
 	COAP_MUTEX_LOCK();
@@ -166,7 +166,7 @@ u32_t coap_error_handler_register(coap_error_callback_t callback)
 	return 0;
 }
 
-u32_t internal_coap_message_send(u32_t *handle, coap_message_t *message)
+uint32_t internal_coap_message_send(uint32_t *handle, coap_message_t *message)
 {
 	if ((message == NULL) || (message->remote == NULL)) {
 		return EINVAL;
@@ -180,8 +180,8 @@ u32_t internal_coap_message_send(u32_t *handle, coap_message_t *message)
 	/* Fetch the expected length of the packet serialized by passing length
 	 * of 0.
 	 */
-	u16_t expected_length = 0;
-	u32_t err_code = coap_message_encode(message, NULL, &expected_length);
+	uint16_t expected_length = 0;
+	uint32_t err_code = coap_message_encode(message, NULL, &expected_length);
 
 	if (err_code != 0) {
 		COAP_EXIT();
@@ -191,8 +191,8 @@ u32_t internal_coap_message_send(u32_t *handle, coap_message_t *message)
 	err_code = ENOMEM;
 
 	/* Allocate a buffer to serialize the message into. */
-	u8_t *buffer;
-	u32_t request_length = expected_length;
+	uint8_t *buffer;
+	uint32_t request_length = expected_length;
 
 	buffer = coap_alloc_fn(request_length);
 	if (buffer == NULL) {
@@ -202,10 +202,10 @@ u32_t internal_coap_message_send(u32_t *handle, coap_message_t *message)
 		return err_code;
 	}
 	memset(buffer, 0, request_length);
-	COAP_TRC("Alloc mem, buffer = %p", (u8_t *)buffer);
+	COAP_TRC("Alloc mem, buffer = %p", (uint8_t *)buffer);
 
 	/* Serialize the message. */
-	u16_t buffer_length = (u16_t)request_length;
+	uint16_t buffer_length = (uint16_t)request_length;
 
 	err_code = coap_message_encode(message, buffer, &buffer_length);
 	if (err_code != 0) {
@@ -282,13 +282,13 @@ u32_t internal_coap_message_send(u32_t *handle, coap_message_t *message)
 }
 
 
-static u32_t create_response(coap_message_t **response, coap_message_t *request,
-			     u16_t data_size)
+static uint32_t create_response(coap_message_t **response, coap_message_t *request,
+			     uint16_t data_size)
 {
-	u32_t err_code = ENOMEM;
+	uint32_t err_code = ENOMEM;
 
 	/* Allocate space for a new message. */
-	u32_t size = sizeof(coap_message_t);
+	uint32_t size = sizeof(coap_message_t);
 
 	(*response) = coap_alloc_fn(size);
 	if (*response == NULL) {
@@ -297,7 +297,7 @@ static u32_t create_response(coap_message_t **response, coap_message_t *request,
 
 
 	memset((*response), 0, sizeof(coap_message_t));
-	COAP_TRC("Alloc mem, response = %p", (u8_t *)(*response));
+	COAP_TRC("Alloc mem, response = %p", (uint8_t *)(*response));
 
 	if (data_size > 0) {
 		/* Allocate a scratch buffer for payload and options. */
@@ -346,11 +346,11 @@ static u32_t create_response(coap_message_t **response, coap_message_t *request,
  *
  * @retval 0 If the response was sent out successfully.
  */
-static u32_t send_error_response(coap_message_t *message, u8_t code)
+static uint32_t send_error_response(coap_message_t *message, uint8_t code)
 {
 	coap_message_t *error_response = NULL;
 
-	u32_t err_code = create_response(&error_response, message,
+	uint32_t err_code = create_response(&error_response, message,
 					 COAP_MESSAGE_DATA_MAX_SIZE);
 
 	if (err_code != 0) {
@@ -363,24 +363,24 @@ static u32_t send_error_response(coap_message_t *message, u8_t code)
 	error_response->header.code = code;
 
 	if (error_response != NULL) {
-		u32_t handle;
+		uint32_t handle;
 
 		err_code = internal_coap_message_send(&handle, error_response);
 
 		COAP_TRC("Free mem, response->data = %p", error_response->data);
 		coap_free_fn(error_response->data);
 
-		COAP_TRC("Free mem, response = %p", (u8_t *)error_response);
+		COAP_TRC("Free mem, response = %p", (uint8_t *)error_response);
 		coap_free_fn(error_response);
 	}
 
 	return err_code;
 }
 
-u32_t coap_transport_read(const coap_transport_handle_t transport,
+uint32_t coap_transport_read(const coap_transport_handle_t transport,
 			  const struct nrf_sockaddr *remote,
 			  const struct nrf_sockaddr *local,
-			  u32_t result, const u8_t *data, u16_t datalen)
+			  uint32_t result, const uint8_t *data, uint16_t datalen)
 {
 	COAP_ENTRY();
 
@@ -390,10 +390,10 @@ u32_t coap_transport_read(const coap_transport_handle_t transport,
 		return 0;
 	}
 
-	u32_t err_code = ENOMEM;
+	uint32_t err_code = ENOMEM;
 	coap_message_t *message;
 	/* Allocate space for a new message. */
-	u32_t size = sizeof(coap_message_t);
+	uint32_t size = sizeof(coap_message_t);
 
 	message = coap_alloc_fn(size);
 	if (message == NULL) {
@@ -402,7 +402,7 @@ u32_t coap_transport_read(const coap_transport_handle_t transport,
 	}
 
 	memset(message, 0, sizeof(coap_message_t));
-	COAP_TRC("Alloc mem, message = %p", (u8_t *)message);
+	COAP_TRC("Alloc mem, message = %p", (uint8_t *)message);
 
 	err_code = coap_message_decode(message, data, datalen);
 	if (err_code != 0) {
@@ -422,7 +422,7 @@ u32_t coap_transport_read(const coap_transport_handle_t transport,
 		COAP_MESSAGE_RST_SET(message->remote, message->transport,
 				     message->header.id);
 
-		u32_t handle;
+		uint32_t handle;
 
 		err_code = internal_coap_message_send(&handle,
 						      &coap_empty_message);
@@ -520,7 +520,7 @@ u32_t coap_transport_read(const coap_transport_handle_t transport,
 		COAP_TRC("CoAP message type: REQUEST");
 
 		if (request_handler != NULL) {
-			u32_t return_code = request_handler(message);
+			uint32_t return_code = request_handler(message);
 
 			/* If success, then all processing and any responses
 			 * has been sent by the application callback.
@@ -548,9 +548,9 @@ u32_t coap_transport_read(const coap_transport_handle_t transport,
 				}
 			}
 		} else {
-			u8_t *uri_pointers[COAP_RESOURCE_MAX_DEPTH] = { 0, };
-			u8_t uri_path_count = 0;
-			u16_t index;
+			uint8_t *uri_pointers[COAP_RESOURCE_MAX_DEPTH] = { 0, };
+			uint8_t uri_path_count = 0;
+			uint16_t index;
 
 			for (index = 0; index < message->options_count;
 								index++) {
@@ -596,35 +596,35 @@ u32_t coap_transport_read(const coap_transport_handle_t transport,
 		}
 	}
 
-	COAP_TRC("Free mem, message = %p", (u8_t *)message);
-	coap_free_fn((u8_t *)message);
+	COAP_TRC("Free mem, message = %p", (uint8_t *)message);
+	coap_free_fn((uint8_t *)message);
 
 	COAP_EXIT();
 	return err_code;
 }
 
-u32_t coap_message_send(u32_t *handle, coap_message_t *message)
+uint32_t coap_message_send(uint32_t *handle, coap_message_t *message)
 {
 	COAP_MUTEX_LOCK();
 
-	u32_t err_code = internal_coap_message_send(handle, message);
+	uint32_t err_code = internal_coap_message_send(handle, message);
 
 	COAP_MUTEX_UNLOCK();
 
 	return err_code;
 }
 
-u32_t coap_message_abort(u32_t handle)
+uint32_t coap_message_abort(uint32_t handle)
 {
 
 	return ENOTSUP;
 }
 
-u32_t coap_message_new(coap_message_t **request, coap_message_conf_t *config)
+uint32_t coap_message_new(coap_message_t **request, coap_message_conf_t *config)
 {
 	COAP_ENTRY();
 
-	u32_t err_code = ENOMEM;
+	uint32_t err_code = ENOMEM;
 	coap_message_t *allocated;
 
 	/* If port is not configured, return error and skip initialization
@@ -638,7 +638,7 @@ u32_t coap_message_new(coap_message_t **request, coap_message_conf_t *config)
 	COAP_MUTEX_LOCK();
 
 	/* Allocate space for a new message. */
-	u32_t size = sizeof(coap_message_t);
+	uint32_t size = sizeof(coap_message_t);
 
 	allocated = coap_alloc_fn(size);
 	if (allocated == NULL) {
@@ -656,7 +656,7 @@ u32_t coap_message_new(coap_message_t **request, coap_message_conf_t *config)
 	if (allocated->data == NULL) {
 		COAP_TRC("Allocation of message data buffer failed!");
 
-		COAP_TRC("Free mem, *request = %p", (u8_t *)(*request));
+		COAP_TRC("Free mem, *request = %p", (uint8_t *)(*request));
 		coap_free_fn(allocated);
 
 		COAP_MUTEX_UNLOCK();
@@ -687,7 +687,7 @@ u32_t coap_message_new(coap_message_t **request, coap_message_conf_t *config)
 	return err_code;
 }
 
-u32_t coap_message_delete(coap_message_t *message)
+uint32_t coap_message_delete(coap_message_t *message)
 {
 	COAP_ENTRY();
 
@@ -698,7 +698,7 @@ u32_t coap_message_delete(coap_message_t *message)
 	COAP_TRC("Free mem, message->data = %p", message->data);
 	coap_free_fn(message->data);
 
-	COAP_TRC("Free mem, message = %p", (u8_t *)message);
+	COAP_TRC("Free mem, message = %p", (uint8_t *)message);
 	coap_free_fn(message);
 
 
@@ -710,7 +710,7 @@ u32_t coap_message_delete(coap_message_t *message)
 }
 
 
-u32_t coap_time_tick(void)
+uint32_t coap_time_tick(void)
 {
 	COAP_MUTEX_LOCK();
 
@@ -730,7 +730,7 @@ u32_t coap_time_tick(void)
 				item->retrans_count++;
 
 				/* Retransmit the message. */
-				u32_t err_code = coap_transport_write(
+				uint32_t err_code = coap_transport_write(
 					item->transport,
 					(struct nrf_sockaddr *)&item->remote,
 					item->buffer,
@@ -777,7 +777,7 @@ u32_t coap_time_tick(void)
 	return 0;
 }
 
-u32_t coap_request_handler_register(coap_request_handler_t handler)
+uint32_t coap_request_handler_register(coap_request_handler_t handler)
 {
 	COAP_MUTEX_LOCK();
 

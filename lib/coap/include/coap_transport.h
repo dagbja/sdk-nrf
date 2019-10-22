@@ -47,7 +47,7 @@ typedef struct {
 	int peer_verify;
 
 	/** Indicates the number of entries in the cipher list. */
-	u32_t cipher_count;
+	uint32_t cipher_count;
 
 	/** Indicates the list of ciphers to be used for the session.
 	 *  May be NULL to use the default ciphers.
@@ -55,7 +55,7 @@ typedef struct {
 	int *cipher_list;
 
 	/** Indicates the number of entries in the sec tag list. */
-	u32_t sec_tag_count;
+	uint32_t sec_tag_count;
 
 	/** Indicates the list of security tags to be used for the session. */
 	nrf_sec_tag_t *sec_tag_list;
@@ -114,7 +114,7 @@ typedef struct {
  * @return 0 if initialization was successful. Otherwise, an error code that
  *         indicates the reason for the failure is returned.
  */
-u32_t coap_transport_init(coap_transport_init_t *param);
+uint32_t coap_transport_init(coap_transport_init_t *param);
 
 /**@brief Sends data on a CoAP endpoint or port.
  *
@@ -126,9 +126,9 @@ u32_t coap_transport_init(coap_transport_init_t *param);
  * @return 0 if the data was sent successfully. Otherwise, an error code that
  *         indicates the reason for the failure is returned.
  */
-u32_t coap_transport_write(const coap_transport_handle_t handle,
-			   const struct nrf_sockaddr *remote, const u8_t *data,
-			   u16_t datalen);
+uint32_t coap_transport_write(const coap_transport_handle_t handle,
+			   const struct nrf_sockaddr *remote, const uint8_t *data,
+			   uint16_t datalen);
 
 /**@brief Handles data received on a CoAP endpoint or port.
  *
@@ -148,10 +148,10 @@ u32_t coap_transport_write(const coap_transport_handle_t handle,
  *         that indicates the reason for the failure is returned.
  *
  */
-u32_t coap_transport_read(const coap_transport_handle_t handle,
-			  const struct nrf_sockaddr *remote,
-			  const struct nrf_sockaddr *local, u32_t result,
-			  const u8_t *data, u16_t datalen);
+uint32_t coap_transport_read(const coap_transport_handle_t handle,
+			    const struct nrf_sockaddr *remote,
+			  	const struct nrf_sockaddr *local, uint32_t result,
+			  	const uint8_t *data, uint16_t datalen);
 
 /**@brief Process loop to handle DTLS processing.
  *

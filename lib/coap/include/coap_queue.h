@@ -32,34 +32,34 @@ typedef struct {
 	void *arg;
 
 	/** Quick reference to the handle value of the current item. */
-	u32_t handle;
+	uint32_t handle;
 
 	/** Message ID. */
-	u16_t mid;
+	uint16_t mid;
 
 	/** Message Token length. */
-	u8_t token_len;
+	uint8_t token_len;
 
 	/** Message Token value up to 8 bytes. */
-	u8_t token[8];
+	uint8_t token[8];
 
 	/** Re-transmission attempt count. */
-	u8_t retrans_count;
+	uint8_t retrans_count;
 
 	/** Time until new re-transmission attempt. */
-	u16_t timeout;
+	uint16_t timeout;
 
 	/** Last timeout value used. */
-	u16_t timeout_val;
+	uint16_t timeout_val;
 
 	/** Source port to use when re-transmitting. */
 	coap_transport_handle_t transport;
 
 	/** Pointer to the data buffer containing the encoded CoAP message. */
-	u8_t *buffer;
+	uint8_t *buffer;
 
 	/** Size of the data buffer containing the encoded CoAP message. */
-	u32_t buffer_len;
+	uint32_t buffer_len;
 
 	/** Callback function to be called upon response or transmission
 	 *  timeout.
@@ -76,7 +76,7 @@ typedef struct {
  *
  * @retval 0 If initialization completed successfully.
  */
-u32_t coap_queue_init(void);
+uint32_t coap_queue_init(void);
 
 /**@brief Add item to the queue.
  *
@@ -88,7 +88,7 @@ u32_t coap_queue_init(void);
  *                 configured by CONFIG_NRF_COAP_MESSAGE_QUEUE_SIZE.
  * @retval EACCESS If the element could not be added.
  */
-u32_t coap_queue_add(coap_queue_item_t *item);
+uint32_t coap_queue_add(coap_queue_item_t *item);
 
 /**@brief Remove item from the queue.
  *
@@ -99,7 +99,7 @@ u32_t coap_queue_add(coap_queue_item_t *item);
  * @retval EINVAL If item pointer is NULL.
  * @retval ENOENT If the item was not located in the queue.
  */
-u32_t coap_queue_remove(coap_queue_item_t *item);
+uint32_t coap_queue_remove(coap_queue_item_t *item);
 
 /**@brief Search for item by token.
  *
@@ -114,8 +114,8 @@ u32_t coap_queue_remove(coap_queue_item_t *item);
  * @retval EINVAL If item pointer is NULL.
  * @retval ENOENT If no item was found.
  */
-u32_t coap_queue_item_by_token_get(coap_queue_item_t **item, u8_t *token,
-				   u8_t token_len);
+uint32_t coap_queue_item_by_token_get(coap_queue_item_t **item, uint8_t *token,
+				   uint8_t token_len);
 
 /**@brief Search for item by message id.
  *
@@ -129,7 +129,7 @@ u32_t coap_queue_item_by_token_get(coap_queue_item_t **item, u8_t *token,
  * @retval EINVAL If item pointer is NULL.
  * @retval ENOENT If no item was found.
  */
-u32_t coap_queue_item_by_mid_get(coap_queue_item_t **item, u16_t message_id);
+uint32_t coap_queue_item_by_mid_get(coap_queue_item_t **item, uint16_t message_id);
 
 /**@brief Iterate through items.
  *
@@ -142,7 +142,7 @@ u32_t coap_queue_item_by_mid_get(coap_queue_item_t **item, u16_t message_id);
  * @retval EINVAL If item pointer is NULL.
  * @retval ENOENT If next item was not found.
  */
-u32_t coap_queue_item_next_get(coap_queue_item_t **item,
+uint32_t coap_queue_item_next_get(coap_queue_item_t **item,
 			       coap_queue_item_t *start);
 
 #ifdef __cplusplus

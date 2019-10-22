@@ -29,9 +29,9 @@ extern "C" {
 #define COAP_BLOCK_OPT_BLOCK_MORE_BIT_SET 1
 
 typedef struct {
-	u8_t more;    /**< More bit value. */
-	u16_t size;   /**< Size of the block in bytes. */
-	u32_t number; /**< Block number. */
+	uint8_t more;    /**< More bit value. */
+	uint16_t size;   /**< Size of the block in bytes. */
+	uint32_t number; /**< Block number. */
 } coap_block_opt_block1_t;
 
 typedef coap_block_opt_block1_t coap_block_opt_block2_t;
@@ -47,7 +47,7 @@ typedef coap_block_opt_block1_t coap_block_opt_block2_t;
  * @retval EINVAL If one of the parameters supplied is a null pointer or one of
  *                the fields in the option structure has an illegal value.
  */
-u32_t coap_block_opt_block1_encode(u32_t *encoded,
+uint32_t coap_block_opt_block1_encode(uint32_t *encoded,
 				   coap_block_opt_block1_t *opt);
 
 /**@brief Decode block1 option from a uint to its structure counterpart.
@@ -61,7 +61,7 @@ u32_t coap_block_opt_block1_encode(u32_t *encoded,
  *                allowed by spec (more than 20 bits) or the size has the value
  *                of the reserved 2048 value (7).
  */
-u32_t coap_block_opt_block1_decode(coap_block_opt_block1_t *opt, u32_t encoded);
+uint32_t coap_block_opt_block1_decode(coap_block_opt_block1_t *opt, uint32_t encoded);
 
 /**@brief Encode block2 option into its uint binary counterpart.
  *
@@ -74,7 +74,7 @@ u32_t coap_block_opt_block1_decode(coap_block_opt_block1_t *opt, u32_t encoded);
  * @retval EINVAL If one of the parameters supplied is a null pointer or one of
  *                the fields in the option structure has an illegal value.
  */
-u32_t coap_block_opt_block2_encode(u32_t *encoded,
+uint32_t coap_block_opt_block2_encode(uint32_t *encoded,
 				   coap_block_opt_block2_t *opt);
 
 /**@brief Decode block2 option from a uint to its structure counterpart.
@@ -88,7 +88,7 @@ u32_t coap_block_opt_block2_encode(u32_t *encoded,
  *                allowed by spec (more than 20 bits) or the size has the value
  *                of the reserved 2048 value (7).
  */
-u32_t coap_block_opt_block2_decode(coap_block_opt_block2_t *opt, u32_t encoded);
+uint32_t coap_block_opt_block2_decode(coap_block_opt_block2_t *opt, uint32_t encoded);
 
 #endif /* COAP_BLOCK_H__ */
 

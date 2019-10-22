@@ -11,11 +11,11 @@
 #include "coap_queue.h"
 
 static coap_queue_item_t queue[COAP_MESSAGE_QUEUE_SIZE];
-static u8_t message_queue_count;
+static uint8_t message_queue_count;
 
-u32_t coap_queue_init(void)
+uint32_t coap_queue_init(void)
 {
-	for (u8_t i = 0; i < COAP_MESSAGE_QUEUE_SIZE; i++) {
+	for (uint8_t i = 0; i < COAP_MESSAGE_QUEUE_SIZE; i++) {
 		memset(&queue[i], 0, sizeof(coap_queue_item_t));
 		queue[i].handle = i;
 	}
@@ -24,7 +24,7 @@ u32_t coap_queue_init(void)
 	return 0;
 }
 
-u32_t coap_queue_add(coap_queue_item_t *item)
+uint32_t coap_queue_add(coap_queue_item_t *item)
 {
 	NULL_PARAM_CHECK(item);
 
@@ -32,7 +32,7 @@ u32_t coap_queue_add(coap_queue_item_t *item)
 		return ENOMEM;
 	}
 
-	for (u8_t i = 0; i < COAP_MESSAGE_QUEUE_SIZE; i++) {
+	for (uint8_t i = 0; i < COAP_MESSAGE_QUEUE_SIZE; i++) {
 		if (queue[i].buffer == NULL) {
 			/* Free spot in message queue. Add message here... */
 			memcpy(&queue[i], item, sizeof(coap_queue_item_t));
@@ -45,9 +45,9 @@ u32_t coap_queue_add(coap_queue_item_t *item)
 	return EACCES;
 }
 
-u32_t coap_queue_remove(coap_queue_item_t *item)
+uint32_t coap_queue_remove(coap_queue_item_t *item)
 {
-	for (u8_t i = 0; i < COAP_MESSAGE_QUEUE_SIZE; i++) {
+	for (uint8_t i = 0; i < COAP_MESSAGE_QUEUE_SIZE; i++) {
 		if (item == (coap_queue_item_t *)&queue[i]) {
 			memset(&queue[i], 0, sizeof(coap_queue_item_t));
 			message_queue_count--;
@@ -58,10 +58,10 @@ u32_t coap_queue_remove(coap_queue_item_t *item)
 	return ENOENT;
 }
 
-u32_t coap_queue_item_by_token_get(coap_queue_item_t **item, u8_t *token,
-				   u8_t token_len)
+uint32_t coap_queue_item_by_token_get(coap_queue_item_t **item, uint8_t *token,
+				   uint8_t token_len)
 {
-	for (u8_t i = 0; i < COAP_MESSAGE_QUEUE_SIZE; i++) {
+	for (uint8_t i = 0; i < COAP_MESSAGE_QUEUE_SIZE; i++) {
 		if (queue[i].token_len == token_len) {
 			if ((queue[i].token_len != 0) &&
 			    (memcmp(queue[i].token, token,
@@ -75,11 +75,11 @@ u32_t coap_queue_item_by_token_get(coap_queue_item_t **item, u8_t *token,
 	return ENOENT;
 }
 
-u32_t coap_queue_item_by_mid_get(coap_queue_item_t **item, u16_t message_id)
+uint32_t coap_queue_item_by_mid_get(coap_queue_item_t **item, uint16_t message_id)
 {
 
 
-	for (u8_t i = 0; i < COAP_MESSAGE_QUEUE_SIZE; i++) {
+	for (uint8_t i = 0; i < COAP_MESSAGE_QUEUE_SIZE; i++) {
 		if (queue[i].mid == message_id) {
 			*item = &queue[i];
 			return 0;
@@ -89,21 +89,21 @@ u32_t coap_queue_item_by_mid_get(coap_queue_item_t **item, u16_t message_id)
 	return ENOENT;
 }
 
-u32_t coap_queue_item_next_get(coap_queue_item_t **item,
+uint32_t coap_queue_item_next_get(coap_queue_item_t **item,
 			       coap_queue_item_t *start)
 {
 	if (start == NULL) {
-		for (u8_t i = 0; i < COAP_MESSAGE_QUEUE_SIZE; i++) {
+		for (uint8_t i = 0; i < COAP_MESSAGE_QUEUE_SIZE; i++) {
 			if (queue[i].buffer != NULL) {
 				(*item) = &queue[i];
 				return 0;
 			}
 		}
 	} else {
-		u8_t index_to_previous = (u8_t)(((u32_t)start - (u32_t)queue) /
-					 (u32_t)sizeof(coap_queue_item_t));
+		uint8_t index_to_previous = (uint8_t)(((uint32_t)start - (uint32_t)queue) /
+					 (uint32_t)sizeof(coap_queue_item_t));
 
-		for (u8_t i = index_to_previous + 1;
+		for (uint8_t i = index_to_previous + 1;
 		     i < COAP_MESSAGE_QUEUE_SIZE; i++) {
 			if (queue[i].buffer != NULL) {
 				(*item) = &queue[i];

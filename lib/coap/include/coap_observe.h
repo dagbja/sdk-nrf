@@ -38,7 +38,7 @@ extern "C" {
  * @retval ENOMEM If the observer could not be added to the list.
  * @retval EINVAL If one of the parameters is a NULL pointer.
  */
-u32_t internal_coap_observe_server_register(u32_t *handle,
+uint32_t internal_coap_observe_server_register(uint32_t *handle,
 					    coap_observer_t *observer);
 
 /**@brief Unregister an observer.
@@ -50,7 +50,7 @@ u32_t internal_coap_observe_server_register(u32_t *handle,
  * @retval 0      If the observer was successfully unregistered.
  * @retval ENOENT If the given handle was not found in the observer list.
  */
-u32_t internal_coap_observe_server_unregister(u32_t handle);
+uint32_t internal_coap_observe_server_unregister(uint32_t handle);
 
 /**@brief Search the observer list for an observer matching remote address and
  *        subject given.
@@ -67,7 +67,7 @@ u32_t internal_coap_observe_server_unregister(u32_t handle);
  * @retval EINVAL If one of the pointers are NULL.
  * @retval ENOENT If observer was not found.
  */
-u32_t internal_coap_observe_server_search(u32_t *handle,
+uint32_t internal_coap_observe_server_search(uint32_t *handle,
 					  struct nrf_sockaddr *observer_addr,
 					  coap_resource_t *resource);
 
@@ -83,7 +83,7 @@ u32_t internal_coap_observe_server_search(u32_t *handle,
  * @retval EINVAL If observer or resource pointer is NULL.
  * @retval ENOENT If next observer was not found.
  */
-u32_t internal_coap_observe_server_next_get(coap_observer_t **observer,
+uint32_t internal_coap_observe_server_next_get(coap_observer_t **observer,
 					    coap_observer_t *start,
 					    coap_resource_t *resource);
 
@@ -97,7 +97,7 @@ u32_t internal_coap_observe_server_next_get(coap_observer_t **observer,
  * @retval EINVAL If observer pointer is NULL.
  * @retval ENOENT If observer associated with the handle was not found.
  */
-u32_t internal_coap_observe_server_get(u32_t handle,
+uint32_t internal_coap_observe_server_get(uint32_t handle,
 				       coap_observer_t **observer);
 
 /**@brief Register a new observable resource.
@@ -112,7 +112,7 @@ u32_t internal_coap_observe_server_get(u32_t handle,
  * @retval ENOMEM If the observable resource could not be added to the list.
  * @retval EINVAL If one of the parameters is a NULL pointer.
  */
-u32_t internal_coap_observe_client_register(u32_t *handle,
+uint32_t internal_coap_observe_client_register(uint32_t *handle,
 					    coap_observable_t *observable);
 
 /**@brief Unregister an observable resource.
@@ -126,7 +126,7 @@ u32_t internal_coap_observe_client_register(u32_t *handle,
  * @retval ENOENT If the given handle was not found in the observable resource
  *                list.
  */
-u32_t internal_coap_observe_client_unregister(u32_t handle);
+uint32_t internal_coap_observe_client_unregister(uint32_t handle);
 
 /**@brief Search for a observable resource instance by token.
  *
@@ -142,8 +142,8 @@ u32_t internal_coap_observe_client_unregister(u32_t handle);
  * @retval ENOENT If observable resource was not found in the observable
  *                resource list.
  */
-u32_t internal_coap_observe_client_search(u32_t *handle, u8_t *token,
-					  u16_t token_len);
+uint32_t internal_coap_observe_client_search(uint32_t *handle, uint8_t *token,
+					  uint16_t token_len);
 
 /**@brief Retrieve the observable resource based on handle.
  *
@@ -157,7 +157,7 @@ u32_t internal_coap_observe_client_search(u32_t *handle, u8_t *token,
  * @retval ENOENT If observable resource associated with the handle was not
  *                found.
  */
-u32_t internal_coap_observe_client_get(u32_t handle,
+uint32_t internal_coap_observe_client_get(uint32_t handle,
 				       coap_observable_t **observable);
 
 /**@brief Iterate through observable resources.
@@ -174,8 +174,8 @@ u32_t internal_coap_observe_client_get(u32_t handle,
  * @retval EINVAL If observer or observer pointer is NULL.
  * @retval ENOENT If next observer was not found.
  */
-u32_t internal_coap_observe_client_next_get(coap_observable_t **observable,
-					    u32_t *handle,
+uint32_t internal_coap_observe_client_next_get(coap_observable_t **observable,
+					    uint32_t *handle,
 					    coap_observable_t *start);
 
 #if (COAP_ENABLE_OBSERVE_SERVER == 1) || (COAP_ENABLE_OBSERVE_CLIENT == 1)

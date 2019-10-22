@@ -32,7 +32,7 @@ extern "C" {
  *
  * @retval 0 This function will always return success.
  */
-u32_t coap_resource_init(void);
+uint32_t coap_resource_init(void);
 
 /**@brief Find a resource by traversing the resource names.
  *
@@ -46,8 +46,8 @@ u32_t coap_resource_init(void);
  * @retval ENOENT The resource was not located or no resource has been
  *                registered.
  */
-u32_t coap_resource_get(coap_resource_t **resource, u8_t **uri_pointers,
-			u8_t num_of_uris);
+uint32_t coap_resource_get(coap_resource_t **resource, uint8_t **uri_pointers,
+			uint8_t num_of_uris);
 
 /**@brief Process the request related to the resource.
  *
@@ -63,7 +63,7 @@ u32_t coap_resource_get(coap_resource_t **resource, u8_t **uri_pointers,
  * @param[inout] response Response message which can be used by the resource
  *                        populate the response message.
  */
-u32_t coap_resource_process_request(coap_resource_t *resource,
+uint32_t coap_resource_process_request(coap_resource_t *resource,
 				    coap_message_t *request,
 				    coap_message_t *response);
 

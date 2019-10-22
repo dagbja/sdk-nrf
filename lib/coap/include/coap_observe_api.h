@@ -32,10 +32,10 @@ typedef struct {
 	struct nrf_sockaddr *remote;
 
 	/** Message Token ID. */
-	u8_t token[8];
+	uint8_t token[8];
 
 	/** Length of the token. */
-	u8_t token_len;
+	uint8_t token_len;
 
 	/** Content type to use when sending notifications. */
 	coap_content_type_t ct;
@@ -55,10 +55,10 @@ typedef struct {
 	struct nrf_sockaddr *remote;
 
 	/** Message Token ID. */
-	u8_t token[8];
+	uint8_t token[8];
 
 	/** Length of the token. */
-	u8_t token_len;
+	uint8_t token_len;
 
 	/** Function callback set by the application to be called when a
 	 *  notifications has been received. Should be set by the application.
@@ -68,7 +68,7 @@ typedef struct {
 	/** Max-Age of the observable resources value. If timed out, the value
 	 *  is no longer valid as a representation of the observable resource.
 	 */
-	u32_t max_age;
+	uint32_t max_age;
 } coap_observable_t;
 
 /**@brief Register a new observer.
@@ -82,7 +82,7 @@ typedef struct {
  * @retval ENOMEM If the observer could not be added to the list.
  * @retval EINVAL If one of the parameters is a NULL pointer.
  */
-u32_t coap_observe_server_register(u32_t *handle, coap_observer_t *observer);
+uint32_t coap_observe_server_register(uint32_t *handle, coap_observer_t *observer);
 
 /**@brief Unregister an observer.
  *
@@ -93,7 +93,7 @@ u32_t coap_observe_server_register(u32_t *handle, coap_observer_t *observer);
  * @retval 0      If the observer was successfully unregistered.
  * @retval ENOENT If the given handle was not found in the observer list.
  */
-u32_t coap_observe_server_unregister(u32_t handle);
+uint32_t coap_observe_server_unregister(uint32_t handle);
 
 /**@brief Search the observer list for an observer matching remote address
  *        and subject given.
@@ -110,7 +110,7 @@ u32_t coap_observe_server_unregister(u32_t handle);
  * @retval EINVAL If one of the pointers are NULL.
  * @retval ENOENT If observer was not found.
  */
-u32_t coap_observe_server_search(u32_t *handle, struct nrf_sockaddr *observer_addr,
+uint32_t coap_observe_server_search(uint32_t *handle, struct nrf_sockaddr *observer_addr,
 				 coap_resource_t *resource);
 
 /**@brief Iterate through observers subscribing to a specific resource.
@@ -125,7 +125,7 @@ u32_t coap_observe_server_search(u32_t *handle, struct nrf_sockaddr *observer_ad
  * @retval EINVAL If observer or resource pointer is NULL.
  * @retval ENOENT If next observer was not found.
  */
-u32_t coap_observe_server_next_get(coap_observer_t **observer,
+uint32_t coap_observe_server_next_get(coap_observer_t **observer,
 				   coap_observer_t *start,
 				   coap_resource_t *resource);
 
@@ -139,7 +139,7 @@ u32_t coap_observe_server_next_get(coap_observer_t **observer,
  * @retval EINVAL If observer pointer is NULL.
  * @retval ENOENT If observer associated with the handle was not found.
  */
-u32_t coap_observe_server_get(u32_t handle, coap_observer_t **observer);
+uint32_t coap_observe_server_get(uint32_t handle, coap_observer_t **observer);
 
 /**@brief Register a new observable resource.
  *
@@ -153,7 +153,7 @@ u32_t coap_observe_server_get(u32_t handle, coap_observer_t **observer);
  * @retval ENOMEM If the observable resource could not be added to the list.
  * @retval EINVAL If one of the parameters is a NULL pointer.
  */
-u32_t coap_observe_client_register(u32_t *handle,
+uint32_t coap_observe_client_register(uint32_t *handle,
 				   coap_observable_t *observable);
 
 /**@brief Unregister an observable resource.
@@ -167,7 +167,7 @@ u32_t coap_observe_client_register(u32_t *handle,
  * @retval ENOENT If the given handle was not found in the observable resource
  *                list.
  */
-u32_t coap_observe_client_unregister(u32_t handle);
+uint32_t coap_observe_client_unregister(uint32_t handle);
 
 /**@brief Search for a observable resource instance by token.
  *
@@ -183,7 +183,7 @@ u32_t coap_observe_client_unregister(u32_t handle);
  * @retval ENOENT If observable resource was not found in the observable
  *                resource list.
  */
-u32_t coap_observe_client_search(u32_t *handle, u8_t *token, u16_t token_len);
+uint32_t coap_observe_client_search(uint32_t *handle, uint8_t *token, uint16_t token_len);
 
 /**@brief Retrieve the observable resource based on handle.
  *
@@ -197,7 +197,7 @@ u32_t coap_observe_client_search(u32_t *handle, u8_t *token, u16_t token_len);
  * @retval ENOENT If observable resource associated with the handle was not
  *                found.
  */
-u32_t coap_observe_client_get(u32_t handle, coap_observable_t **observable);
+uint32_t coap_observe_client_get(uint32_t handle, coap_observable_t **observable);
 
 /**@brief Iterate through observable resources.
  *
@@ -213,8 +213,8 @@ u32_t coap_observe_client_get(u32_t handle, coap_observable_t **observable);
  * @retval EINVAL If observer or observer pointer is NULL.
  * @retval ENOENT If next observer was not found.
  */
-u32_t coap_observe_client_next_get(coap_observable_t **observable,
-				   u32_t *handle, coap_observable_t *start);
+uint32_t coap_observe_client_next_get(coap_observable_t **observable,
+				   uint32_t *handle, coap_observable_t *start);
 
 #ifdef __cplusplus
 }

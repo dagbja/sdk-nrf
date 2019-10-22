@@ -22,7 +22,7 @@
 		} \
 	} while (false)
 
-u32_t coap_message_create(coap_message_t *message,
+uint32_t coap_message_create(coap_message_t *message,
 			  coap_message_conf_t *init_config)
 {
 	NULL_PARAM_CHECK(message);
@@ -64,20 +64,20 @@ u32_t coap_message_create(coap_message_t *message,
  *
  * @retval 0 If the option parsing went successful.
  */
-static u32_t decode_option(const u8_t *raw_option, coap_message_t *message,
-			   u16_t *byte_count)
+static uint32_t decode_option(const uint8_t *raw_option, coap_message_t *message,
+			   uint16_t *byte_count)
 {
-	u16_t byte_index = 0;
-	u8_t option_num = message->options_count;
+	uint16_t byte_index = 0;
+	uint8_t option_num = message->options_count;
 
 	/* Calculate the option number. */
-	u16_t option_delta = (raw_option[byte_index] & 0xF0) >> 4;
+	uint16_t option_delta = (raw_option[byte_index] & 0xF0) >> 4;
 	/* Calculate the option length. */
-	u16_t option_length = (raw_option[byte_index] & 0x0F);
+	uint16_t option_length = (raw_option[byte_index] & 0x0F);
 
 	byte_index++;
 
-	u16_t acc_option_delta = message->options_delta;
+	uint16_t acc_option_delta = message->options_delta;
 
 	if (option_delta == 13) {
 		/* read one additional byte to get the extended delta. */
@@ -107,7 +107,7 @@ static u32_t decode_option(const u8_t *raw_option, coap_message_t *message,
 	message->options[option_num].length = option_length;
 
 	/* Point data to the memory where to find the option value. */
-	message->options[option_num].data = (u8_t *)&raw_option[byte_index];
+	message->options[option_num].data = (uint8_t *)&raw_option[byte_index];
 
 	/* Update the delta counter with latest option number. */
 	message->options_delta = message->options[option_num].number;
@@ -126,11 +126,11 @@ static u32_t decode_option(const u8_t *raw_option, coap_message_t *message,
  *
  * @return The size of the extended byte field.
  */
-static inline u8_t encode_extended_bytes(u16_t *value, u16_t *value_ext)
+static inline uint8_t encode_extended_bytes(uint16_t *value, uint16_t *value_ext)
 {
-	u16_t raw_value = *value;
+	uint16_t raw_value = *value;
 
-	u8_t ext_size = 0;
+	uint8_t ext_size = 0;
 
 	if (raw_value >= 269) {
 		*value = 14;
@@ -148,27 +148,27 @@ static inline u8_t encode_extended_bytes(u16_t *value, u16_t *value_ext)
 	return ext_size;
 }
 
-static u32_t encode_option(u8_t *buffer, coap_option_t *option,
-			   u16_t *byte_count)
+static uint32_t encode_option(uint8_t *buffer, coap_option_t *option,
+			   uint16_t *byte_count)
 {
-	u16_t delta_ext = 0;
-	u16_t delta = option->number;
+	uint16_t delta_ext = 0;
+	uint16_t delta = option->number;
 
-	u8_t delta_ext_size = encode_extended_bytes(&delta, &delta_ext);
+	uint8_t delta_ext_size = encode_extended_bytes(&delta, &delta_ext);
 
-	u16_t length = option->length;
-	u16_t length_ext = 0;
+	uint16_t length = option->length;
+	uint16_t length_ext = 0;
 
-	u8_t length_ext_size = encode_extended_bytes(&length, &length_ext);
+	uint8_t length_ext_size = encode_extended_bytes(&length, &length_ext);
 
 	if (buffer == NULL) {
-		u16_t header_size = 1;
+		uint16_t header_size = 1;
 		*byte_count = header_size + delta_ext_size + length_ext_size +
 			      option->length;
 		return 0;
 	}
 
-	u16_t byte_index = 0;
+	uint16_t byte_index = 0;
 
 	/* Add the option header. */
 	buffer[byte_index++] = ((delta & 0x0F) << 4) | (length & 0x0F);
@@ -176,20 +176,20 @@ static u32_t encode_option(u8_t *buffer, coap_option_t *option,
 	/* Add option delta extended bytes to the buffer. */
 	if (delta_ext_size == 1) {
 		/* Add first byte of delta_ext to the option header. */
-		buffer[byte_index++] = (u8_t)delta_ext;
+		buffer[byte_index++] = (uint8_t)delta_ext;
 	} else if (delta_ext_size == 2) {
 		/* u16 in Network Byte Order. */
-		buffer[byte_index++] = (u8_t)((delta_ext & 0xFF00) >> 8);
-		buffer[byte_index++] = (u8_t)((delta_ext & 0x00FF));
+		buffer[byte_index++] = (uint8_t)((delta_ext & 0xFF00) >> 8);
+		buffer[byte_index++] = (uint8_t)((delta_ext & 0x00FF));
 	}
 
 	if (length_ext_size == 1) {
 		/* Add first byte of length_ext to the option header. */
-		buffer[byte_index++] = (u8_t)length_ext;
+		buffer[byte_index++] = (uint8_t)length_ext;
 	} else if (length_ext_size == 2) {
 		/* u16 in Network Byte Order. */
-		buffer[byte_index++] = (u8_t)((length_ext & 0xFF00) >> 8);
-		buffer[byte_index++] = (u8_t)((length_ext & 0x00FF));
+		buffer[byte_index++] = (uint8_t)((length_ext & 0xFF00) >> 8);
+		buffer[byte_index++] = (uint8_t)((length_ext & 0x00FF));
 	}
 
 	memcpy(&buffer[byte_index], option->data, option->length);
@@ -198,8 +198,8 @@ static u32_t encode_option(u8_t *buffer, coap_option_t *option,
 	return 0;
 }
 
-u32_t coap_message_decode(coap_message_t *message, const u8_t *raw_message,
-			  u16_t message_len)
+uint32_t coap_message_decode(coap_message_t *message, const uint8_t *raw_message,
+			  uint16_t message_len)
 {
 	NULL_PARAM_CHECK(message);
 	NULL_PARAM_CHECK(raw_message);
@@ -210,7 +210,7 @@ u32_t coap_message_decode(coap_message_t *message, const u8_t *raw_message,
 	}
 
 	/* Parse the content of the raw message buffer. */
-	u16_t byte_index = 0;
+	uint16_t byte_index = 0;
 
 	/* Parse the 4 byte CoAP header. */
 	message->header.version = (raw_message[byte_index] >> 6);
@@ -226,7 +226,7 @@ u32_t coap_message_decode(coap_message_t *message, const u8_t *raw_message,
 	message->header.id += raw_message[byte_index++];
 
 	/* Parse the token, if any. */
-	for (u8_t index = 0; (byte_index < message_len) &&
+	for (uint8_t index = 0; (byte_index < message_len) &&
 			     (index < message->header.token_len); index++) {
 		message->token[index] = raw_message[byte_index++];
 	}
@@ -237,8 +237,8 @@ u32_t coap_message_decode(coap_message_t *message, const u8_t *raw_message,
 	/* Parse the options if any. */
 	while ((byte_index < message_len) &&
 	       (raw_message[byte_index] != COAP_PAYLOAD_MARKER)) {
-		u32_t err_code;
-		u16_t byte_count = 0;
+		uint32_t err_code;
+		uint16_t byte_count = 0;
 
 		err_code = decode_option(&raw_message[byte_index], message,
 					 &byte_count);
@@ -261,19 +261,19 @@ u32_t coap_message_decode(coap_message_t *message, const u8_t *raw_message,
 		}
 
 		message->payload_len = message_len - byte_index;
-		message->payload = (u8_t *)&raw_message[byte_index];
+		message->payload = (uint8_t *)&raw_message[byte_index];
 	}
 
 	return 0;
 }
 
-u32_t coap_message_encode(coap_message_t *message, u8_t *buffer, u16_t *length)
+uint32_t coap_message_encode(coap_message_t *message, uint8_t *buffer, uint16_t *length)
 {
 	NULL_PARAM_CHECK(length);
 	NULL_PARAM_CHECK(message);
 
 	/* calculated size */
-	u16_t total_packet_size = 4;
+	uint16_t total_packet_size = 4;
 
 	if (message->payload_len > 0) {
 		total_packet_size += message->payload_len;
@@ -305,7 +305,7 @@ u32_t coap_message_encode(coap_message_t *message, u8_t *buffer, u16_t *length)
 	}
 
 	/* Start filling the bytes. */
-	u16_t byte_index = 0;
+	uint16_t byte_index = 0;
 
 	/* TODO: Verify the values of the header fields.
 	 * if (version > 1)
@@ -329,9 +329,9 @@ u32_t coap_message_encode(coap_message_t *message, u8_t *buffer, u16_t *length)
 
 	/* memcpy(&buffer[byte_index], &message->data[0], message->options_len);
 	 */
-	for (u8_t i = 0; i < message->options_count; i++) {
-		u32_t err_code;
-		u16_t byte_count = 0;
+	for (uint8_t i = 0; i < message->options_count; i++) {
+		uint32_t err_code;
+		uint16_t byte_count = 0;
 
 		err_code = encode_option(&buffer[byte_index],
 					 &message->options[i],
@@ -354,13 +354,13 @@ u32_t coap_message_encode(coap_message_t *message, u8_t *buffer, u16_t *length)
 	return 0;
 }
 
-u32_t coap_message_opt_empty_add(coap_message_t *message, u16_t option_num)
+uint32_t coap_message_opt_empty_add(coap_message_t *message, uint16_t option_num)
 {
 	OPTION_INDEX_AVAIL_CHECK(message->options_count);
 
-	u32_t err_code;
-	u16_t encoded_len = 0;
-	u8_t current_option_index = message->options_count;
+	uint32_t err_code;
+	uint16_t encoded_len = 0;
+	uint8_t current_option_index = message->options_count;
 
 	message->options[current_option_index].number =
 					option_num - message->options_delta;
@@ -370,7 +370,7 @@ u32_t coap_message_opt_empty_add(coap_message_t *message, u16_t option_num)
 	message->options_delta = option_num;
 
 	/* Calculate option size */
-	u16_t option_byte_count = 0;
+	uint16_t option_byte_count = 0;
 
 	/* do a length check to encode_option to get the header length. */
 	err_code = encode_option(NULL, &message->options[current_option_index],
@@ -384,15 +384,15 @@ u32_t coap_message_opt_empty_add(coap_message_t *message, u16_t option_num)
 	return err_code;
 }
 
-u32_t coap_message_opt_uint_add(coap_message_t *message, u16_t option_num,
-				u32_t data)
+uint32_t coap_message_opt_uint_add(coap_message_t *message, uint16_t option_num,
+				uint32_t data)
 {
 	OPTION_INDEX_AVAIL_CHECK(message->options_count);
 
-	u32_t err_code;
-	u16_t encoded_len = message->data_len - message->options_offset;
-	u8_t current_option_index = message->options_count;
-	u8_t *next_option_data = &message->data[message->options_offset];
+	uint32_t err_code;
+	uint16_t encoded_len = message->data_len - message->options_offset;
+	uint8_t current_option_index = message->options_count;
+	uint8_t *next_option_data = &message->data[message->options_offset];
 
 	/* If the value of the option is 0, do not encode the 0, as this can
 	 * be omitted. (RFC7252 3.2)
@@ -416,7 +416,7 @@ u32_t coap_message_opt_uint_add(coap_message_t *message, u16_t option_num,
 	message->options_delta = option_num;
 
 	/* Calculate option size. */
-	u16_t option_byte_count = 0;
+	uint16_t option_byte_count = 0;
 
 	/* Do a length check to encode_option to get the header length. */
 	err_code = encode_option(NULL, &message->options[current_option_index],
@@ -435,16 +435,16 @@ u32_t coap_message_opt_uint_add(coap_message_t *message, u16_t option_num,
 	return err_code;
 }
 
-u32_t coap_message_opt_str_add(coap_message_t *message, u16_t option_num,
-			       u8_t *data, u16_t length)
+uint32_t coap_message_opt_str_add(coap_message_t *message, uint16_t option_num,
+			       uint8_t *data, uint16_t length)
 {
 	OPTION_INDEX_AVAIL_CHECK(message->options_count);
 
-	u32_t err_code;
+	uint32_t err_code;
 
-	u16_t encoded_len = length;
-	u8_t current_option_index = message->options_count;
-	u8_t *next_option_data = &message->data[message->options_offset];
+	uint16_t encoded_len = length;
+	uint8_t current_option_index = message->options_count;
+	uint8_t *next_option_data = &message->data[message->options_offset];
 
 
 	err_code = coap_opt_string_encode(next_option_data, &encoded_len,
@@ -462,7 +462,7 @@ u32_t coap_message_opt_str_add(coap_message_t *message, u16_t option_num,
 	message->options_delta = option_num;
 
 	/* Calculate option size */
-	u16_t option_byte_count = 0;
+	uint16_t option_byte_count = 0;
 
 	/* do a length check to encode_option to get the header length. */
 	err_code = encode_option(NULL, &message->options[current_option_index],
@@ -478,8 +478,8 @@ u32_t coap_message_opt_str_add(coap_message_t *message, u16_t option_num,
 
 }
 
-u32_t coap_message_opt_opaque_add(coap_message_t *message, u16_t option_num,
-				  u8_t *data, u16_t length)
+uint32_t coap_message_opt_opaque_add(coap_message_t *message, uint16_t option_num,
+				  uint8_t *data, uint16_t length)
 {
 	OPTION_INDEX_AVAIL_CHECK(message->options_count);
 
@@ -488,11 +488,11 @@ u32_t coap_message_opt_opaque_add(coap_message_t *message, u16_t option_num,
 		return EMSGSIZE;
 	}
 
-	u32_t err_code = 0;
+	uint32_t err_code = 0;
 
-	u16_t encoded_len = length;
-	u8_t current_option_index = message->options_count;
-	u8_t *next_option_data = &message->data[message->options_offset];
+	uint16_t encoded_len = length;
+	uint8_t current_option_index = message->options_count;
+	uint8_t *next_option_data = &message->data[message->options_offset];
 
 
 	memcpy(next_option_data, data, encoded_len);
@@ -506,7 +506,7 @@ u32_t coap_message_opt_opaque_add(coap_message_t *message, u16_t option_num,
 	message->options_delta = option_num;
 
 	/* Calculate option size */
-	u16_t option_byte_count = 0;
+	uint16_t option_byte_count = 0;
 
 	/* do a length check to encode_option to get the header length. */
 	err_code = encode_option(NULL, &message->options[current_option_index],
@@ -521,8 +521,8 @@ u32_t coap_message_opt_opaque_add(coap_message_t *message, u16_t option_num,
 	return err_code;
 }
 
-u32_t coap_message_payload_set(coap_message_t *message, void *payload,
-			       u16_t payload_len)
+uint32_t coap_message_payload_set(coap_message_t *message, void *payload,
+			       uint16_t payload_len)
 {
 	/* Check that there is available memory in the message->data scratch
 	 * buffer.
@@ -539,7 +539,7 @@ u32_t coap_message_payload_set(coap_message_t *message, void *payload,
 	return 0;
 }
 
-u32_t coap_message_remote_addr_set(coap_message_t *message,
+uint32_t coap_message_remote_addr_set(coap_message_t *message,
 				   struct nrf_sockaddr *address)
 {
 	message->remote = address;
@@ -547,13 +547,13 @@ u32_t coap_message_remote_addr_set(coap_message_t *message,
 	return 0;
 }
 
-u32_t coap_message_opt_index_get(u8_t *index, coap_message_t *message,
-				 u16_t option)
+uint32_t coap_message_opt_index_get(uint8_t *index, coap_message_t *message,
+				 uint16_t option)
 {
 	NULL_PARAM_CHECK(index);
 	NULL_PARAM_CHECK(message);
 
-	u8_t i;
+	uint8_t i;
 
 	for (i = 0; i < message->options_count; i++) {
 		if (message->options[i].number == option) {
@@ -565,11 +565,11 @@ u32_t coap_message_opt_index_get(u8_t *index, coap_message_t *message,
 	return ENOENT;
 }
 
-u32_t coap_message_opt_present(coap_message_t *message, u16_t option)
+uint32_t coap_message_opt_present(coap_message_t *message, uint16_t option)
 {
 	NULL_PARAM_CHECK(message);
 
-	u8_t index;
+	uint8_t index;
 
 	for (index = 0; index < message->options_count; index++) {
 		if (message->options[index].number == option) {
@@ -580,7 +580,7 @@ u32_t coap_message_opt_present(coap_message_t *message, u16_t option)
 	return ENOENT;
 }
 
-static u32_t bit_to_content_format(coap_content_type_t *ct, u32_t bit)
+static uint32_t bit_to_content_format(coap_content_type_t *ct, uint32_t bit)
 {
 	switch (bit) {
 	case COAP_CT_MASK_PLAIN_TEXT:
@@ -618,9 +618,9 @@ static u32_t bit_to_content_format(coap_content_type_t *ct, u32_t bit)
 	return 0;
 }
 
-static u32_t content_format_to_bit(coap_content_type_t ct)
+static uint32_t content_format_to_bit(coap_content_type_t ct)
 {
-	u32_t mask = 0;
+	uint32_t mask = 0;
 
 	switch (ct) {
 	case COAP_CT_PLAIN_TEXT:
@@ -658,17 +658,17 @@ static u32_t content_format_to_bit(coap_content_type_t ct)
 	return mask;
 }
 
-u32_t coap_message_ct_mask_get(coap_message_t *message, u32_t *mask)
+uint32_t coap_message_ct_mask_get(coap_message_t *message, uint32_t *mask)
 {
 	NULL_PARAM_CHECK(message);
 	NULL_PARAM_CHECK(mask);
 
 	(*mask) = 0;
 
-	for (u8_t index = 0; index < message->options_count; index++) {
+	for (uint8_t index = 0; index < message->options_count; index++) {
 		if (message->options[index].number == COAP_OPT_CONTENT_FORMAT) {
-			u32_t value;
-			u32_t err_code = coap_opt_uint_decode(
+			uint32_t value;
+			uint32_t err_code = coap_opt_uint_decode(
 					&value, message->options[index].length,
 					message->options[index].data);
 			if (err_code == 0) {
@@ -683,17 +683,17 @@ u32_t coap_message_ct_mask_get(coap_message_t *message, u32_t *mask)
 	return 0;
 }
 
-u32_t coap_message_accept_mask_get(coap_message_t *message, u32_t *mask)
+uint32_t coap_message_accept_mask_get(coap_message_t *message, uint32_t *mask)
 {
 	NULL_PARAM_CHECK(message);
 	NULL_PARAM_CHECK(mask);
 
 	(*mask) = 0;
 
-	for (u8_t index = 0; index < message->options_count; index++) {
+	for (uint8_t index = 0; index < message->options_count; index++) {
 		if (message->options[index].number == COAP_OPT_ACCEPT) {
-			u32_t value;
-			u32_t err_code = coap_opt_uint_decode(
+			uint32_t value;
+			uint32_t err_code = coap_opt_uint_decode(
 					&value, message->options[index].length,
 					message->options[index].data);
 			if (err_code == 0) {
@@ -709,12 +709,12 @@ u32_t coap_message_accept_mask_get(coap_message_t *message, u32_t *mask)
 	return 0;
 }
 
-u32_t coap_message_ct_match_select(coap_content_type_t *ct,
+uint32_t coap_message_ct_match_select(coap_content_type_t *ct,
 				   coap_message_t *message,
 				   coap_resource_t *resource)
 {
 	/* Check ACCEPT options */
-	u32_t accept_mask = 0;
+	uint32_t accept_mask = 0;
 
 	(void)coap_message_accept_mask_get(message, &accept_mask);
 
@@ -726,8 +726,8 @@ u32_t coap_message_ct_match_select(coap_content_type_t *ct,
 	/* Select the first common content-type between the resource and the
 	 * CoAP client.
 	 */
-	u32_t common_ct = resource->ct_support_mask & accept_mask;
-	u32_t bit_index;
+	uint32_t common_ct = resource->ct_support_mask & accept_mask;
+	uint32_t bit_index;
 
 	for (bit_index = 0; bit_index < 32; bit_index++) {
 		if (((common_ct >> bit_index) & 0x1) == 1) {
@@ -735,7 +735,7 @@ u32_t coap_message_ct_match_select(coap_content_type_t *ct,
 		}
 	}
 
-	u32_t err_code = bit_to_content_format(ct, 1 << bit_index);
+	uint32_t err_code = bit_to_content_format(ct, 1 << bit_index);
 
 	return err_code;
 }

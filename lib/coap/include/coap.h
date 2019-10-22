@@ -15,8 +15,6 @@
 #ifndef COAP_H__
 #define COAP_H__
 
-#include <zephyr.h>
-
 #include <coap_api.h>
 
 /* Use a common header for now. */
@@ -101,7 +99,7 @@ extern "C" {
  * @retval 0 If the message was successfully encoded and scheduled for
  *           transmission.
  */
-u32_t internal_coap_message_send(u32_t *handle, coap_message_t *message);
+uint32_t internal_coap_message_send(uint32_t *handle, coap_message_t *message);
 
 #ifdef __cplusplus
 }
