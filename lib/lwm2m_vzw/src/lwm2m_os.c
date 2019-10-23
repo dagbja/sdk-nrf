@@ -6,6 +6,8 @@
 
 #include <lwm2m_os.h>
 
+#include <stdlib.h>
+#include <stdbool.h>
 #include <zephyr.h>
 #include <string.h>
 #include <at_cmd.h>
@@ -24,6 +26,8 @@
 #include <logging/log.h>
 #include <errno.h>
 #include <nrf_errno.h>
+#include <nrf_inbuilt_key.h>
+#include <nrf_key_mgmt.h>
 
 /* NVS-related defines */
 
@@ -729,4 +733,36 @@ int lwm2m_os_errno(void)
 		__ASSERT(false, "Untranslated errno %d", errno);
 		return 0xDEADBEEF;
 	}
+}
+
+int lwm2m_os_sec_ca_chain_write(uint32_t  sec_tag,
+                    			uint8_t  *p_buffer,
+                    			uint16_t  buffer_len)
+{
+	return nrf_inbuilt_key_write(sec_tag, NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
+								 p_buffer, buffer_len);
+}
+
+int lwm2m_os_sec_psk_write(uint32_t sec_tag,
+                    	   uint8_t *p_buffer,
+                    	   uint16_t buffer_len)
+{
+	return nrf_inbuilt_key_write(sec_tag, NRF_KEY_MGMT_CRED_TYPE_PSK,
+								 p_buffer, buffer_len);
+}
+
+int lwm2m_os_sec_identity_write(uint32_t  sec_tag,
+                    			uint8_t  *p_buffer,
+                    			uint16_t  buffer_len)
+{
+	return nrf_inbuilt_key_write(sec_tag, NRF_KEY_MGMT_CRED_TYPE_IDENTITY,
+								 p_buffer, buffer_len);
+}
+
+int lwm2m_os_sec_ca_chain_exists(uint32_t  sec_tag,
+                           		 bool     *p_exists,
+                           		 uint8_t  *p_perm_flags)
+{
+	return nrf_inbuilt_key_exists(sec_tag, NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
+								  p_exists, p_perm_flags);
 }

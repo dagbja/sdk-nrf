@@ -71,6 +71,10 @@
 ^lwm2m_os_lte_power_down$
 ^lwm2m_os_pdn_disconnect$
 ^lwm2m_os_pdn_init_and_connect$
+^lwm2m_os_sec_ca_chain_write$
+^lwm2m_os_sec_psk_write$
+^lwm2m_os_sec_identity_write$
+^lwm2m_os_sec_ca_chain_exists$
 
 # Callbacks
 ^lwm2m_coap_handler_root$

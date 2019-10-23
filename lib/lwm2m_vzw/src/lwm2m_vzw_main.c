@@ -29,7 +29,6 @@
 #include <app_debug.h>
 #include <at_interface.h>
 #include <nrf_socket.h>
-#include <nrf_inbuilt_key.h>
 #include <nrf_errno.h>
 #include <sms_receive.h>
 
@@ -2215,9 +2214,7 @@ static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len
 {
     uint32_t err_code;
 
-    err_code = nrf_inbuilt_key_write(sec_tag,
-                                     NRF_KEY_MGMT_CRED_TYPE_IDENTITY,
-                                     identity, identity_len);
+    err_code = lwm2m_os_sec_identity_write(sec_tag, identity, identity_len);
     APP_ERROR_CHECK(err_code);
 
     size_t secret_key_nrf9160_style_len = psk_len * 2;
@@ -2226,9 +2223,8 @@ static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len
     {
         sprintf(&p_secret_key_nrf9160_style[i * 2], "%02x", psk[i]);
     }
-    err_code = nrf_inbuilt_key_write(sec_tag,
-                                     NRF_KEY_MGMT_CRED_TYPE_PSK,
-                                     p_secret_key_nrf9160_style, secret_key_nrf9160_style_len);
+    err_code = lwm2m_os_sec_psk_write(sec_tag, p_secret_key_nrf9160_style,
+                                      secret_key_nrf9160_style_len);
     lwm2m_os_free(p_secret_key_nrf9160_style);
     APP_ERROR_CHECK(err_code);
 }

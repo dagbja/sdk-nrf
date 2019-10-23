@@ -9,6 +9,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 /**@file lwm2m_os.h
  *
@@ -309,6 +310,45 @@ int lwm2m_os_pdn_init_and_connect(const char *apn_name);
  * @brief Translate the error number.
  */
 int lwm2m_os_errno(void);
+
+/**
+ * @brief Provision a new or update the existing certificate chain credential
+ *        in persistent storage.
+ * 
+ * @note  The API is required to report an error code defined in nrf_errno.h.
+ */
+int lwm2m_os_sec_ca_chain_write(uint32_t  sec_tag,
+                    			uint8_t  *p_buffer,
+                    			uint16_t  buffer_len);
+
+/**
+ * @brief Provision a new or update the existing pre-shared key credential
+ *        in persistent storage.
+ * 
+ * @note  The API is required to report an error code defined in nrf_errno.h.
+ */
+int lwm2m_os_sec_psk_write(uint32_t sec_tag,
+                    	   uint8_t *p_buffer,
+                    	   uint16_t buffer_len);
+
+/**
+ * @brief Provision a new or update the existing identity credential
+ *        in persistent storage.
+ * 
+ * @note  The API is required to report an error code defined in nrf_errno.h.
+ */
+int lwm2m_os_sec_identity_write(uint32_t  sec_tag,
+                    			uint8_t  *p_buffer,
+                    			uint16_t  buffer_len);
+
+/**
+ * @brief Check if a certificate chain credential exists in persistent storage.
+ * 
+ * @note  The API is required to report an error code defined in nrf_errno.h.
+ */
+int lwm2m_os_sec_ca_chain_exists(uint32_t  sec_tag,
+                           		 bool     *p_exists,
+                           		 uint8_t  *p_perm_flags);
 
 /**@} */
 
