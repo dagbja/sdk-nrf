@@ -19,6 +19,13 @@ config NRF_LWM2M_VZW_INCLUDE_DEBUG_INFORMATION
 	bool "Include debug information in the output library"
 	depends on NRF_LWM2M_VZW_STANDALONE_LIBRARY
 
+config NRF_LWM2M_VZW_COAP_CON_INTERVAL
+	int "CoAP CON interval"
+	default 3600
+	help
+	  This interval defines how often a CoAP Non-Confirmable notification
+	  is sent as Confirmable, according to RFC 7641 section 4.5.
+
 config NRF_LWM2M_VZW_SEC_TAG
 	int "TLS security tag for Firmware downloads"
 	default 11

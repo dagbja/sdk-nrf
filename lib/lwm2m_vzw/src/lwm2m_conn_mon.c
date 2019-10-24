@@ -17,12 +17,15 @@
 #include <nrf_apn_class.h>
 #include <lwm2m_vzw_main.h>
 #include <at_interface.h>
+#include <app_debug.h>
 
 #define VERIZON_RESOURCE 30000
 
 static lwm2m_object_t                  m_object_conn_mon;        /**< Connectivity Monitoring base object. */
 static lwm2m_connectivity_monitoring_t m_instance_conn_mon;      /**< Connectivity Monitoring object instance. */
 static vzw_conn_mon_class_apn_t        m_vzw_conn_mon_class_apn; /**< Verizon specific APN names. */
+
+static int64_t m_con_time_start[sizeof(((lwm2m_connectivity_monitoring_t *)0)->resource_ids)];
 
 static char m_apn_class_scratch_buffer[64];
 
@@ -320,6 +323,8 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                                                   p_request,
                                                   COAP_CT_APP_LWM2M_TLV,
                                                   (void *)&m_instance_conn_mon.resource_ids[resource_id]);
+
+                m_con_time_start[resource_id] = lwm2m_os_uptime_get();
             }
             else if (observe_option == 1) // Observe stop
             {
@@ -487,10 +492,19 @@ void lwm2m_conn_mon_observer_process(void)
             LWM2M_ERR("Could not encode LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH, error code: %lu", err_code);
         }
 
+        coap_msg_type_t type = COAP_TYPE_NON;
+        int64_t now = lwm2m_os_uptime_get();
+
+        // Send CON every configured interval
+        if ((m_con_time_start[LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH] + (lwm2m_coap_con_interval_get() * 1000)) < now) {
+            type = COAP_TYPE_CON;
+            m_con_time_start[LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH] = now;
+        }
+
         err_code =  lwm2m_notify(buffer,
-                                buffer_size,
-                                p_observer,
-                                COAP_TYPE_CON);
+                                 buffer_size,
+                                 p_observer,
+                                 type);
         if (err_code)
         {
             LWM2M_ERR("Could notify observer, error code: %lu", err_code);

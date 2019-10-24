@@ -19,10 +19,12 @@
 
 #include <common.h>
 #include <lwm2m_firmware_download.h>
-
+#include <app_debug.h>
 
 static lwm2m_object_t   m_object_firmware;
 static lwm2m_firmware_t m_instance_firmware;
+
+static int64_t m_con_time_start[sizeof(((lwm2m_location_t *)0)->resource_ids)];
 
 // Forward declare.
 static void lwm2m_firmware_notify_resource(uint16_t resource_id);
@@ -167,6 +169,8 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
                                                   p_request,
                                                   COAP_CT_APP_LWM2M_TLV,
                                                   (void *)&m_instance_firmware.resource_ids[resource_id]);
+
+                m_con_time_start[resource_id] = lwm2m_os_uptime_get();
             }
             else if (observe_option == 1) // Observe stop
             {
@@ -371,10 +375,19 @@ static void lwm2m_firmware_notify_resource(uint16_t resource_id)
             LWM2M_ERR("Could not encode resource_id %u, error code: %lu", resource_id, err_code);
         }
 
+        coap_msg_type_t type = COAP_TYPE_NON;
+        int64_t now = lwm2m_os_uptime_get();
+
+        // Send CON every configured interval
+        if ((m_con_time_start[resource_id] + (lwm2m_coap_con_interval_get() * 1000)) < now) {
+            type = COAP_TYPE_CON;
+            m_con_time_start[resource_id] = now;
+        }
+
         err_code =  lwm2m_notify(buffer,
                                  buffer_size,
                                  p_observer,
-                                 COAP_TYPE_CON);
+                                 type);
         if (err_code)
         {
             LWM2M_ERR("Could notify observer, error code: %lu", err_code);
@@ -399,10 +412,19 @@ void lwm2m_firmware_observer_process(void)
             LWM2M_ERR("Could not encode LWM2M_FIRMWARE_STATE, error code: %lu", err_code);
         }
 
+        coap_msg_type_t type = COAP_TYPE_NON;
+        int64_t now = lwm2m_os_uptime_get();
+
+        // Send CON every configured interval
+        if ((m_con_time_start[LWM2M_FIRMWARE_STATE] + (lwm2m_coap_con_interval_get() * 1000)) < now) {
+            type = COAP_TYPE_CON;
+            m_con_time_start[LWM2M_FIRMWARE_STATE] = now;
+        }
+
         err_code =  lwm2m_notify(buffer,
                                 buffer_size,
                                 p_observer,
-                                COAP_TYPE_CON);
+                                type);
         if (err_code)
         {
             LWM2M_ERR("Could notify observer, error code: %lu", err_code);

@@ -147,6 +147,8 @@ static uint32_t m_net_stat;
 static uint32_t observable_pmin = 15;
 static uint32_t observable_pmax = 60;
 
+static uint32_t m_coap_con_interval = CONFIG_NRF_LWM2M_VZW_COAP_CON_INTERVAL;
+
 /* Structures for timers */
 static void *state_update_timer;
 
@@ -371,6 +373,16 @@ bool lwm2m_is_admin_pdn_ready()
 uint16_t lwm2m_server_instance(void)
 {
     return m_server_instance;
+}
+
+int64_t lwm2m_coap_con_interval_get(void)
+{
+    return m_coap_con_interval;
+}
+
+void lwm2m_coap_con_interval_set(int64_t con_interval)
+{
+    m_coap_con_interval = con_interval;
 }
 
 sa_family_t lwm2m_family_type_get(uint16_t instance_id)

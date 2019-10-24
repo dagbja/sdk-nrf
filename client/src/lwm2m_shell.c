@@ -150,6 +150,7 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "  Carrier check  %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK) ? "No" : "Yes");
     shell_print(shell, "  IPv6 enabled   %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6) ? "No" : "Yes");
     shell_print(shell, "  IP fallback    %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_FALLBACK) ? "No" : "Yes");
+    shell_print(shell, "  CON interval   %d seconds", (int32_t)lwm2m_coap_con_interval_get());
     shell_print(shell, "  SMS Counter    %u", lwm2m_sms_receive_counter());
     shell_print(shell, "  Network status %u", lwm2m_net_reg_stat_get());
 
@@ -297,6 +298,28 @@ static int cmd_debug_fallback_disabled(const struct shell *shell, size_t argc, c
     }
 
     shell_print(shell, "Set IP fallback: %d", enable_fallback);
+
+    return 0;
+}
+
+static int cmd_debug_con_interval(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s <seconds>", argv[0]);
+        return 0;
+    }
+
+    int con_interval = atoi(argv[1]);
+
+    if (con_interval < 0 || con_interval > 86400) {
+        shell_print(shell, "invalid value, must be between 0 and 86400 (24 hours)");
+        return 0;
+    }
+
+    lwm2m_coap_con_interval_set(con_interval);
+    lwm2m_debug_con_interval_set(con_interval);
+
+    shell_print(shell, "Set CoAP CON interval: %d seconds", con_interval);
 
     return 0;
 }
@@ -901,7 +924,7 @@ static int cmd_device_error_code_remove(const struct shell *shell, size_t argc, 
 static char *lwm2m_string_get(const lwm2m_string_t *string)
 {
     static char string_buf[200];
-    
+
     if (string->len >= 200)
     {
         return "<error>";
@@ -979,6 +1002,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(carrier_check, NULL, "Set carrier check", cmd_debug_carrier_check),
     SHELL_CMD(ipv6_enable, NULL, "Set IPv6 enabled", cmd_debug_ipv6_enabled),
     SHELL_CMD(fallback, NULL, "Set IP Fallback", cmd_debug_fallback_disabled),
+    SHELL_CMD(con_interval, NULL, "Set CoAP CON timer", cmd_debug_con_interval),
     SHELL_CMD(net_reg_stat, NULL, "Set network registration status", cmd_debug_set_net_reg_stat),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );

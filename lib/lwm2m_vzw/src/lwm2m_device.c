@@ -24,6 +24,7 @@
 #include <lwm2m_carrier.h>
 #include <coap_option.h>
 #include <coap_observe_api.h>
+#include <app_debug.h>
 
 #define VERIZON_RESOURCE 30000
 
@@ -35,6 +36,8 @@
 static lwm2m_object_t m_object_device;    /**< Device base object. */
 static lwm2m_device_t m_instance_device;  /**< Device object instance. */
 static lwm2m_string_t m_verizon_resources[2];
+
+static int64_t m_con_time_start[sizeof(((lwm2m_device_t *)0)->resource_ids)];
 
 void lwm2m_device_notify_resource(uint16_t resource_id); // Forward declare.
 
@@ -278,6 +281,8 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
                                                   p_request,
                                                   COAP_CT_APP_LWM2M_TLV,
                                                   (void *)&m_instance_device.resource_ids[resource_id]);
+
+                m_con_time_start[resource_id] = lwm2m_os_uptime_get();
             }
             else if (observe_option == 1) // Observe stop
             {
@@ -594,10 +599,19 @@ void lwm2m_device_notify_resource(uint16_t resource_id)
             LWM2M_ERR("Could not encode resource_id %u, error code: %lu", resource_id, err_code);
         }
 
+        coap_msg_type_t type = COAP_TYPE_NON;
+        int64_t now = lwm2m_os_uptime_get();
+
+        // Send CON every configured interval
+        if ((m_con_time_start[resource_id] + (lwm2m_coap_con_interval_get() * 1000)) < now) {
+            type = COAP_TYPE_CON;
+            m_con_time_start[resource_id] = now;
+        }
+
         err_code =  lwm2m_notify(buffer,
                                  buffer_size,
                                  p_observer,
-                                 COAP_TYPE_CON);
+                                 type);
         if (err_code)
         {
             LWM2M_ERR("Could not notify observer, error code: %lu", err_code);
