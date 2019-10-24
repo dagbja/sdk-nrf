@@ -2050,7 +2050,7 @@ static void app_lwm2m_process(void)
                 uint32_t err_code = lwm2m_remote_location_find(&p_location,
                                                                &location_len,
                                                                short_server_id);
-                if (err_code == 0) {
+                if (err_code == 0 && location_len > 0) {
                     do_register = false;
                 }
             }
