@@ -521,7 +521,7 @@ static int cmd_factory_reset(const struct shell *shell, size_t argc, char **argv
 
 static int cmd_reboot(const struct shell *shell, size_t argc, char **argv)
 {
-    lwm2m_system_reset();
+    lwm2m_system_reset(true);
 
     return 0;
 }

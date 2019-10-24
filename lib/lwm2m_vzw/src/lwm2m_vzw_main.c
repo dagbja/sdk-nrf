@@ -187,7 +187,7 @@ static const char * app_uri_get(char * p_server_uri, uint16_t * p_port, bool * p
 
 extern int cert_provision();
 
-static void app_event_notify(uint32_t type, void * data)
+static int app_event_notify(uint32_t type, void * data)
 {
     lwm2m_carrier_event_t event =
     {
@@ -195,7 +195,7 @@ static void app_event_notify(uint32_t type, void * data)
         .data = data
     };
 
-    lwm2m_carrier_event_handler(&event);
+    return lwm2m_carrier_event_handler(&event);
 }
 
 static bool lwm2m_state_set(lwm2m_state_t app_state)
@@ -218,12 +218,12 @@ static void app_init_and_connect(void)
 {
     lwm2m_os_lte_link_up();
 
-    app_event_notify(LWM2M_CARRIER_EVENT_CONNECT, NULL);
+    (void)app_event_notify(LWM2M_CARRIER_EVENT_CONNECT, NULL);
 }
 
 static void app_offline(void)
 {
-    app_event_notify(LWM2M_CARRIER_EVENT_DISCONNECT, NULL);
+    (void)app_event_notify(LWM2M_CARRIER_EVENT_DISCONNECT, NULL);
 
     // Set state to DISCONNECTED to avoid detecting "no registered network"
     // when provisioning security keys.
@@ -426,15 +426,23 @@ void lwm2m_system_shutdown(void)
     LWM2M_INF("LTE link down");
 }
 
-void lwm2m_system_reset(void)
+void lwm2m_system_reset(bool force_reset)
 {
-    app_event_notify(LWM2M_CARRIER_EVENT_REBOOT, NULL);
+    int ret = app_event_notify(LWM2M_CARRIER_EVENT_REBOOT, NULL);
 
-    if (m_app_state != LWM2M_STATE_SHUTDOWN) {
-        lwm2m_system_shutdown();
+    if (ret == 0 || force_reset)
+    {
+        if (m_app_state != LWM2M_STATE_SHUTDOWN) {
+            lwm2m_system_shutdown();
+        }
+
+        lwm2m_os_sys_reset();
     }
-
-    lwm2m_os_sys_reset();
+    else
+    {
+        LWM2M_INF("Reboot deferred by application");
+    }
+    
 }
 
 /**@brief Setup ADMIN PDN connection */
@@ -1148,7 +1156,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
         lwm2m_instance_storage_server_store(i);
     }
 
-    app_event_notify(LWM2M_CARRIER_EVENT_BOOTSTRAPPED, NULL);
+    (void)app_event_notify(LWM2M_CARRIER_EVENT_BOOTSTRAPPED, NULL);
 
     return 0;
 }
@@ -2042,7 +2050,7 @@ static void app_check_server_update(void)
     }
 }
 
-static void app_lwm2m_process(void)
+static int app_lwm2m_process(void)
 {
 #if APP_USE_SOCKET_POLL
     if (app_coap_socket_poll()) {
@@ -2136,7 +2144,10 @@ static void app_lwm2m_process(void)
         }
         case LWM2M_STATE_RESET:
         {
-            lwm2m_system_reset();
+            lwm2m_system_reset(false);
+
+            // Application has deferred the reset -> exit processing loop
+            return -1;
         }
         default:
         {
@@ -2145,6 +2156,8 @@ static void app_lwm2m_process(void)
     }
 
     app_check_server_update();
+
+    return 0;
 }
 
 static void app_coap_init(void)
@@ -2353,7 +2366,7 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
         CODE_UNREACHABLE;
     }
 
-    app_event_notify(LWM2M_CARRIER_EVENT_BSDLIB_INIT, NULL);
+    (void)app_event_notify(LWM2M_CARRIER_EVENT_BSDLIB_INIT, NULL);
 
     // Initialize AT interface
     err = at_if_init();
@@ -2416,7 +2429,12 @@ void lwm2m_carrier_run(void)
             ARG_UNUSED(coap_time_tick());
         }
 
-        app_lwm2m_process();
+        int exit = app_lwm2m_process();
+
+        if (exit != 0)
+        {
+            break;
+        }
 
         if (tick_count % (observable_pmin * 100) == 0)
         {

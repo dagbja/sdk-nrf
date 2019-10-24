@@ -185,8 +185,13 @@ int lwm2m_carrier_timezone_write(const char *p_tz);
  * @note This function has to be implemented by the application.
  *
  * @param[in] event LWM2M carrier event that occurred.
+ *
+ * @return     In case of LWM2M_CARRIER_EVENT_REBOOT event: if non-zero is returned, LWM2M carrier
+ *             library will not reboot the device. Application is expected to execute reboot at
+ *             the earliest convenient point of time.
+
  */
-void lwm2m_carrier_event_handler(const lwm2m_carrier_event_t *event);
+int lwm2m_carrier_event_handler(const lwm2m_carrier_event_t *event);
 /**@} */
 
 /**

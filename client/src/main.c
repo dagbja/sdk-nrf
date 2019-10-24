@@ -13,9 +13,11 @@
 #include <lwm2m_carrier.h>
 #include <modem_logging.h>
 
-void lwm2m_carrier_event_handler(const lwm2m_carrier_event_t * event)
+int lwm2m_carrier_event_handler(const lwm2m_carrier_event_t * event)
 {
-    ARG_UNUSED(event);
+   ARG_UNUSED(event);
+
+   return 0;
 }
 
 /**@brief Recoverable BSD library error. */
