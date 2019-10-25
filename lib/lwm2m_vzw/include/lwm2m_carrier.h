@@ -55,7 +55,8 @@
 /**
  * @brief LWM2M device battery status.
  *
- * @note These values are only valid for the LWM2M Device INTERNAL_BATTERY if present.
+ * @note These values are only valid for the LWM2M Device INTERNAL_BATTERY if
+ *       present.
  */
 #define LWM2M_CARRIER_BATTERY_STATUS_NORMAL          0
 #define LWM2M_CARRIER_BATTERY_STATUS_CHARGING        1
@@ -212,7 +213,7 @@ void lwm2m_carrier_event_handler(const lwm2m_carrier_event_t *event);
  *                       successfully.
  */
 int lwm2m_carrier_avail_power_sources_set(const uint8_t *power_sources,
-                                          uint8_t power_source_count);
+					  uint8_t power_source_count);
 
 /**
  * @brief      Set or update the latest voltage measurements made on one of
@@ -232,7 +233,7 @@ int lwm2m_carrier_avail_power_sources_set(const uint8_t *power_sources,
  *                       successfully.
  */
 int lwm2m_carrier_power_source_voltage_set(uint8_t power_source,
-                                           int32_t value);
+					   int32_t value);
 
 /**
  * @brief      Set or update the latest current measurements made on one of
@@ -252,7 +253,7 @@ int lwm2m_carrier_power_source_voltage_set(uint8_t power_source,
  *                       successfully.
  */
 int lwm2m_carrier_power_source_current_set(uint8_t power_source,
-                                           int32_t value);
+					   int32_t value);
 
 /**
  * @brief      Set or update the latest battery level (internal battery).
@@ -328,7 +329,8 @@ int lwm2m_carrier_hardware_version_set(const char *hardware_version);
  * @note       High level device software version (application).
  *
  * @param[in]  software_version     Null terminated string specifying the
- *                                  current software version of the LWM2M device.
+ *                                  current software version of the LWM2M
+ *                                  device.
  *
  * @retval     -EINVAL              If the input argument is a NULL pointer or
  *                                  an empty string.
@@ -387,9 +389,9 @@ int lwm2m_carrier_error_code_remove(int32_t error);
  *
  * @param[in]  memory_total     Total amount of storage space in kilobytes.
  *
- * @retval     -EINVAL  	    It the reported value is bigger than INT32_MAX.
- * @retval     0 			    If the total amount of storage space has been
- * 								set successfully.
+ * @retval     -EINVAL          It the reported value is bigger than INT32_MAX.
+ * @retval     0                If the total amount of storage space has been
+ *                              set successfully.
  */
 int lwm2m_carrier_memory_total_set(uint32_t memory_total);
 
@@ -398,8 +400,8 @@ int lwm2m_carrier_memory_total_set(uint32_t memory_total);
  *             store data and software in the LWM2M Device.
  *
  * @note       This function must be implemented by the application in order to
- * 			   support the reporting of memory free, otherwise the returned
- * 			   value will be 0.
+ *             support the reporting of memory free, otherwise the returned
+ *             value will be 0.
  *
  * @return     Available amount of storage space expressed in kB.
  */
