@@ -16,7 +16,7 @@ typedef void (*at_net_reg_stat_cb_t)(uint32_t net_stat);
 
 /* TODO: Move APIs to modem interface modem with data model. */
 
-int mdm_interface_init(void);
+int at_if_init(void);
 
 /**
  * @brief Wait for IPV6 link on APN.

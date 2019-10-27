@@ -22,14 +22,14 @@ manifest:
   projects:
     - name: fw-nrfconnect-nrf
       path: nrf
-      revision: 460c4309d1886d1d73b257169a009fac54318a57
+      revision: d4a23f96221fce9bff846a2979d304c0130d6b74
     - name: fw-nrfconnect-zephyr
       path: zephyr
       west-commands: scripts/west-commands.yml
-      revision: d6e67554cfeb28df5525e53c073f61a00836f283
+      revision: 5aa1e0d5fd58bb60cd76c19bfb175888dd473e8f
     - name: nrfxlib
       path: nrfxlib
-      revision: ef8bb6a9f4901d3ce51dcfa8883c2ad164c2c320
+      revision: a806f5fcac3bde98c4c7324a0c4d547b4ba89f75
     - name: mbedtls
       repo-path: fw-nrfconnect-mbedtls
       path: modules/crypto/mbedtls

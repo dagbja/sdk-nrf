@@ -196,6 +196,8 @@
 ^lwm2m_update$
 
 # others
+^at_notif_init$
+^at_notif_register_handler$
 ^at_cmd_init$
 ^at_cmd_set_notification_handler$
 ^at_cmd_write$

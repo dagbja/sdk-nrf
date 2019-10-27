@@ -30,18 +30,6 @@ void bsd_recoverable_error_handler(uint32_t error)
 #endif
 }
 
-/**@brief Irrecoverable BSD library error. */
-void bsd_irrecoverable_error_handler(uint32_t error)
-{
-#if CONFIG_DK_LIBRARY
-    ARG_UNUSED(error);
-    buttons_and_leds_uninit();
-#endif
-
-    printk("IRRECOVERABLE ERROR %u\n", error);
-    while (true);
-}
-
 /**@brief Function for application main entry.
  */
 int main(void)

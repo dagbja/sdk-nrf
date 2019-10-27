@@ -28,10 +28,8 @@
 #include <lwm2m_os.h>
 
 #include <app_debug.h>
-#include <at_cmd.h>
-#include <secure_services.h>
-#include <at_interface.h>
 #include <lte_lc.h>
+#include <at_interface.h>
 #include <nrf_inbuilt_key.h>
 #include <pdn_management.h>
 #include <sms_receive.h>
@@ -221,11 +219,6 @@ static void app_init_and_connect(void)
 {
     lte_lc_init_and_connect();
     app_event_notify(LWM2M_CARRIER_EVENT_CONNECT, NULL);
-
-    // Now set the AT notification callback after link is up
-    // and link controller module is done.
-    // AT notifications are now process by the Modem AT interface.
-    (void)mdm_interface_init();
 
     // Because lte_lc_init_and_connect() will suspend net_reg_stat notifications
     // this must be read again.
@@ -2282,11 +2275,11 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     }
 #endif
 
-    app_timers_init();
-
     // Initialize OS abstraction layer.
     // This will initialize the NVS subsystem as well.
     lwm2m_os_init();
+
+    app_timers_init();
 
     err = lwm2m_firmware_update_state_get(&mdfu);
     if (!err && mdfu == UPDATE_SCHEDULED) {
@@ -2311,6 +2304,10 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
             LWM2M_ERR("Modem firmware update failed.");
             LWM2M_ERR("Fatal error.");
             break;
+        case -1:
+            LWM2M_ERR("Could not initialize bsdlib.");
+            LWM2M_ERR("Fatal error.");
+            return -EFAULT;
         default:
             break;
         }
@@ -2322,8 +2319,14 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 
     app_event_notify(LWM2M_CARRIER_EVENT_BSDLIB_INIT, NULL);
 
-    // Initialize the AT command driver before sending any AT command.
-    at_cmd_init();
+    // Initialize AT interface
+    err = at_if_init();
+    if (err) {
+            return err;
+    }
+
+    // Register network registration status changes
+    at_subscribe_net_reg_stat(lwm2m_net_reg_stat_cb);
 
     // Initialize debug settings from flash.
     app_debug_init();
@@ -2334,19 +2337,15 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     // Set-phone-functionality. Blocking call until we are connected.
     // The lc module uses AT notifications.
     lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
+
     app_init_and_connect();
 
-    // Register network registration status changes
-    at_subscribe_net_reg_stat(lwm2m_net_reg_stat_cb);
-
     // Read IMEI, which is a static value and will never change.
-    int ret = at_read_imei(m_imei, sizeof(m_imei));
-
-    if (ret != 0)
-    {
+    err = at_read_imei(m_imei, sizeof(m_imei));
+    if (err != 0) {
         // IMEI is required to generate a unique Client ID. Cannot continue.
         LWM2M_ERR("Unable to read IMEI, cannot generate client ID");
-        return EIO;
+        return -EIO;
     }
 
     // Initialize CoAP.

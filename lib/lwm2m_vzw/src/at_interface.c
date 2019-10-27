@@ -12,6 +12,7 @@
 #include <pdn_management.h>
 #include <sms_receive.h>
 #include <at_cmd.h>
+#include <at_notif.h>
 #include <at_cmd_parser/at_cmd_parser.h>
 #include <at_cmd_parser/at_params.h>
 #include <lwm2m_api.h>
@@ -148,12 +149,15 @@ static int at_response_param_to_string(const char * p_at_command, int param_coun
     return retval;
 }
 
-static void at_response_handler(char *response)
+static void at_response_handler(void *context, char *response)
 {
+    ARG_UNUSED(context);
+
     for (int i = 0; i < ARRAY_SIZE(at_handlers); i++) {
         int ret = at_handlers[i](response);
         if (ret == 0) {
-            // Message or events is consumed. Skip next handlers and wait for next message/event.
+            // Message or events is consumed.
+            // Skip next handlers and wait for next message/event.
             return;
         }
     }
@@ -282,13 +286,28 @@ static void at_cclk_reponse_convert(const char *p_read_buf, int32_t *p_time, int
     *p_utc_offset = (int32_t)strtol(p_end, &p_end, 10);
 }
 
-int mdm_interface_init(void)
+int at_if_init(void)
 {
-    // The AT command driver initialization is done automatically by the OS.
-    // Set handler for AT notifications and events (SMS, CESQ, etc.).
-    at_cmd_set_notification_handler(at_response_handler);
+    int err;
 
-    LWM2M_INF("Modem interface initialized.");
+    err = at_cmd_init();
+    if (err) {
+            return err;
+    }
+
+    err = at_notif_init();
+    if (err) {
+        LWM2M_ERR("Failed to initialize at_notif, err %d", err);
+        return err;
+    }
+
+    // Set handler for AT notifications and events (SMS, CESQ, etc.).
+    err = at_notif_register_handler(NULL, at_response_handler);
+    if (err) {
+        LWM2M_ERR("Failed to register AT handler, err %d", err);
+        return err;
+    }
+
     return 0;
 }
 
