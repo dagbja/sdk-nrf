@@ -129,7 +129,7 @@ def obfuscate(temp_directory, input_archive, output_archive, relinked_archive, s
     rename_symbols = [symbol for symbol in orig_symbols if not any([sfilter.match(symbol) for sfilter in symbol_filters])]
     # Do not go wild here, a very high upper bound might crash some environments
     symbol_indices = random.sample(range(1, 0x100000), len(rename_symbols))
-    renamed_symbols = {symbol: "symbol_{:07x}".format(i) for i, symbol in zip(symbol_indices, rename_symbols)}
+    renamed_symbols = {symbol: "liblwm2m_carrier_symbol_{:07x}".format(i) for i, symbol in zip(symbol_indices, rename_symbols)}
 
     # Create edit symbol rename file for objcopy
     with open(mapping_file, 'wb') as wfh:
