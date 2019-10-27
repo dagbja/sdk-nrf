@@ -146,6 +146,17 @@ static int on_error(const struct lwm2m_os_download_evt *event)
 		return -1;
 	}
 
+	if (event->error == -EBADMSG) {
+		/* We have a non-zero, non-dirty offset but the server won't
+		 * send any more bytes, so we can't continue the download.
+		 * We likely lost power after downloading the whole image but
+		 * before we could save that information in flash.
+		 * Manually override the image state to attempt to apply
+		 * the existing patch.
+		 */
+		lwm2m_firmware_image_state_set(FIRMWARE_READY);
+	}
+
 	lwm2m_os_timer_start(download_dwork, K_SECONDS(1));
 
 	return 0;
