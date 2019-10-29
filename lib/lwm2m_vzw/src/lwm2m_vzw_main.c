@@ -214,13 +214,8 @@ static bool lwm2m_state_set(lwm2m_state_t app_state)
 static void app_init_and_connect(void)
 {
     lwm2m_os_lte_link_up();
-    app_event_notify(LWM2M_CARRIER_EVENT_CONNECT, NULL);
 
-    // Because lte_lc_init_and_connect() will suspend net_reg_stat notifications
-    // this must be read again.
-    uint32_t net_stat;
-    (void)at_read_net_reg_stat(&net_stat);
-    lwm2m_net_reg_stat_cb(net_stat);
+    app_event_notify(LWM2M_CARRIER_EVENT_CONNECT, NULL);
 }
 
 static void app_offline(void)

@@ -89,14 +89,6 @@ int at_read_firmware_version(lwm2m_string_t *p_manufacturer_id);
 int at_read_operator_id(uint32_t *p_oper_id);
 
 /**
- * @brief Read network registration status as defined in CEREG AT command <stat> field definition.
- *
- * @param[out] p_net_stat Pointer to store the stat
- * @return An error code if the read failed.
- */
-int at_read_net_reg_stat(uint32_t * p_net_stat);
-
-/**
  * @brief Read manufacturer string from modem.
  *
  * @param[out] p_manufacturer_id Pointer to store the manufacturer as lwm2m_string_t

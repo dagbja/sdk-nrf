@@ -528,48 +528,6 @@ void at_subscribe_net_reg_stat(at_net_reg_stat_cb_t net_reg_stat_cb)
     }
 }
 
-int at_read_net_reg_stat(uint32_t * p_net_stat)
-{
-    int retval = 0;
-    struct lwm2m_os_at_param_list cereg_params;
-
-    // Read network registration status
-    const char *at_cereg = "AT+CEREG?";
-
-    retval = lwm2m_os_at_params_list_init(&cereg_params, 3);
-    if (retval == 0)
-    {
-        int ret = at_send_command_and_parse_params(at_cereg, &cereg_params);
-        if (ret == 0 || ret == -E2BIG)
-        {
-            uint32_t net_stat;
-            if (lwm2m_os_at_params_int_get(&cereg_params, 2, &net_stat) == 0)
-            {
-                *p_net_stat = (uint32_t)net_stat;
-            }
-            else
-            {
-                LWM2M_ERR("net stat parsing failed: get int failed");
-                retval = -EINVAL;
-            }
-        }
-        else
-        {
-            LWM2M_ERR(" (%d)\n", ret);
-            retval = -EINVAL;
-        }
-
-        lwm2m_os_at_params_list_free(&cereg_params);
-    }
-    else
-    {
-        LWM2M_ERR("cereg params_list_init failed");
-        retval = EINVAL;
-    }
-
-    return retval;
-}
-
 int at_read_manufacturer(lwm2m_string_t *p_manufacturer_id)
 {
     int retval = 0;
