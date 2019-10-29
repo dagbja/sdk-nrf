@@ -1736,9 +1736,19 @@ void app_server_update(uint16_t instance_id, bool connect_update)
             app_server_disconnect(instance_id);
             lwm2m_disconnect_admin_pdn(instance_id);
             lwm2m_request_server_update(instance_id, true);
-        } else if (connect_update) {
-            if (!lwm2m_state_set(LWM2M_STATE_SERVER_REGISTER_WAIT)) {
-                restart_lifetime_timer = false;
+
+            if (connect_update) {
+                // Failed sending update after a server connect, reconnect from idle state.
+                if (!lwm2m_state_set(LWM2M_STATE_IDLE)) {
+                    restart_lifetime_timer = false;
+                }
+            }
+        } else {
+            if (connect_update) {
+                // Update after a server connect, set next state.
+                if (!lwm2m_state_set(LWM2M_STATE_SERVER_REGISTER_WAIT)) {
+                    restart_lifetime_timer = false;
+                }
             }
         }
     }
@@ -2067,7 +2077,7 @@ static void app_lwm2m_process(void)
                 LWM2M_INF("Server register (server %u)", m_server_instance);
                 app_server_register(m_server_instance);
             } else {
-                LWM2M_INF("Server update (server %u)", m_server_instance);
+                LWM2M_INF("Server update after connect (server %u)", m_server_instance);
                 app_server_update(m_server_instance, true);
             }
 
