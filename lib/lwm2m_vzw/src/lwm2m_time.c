@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <at_interface.h>
 #include <lwm2m.h>
+#include <lwm2m_os.h>
 
 #define MAX_TIMEZONE_LEN 64
 
@@ -166,6 +167,7 @@ static void lwm2m_time_current_time_update(void)
 
         if (err == 0)
         {
+            // After successfull update set the base time
             m_time_base_msecs = lwm2m_os_uptime_get();
         }
         else
@@ -238,4 +240,46 @@ int __WEAK lwm2m_carrier_timezone_write(const char *p_tz)
     m_timezone_set = true;
 
     return 0;
+}
+
+void __WEAK lwm2m_carrier_time_read(int32_t *utc_time, int *utc_offset, const char **p_tz)
+{
+    // If time is set, it will not be updated from modem, so increment here
+    if (m_time_set == true)
+    {
+        int64_t delta_time = lwm2m_os_uptime_delta(&m_time_base_msecs);
+        m_current_time_msecs += delta_time;
+    }
+    
+    // If any of the time resources is not set, update it from modem
+    if (m_time_set == false || m_utc_offset_set == false || m_timezone_set == false)
+    {
+        // Global m_time_set might be touched by modem time getter
+        bool time_set_tmp = m_time_set;
+
+        int err = lwm2m_time_modem_time_get();
+
+        if (time_set_tmp == false)
+        {
+            // UTC time was not set before this
+            if (err == 0)
+            {
+                // After successfull update set the base time
+                 m_time_base_msecs = lwm2m_os_uptime_get();
+            }
+            else
+            {
+                /* Modem time not avalable, increment current time
+                * based on elapsed uptime */
+                int64_t delta_time = lwm2m_os_uptime_delta(&m_time_base_msecs);
+                m_current_time_msecs += delta_time;
+            }
+        }
+    }
+
+    *utc_time = (int32_t) (m_current_time_msecs / 1000);
+    *utc_offset = m_utc_offset;
+    *p_tz = m_timezone;
+
+    return;
 }

@@ -62,6 +62,35 @@ static uint32_t tlv_device_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p
     return 0;
 }
 
+static void lwm2m_device_time_resources_update(void)
+{
+    char string_buffer[17];
+
+    lwm2m_time_t time;
+    int utc_offset;
+    const char *p_tz;
+
+    lwm2m_carrier_time_read(&time, &utc_offset, &p_tz);
+
+    // Update UTC time
+    m_instance_device.current_time = time;
+
+    // Update UTC offset
+    snprintf(string_buffer, sizeof(string_buffer), "UTC%+03d:%02d", utc_offset / 60, abs(utc_offset % 60));
+
+    (void)lwm2m_bytebuffer_to_string(string_buffer, strlen(string_buffer), &m_instance_device.utc_offset);
+
+    // Update timezone
+    int tz_len = strlen(p_tz);
+
+    if (tz_len > MAX_TIMEZONE_LEN)
+    {
+        tz_len = MAX_TIMEZONE_LEN;
+    }
+
+    (void)lwm2m_bytebuffer_to_string((char*)p_tz, tz_len, &m_instance_device.timezone);
+}
+
 static void lwm2m_device_current_time_update(void)
 {
     m_instance_device.current_time = lwm2m_carrier_utc_time_read();
@@ -370,9 +399,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
                     lwm2m_device_timezone_update();
                     break;
                 case LWM2M_NAMED_OBJECT:
-                    lwm2m_device_current_time_update();
-                    lwm2m_device_utc_offset_update();
-                    lwm2m_device_timezone_update();
+                    lwm2m_device_time_resources_update();
                     break;
                 default:
                     break;
@@ -573,9 +600,7 @@ void lwm2m_device_init(void)
     uint8_t power_sources[] = { LWM2M_CARRIER_POWER_SOURCE_DC };
 
     // Assignment of default values to Device object resources.
-    lwm2m_device_current_time_update();
-    lwm2m_device_utc_offset_update();
-    lwm2m_device_timezone_update();
+    lwm2m_device_time_resources_update();
     (void)lwm2m_carrier_avail_power_sources_set(power_sources, ARRAY_SIZE(power_sources));
     (void)lwm2m_carrier_power_source_voltage_set(LWM2M_CARRIER_POWER_SOURCE_DC, 0);
     (void)lwm2m_carrier_power_source_current_set(LWM2M_CARRIER_POWER_SOURCE_DC, 0);

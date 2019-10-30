@@ -112,6 +112,16 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t *config);
 void lwm2m_carrier_run(void);
 
 /**
+ * @brief Function to read all time parameters
+ *
+ * @param[out] utc_time Pointer to time since Epoch in seconds
+ * @param[out] offset   Pointer to UTC offset in minutes
+ * @param[out] p_tz     Pointer to null-terminated timezone string pointer
+ */
+void lwm2m_carrier_time_read(int32_t *utc_time, int *utc_offset,
+						const char **p_tz);
+
+/**
  * @brief Function to read current UTC time
  *
  * @note This function can be implemented by the application, if custom time

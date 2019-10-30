@@ -29,6 +29,7 @@
 ^lwm2m_carrier_utc_offset_write$
 ^lwm2m_carrier_utc_time_read$
 ^lwm2m_carrier_utc_time_write$
+^lwm2m_carrier_time_read$
 
 # lwm2m_os.h
 ^lwm2m_os_errno$
