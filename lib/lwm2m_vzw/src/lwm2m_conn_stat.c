@@ -23,6 +23,8 @@ static void *collection_period_timer;
 static lwm2m_object_t                  m_object_conn_stat;        /**< Connectivity Statistics base object. */
 static lwm2m_connectivity_statistics_t m_instance_conn_stat;      /**< Connectivity Statistics object instance. */
 
+// static int64_t m_con_time_start[sizeof(((m_instance_conn_stat *)0)->resource_ids)];
+
 // LWM2M core resources.
 
 lwm2m_connectivity_statistics_t * lwm2m_conn_stat_get_instance(uint16_t instance_id)
@@ -80,6 +82,91 @@ uint32_t conn_stat_instance_callback(lwm2m_instance_t * p_instance,
 
     uint8_t  buffer[200];
     uint32_t buffer_size = sizeof(buffer);
+
+    if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
+    {
+        u32_t observe_option = 0;
+        for (uint8_t index = 0; index < p_request->options_count; index++)
+        {
+            if (p_request->options[index].number == COAP_OPT_OBSERVE)
+            {
+                err_code = coap_opt_uint_decode(&observe_option,
+                                                p_request->options[index].length,
+                                                p_request->options[index].data);
+                break;
+            }
+        }
+
+        if (err_code == 0)
+        {
+            if (observe_option == 0) // Observe start
+            {
+                // Whitelist the resources that support observe.
+                switch (resource_id)
+                {
+                    // case LWM2M_CONN_STAT_SMS_TX_COUNTER:
+                    // case LWM2M_CONN_STAT_SMS_RX_COUNTER:
+                    // case LWM2M_CONN_STAT_TX_DATA:
+                    // case LWM2M_CONN_STAT_RX_DATA:
+                    // case LWM2M_CONN_STAT_MAX_MSG_SIZE:
+                    // case LWM2M_CONN_STAT_AVG_MSG_SIZE:
+                    // case LWM2M_CONN_STAT_COLLECTION_PERIOD:
+                    /*
+                    {
+                        LWM2M_INF("Observe requested on resource /7/%i/%i", p_instance->instance_id, resource_id);
+                        err_code = lwm2m_tlv_conn_stat_encode(buffer,
+                                                              &buffer_size,
+                                                              resource_id,
+                                                              &m_instance_conn_stat);
+
+                        err_code = lwm2m_observe_register(buffer,
+                                                        buffer_size,
+                                                        m_instance_conn_stat.proto.expire_time,
+                                                        p_request,
+                                                        COAP_CT_APP_LWM2M_TLV,
+                                                        (void *)&m_instance_conn_stat.resource_ids[resource_id]);
+
+                        m_con_time_start[resource_id] = lwm2m_os_uptime_get();
+                        break;
+                    }
+                    */
+
+                    case LWM2M_INVALID_RESOURCE: // By design LWM2M_INVALID_RESOURCE indicates that this is on instance level.
+                    {
+                        // Process the GET request as usual.
+                        LWM2M_INF("Observe requested on instance /7/%i, no slots", p_instance->instance_id);
+                        op_code = LWM2M_OPERATION_CODE_READ;
+                        break;
+                    }
+
+                    default:
+                    {
+                        // Process the GET request as usual.
+                        LWM2M_INF("Observe requested on resource /7/%i/%i, no slots", p_instance->instance_id, resource_id);
+                        op_code = LWM2M_OPERATION_CODE_READ;
+                        break;
+                    }
+                }
+            }
+            else if (observe_option == 1) // Observe stop
+            {
+                if (resource_id == LWM2M_INVALID_RESOURCE) {
+                    LWM2M_INF("Observe cancel on instance /7/%i, no match", p_instance->instance_id);
+                } else {
+                    LWM2M_INF("Observe cancel on resource /7/%i/%i", p_instance->instance_id, resource_id);
+                    lwm2m_observe_unregister(p_request->remote, (void *)&m_instance_conn_stat.resource_ids[resource_id]);
+                }
+
+                // Process the GET request as usual.
+                op_code = LWM2M_OPERATION_CODE_READ;
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+                return 0;
+            }
+        }
+    }
 
     if (op_code == LWM2M_OPERATION_CODE_READ)
     {

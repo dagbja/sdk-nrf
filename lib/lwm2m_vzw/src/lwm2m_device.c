@@ -269,25 +269,71 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
         {
             if (observe_option == 0) // Observe start
             {
-                LWM2M_INF("Observe requested on object 3/%i/%i", p_instance->instance_id, resource_id);
-                err_code = lwm2m_tlv_device_encode(buffer,
-                                                   &buffer_size,
-                                                   resource_id,
-                                                   &m_instance_device);
+                // Whitelist the resources that support observe.
+                switch (resource_id)
+                {
+                    // case LWM2M_DEVICE_MANUFACTURER:
+                    // case LWM2M_DEVICE_MODEL_NUMBER:
+                    // case LWM2M_DEVICE_SERIAL_NUMBER:
+                    // case LWM2M_DEVICE_FIRMWARE_VERSION:
+                    case LWM2M_DEVICE_AVAILABLE_POWER_SOURCES:
+                    case LWM2M_DEVICE_POWER_SOURCE_VOLTAGE:
+                    case LWM2M_DEVICE_POWER_SOURCE_CURRENT:
+                    case LWM2M_DEVICE_BATTERY_LEVEL:
+                    // case LWM2M_DEVICE_MEMORY_FREE:
+                    case LWM2M_DEVICE_ERROR_CODE:
+                    // case LWM2M_DEVICE_CURRENT_TIME:
+                    // case LWM2M_DEVICE_UTC_OFFSET:
+                    // case LWM2M_DEVICE_TIMEZONE:
+                    // case LWM2M_DEVICE_SUPPORTED_BINDINGS:
+                    case LWM2M_DEVICE_DEVICE_TYPE:
+                    case LWM2M_DEVICE_HARDWARE_VERSION:
+                    case LWM2M_DEVICE_SOFTWARE_VERSION:
+                    case LWM2M_DEVICE_BATTERY_STATUS:
+                    case LWM2M_DEVICE_MEMORY_TOTAL:
+                    {
+                        LWM2M_INF("Observe requested on resource /3/%i/%i", p_instance->instance_id, resource_id);
+                        err_code = lwm2m_tlv_device_encode(buffer,
+                                                        &buffer_size,
+                                                        resource_id,
+                                                        &m_instance_device);
 
-                err_code = lwm2m_observe_register(buffer,
-                                                  buffer_size,
-                                                  m_instance_device.proto.expire_time,
-                                                  p_request,
-                                                  COAP_CT_APP_LWM2M_TLV,
-                                                  (void *)&m_instance_device.resource_ids[resource_id]);
+                        err_code = lwm2m_observe_register(buffer,
+                                                        buffer_size,
+                                                        m_instance_device.proto.expire_time,
+                                                        p_request,
+                                                        COAP_CT_APP_LWM2M_TLV,
+                                                        (void *)&m_instance_device.resource_ids[resource_id]);
 
-                m_con_time_start[resource_id] = lwm2m_os_uptime_get();
+                        m_con_time_start[resource_id] = lwm2m_os_uptime_get();
+                        break;
+                    }
+
+                    case LWM2M_INVALID_RESOURCE: // By design LWM2M_INVALID_RESOURCE indicates that this is on instance level.
+                    {
+                        // Process the GET request as usual.
+                        LWM2M_INF("Observe requested on instance /3/%i, no slots", p_instance->instance_id);
+                        op_code = LWM2M_OPERATION_CODE_READ;
+                        break;
+                    }
+
+                    default:
+                    {
+                        // Process the GET request as usual.
+                        LWM2M_INF("Observe requested on resource /3/%i/%i, no slots", p_instance->instance_id, resource_id);
+                        op_code = LWM2M_OPERATION_CODE_READ;
+                        break;
+                    }
+                }
             }
             else if (observe_option == 1) // Observe stop
             {
-                LWM2M_INF("Observe cancel on object 3/%i/%i", p_instance->instance_id, resource_id);
-                lwm2m_observe_unregister(p_request->remote, (void *)&m_instance_device.resource_ids[resource_id]);
+                if (resource_id == LWM2M_INVALID_RESOURCE) {
+                    LWM2M_INF("Observe cancel on instance /3/%i, no  match", p_instance->instance_id);
+                } else {
+                    LWM2M_INF("Observe cancel on resource /3/%i/%i", p_instance->instance_id, resource_id);
+                    lwm2m_observe_unregister(p_request->remote, (void *)&m_instance_device.resource_ids[resource_id]);
+                }
 
                 // Process the GET request as usual.
                 op_code = LWM2M_OPERATION_CODE_READ;
