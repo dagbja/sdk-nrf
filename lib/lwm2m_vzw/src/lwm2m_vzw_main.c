@@ -255,6 +255,38 @@ static bool lwm2m_is_deregistration_done(void)
     return true;
 }
 
+static uint16_t lwm2m_instance_id_from_remote(struct sockaddr *p_remote, uint16_t *short_server_id)
+{
+    uint16_t instance_id = UINT16_MAX;
+
+    if (p_remote == NULL)
+    {
+        LWM2M_WRN("Remote address missing");
+    }
+    else if (lwm2m_remote_short_server_id_find(short_server_id, p_remote) != 0)
+    {
+        LWM2M_WRN("Remote address not found");
+    }
+    else
+    {
+        // Find the server instance for the short server ID.
+        for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+            if (lwm2m_server_short_server_id_get(i) == *short_server_id) {
+                instance_id = i;
+                break;
+            }
+        }
+    }
+
+    if ((instance_id == UINT16_MAX) &&
+        (*short_server_id != 0))
+    {
+        LWM2M_WRN("Server instance for short server ID not found: %d", *short_server_id);
+    }
+
+    return instance_id;
+}
+
 /** Functions available from shell access */
 
 void lwm2m_request_connect(void)
@@ -436,6 +468,24 @@ static void lwm2m_disconnect_admin_pdn(uint16_t instance_id)
     {
         lwm2m_os_pdn_disconnect(m_admin_pdn_handle);
         m_admin_pdn_handle = -1;
+    }
+}
+
+void lwm2m_request_remote_reconnect(struct sockaddr *p_remote)
+{
+    if (m_app_state == LWM2M_STATE_IDLE)
+    {
+        uint16_t short_server_id = 0;
+        uint16_t instance_id = lwm2m_instance_id_from_remote(p_remote, &short_server_id);;
+
+        // Only reconnect if remote is found and already connected.
+        if ((instance_id != UINT16_MAX) &&
+            (m_lwm2m_transport[instance_id] != -1))
+        {
+            app_server_disconnect(instance_id);
+            lwm2m_disconnect_admin_pdn(instance_id);
+            lwm2m_request_server_update(instance_id, true);
+        }
     }
 }
 
@@ -879,29 +929,12 @@ void lwm2m_notification(lwm2m_notification_type_t type,
         return;
     }
 
-    uint16_t instance_id = UINT16_MAX;
     uint16_t short_server_id = 0;
+    uint16_t instance_id = lwm2m_instance_id_from_remote(p_remote, &short_server_id);
 
-    if (p_remote == NULL) {
-        LWM2M_WRN("Remote address missing");
-        return;
-    }
-    else if (lwm2m_remote_short_server_id_find(&short_server_id, p_remote) != 0)
+    if (instance_id == UINT16_MAX)
     {
-        LWM2M_WRN("Remote address not found");
-        return;
-    }
-
-    // Find the server instance for the short server ID.
-    for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-        if (lwm2m_server_short_server_id_get(i) == short_server_id) {
-            instance_id = i;
-            break;
-        }
-    }
-
-    if (instance_id == 0xFFFF) {
-        LWM2M_WRN("Server instance for short server ID not found: %d", short_server_id);
+        // Not found
         return;
     }
 

@@ -402,7 +402,11 @@ static void lwm2m_firmware_notify_resource(uint16_t resource_id)
                                  type);
         if (err_code)
         {
-            LWM2M_ERR("Could notify observer, error code: %lu", err_code);
+            LWM2M_INF("Notify /5/0/%d failed: %s (%ld), %s (%d)", resource_id,
+                      lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                      lwm2m_os_log_strdup(strerror(errno)), errno);
+
+            lwm2m_request_remote_reconnect(p_observer->remote);
         }
     }
 }
@@ -439,7 +443,11 @@ void lwm2m_firmware_observer_process(void)
                                 type);
         if (err_code)
         {
-            LWM2M_ERR("Could notify observer, error code: %lu", err_code);
+            LWM2M_INF("Notify /5/0/%d failed: %s (%ld), %s (%d)", LWM2M_FIRMWARE_STATE,
+                      lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                      lwm2m_os_log_strdup(strerror(errno)), errno);
+
+            lwm2m_request_remote_reconnect(p_observer->remote);
         }
     }
 }
