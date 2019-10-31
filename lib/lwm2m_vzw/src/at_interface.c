@@ -6,6 +6,7 @@
 
 #include <at_interface.h>
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <lwm2m.h>
 #include <lwm2m_os.h>
@@ -16,7 +17,10 @@
 /**
  * @brief Max size for the AT responses.
  */
-#define AT_INTERFACE_RESPONSE_MAX_SIZE 128
+#define AT_INTERFACE_CMD_RESP_MAX_SIZE 128
+
+#define AT_APN_CLASS_OP_RD "AT%XAPNCLASS=0"
+#define AT_APN_CLASS_OP_WR "AT%XAPNCLASS=1"
 
 /** Cumulative days per month in a year
  *  Leap days are taken into account in the formula calculating the time since Epoch.
@@ -48,7 +52,7 @@ static const at_notif_handler at_handlers[] = {
 at_net_reg_stat_cb_t m_net_reg_stat_cb;
 
 /** Buffer used for at reponse and string params */
-static char m_at_buffer[AT_INTERFACE_RESPONSE_MAX_SIZE];
+static char m_at_buffer[AT_INTERFACE_CMD_RESP_MAX_SIZE];
 
 static int at_send_command_and_parse_params(const char * p_at_command, struct lwm2m_os_at_param_list * p_param_list)
 {
@@ -364,6 +368,68 @@ int at_apn_setup_wait_for_ipv6(const char * const apn)
     (void)lwm2m_os_at_cmd_write("AT+CGEREP=0", NULL, 0);
 
     return apn_handle;
+}
+
+int at_read_apn_class(uint8_t apn_class, char * const p_apn, int * p_apn_len)
+{
+    int retval = 0;
+
+    if ((p_apn == NULL) || (p_apn_len == NULL) || (*p_apn_len <= 0))
+    {
+        return EINVAL;
+    }
+
+    int written = snprintf(m_at_buffer, sizeof(m_at_buffer), "%s,%u", AT_APN_CLASS_OP_RD, apn_class);
+    if ((written < 0) || (written > sizeof(m_at_buffer)))
+    {
+        retval = ENOMEM;
+    }
+    else
+    {
+        int err = at_response_param_to_string(m_at_buffer, 4, 2, p_apn, p_apn_len);
+
+        if (err != 0)
+        {
+            // AT command error
+            LWM2M_ERR("Unable to read APN Class. AT command error %d.", err);
+            retval = EIO;
+        }
+    }
+
+    return retval;
+}
+
+int at_write_apn_class(uint8_t apn_class, const char * p_apn, int apn_len)
+{
+    int retval = 0;
+
+    if (p_apn == NULL || apn_len <= 0)
+    {
+        return EINVAL;
+    }
+
+    static const char end_quote_and_zero[2] = {'\"', '\0'};
+
+    int written = snprintf(m_at_buffer, sizeof(m_at_buffer), "%s,%u,\"", AT_APN_CLASS_OP_WR, apn_class);
+    if ((written < 0) || (written + apn_len + sizeof(end_quote_and_zero)) >= sizeof(m_at_buffer))
+    {
+        return ENOMEM;
+    }
+
+    memcpy(&m_at_buffer[written], p_apn, apn_len);
+    written += apn_len;
+    memcpy(&m_at_buffer[written], end_quote_and_zero, sizeof(end_quote_and_zero));
+
+    int err = lwm2m_os_at_cmd_write(m_at_buffer, m_at_buffer, sizeof(m_at_buffer));
+
+    if (err != 0)
+    {
+        // AT command error
+        LWM2M_ERR("Unable to read APN Class. AT command error %d.", err);
+        retval = EIO;
+    }
+
+    return retval;
 }
 
 int at_read_imei(char * const p_imei, int imei_len)
@@ -819,7 +885,7 @@ int at_read_ipaddr(lwm2m_list_t * p_ipaddr_list)
         return -EINVAL;
     }
 
-    if (p_ipaddr_list->max_len < 2) 
+    if (p_ipaddr_list->max_len < 2)
     {
         LWM2M_ERR("IP address list too short: %d", p_ipaddr_list->max_len);
         return -ENOMEM;
@@ -865,7 +931,7 @@ int at_read_ipaddr(lwm2m_list_t * p_ipaddr_list)
         LWM2M_ERR("cgpaddr_params list init failed: %d", err);
         retval = -EINVAL;
     }
- 
+
     return retval;
 }
 

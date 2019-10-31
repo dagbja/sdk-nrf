@@ -15,13 +15,13 @@
 #include <lwm2m_conn_mon.h>
 #include <coap_message.h>
 #include <common.h>
-#include <nrf_apn_class.h>
 #include <lwm2m_vzw_main.h>
 #include <at_interface.h>
 #include <app_debug.h>
 #include <lwm2m_remote.h>
+#include <lwm2m_os.h>
 
-#define VERIZON_RESOURCE 30000
+#define VERIZON_RESOURCE            30000
 
 static lwm2m_object_t                  m_object_conn_mon;        /**< Connectivity Monitoring base object. */
 static lwm2m_connectivity_monitoring_t m_instance_conn_mon;      /**< Connectivity Monitoring object instance. */
@@ -84,7 +84,7 @@ static int8_t index_apn_class(uint8_t apn_index)
 char * lwm2m_conn_mon_class_apn_get(uint8_t apn_class, uint8_t * p_len)
 {
     // Check for updated value.
-    uint16_t apn_class_len = sizeof(m_apn_class_scratch_buffer);
+    size_t apn_class_len = sizeof(m_apn_class_scratch_buffer);
     int8_t apn_index = class_apn_index(apn_class);
 
     if (apn_index < 0 || apn_index > 3)
@@ -93,9 +93,9 @@ char * lwm2m_conn_mon_class_apn_get(uint8_t apn_class, uint8_t * p_len)
         return NULL;
     }
 
-    int retval = nrf_apn_class_read(apn_class, m_apn_class_scratch_buffer, &apn_class_len);
+    int result = at_read_apn_class(apn_class, m_apn_class_scratch_buffer, &apn_class_len);
 
-    if (retval == 0)
+    if (result == 0)
     {
         // Check if length or value has changed.
         if ((m_vzw_conn_mon_class_apn.class_apn[apn_index].len != apn_class_len) ||
@@ -138,13 +138,12 @@ void lwm2m_conn_mon_class_apn_set(uint8_t apn_class, char * p_value, uint8_t len
 
     // Check if length or value has changed.
     if ((m_vzw_conn_mon_class_apn.class_apn[apn_index].len != len) ||
-        (strncmp(m_vzw_conn_mon_class_apn.class_apn[apn_index].p_val, m_apn_class_scratch_buffer, len)))
+        (strncmp(m_vzw_conn_mon_class_apn.class_apn[apn_index].p_val, p_value, len)))
     {
-        // Update the network setting.
-        int retval = nrf_apn_class_update(apn_class, p_value, len);
+        int result = at_write_apn_class(apn_class, p_value, len);
 
         // Update the cached value.
-        if (retval == 0)
+        if (result == 0)
         {
             if (lwm2m_bytebuffer_to_string(m_apn_class_scratch_buffer, len, &m_vzw_conn_mon_class_apn.class_apn[apn_index]) != 0)
             {

@@ -29,6 +29,36 @@ int at_if_init(void);
 int at_apn_setup_wait_for_ipv6(const char * const apn);
 
 /**
+ * @brief Read APN class name.
+ * APN Class name has max size of 63 bytes excluding null-terminator.
+ *
+ * @param[in]    apn_class The APN Class to lookup the APN for.
+ * @param[out]   p_apn     The buffer where to store the APN.
+ * @param[inout] p_apn_len Size of the buffer as input. Length of
+ *                         the APN as output.
+ *
+ * @retval EINVAL Invalid parameters.
+ * @retval EIO    AT command error.
+ * @retval ENOMEM Send buffer was not large enough for the generated AT command.
+ * @retval 0 Success.
+ */
+int at_read_apn_class(uint8_t apn_class, char * const p_apn, int * p_apn_len);
+
+/**
+ * @brief Write APN class name.
+ *
+ * @param[in]  apn_class   The APN Class to write the APN for.
+ * @param[in]  p_apn       The buffer where the APN is stored.
+ * @param[in]  apn_len     Size of the APN.
+ *
+ * @retval EINVAL Invalid parameters.
+ * @retval EIO    AT command error.
+ * @retval ENOMEM Send buffer was not large enough for the generated AT command.
+ * @retval 0 Success.
+ */
+int at_write_apn_class(uint8_t apn_class, const char * p_apn, int apn_len);
+
+/**
  * @brief Read device IMEI.
  * IMEI is always 14 digits and a check digit.
  *

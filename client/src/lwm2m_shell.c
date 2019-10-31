@@ -16,6 +16,7 @@
 #include <lwm2m_security.h>
 #include <lwm2m_server.h>
 #include <lwm2m_device.h>
+#include <lwm2m_conn_mon.h>
 #include <lwm2m_retry_delay.h>
 #include <lwm2m_instance_storage.h>
 #include <at_interface.h>
@@ -984,6 +985,58 @@ static int cmd_device_print(const struct shell *shell, size_t argc, char **argv)
     return 0;
 }
 
+static int cmd_apn_set(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 3)
+    {
+        shell_print(shell, "%s <class> <APN>", argv[0]);
+        return 0;
+    }
+
+    char *p_end;
+    int class = strtol(argv[1], &p_end, 10);
+    if ((class < 1) || (class > 10))
+    {
+        shell_print(shell, "Invalid APN Class: %u", class);
+        return 0;
+    }
+
+    char * p_apn = argv[2];
+    shell_print(shell, "Setting APN Class %d: %s", class, p_apn);
+
+    lwm2m_conn_mon_class_apn_set(class, p_apn, strlen(p_apn));
+
+    return 0;
+}
+
+static int cmd_apn_get(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2)
+    {
+        shell_print(shell, "%s <class>", argv[0]);
+        return 0;
+    }
+
+    char buffer[64];
+
+    char *p_end;
+    int class = strtol(argv[1], &p_end, 10);
+    if ((class < 1) || (class > 10))
+    {
+        shell_print(shell, "Invalid APN Class value: %u", class);
+        return 0;
+    }
+
+    uint8_t len = 0;
+    char * p_apn = lwm2m_conn_mon_class_apn_get(class, &len);
+
+    memcpy(buffer, p_apn, len);
+    buffer[len] = '\0';
+
+    shell_print(shell, "APN Class %d: %s", class, buffer);
+
+    return 0;
+}
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_config,
     SHELL_CMD(print, NULL, "Print configuration", cmd_config_print),
@@ -994,6 +1047,11 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_config,
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );
 
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_apn,
+    SHELL_CMD(get, NULL, "Read APN", cmd_apn_get),
+    SHELL_CMD(set, NULL, "Write APN", cmd_apn_set),
+    SHELL_SUBCMD_SET_END /* Array terminated. */
+);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(print, NULL, "Print configuration", cmd_debug_print),
@@ -1036,6 +1094,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_device,
 );
 
 
+SHELL_CMD_REGISTER(apn, &sub_apn, "APN Table", NULL);
 SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
 SHELL_CMD_REGISTER(config, &sub_config, "Instance configuration", NULL);
 SHELL_CMD_REGISTER(debug, &sub_debug, "Debug configuration", NULL);
