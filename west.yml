@@ -22,11 +22,11 @@ manifest:
   projects:
     - name: fw-nrfconnect-nrf
       path: nrf
-      revision: 491d68a4f421e2df507292dcd79f4a9564161665
+      revision: d92eee2424d5be78355d785d12b3fbfa7e4379ee
     - name: fw-nrfconnect-zephyr
       path: zephyr
       west-commands: scripts/west-commands.yml
-      revision: 98804daed7a9745302391e581073f2c29878470c
+      revision: 9c3f95834f5c021a5c36db6f382a2cfdaff25c06
     - name: nrfxlib
       path: nrfxlib
       revision: a806f5fcac3bde98c4c7324a0c4d547b4ba89f75
