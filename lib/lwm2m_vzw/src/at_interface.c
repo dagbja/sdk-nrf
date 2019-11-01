@@ -13,9 +13,10 @@
 #include <nrf_socket.h>
 #include <sms_receive.h>
 
-// FIXME: remove this and move to KConfig
-#define APP_MAX_AT_READ_LENGTH          CONFIG_AT_CMD_RESPONSE_MAX_LEN
-#define APP_MAX_AT_WRITE_LENGTH         256
+/**
+ * @brief Max size for the AT responses.
+ */
+#define AT_INTERFACE_RESPONSE_MAX_SIZE 128
 
 /** Cumulative days per month in a year
  *  Leap days are taken into account in the formula calculating the time since Epoch.
@@ -46,16 +47,17 @@ static const at_notif_handler at_handlers[] = {
 
 at_net_reg_stat_cb_t m_net_reg_stat_cb;
 
+/** Buffer used for at reponse and string params */
+static char m_at_buffer[AT_INTERFACE_RESPONSE_MAX_SIZE];
+
 static int at_send_command_and_parse_params(const char * p_at_command, struct lwm2m_os_at_param_list * p_param_list)
 {
-    char read_buffer[APP_MAX_AT_READ_LENGTH];
-
     int retval = 0;
 
-    retval = lwm2m_os_at_cmd_write(p_at_command, read_buffer, APP_MAX_AT_READ_LENGTH);
+    retval = lwm2m_os_at_cmd_write(p_at_command, m_at_buffer, sizeof(m_at_buffer));
 
     if (retval == 0) {
-        retval = lwm2m_os_at_parser_params_from_str(read_buffer, NULL, p_param_list);
+        retval = lwm2m_os_at_parser_params_from_str(m_at_buffer, NULL, p_param_list);
     }
 
     return retval;
@@ -66,17 +68,16 @@ static int at_response_param_to_lwm2m_string(const char * p_at_command, lwm2m_st
     int retval = 0;
     struct lwm2m_os_at_param_list params;
 
-    char read_buf[APP_MAX_AT_READ_LENGTH];
-    size_t buf_len = sizeof(read_buf);
+    size_t buf_len = sizeof(m_at_buffer);
 
     if (lwm2m_os_at_params_list_init(&params, 1) == 0)
     {
         if (at_send_command_and_parse_params(p_at_command, &params) == 0)
         {
-            retval = lwm2m_os_at_params_string_get(&params, 0, read_buf, &buf_len);
+            retval = lwm2m_os_at_params_string_get(&params, 0, m_at_buffer, &buf_len);
             if (retval == 0)
             {
-                (void)lwm2m_bytebuffer_to_string(read_buf, buf_len, p_string);
+                (void)lwm2m_bytebuffer_to_string(m_at_buffer, buf_len, p_string);
             }
             else
             {
@@ -437,7 +438,6 @@ static int copy_and_convert_iccid(const char *src, uint32_t src_len, char *dst, 
 
 int at_read_sim_iccid(char *p_iccid, uint32_t * p_iccid_len)
 {
-    char string_buffer[APP_MAX_AT_READ_LENGTH];
     int retval = 0;
 
     if (p_iccid == NULL || *p_iccid_len < 16) {
@@ -445,10 +445,10 @@ int at_read_sim_iccid(char *p_iccid, uint32_t * p_iccid_len)
     }
 
     // Read SIM Integrated Circuit Card Identifier (ICCID)
-    int len = sizeof(string_buffer);
-    int err = at_response_param_to_string("AT+CRSM=176,12258,0,0,10", 4, 3, string_buffer, &len);
+    int len = sizeof(m_at_buffer);
+    int err = at_response_param_to_string("AT+CRSM=176,12258,0,0,10", 4, 3, m_at_buffer, &len);
     if (err == 0) {
-        retval = copy_and_convert_iccid(string_buffer, len - 1, p_iccid, p_iccid_len);
+        retval = copy_and_convert_iccid(m_at_buffer, len - 1, p_iccid, p_iccid_len);
     } else {
         LWM2M_ERR("Unable to read ICCID. AT command error.");
         retval = EIO;
@@ -460,6 +460,10 @@ int at_read_sim_iccid(char *p_iccid, uint32_t * p_iccid_len)
 int at_read_firmware_version(lwm2m_string_t *p_manufacturer_id)
 {
     int retval = 0;
+
+    if (p_manufacturer_id == NULL) {
+        return -EINVAL;
+    }
 
     // Read manufacturer identification
     const char *at_cgmi = "AT+CGMR";
@@ -473,6 +477,10 @@ int at_read_operator_id(uint32_t  *p_operator_id)
 {
     int retval = 0;
     struct lwm2m_os_at_param_list operid_params;
+
+    if (p_operator_id == NULL) {
+        return -EINVAL;
+    }
 
     *p_operator_id = 0;
 
@@ -529,6 +537,10 @@ int at_read_manufacturer(lwm2m_string_t *p_manufacturer_id)
 {
     int retval = 0;
 
+    if (p_manufacturer_id == NULL) {
+        return -EINVAL;
+    }
+
     // Read manufacturer identification
     const char *at_cgmi = "AT+CGMI";
 
@@ -540,6 +552,10 @@ int at_read_manufacturer(lwm2m_string_t *p_manufacturer_id)
 int at_read_model_number(lwm2m_string_t *p_model_number)
 {
     int retval = 0;
+
+    if (p_model_number == NULL) {
+        return -EINVAL;
+    }
 
     // Read model number
     const char *at_cgmm = "AT+CGMM";
@@ -553,6 +569,10 @@ int at_read_radio_signal_strength_and_link_quality(int32_t * p_signal_strength, 
 {
     int retval = 0;
     struct lwm2m_os_at_param_list cesq_params;
+
+    if (p_signal_strength == NULL || p_link_quality == NULL) {
+        return -EINVAL;
+    }
 
     // Read network registration status
     const char *at_cesq = "AT+CESQ";
@@ -667,17 +687,20 @@ int at_read_radio_signal_strength_and_link_quality(int32_t * p_signal_strength, 
 int at_read_cell_id(uint32_t * p_cell_id)
 {
     int retval = 0;
-    char ci_buf[9];
+
+    if (p_cell_id == NULL) {
+        return -EINVAL;
+    }
 
     *p_cell_id = 0;
 
     // Read network registration status
-    int len = sizeof(ci_buf);
-    int err = at_response_param_to_string("AT+CEREG?", 6, 4, ci_buf, &len);
+    int len = sizeof(m_at_buffer);
+    int err = at_response_param_to_string("AT+CEREG?", 6, 4, m_at_buffer, &len);
 
     if (err == 0)
     {
-        *p_cell_id = (uint32_t)strtol(ci_buf, NULL, 16);
+        *p_cell_id = (uint32_t)strtol(m_at_buffer, NULL, 16);
     }
     else
     {
@@ -691,21 +714,24 @@ int at_read_cell_id(uint32_t * p_cell_id)
 int at_read_smnc_smcc(int32_t * p_smnc, int32_t *p_smcc)
 {
     int retval = 0;
-    char oper_buf[8];
+
+    if (p_smnc == NULL || p_smcc == NULL) {
+        return -EINVAL;
+    }
 
     *p_smnc = 0;
     *p_smcc = 0;
 
     // Read network registration status
-    int len = sizeof(oper_buf);
-    int err = at_response_param_to_string("AT+COPS?", 5, 3, oper_buf, &len);
+    int len = sizeof(m_at_buffer);
+    int err = at_response_param_to_string("AT+COPS?", 5, 3, m_at_buffer, &len);
 
     if (err == 0)
     {
         // SMNC is first 3 characters, SMNN the following characters
-        *p_smcc = (int32_t)strtol(&oper_buf[3], NULL, 0);
-        oper_buf[3] = '\0'; // Null termination of SMNC
-        *p_smnc = (int32_t)strtol(oper_buf, NULL, 0);
+        *p_smcc = (int32_t)strtol(&m_at_buffer[3], NULL, 0);
+        m_at_buffer[3] = '\0'; // Null termination of SMNC
+        *p_smnc = (int32_t)strtol(m_at_buffer, NULL, 0);
     }
     else
     {
@@ -719,8 +745,12 @@ int at_read_smnc_smcc(int32_t * p_smnc, int32_t *p_smcc)
 int at_read_time(int32_t *p_time, int32_t *p_utc_offset, int32_t *p_dst_adjustment)
 {
     int retval = 0;
-    char string_buf[21];
-    int len = sizeof(string_buf);
+
+    int len = sizeof(m_at_buffer);
+
+    if (p_time == NULL || p_utc_offset == NULL || p_dst_adjustment == NULL) {
+        return -EINVAL;
+    }
 
     *p_time = 0;
     *p_utc_offset = 0;
@@ -741,11 +771,11 @@ int at_read_time(int32_t *p_time, int32_t *p_utc_offset, int32_t *p_dst_adjustme
         // Get time string
         if (err == 0)
         {
-            err = lwm2m_os_at_params_string_get(&cclk_params, 1, string_buf, &len);
+            err = lwm2m_os_at_params_string_get(&cclk_params, 1, m_at_buffer, &len);
             if (err == 0)
             {
-                string_buf[len] = '\0';
-                at_cclk_reponse_convert(string_buf, p_time, p_utc_offset);
+                m_at_buffer[len] = '\0';
+                at_cclk_reponse_convert(m_at_buffer, p_time, p_utc_offset);
             }
         }
 
@@ -782,41 +812,60 @@ int at_read_time(int32_t *p_time, int32_t *p_utc_offset, int32_t *p_dst_adjustme
 
 int at_read_ipaddr(lwm2m_list_t * p_ipaddr_list)
 {
-    char string_buf[APP_MAX_AT_READ_LENGTH];
-
     int retval = 0;
+    int len = sizeof(m_at_buffer) - 1;
+
+    if (p_ipaddr_list == NULL) {
+        return -EINVAL;
+    }
+
+    if (p_ipaddr_list->max_len < 2) 
+    {
+        LWM2M_ERR("IP address list too short: %d", p_ipaddr_list->max_len);
+        return -ENOMEM;
+    }
 
     // Read IP addresses
-    int len = sizeof(string_buf);
-    int err = at_response_param_to_string("AT+CGDCONT?", 7, 4, string_buf, &len);
+    struct lwm2m_os_at_param_list cgpaddr_params;
 
-    if (err == 0 || err == -EAGAIN) {
-        int idx = 0;
-        if (len > 0)
+    int err = lwm2m_os_at_params_list_init(&cgpaddr_params, 4);
+    if (err == 0)
+    {
+        err = at_send_command_and_parse_params("AT+CGPADDR=0", &cgpaddr_params);
+
+        if (err == 0)
         {
-            for (char *ip_addr = strtok(string_buf, " "); ip_addr; ip_addr = strtok(NULL, " ")) {
-                if (idx < p_ipaddr_list->max_len) {
-                    (void)lwm2m_bytebuffer_to_string(ip_addr, strlen(ip_addr), &p_ipaddr_list->val.p_string[idx++]);
-                    p_ipaddr_list->len = idx;
-                } else {
-                    LWM2M_ERR("ipaddr list full");
-                    retval = -ENOMEM;
-                    break;
-                }
+            // Get IPV4 address
+            err = lwm2m_os_at_params_string_get(&cgpaddr_params, 2, m_at_buffer, &len);
+            if (err == 0)
+            {
+                m_at_buffer[len] = '\0';
+                (void)lwm2m_bytebuffer_to_string(m_at_buffer, len, &p_ipaddr_list->val.p_string[0]);
+                p_ipaddr_list->len = 1;
+            }
+
+            // Get IPV6 address
+            len = sizeof(m_at_buffer) - 1;
+            err = lwm2m_os_at_params_string_get(&cgpaddr_params, 3, m_at_buffer, &len);
+            if (err == 0)
+            {
+                m_at_buffer[len] = '\0';
+                (void)lwm2m_bytebuffer_to_string(m_at_buffer, len, &p_ipaddr_list->val.p_string[1]);
+                p_ipaddr_list->len = 2;
             }
         }
         else
         {
-            LWM2M_ERR("IP address string length %d", len);
-            retval = -EINVAL;
+            LWM2M_ERR("Reading IP addresses failed: %d", err);
+            retval = -EIO;
         }
     }
     else
     {
-        LWM2M_ERR("Reading IP addresses failed: %d", err);
-        retval = -EIO;
+        LWM2M_ERR("cgpaddr_params list init failed: %d", err);
+        retval = -EINVAL;
     }
-
+ 
     return retval;
 }
 
@@ -826,6 +875,10 @@ int at_read_connstat(lwm2m_connectivity_statistics_t * p_conn_stat)
     int retval;
 
     const char *at_xconnstat = "AT%XCONNSTAT?";
+
+    if (p_conn_stat == NULL) {
+        return -EINVAL;
+    }
 
     retval = lwm2m_os_at_params_list_init(&xconnstat_params, 7);
     if (retval == 0)
