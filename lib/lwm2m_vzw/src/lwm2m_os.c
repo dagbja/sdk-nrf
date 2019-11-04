@@ -341,8 +341,8 @@ int lwm2m_os_at_cmd_write(const char *const cmd, char *buf, size_t buf_len)
 	return at_cmd_write(cmd, buf, buf_len, (enum at_cmd_state *)NULL);
 }
 
-static void at_params_list_get(const struct lwm2m_os_at_param_list *src,
-			struct at_param_list *dst)
+static void at_params_list_get(struct at_param_list *dst,
+			struct lwm2m_os_at_param_list *src)
 {
 	struct at_param *src_param = src->params;
 
@@ -362,18 +362,10 @@ static void at_params_list_get(const struct lwm2m_os_at_param_list *src,
 		case AT_PARAM_TYPE_STRING:
 			dst->params[i].value.str_val =
 				src_param[i].value.str_val;
-			/* Detach this pointer from the source list
-			 * so that it's not freed when we free at_param_list.
-			 */
-			src_param[i].value.str_val = NULL;
 			break;
 		case AT_PARAM_TYPE_ARRAY:
-			/* Detach this pointer from the source list
-			 * so that it's not freed when we free at_param_list.
-			 */
 			dst->params[i].value.array_val =
 				src_param[i].value.array_val;
-			src_param[i].value.array_val = NULL;
 			break;
 		default:
 			break;
@@ -382,7 +374,7 @@ static void at_params_list_get(const struct lwm2m_os_at_param_list *src,
 }
 
 static void at_params_list_translate(struct lwm2m_os_at_param_list *dst,
-			      struct at_param_list *src)
+			struct at_param_list *src)
 {
 	struct at_param *dst_param = dst->params;
 
@@ -449,7 +441,7 @@ void lwm2m_os_at_params_list_free(struct lwm2m_os_at_param_list *list)
 	at_params_list_free(&tmp_list);
 }
 
-int lwm2m_os_at_params_int_get(const struct lwm2m_os_at_param_list *list,
+int lwm2m_os_at_params_int_get(struct lwm2m_os_at_param_list *list,
 			       size_t index, uint32_t *value)
 {
 	int err;
@@ -460,15 +452,16 @@ int lwm2m_os_at_params_int_get(const struct lwm2m_os_at_param_list *list,
 		return err;
 	}
 
-	at_params_list_get(list, &tmp_list);
-
+	at_params_list_get(&tmp_list, list);
 	err = at_params_int_get(&tmp_list, index, value);
+	at_params_list_translate(list, &tmp_list);
+
 	at_params_list_free(&tmp_list);
 
 	return err;
 }
 
-int lwm2m_os_at_params_short_get(const struct lwm2m_os_at_param_list *list,
+int lwm2m_os_at_params_short_get(struct lwm2m_os_at_param_list *list,
 				 size_t index, uint16_t *value)
 {
 	int err;
@@ -479,15 +472,16 @@ int lwm2m_os_at_params_short_get(const struct lwm2m_os_at_param_list *list,
 		return err;
 	}
 
-	at_params_list_get(list, &tmp_list);
-
+	at_params_list_get(&tmp_list, list);
 	err = at_params_short_get(&tmp_list, index, value);
+	at_params_list_translate(list, &tmp_list);
+
 	at_params_list_free(&tmp_list);
 
 	return err;
 }
 
-int lwm2m_os_at_params_string_get(const struct lwm2m_os_at_param_list *list,
+int lwm2m_os_at_params_string_get(struct lwm2m_os_at_param_list *list,
 				  size_t index, char *value, size_t *len)
 {
 	int err;
@@ -498,9 +492,10 @@ int lwm2m_os_at_params_string_get(const struct lwm2m_os_at_param_list *list,
 		return err;
 	}
 
-	at_params_list_get(list, &tmp_list);
-
+	at_params_list_get(&tmp_list, list);
 	err = at_params_string_get(&tmp_list, index, value, len);
+	at_params_list_translate(list, &tmp_list);
+
 	at_params_list_free(&tmp_list);
 
 	return err;
@@ -529,7 +524,7 @@ int lwm2m_os_at_parser_params_from_str(
 }
 
 int lwm2m_os_at_params_valid_count_get(
-	const struct lwm2m_os_at_param_list *list)
+	struct lwm2m_os_at_param_list *list)
 {
 	int err;
 	struct at_param_list tmp_list;
@@ -539,9 +534,10 @@ int lwm2m_os_at_params_valid_count_get(
 		return err;
 	}
 
-	at_params_list_get(list, &tmp_list);
-
+	at_params_list_get(&tmp_list, list);
 	err = at_params_valid_count_get(&tmp_list);
+	at_params_list_translate(list, &tmp_list);
+	
 	at_params_list_free(&tmp_list);
 
 	return err;

@@ -226,19 +226,19 @@ int lwm2m_os_at_params_list_init(struct lwm2m_os_at_param_list *list,
 /**
  * @brief Get a parameter value as an integer number.
  */
-int lwm2m_os_at_params_int_get(const struct lwm2m_os_at_param_list *list,
+int lwm2m_os_at_params_int_get(struct lwm2m_os_at_param_list *list,
 			       size_t index, uint32_t *value);
 
 /**
  * @brief Get a parameter value as a short number.
  */
-int lwm2m_os_at_params_short_get(const struct lwm2m_os_at_param_list *list,
+int lwm2m_os_at_params_short_get(struct lwm2m_os_at_param_list *list,
 				 size_t index, uint16_t *value);
 
 /**
  * @brief Get a parameter value as a string.
  */
-int lwm2m_os_at_params_string_get(const struct lwm2m_os_at_param_list *list,
+int lwm2m_os_at_params_string_get(struct lwm2m_os_at_param_list *list,
 				  size_t index, char *value, size_t *len);
 
 /**
@@ -257,7 +257,7 @@ int lwm2m_os_at_parser_params_from_str(
  * @brief Get the number of valid parameters in the list.
  */
 int lwm2m_os_at_params_valid_count_get(
-	const struct lwm2m_os_at_param_list *list);
+	struct lwm2m_os_at_param_list *list);
 
 /**
  * @brief Establish a connection with the server.
