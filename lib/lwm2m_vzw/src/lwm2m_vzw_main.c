@@ -28,6 +28,7 @@
 
 #include <app_debug.h>
 #include <at_interface.h>
+#include <nrf_socket.h>
 #include <nrf_inbuilt_key.h>
 #include <nrf_errno.h>
 #include <sms_receive.h>
@@ -257,7 +258,7 @@ static bool lwm2m_is_deregistration_done(void)
     return true;
 }
 
-static uint16_t lwm2m_instance_id_from_remote(struct sockaddr *p_remote, uint16_t *short_server_id)
+static uint16_t lwm2m_instance_id_from_remote(struct nrf_sockaddr *p_remote, uint16_t *short_server_id)
 {
     uint16_t instance_id = UINT16_MAX;
 
@@ -473,7 +474,7 @@ static void lwm2m_disconnect_admin_pdn(uint16_t instance_id)
     }
 }
 
-void lwm2m_request_remote_reconnect(struct sockaddr *p_remote)
+void lwm2m_request_remote_reconnect(struct nrf_sockaddr *p_remote)
 {
     if (m_app_state == LWM2M_STATE_IDLE)
     {
