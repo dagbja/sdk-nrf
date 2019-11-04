@@ -15,7 +15,7 @@ uint16_t             m_short_server_id[LWM2M_MAX_SERVERS];
 struct nrf_sockaddr_in6  m_remotes[LWM2M_MAX_SERVERS];
 char                 m_location[LWM2M_MAX_SERVERS][LWM2M_REGISTER_MAX_LOCATION_LEN];
 uint16_t             m_location_len[LWM2M_MAX_SERVERS];
-
+bool                 m_reconnecting[LWM2M_MAX_SERVERS] = {0};
 
 #define LWM2M_REMOTE_FIND_OR_RETURN_ERR(ID, IDX) \
     IDX = find_index(ID);                        \
@@ -202,7 +202,6 @@ uint32_t lwm2m_remote_location_delete(uint16_t short_server_id)
     return 0;
 }
 
-
 uint32_t lwm2m_remote_location_find(char    ** pp_location,
                                     uint16_t * p_location_len,
                                     uint16_t   short_server_id)
@@ -219,6 +218,46 @@ uint32_t lwm2m_remote_location_find(char    ** pp_location,
     *p_location_len = m_location_len[index];
 
     LWM2M_EXIT();
+
+    return 0;
+}
+
+int lwm2m_remote_reconnecting_set(uint16_t short_server_id)
+{
+    int index;
+
+    index = find_index(short_server_id);
+    if (index < 0) {
+        return -ENOENT;
+    }
+
+    m_reconnecting[index] = true;
+
+    return 0;
+}
+
+bool lwm2m_remote_reconnecting_get(uint16_t short_server_id)
+{
+    int index;
+
+    index = find_index(short_server_id);
+    if (index < 0) {
+        return false;
+    }
+
+    return m_reconnecting[index];
+}
+
+int lwm2m_remote_reconnecting_clear(uint16_t short_server_id)
+{
+    int index;
+
+    index = find_index(short_server_id);
+    if (index < 0) {
+        return -ENOENT;
+    }
+
+    m_reconnecting[index] = false;
 
     return 0;
 }

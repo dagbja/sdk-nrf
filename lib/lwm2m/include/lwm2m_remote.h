@@ -118,6 +118,12 @@ uint32_t lwm2m_remote_location_find(char     ** pp_location,
                                     uint16_t  * p_location_len,
                                     uint16_t    short_server_id);
 
+
+int lwm2m_remote_reconnecting_set(uint16_t short_server_id);
+bool lwm2m_remote_reconnecting_get(uint16_t short_server_id);
+int lwm2m_remote_reconnecting_clear(uint16_t short_server_id);
+
+
 #endif // LWM2M_REMOTE_H__
 
 /**@} */

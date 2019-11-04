@@ -42,6 +42,6 @@ uint32_t lwm2m_conn_mon_object_callback(lwm2m_object_t * p_object,
                                         uint8_t          op_code,
                                         coap_message_t * p_request);
 
-void lwm2m_conn_mon_observer_process(void);
+void lwm2m_conn_mon_observer_process(struct nrf_sockaddr * p_remote_server);
 
 uint32_t tlv_conn_mon_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv);

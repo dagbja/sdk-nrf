@@ -19,6 +19,7 @@
 #include <lwm2m_vzw_main.h>
 #include <at_interface.h>
 #include <app_debug.h>
+#include <lwm2m_remote.h>
 
 #define VERIZON_RESOURCE 30000
 
@@ -315,15 +316,15 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                 // Whitelist the resources that support observe.
                 switch (resource_id)
                 {
-                    // case LWM2M_CONN_MON_NETWORK_BEARER:
+                    case LWM2M_CONN_MON_NETWORK_BEARER:
                     // case LWM2M_CONN_MON_AVAILABLE_NETWORK_BEARER:
                     case LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH:
-                    // case LWM2M_CONN_MON_LINK_QUALITY:
+                    case LWM2M_CONN_MON_LINK_QUALITY:
                     // case LWM2M_CONN_MON_IP_ADDRESSES:
                     // case LWM2M_CONN_MON_ROUTER_IP_ADRESSES:
                     // case LWM2M_CONN_MON_LINK_UTILIZATION:
                     // case LWM2M_CONN_MON_APN:
-                    // case LWM2M_CONN_MON_CELL_ID:
+                    case LWM2M_CONN_MON_CELL_ID:
                     // case LWM2M_CONN_MON_SMNC:
                     // case LWM2M_CONN_MON_SMCC:
                     {
@@ -510,49 +511,101 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
     return err_code;
 }
 
-void lwm2m_conn_mon_observer_process(void)
+/* Fetch latest resource value */
+static void lwm2m_conn_mon_update_resource(uint16_t id)
 {
-    coap_observer_t * p_observer = NULL;
-    while (coap_observe_server_next_get(&p_observer, p_observer, (void *)&m_instance_conn_mon.resource_ids[LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH]) == 0)
-    {
-        LWM2M_TRC("Observer found");
+    switch (id) {
+    case LWM2M_CONN_MON_NETWORK_BEARER:
+        /* Values is hardcoded */
+        break;
+    case LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH:
+    case LWM2M_CONN_MON_LINK_QUALITY:
+        at_read_radio_signal_strength_and_link_quality(
+            &m_instance_conn_mon.radio_signal_strength,
+            &m_instance_conn_mon.link_quality);
+        break;
+    case LWM2M_CONN_MON_CELL_ID:
+        at_read_cell_id(&m_instance_conn_mon.cell_id);
+        break;
+    default:
+        LWM2M_WRN("Resource /4/0/%d might be out of date", id);
+        break;
+    }
+}
 
-        (void)at_read_radio_signal_strength_and_link_quality(&m_instance_conn_mon.radio_signal_strength, &m_instance_conn_mon.link_quality);
+static void lwm2m_conn_mon_notify_resource(struct nrf_sockaddr * p_remote_server, int16_t id)
+{
+    uint16_t short_server_id;
+    coap_observer_t *p_observer = NULL;
 
-        uint8_t  buffer[200];
+    lwm2m_conn_mon_update_resource(id);
+
+    while (coap_observe_server_next_get(&p_observer, p_observer,
+               (void*)&m_instance_conn_mon.resource_ids[id]) == 0) {
+
+        lwm2m_remote_short_server_id_find(&short_server_id, p_observer->remote);
+        if (lwm2m_remote_reconnecting_get(short_server_id)) {
+            /* Wait for reconnection */
+            continue;
+        }
+
+        if (p_remote_server != NULL) {
+            /* Only notify to given remote */
+            if (memcmp(p_observer->remote, p_remote_server,
+                       sizeof(struct nrf_sockaddr)) != 0) {
+                continue;
+            }
+        }
+
+        uint32_t err_code;
+        uint8_t buffer[200];
         uint32_t buffer_size = sizeof(buffer);
-        uint32_t err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
-                                                                    &buffer_size,
-                                                                    LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH,
-                                                                    &m_instance_conn_mon);
-        if (err_code)
-        {
-            LWM2M_ERR("Could not encode LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH, error code: %lu", err_code);
+
+        LWM2M_TRC("Observer found");
+        err_code = lwm2m_tlv_connectivity_monitoring_encode(
+            buffer, &buffer_size, id, &m_instance_conn_mon);
+
+        if (err_code) {
+            LWM2M_ERR(
+                "Could not encode resource_id %u, error code: %lu",
+                id, err_code);
         }
 
         coap_msg_type_t type = COAP_TYPE_NON;
         int64_t now = lwm2m_os_uptime_get();
 
         // Send CON every configured interval
-        if ((m_con_time_start[LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH] + (lwm2m_coap_con_interval_get() * 1000)) < now) {
+        if ((m_con_time_start[id] +
+             (lwm2m_coap_con_interval_get() * 1000)) < now) {
             type = COAP_TYPE_CON;
-            m_con_time_start[LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH] = now;
+            m_con_time_start[id] = now;
         }
 
-        err_code =  lwm2m_notify(buffer,
-                                 buffer_size,
-                                 p_observer,
-                                 type);
-        if (err_code)
-        {
-            LWM2M_INF("Notify /4/0/%d failed: %s (%ld), %s (%d)", LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH,
-                      lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                      lwm2m_os_log_strdup(strerror(errno)), errno);
+        LWM2M_INF("Notify /4/0/%d", id);
+        err_code = lwm2m_notify(buffer, buffer_size, p_observer, type);
+
+        if (err_code) {
+            LWM2M_INF("Notify /4/0/%d failed: %s (%ld), %s (%d)", id,
+                    lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                    lwm2m_os_log_strdup(strerror(errno)), errno);
 
             lwm2m_request_remote_reconnect(p_observer->remote);
         }
     }
+}
 
+void lwm2m_conn_mon_observer_process(struct nrf_sockaddr * p_remote_server)
+{
+    const uint16_t res_id[] = {
+        LWM2M_CONN_MON_NETWORK_BEARER,
+        LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH,
+        LWM2M_CONN_MON_LINK_QUALITY,
+        LWM2M_CONN_MON_CELL_ID,
+    };
+
+    for (size_t i = 0; i < ARRAY_SIZE(res_id); i++) {
+        lwm2m_conn_mon_notify_resource(p_remote_server, res_id[i]);
+    }
 }
 
 void lwm2m_conn_mon_init(void)

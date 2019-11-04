@@ -496,6 +496,7 @@ void lwm2m_request_remote_reconnect(struct nrf_sockaddr *p_remote)
             app_server_disconnect(instance_id);
             lwm2m_disconnect_admin_pdn(instance_id);
             lwm2m_request_server_update(instance_id, true);
+            lwm2m_remote_reconnecting_set(short_server_id);
         }
     }
 }
@@ -994,6 +995,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             (void)lwm2m_remote_location_delete(short_server_id);
             lwm2m_server_registered_set(instance_id, 0);
             lwm2m_instance_storage_server_store(instance_id);
+
             // Reset state to get back to registration.
             lwm2m_state_set(LWM2M_STATE_SERVER_CONNECTED);
         }
@@ -1007,6 +1009,11 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
                 m_use_client_holdoff_timer = false;
                 m_registration_ready = true;
                 app_event_notify(LWM2M_CARRIER_EVENT_READY, NULL);
+            }
+
+            if (lwm2m_remote_reconnecting_get(short_server_id)) {
+                lwm2m_remote_reconnecting_clear(short_server_id);
+                lwm2m_conn_mon_observer_process(p_remote);
             }
         }
     }
@@ -1693,6 +1700,7 @@ static void app_server_connect(uint16_t instance_id)
         if (err_code == 0)
         {
             LWM2M_INF("Connected");
+            // Reset state to get back to registration.
             lwm2m_state_set(LWM2M_STATE_SERVER_CONNECTED);
             m_lwm2m_transport[instance_id] = local_port.transport;
         }
@@ -2278,7 +2286,7 @@ static void app_timers_init(void)
 static void app_lwm2m_observer_process(void)
 {
     lwm2m_server_observer_process();
-    lwm2m_conn_mon_observer_process();
+    lwm2m_conn_mon_observer_process(NULL);
     lwm2m_firmware_observer_process();
 }
 

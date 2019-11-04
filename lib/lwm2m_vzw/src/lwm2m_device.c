@@ -655,6 +655,7 @@ void lwm2m_device_notify_resource(uint16_t resource_id)
             m_con_time_start[resource_id] = now;
         }
 
+        LWM2M_INF("Notify /3/0/%d", resource_id);
         err_code =  lwm2m_notify(buffer,
                                  buffer_size,
                                  p_observer,
