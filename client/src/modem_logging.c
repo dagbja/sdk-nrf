@@ -15,7 +15,8 @@
 #define MODEM_LOGGING_STORAGE_ID 0x4242
 #define APP_MAX_AT_READ_LENGTH   CONFIG_AT_CMD_RESPONSE_MAX_LEN
 
-static char modem_logging[65];
+static char  modem_logging[65];
+static char  read_buffer[APP_MAX_AT_READ_LENGTH];
 
 int modem_logging_init(void)
 {
@@ -42,7 +43,6 @@ int32_t modem_logging_set(const char * new_modem_logging)
 int modem_at_write(const char *const cmd, bool do_logging)
 {
     int ret = 0;
-    char read_buffer[APP_MAX_AT_READ_LENGTH];
 
     if (cmd == NULL) {
         ret = -1;
@@ -119,7 +119,7 @@ void modem_logging_enable(void)
     } else if (strcmp(modem_logging, "4") == 0) {
         modem_at_write("AT%XMODEMTRACE=1,4", false);
     } else if (strlen(modem_logging) == 64) {
-        char at_command[128];
+        static char at_command[128];
         sprintf(at_command, "AT%%XMODEMTRACE=2,,3,%s", modem_logging);
         modem_at_write(at_command, false);
     }
