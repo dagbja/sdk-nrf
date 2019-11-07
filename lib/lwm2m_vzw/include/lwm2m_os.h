@@ -312,4 +312,4 @@ int lwm2m_os_errno(void);
 
 /**@} */
 
-#endif // LWM2M_OS_H__
+#endif /* LWM2M_OS_H__ */

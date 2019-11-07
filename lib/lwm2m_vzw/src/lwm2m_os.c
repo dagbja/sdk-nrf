@@ -537,7 +537,7 @@ int lwm2m_os_at_params_valid_count_get(
 	at_params_list_get(&tmp_list, list);
 	err = at_params_valid_count_get(&tmp_list);
 	at_params_list_translate(list, &tmp_list);
-	
+
 	at_params_list_free(&tmp_list);
 
 	return err;
@@ -634,7 +634,7 @@ void lwm2m_os_pdn_disconnect(int pdn_fd)
 
 int lwm2m_os_pdn_init_and_connect(const char *apn_name)
 {
-	return pdn_init_and_connect((char*)apn_name);
+	return pdn_init_and_connect((char *)apn_name);
 }
 
 #ifndef ENOKEY
