@@ -10,12 +10,11 @@
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 
-uint16_t             m_count;
-uint16_t             m_short_server_id[LWM2M_MAX_SERVERS];
+uint16_t                 m_short_server_id[LWM2M_MAX_SERVERS];
 struct nrf_sockaddr_in6  m_remotes[LWM2M_MAX_SERVERS];
-char                 m_location[LWM2M_MAX_SERVERS][LWM2M_REGISTER_MAX_LOCATION_LEN];
-uint16_t             m_location_len[LWM2M_MAX_SERVERS];
-bool                 m_reconnecting[LWM2M_MAX_SERVERS] = {0};
+char                     m_location[LWM2M_MAX_SERVERS][LWM2M_REGISTER_MAX_LOCATION_LEN];
+uint16_t                 m_location_len[LWM2M_MAX_SERVERS];
+bool                     m_reconnecting[LWM2M_MAX_SERVERS] = {0};
 
 #define LWM2M_REMOTE_FIND_OR_RETURN_ERR(ID, IDX) \
     IDX = find_index(ID);                        \
@@ -27,9 +26,22 @@ bool                 m_reconnecting[LWM2M_MAX_SERVERS] = {0};
 
 static int find_index(uint16_t short_server_id)
 {
-    for (int i = 0; i < m_count; ++i)
+    for (int i = 0; i < LWM2M_MAX_SERVERS; ++i)
     {
         if (m_short_server_id[i] == short_server_id)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+static int find_free(void)
+{
+    for (int i = 0; i < LWM2M_MAX_SERVERS; ++i)
+    {
+        if (m_short_server_id[i] == 0)
         {
             return i;
         }
@@ -41,7 +53,11 @@ static int find_index(uint16_t short_server_id)
 
 uint32_t lwm2m_remote_init()
 {
-    m_count = 0;
+    for (int i = 0; i < LWM2M_MAX_SERVERS; i++)
+    {
+        m_short_server_id[i] = 0;
+    }
+
     return 0;
 }
 
@@ -50,29 +66,26 @@ uint32_t lwm2m_remote_register(uint16_t short_server_id, struct nrf_sockaddr * p
 {
     LWM2M_TRC("SSID: %u", short_server_id);
 
-    int index = find_index(short_server_id);
-
-    if (index < 0)
+    if (find_index(short_server_id) < 0)
     {
-        if (m_count + 1 > LWM2M_MAX_SERVERS)
+        int index = find_free();
+        if (index < 0)
         {
             return ENOMEM;
         }
 
-        m_short_server_id[m_count] = short_server_id;
+        m_short_server_id[index] = short_server_id;
 
         if (p_remote->sa_family == NRF_AF_INET6)
         {
             const struct nrf_sockaddr_in6 * p_remote6 = (struct nrf_sockaddr_in6 *)p_remote;
-            memcpy(&m_remotes[m_count], p_remote6, sizeof(struct nrf_sockaddr_in6));
+            memcpy(&m_remotes[index], p_remote6, sizeof(struct nrf_sockaddr_in6));
         }
         else
         {
             const struct nrf_sockaddr_in  * p_remote4 = (struct nrf_sockaddr_in *)p_remote;
-            memcpy(&m_remotes[m_count], p_remote4, sizeof(struct nrf_sockaddr_in));
+            memcpy(&m_remotes[index], p_remote4, sizeof(struct nrf_sockaddr_in));
         }
-
-        m_count++;
     }
 
     LWM2M_EXIT();
@@ -88,19 +101,11 @@ uint32_t lwm2m_remote_deregister(uint16_t short_server_id)
     int index;
     LWM2M_REMOTE_FIND_OR_RETURN_ERR(short_server_id, index)
 
-    m_count--;
-
-    // Move last element to the deleted index.
-    m_short_server_id[index] = m_short_server_id[m_count];
-    m_remotes[index] = m_remotes[m_count];
-    memcpy(m_location[index], m_location[m_count], m_location_len[m_count]);
-    m_location_len[index] = m_location_len[m_count];
-
     // Clear out the last index.
-    m_short_server_id[m_count] = 0;
-    memset(&m_remotes[m_count], 0, sizeof(struct nrf_sockaddr_in6));
-    memset(m_location[m_count], 0, LWM2M_REGISTER_MAX_LOCATION_LEN);
-    m_location_len[m_count] = 0;
+    m_short_server_id[index] = 0;
+    m_location_len[index]    = 0;
+    memset(&m_remotes[index], 0, sizeof(struct nrf_sockaddr_in6));
+    memset(m_location[index], 0, LWM2M_REGISTER_MAX_LOCATION_LEN);
 
     LWM2M_EXIT();
 
@@ -118,7 +123,7 @@ uint32_t lwm2m_remote_short_server_id_find(uint16_t            * p_short_server_
     const struct nrf_sockaddr_in  * p_remote4 = (struct nrf_sockaddr_in *)p_remote;
     const struct nrf_sockaddr_in6 * p_remote6 = (struct nrf_sockaddr_in6 *)p_remote;
 
-    for (int i = 0; i < m_count; ++i)
+    for (int i = 0; i < LWM2M_MAX_SERVERS; ++i)
     {
         if (p_remote->sa_family == NRF_AF_INET6)
         {
