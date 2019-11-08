@@ -434,7 +434,7 @@ int lwm2m_os_at_params_list_init(struct lwm2m_os_at_param_list *list,
 void lwm2m_os_at_params_list_free(struct lwm2m_os_at_param_list *list)
 {
 	struct at_param_list tmp_list = {
-		.param_count = 0,
+		.param_count = list->param_count,
 		.params = (struct at_param *)list->params,
 	};
 
