@@ -52,7 +52,7 @@ def lwm2mCompileLib(boolean debug = false) {
 
     lwm2mLog("Create archive to store artifacts.")
     def archiveName = "liblwm2m_carrier${debug ? "_debug" : ""}.tar.gz"
-    sh "tar -zcvf ${archiveName} ../../nrf/lib/lwm2m_carrier/"
+    sh "tar -zcvf ${archiveName} ../../nrf/lib/bin/lwm2m_carrier/"
 
     archiveArtifacts artifacts: '*.tar.gz'
   }
