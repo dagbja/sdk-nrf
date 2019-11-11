@@ -60,9 +60,10 @@ static uint16_t           m_num_objects;
 static uint16_t           m_num_instances;
 
 
-static void coap_error_handler(uint32_t error_code, coap_message_t * p_message)
+static bool coap_error_handler(uint32_t error_code, coap_message_t * p_message)
 {
     // LWM2M_ERR("[CoAP]: Unhandled CoAP message received. Error code: %u", error_code);
+    return lwm2m_coap_error_handler(error_code, p_message);
 }
 
 

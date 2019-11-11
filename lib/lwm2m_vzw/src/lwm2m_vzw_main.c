@@ -263,7 +263,8 @@ static uint16_t lwm2m_instance_id_from_remote(struct nrf_sockaddr *p_remote, uin
 
     if (p_remote == NULL)
     {
-        LWM2M_WRN("Remote address missing");
+        // Nothing to handle
+        // LWM2M_WRN("Remote address missing");
     }
     else if (lwm2m_remote_short_server_id_find(short_server_id, p_remote) != 0)
     {
@@ -1079,6 +1080,9 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             lwm2m_retry_delay_reset(instance_id);
             lwm2m_server_registered_set(instance_id, true);
 
+            // Reset connection update in case this has been requested while connecting
+            m_connection_update[instance_id].requested = LWM2M_REQUEST_NONE;
+
             lwm2m_state_set(LWM2M_STATE_IDLE);
 
             // Refresh stored server object, to also include is_connected status and registration ID.
@@ -1124,8 +1128,12 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         {
             // Update instead of register during connect
             LWM2M_INF("Updated after connect (server %d)", instance_id);
-            lwm2m_state_set(LWM2M_STATE_IDLE);
             lwm2m_retry_delay_reset(instance_id);
+
+            // Reset connection update in case this has been requested while connecting
+            m_connection_update[instance_id].requested = LWM2M_REQUEST_NONE;
+
+            lwm2m_state_set(LWM2M_STATE_IDLE);
 
             if (!m_registration_ready && lwm2m_is_registration_ready()) {
                 m_use_client_holdoff_timer = false;
@@ -1166,6 +1174,27 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             lwm2m_os_timer_start(m_connection_update[instance_id].timer, delay * 1000);
         }
     }
+}
+
+bool lwm2m_coap_error_handler(uint32_t error_code, coap_message_t * p_message)
+{
+    bool handled = false;
+    // Handle CoAP failures when:
+    // - sending error responses in send_error_response() fails
+    // - decode error in coap_transport_read()
+    // - send() error on retransmitting message in coap_time_tick()
+
+    LWM2M_WRN("CoAP failure: %s (%ld), %s (%d)",
+              lwm2m_os_log_strdup(strerror(error_code)), error_code,
+              lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
+
+    // Handle error when not able to send on socket.
+    if (error_code == EIO && lwm2m_os_errno() == EOPNOTSUPP) {
+        lwm2m_request_remote_reconnect(p_message->remote);
+        handled = true;
+    }
+
+    return handled;
 }
 
 uint32_t lwm2m_handler_error(uint16_t           short_server_id,

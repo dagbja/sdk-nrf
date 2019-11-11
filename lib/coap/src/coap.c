@@ -97,15 +97,19 @@ static inline bool is_response(uint8_t message_code)
 	return (message_code >= 64) && (message_code < 192);
 }
 
-static inline void app_error_notify(uint32_t err_code, coap_message_t *message)
+static inline bool app_error_notify(uint32_t err_code, coap_message_t *message)
 {
+	bool handled = false;
+
 	if (error_callback != NULL) {
 		COAP_MUTEX_UNLOCK();
 
-		error_callback(err_code, message);
+		handled = error_callback(err_code, message);
 
 		COAP_MUTEX_LOCK();
 	}
+
+	return handled;
 }
 
 uint32_t coap_init(uint32_t token_rand_seed,
@@ -355,7 +359,7 @@ static uint32_t send_error_response(coap_message_t *message, uint8_t code)
 
 	if (err_code != 0) {
 		/* If message could not be created, notify the application. */
-		app_error_notify(err_code, message);
+		(void)app_error_notify(err_code, message);
 		return err_code;
 	}
 
@@ -406,7 +410,7 @@ uint32_t coap_transport_read(const coap_transport_handle_t transport,
 
 	err_code = coap_message_decode(message, data, datalen);
 	if (err_code != 0) {
-		app_error_notify(err_code, message);
+		(void)app_error_notify(err_code, message);
 
 		coap_free_fn(message);
 		COAP_EXIT();
@@ -740,7 +744,11 @@ uint32_t coap_time_tick(void)
 						.transport = item->transport,
 						.remote = (struct nrf_sockaddr *)&item->remote,
 					};
-					app_error_notify(err_code, &message);
+					if (app_error_notify(err_code, &message)) {
+						coap_free_fn(item->buffer);
+						(void)coap_queue_remove(item);
+						continue;
+					}
 				}
 			}
 

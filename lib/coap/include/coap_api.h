@@ -157,8 +157,10 @@ typedef void (*coap_free_t)(void *memory);
  * @param[in] error_code Error code from CoAP module.
  * @param[in] message    CoAP message processed when error occurred.
  *                       Could be NULL.
+ *
+ * @retval true if error is handled, false if error is not handled.
  */
-typedef void (*coap_error_callback_t)(uint32_t error_code,
+typedef bool (*coap_error_callback_t)(uint32_t error_code,
 				      coap_message_t *message);
 
 /**@brief Callback function to be registered with CoAP messages.

@@ -276,6 +276,14 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
                         uint8_t                     coap_code,
                         uint32_t                    err_code);
 
+/**@brief Callback from LwM2M CoAP error handler to the application.
+ *
+ * @param[in] error_code Error code from CoAP.
+ * @param[in] p_message  Message from CoAP.
+ *
+ * @return true if error is handled, false if error is not handled.
+ */
+bool lwm2m_coap_error_handler(uint32_t error_code, coap_message_t * p_message);
 
 /**@brief Callback interface from LWM2M core to the application.
  *
