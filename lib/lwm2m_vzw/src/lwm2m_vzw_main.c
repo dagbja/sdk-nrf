@@ -1004,6 +1004,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             // Update instead of register during connect
             LWM2M_INF("Updated after connect (server %d)", instance_id);
             lwm2m_state_set(LWM2M_STATE_IDLE);
+            lwm2m_retry_delay_reset(instance_id);
 
             if (!m_registration_ready && lwm2m_is_registration_ready()) {
                 m_use_client_holdoff_timer = false;
