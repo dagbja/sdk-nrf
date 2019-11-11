@@ -109,7 +109,7 @@ pipeline {
             ciUtils.lwm2mLog("Building client application using library source files.")
 
             // Use West to built the application. West finds the ZEPHYR_BASE folder automatically.
-            sh "rm -rf build && west build -b nrf9160_pca10090ns ."
+            sh 'rm -rf build && west build -b nrf9160_pca10090ns .'
 
             /* Store compiled files as artifacts. */
             sh 'mkdir output/'
@@ -119,7 +119,10 @@ pipeline {
             archiveArtifacts artifacts: 'output/*.tar.gz'
           }
           catch (err) {
-            ciUtils.lwm2mLog("Build failed: ${err}")
+            /* Any error in the scripts mark this stage as failing. */
+            ciUtils.lwm2mLog("Build client app failed: ${err}")
+            error('Build client app failed !')
+            currentBuild.result = 'FAILURE'
           }
         }
       }}
@@ -167,7 +170,7 @@ pipeline {
             ciUtils.lwm2mLog("Building nrf client application using library.")
 
             // Use West to built the application. West finds the ZEPHYR_BASE folder automatically.
-            sh "rm -rf build && west build -b nrf9160_pca10090ns ."
+            sh 'rm -rf build && west build -b nrf9160_pca10090ns .'
 
             /* Store compiled files as artifacts. */
             sh 'mkdir output/'
@@ -177,7 +180,10 @@ pipeline {
             archiveArtifacts artifacts: 'output/*.tar.gz'
           }
           catch (err) {
-            ciUtils.lwm2mLog("Build failed: ${err}")
+            /* Any error in the scripts mark this stage as failing. */
+            ciUtils.lwm2mLog("Build nrf client app failed: ${err}")
+            error('Build nrf client app failed !')
+            currentBuild.result = 'FAILURE'
           }
         }
       }}
