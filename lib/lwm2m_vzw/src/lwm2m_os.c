@@ -68,6 +68,11 @@ int64_t lwm2m_os_uptime_get(void)
 	return k_uptime_get();
 }
 
+int64_t lwm2m_os_uptime_delta(int64_t *ref)
+{
+	return k_uptime_delta(ref);
+}
+
 int lwm2m_os_sleep(int ms)
 {
 	return k_sleep(K_MSEC(ms));
@@ -571,19 +576,18 @@ static void
 download_client_evt_translate(const struct download_client_evt *event,
 			      struct lwm2m_os_download_evt *lwm2m_os_event)
 {
-	lwm2m_os_event->error = event->error;
-	lwm2m_os_event->fragment.buf = event->fragment.buf;
-	lwm2m_os_event->fragment.len = event->fragment.len;
-
 	switch (event->id) {
 	case DOWNLOAD_CLIENT_EVT_FRAGMENT:
 		lwm2m_os_event->id = LWM2M_OS_DOWNLOAD_EVT_FRAGMENT;
+		lwm2m_os_event->fragment.buf = event->fragment.buf;
+		lwm2m_os_event->fragment.len = event->fragment.len;
 		break;
 	case DOWNLOAD_CLIENT_EVT_DONE:
 		lwm2m_os_event->id = LWM2M_OS_DOWNLOAD_EVT_DONE;
 		break;
 	case DOWNLOAD_CLIENT_EVT_ERROR:
 		lwm2m_os_event->id = LWM2M_OS_DOWNLOAD_EVT_ERROR;
+		lwm2m_os_event->error = event->error;
 		break;
 	default:
 		break;

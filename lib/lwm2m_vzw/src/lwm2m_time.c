@@ -166,17 +166,17 @@ static void lwm2m_time_current_time_update(void)
 
         if (err == 0)
         {
-            m_time_base_msecs = k_uptime_get();
+            m_time_base_msecs = lwm2m_os_uptime_get();
         }
         else
         {
-            int64_t delta_time = k_uptime_delta(&m_time_base_msecs);
+            int64_t delta_time = lwm2m_os_uptime_delta(&m_time_base_msecs);
             m_current_time_msecs += delta_time;
         }
     }
     else
     {
-        int64_t delta_time = k_uptime_delta(&m_time_base_msecs);
+        int64_t delta_time = lwm2m_os_uptime_delta(&m_time_base_msecs);
         m_current_time_msecs += delta_time;
     }
 }
@@ -193,7 +193,7 @@ int __WEAK lwm2m_carrier_utc_time_write(int32_t time)
     if (time >= 0)
     {
         m_current_time_msecs = (int64_t)time * 1000;
-        m_time_base_msecs = k_uptime_get();
+        m_time_base_msecs = lwm2m_os_uptime_get();
         m_time_set = true;
     }
     else

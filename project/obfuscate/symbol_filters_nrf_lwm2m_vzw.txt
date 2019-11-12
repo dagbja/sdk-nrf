@@ -49,6 +49,7 @@
 ^lwm2m_os_timer_remaining$
 ^lwm2m_os_timer_start$
 ^lwm2m_os_uptime_get$
+^lwm2m_os_uptime_delta$
 ^lwm2m_os_bsdlib_init$
 ^lwm2m_os_bsdlib_shutdown$
 ^lwm2m_os_at_init$
@@ -102,6 +103,9 @@
 ^lwm2m_msisdn_get$
 ^lwm2m_plain_text_firmware_decode$
 ^lwm2m_remote_location_find$
+^lwm2m_remote_reconnecting_clear$
+^lwm2m_remote_reconnecting_get$
+^lwm2m_remote_reconnecting_set$
 ^lwm2m_request_connect$
 ^lwm2m_request_disconnect$
 ^lwm2m_request_reset$
@@ -126,11 +130,13 @@
 # External symbols we should not modify
 
 # stdlib
+^__memcpy_chk$
+^__strncpy_chk$
+^__aeabi_ldivmod$
 ^abs$
 ^atoi$
 ^memcmp$
 ^memcpy$
-^__memcpy_chk$
 ^memset$
 ^snprintf$
 ^sprintf$

@@ -57,20 +57,20 @@ struct lwm2m_os_at_param_list {
 typedef void (*lwm2m_os_at_cmd_handler_t)(void *ctx, char *response);
 
 /**
- * @brief Download client event IDs.
+ * @defgroup lwm2m_os_download_evt_id LwM2M OS download events
+ * @{
  */
-enum lwm2m_os_download_evt_id {
-	LWM2M_OS_DOWNLOAD_EVT_FRAGMENT,
-	LWM2M_OS_DOWNLOAD_EVT_DONE,
-	LWM2M_OS_DOWNLOAD_EVT_ERROR,
-};
+#define LWM2M_OS_DOWNLOAD_EVT_FRAGMENT 0
+#define LWM2M_OS_DOWNLOAD_EVT_ERROR 1
+#define LWM2M_OS_DOWNLOAD_EVT_DONE 2
+/**@} */
 
 /**
  * @brief Download client event.
  */
 struct lwm2m_os_download_evt {
 	/** Event ID. */
-	enum lwm2m_os_download_evt_id id;
+	int id;
 	union {
 		/** Error cause. */
 		int error;
@@ -115,6 +115,11 @@ void lwm2m_os_free(void *ptr);
  * @brief Get uptime, in milliseconds.
  */
 int64_t lwm2m_os_uptime_get(void);
+
+/**
+ * @brief Get uptime delta, in milliseconds.
+ */
+int64_t lwm2m_os_uptime_delta(int64_t *ref);
 
 /**
  * @brief Put a thread to a sleep.
