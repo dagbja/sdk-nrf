@@ -470,7 +470,6 @@ void lwm2m_system_reset(bool force_reset)
     {
         LWM2M_INF("Reboot deferred by application");
     }
-
 }
 
 /* Read the access point name into a buffer, and null-terminate it.
@@ -996,13 +995,31 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
 
     if (start_retry_delay)
     {
-        int32_t retry_delay = lwm2m_retry_delay_get(instance_id, true);
+        bool is_last = false;
+        int32_t retry_delay = lwm2m_retry_delay_get(instance_id, true, &is_last);
 
         if (retry_delay == -1) {
             LWM2M_ERR("Bootstrap procedure failed");
             m_app_state = LWM2M_STATE_DISCONNECTED;
             lwm2m_retry_delay_reset(instance_id);
             return;
+        }
+
+        if (is_last) {
+            // This is the last retry delay after ...
+            if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT) {
+                // ... no response from server.
+                // Disconnect the session and retry on timeout.
+                app_server_disconnect(instance_id);
+            } else if (!no_reply) {
+                // ... an inability to establish a DTLS session.
+                // Repeat the bootstrap flow on timeout or reboot.
+                lwm2m_bootstrap_clear();
+                lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT);
+            } else {
+                // ... no response from server when establish a DTLS session.
+                // Retry on timeout.
+            }
         }
 
         LWM2M_INF("Retry delay for %ld minutes (server %u)", retry_delay / 60, instance_id);
@@ -1104,7 +1121,21 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         }
         else
         {
+            // No response or received a 4.0x error.
             if (lwm2m_state_set(LWM2M_STATE_SERVER_REGISTER_WAIT)) {
+                if (instance_id == VZW_MANAGEMENT_INSTANCE_ID && coap_code == COAP_CODE_400_BAD_REQUEST) {
+                    // Received 4.00 error from DM server, use last defined retry delay.
+                    int32_t retry_delay = lwm2m_retry_delay_get(instance_id, false, NULL);
+
+                    // VZW HACK: Loop until the current delay is 8 minutes. This will give the
+                    // last retry delay (24 hours) in the next call to lwm2m_retry_delay_get()
+                    // in app_handle_connect_retry().
+                    while (retry_delay != (8*60)) {
+                        // If not second to last then fetch next.
+                        retry_delay = lwm2m_retry_delay_get(instance_id, true, NULL);
+                    }
+                }
+
                 app_handle_connect_retry(instance_id, false);
             }
         }

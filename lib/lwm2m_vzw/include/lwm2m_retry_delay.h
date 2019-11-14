@@ -11,10 +11,11 @@
  *
  * @param[in]  instance_id  LwM2M server instance ID
  * @param[in]  next_delay   Fetch next delay
+ * @param[out] p_is_last    Set to true if this is the last retry delay
  *
  * @return Retry delay in seconds. -1 if no more retries.
  */
-int32_t lwm2m_retry_delay_get(int instance_id, bool next_delay);
+int32_t lwm2m_retry_delay_get(int instance_id, bool next_delay, bool * p_is_last);
 
 /**@brief Reset retry delay counter.
  *
