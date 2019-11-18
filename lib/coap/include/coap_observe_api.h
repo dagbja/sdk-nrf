@@ -113,16 +113,26 @@ uint32_t coap_observe_server_unregister(uint32_t handle);
 uint32_t coap_observe_server_search(uint32_t *handle, struct nrf_sockaddr *observer_addr,
 				 coap_resource_t *resource);
 
-/**@brief Iterate through observers subscribing to a specific resource.
+/**@brief Iterate through observers, with support for filter on specific resource
+ *
+ * @details This function will let you iterate through the list of registered
+ *          observers. If the start parameter is NULL, it will start at beginning
+ *          of the list, if not, it will search for the observer next to start.
+ *          If the resource parameter points to a specific resource this
+ *          function will only return observers observing this resources, skipping
+ *          observers that don't. If the resource parameter is NULL it will always
+ *          return the observer next to start.
  *
  * @param[out] observer Pointer to be filled by the search function upon finding
  *                      the next observer starting from the observer pointer
  *                      provided. Should not be NULL.
  * @param[in]  start    Pointer to the observer where to start the search.
  * @param[in]  resource Pointer to the resource of interest. Should not be NULL.
+ * @param[in]  resource Pointer to the resource of interest.
  *
  * @retval 0      If observer was found.
  * @retval EINVAL If observer or resource pointer is NULL.
+ * @retval EINVAL If observer is NULL.
  * @retval ENOENT If next observer was not found.
  */
 uint32_t coap_observe_server_next_get(coap_observer_t **observer,

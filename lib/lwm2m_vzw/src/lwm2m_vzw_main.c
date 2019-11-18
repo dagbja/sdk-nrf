@@ -1181,8 +1181,17 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             }
 
             if (lwm2m_remote_reconnecting_get(short_server_id)) {
+                coap_observer_t *p_observer = NULL;
                 lwm2m_remote_reconnecting_clear(short_server_id);
-                app_lwm2m_observer_process(p_remote);
+
+                while (coap_observe_server_next_get(&p_observer, p_observer, NULL) == 0)
+                {
+                    if (memcmp(p_observer->remote, p_remote, sizeof(struct nrf_sockaddr)) == 0)
+                    {
+                        p_observer->transport = m_lwm2m_transport[instance_id];
+                    }
+                }
+                lwm2m_conn_mon_observer_process(p_remote);
             }
         }
     }

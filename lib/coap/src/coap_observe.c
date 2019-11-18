@@ -166,12 +166,17 @@ uint32_t internal_coap_observe_server_next_get(coap_observer_t **observer,
 					    coap_observer_t *start,
 					    coap_resource_t *resource)
 {
-	NULL_PARAM_CHECK(resource);
 	NULL_PARAM_CHECK(observer);
 
 	if (start == NULL) {
 		for (uint32_t i = 0; i < COAP_OBSERVE_MAX_NUM_OBSERVERS; i++) {
-			if (observers[i].observer.resource_of_interest ==
+			if (resource == NULL) {
+				if (observers[i].observer.resource_of_interest !=
+								NULL) {
+					(*observer) = &observers[i].observer;
+					return 0;
+				}
+			} else if (observers[i].observer.resource_of_interest ==
 								resource) {
 				(*observer) = &observers[i].observer;
 				return 0;
@@ -184,7 +189,13 @@ uint32_t internal_coap_observe_server_next_get(coap_observer_t **observer,
 
 		for (uint32_t i = index_to_previous + 1;
 		     i < COAP_OBSERVE_MAX_NUM_OBSERVERS; i++) {
-			if (observers[i].observer.resource_of_interest ==
+			if (resource == NULL) {
+				if (observers[i].observer.resource_of_interest !=
+								NULL) {
+					(*observer) = &observers[i].observer;
+					return 0;
+				}
+			} else if (observers[i].observer.resource_of_interest ==
 								resource) {
 				(*observer) = &observers[i].observer;
 				return 0;

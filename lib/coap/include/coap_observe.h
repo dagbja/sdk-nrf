@@ -73,11 +73,20 @@ uint32_t internal_coap_observe_server_search(uint32_t *handle,
 
 /**@brief Iterate through observers subscribing to a specific resource.
  *
+ * @details This function will let you iterate through the list of registered
+ *          observers. If the start parameter is NULL, it will start at beginning
+ *          of the list, if not, it will search for the observer next to start.
+ *          If the resource parameter points to a specific resource this
+ *          function will only return observers observing this resources, skipping
+ *          observers that don't. If the resource parameter is NULL it will always
+ *          return the observer next to start.
+ *
  * @param[out] observer Pointer to be filled by the search function upon finding
  *                      the next observer starting from the observer pointer
  *                      provided. Should not be NULL.
  * @param[in]  observer Pointer to the observer where to start the search.
  * @param[in]  resource Pointer to the resource of interest. Should not be NULL.
+ * @param[in]  resource Pointer to the resource of interest.
  *
  * @retval 0      If observer was found.
  * @retval EINVAL If observer or resource pointer is NULL.
