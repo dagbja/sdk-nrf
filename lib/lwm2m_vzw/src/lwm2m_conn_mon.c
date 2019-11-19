@@ -533,15 +533,15 @@ static void lwm2m_conn_mon_update_resource(uint16_t id)
     }
 }
 
-static void lwm2m_conn_mon_notify_resource(struct nrf_sockaddr * p_remote_server, int16_t id)
+static void lwm2m_conn_mon_notify_resource(struct nrf_sockaddr * p_remote_server, int16_t resource_id)
 {
     uint16_t short_server_id;
     coap_observer_t *p_observer = NULL;
 
-    lwm2m_conn_mon_update_resource(id);
-
     while (coap_observe_server_next_get(&p_observer, p_observer,
-               (void*)&m_instance_conn_mon.resource_ids[id]) == 0) {
+               (void*)&m_instance_conn_mon.resource_ids[resource_id]) == 0)
+    {
+        lwm2m_conn_mon_update_resource(resource_id);
 
         lwm2m_remote_short_server_id_find(&short_server_id, p_observer->remote);
         if (lwm2m_remote_reconnecting_get(short_server_id)) {
@@ -563,29 +563,28 @@ static void lwm2m_conn_mon_notify_resource(struct nrf_sockaddr * p_remote_server
 
         LWM2M_TRC("Observer found");
         err_code = lwm2m_tlv_connectivity_monitoring_encode(
-            buffer, &buffer_size, id, &m_instance_conn_mon);
+            buffer, &buffer_size, resource_id, &m_instance_conn_mon);
 
         if (err_code) {
-            LWM2M_ERR(
-                "Could not encode resource_id %u, error code: %lu",
-                id, err_code);
+            LWM2M_ERR("Could not encode resource_id %u, error code: %lu",
+                      resource_id, err_code);
         }
 
         coap_msg_type_t type = COAP_TYPE_NON;
         int64_t now = lwm2m_os_uptime_get();
 
         // Send CON every configured interval
-        if ((m_con_time_start[id] +
+        if ((m_con_time_start[resource_id] +
              (lwm2m_coap_con_interval_get() * 1000)) < now) {
             type = COAP_TYPE_CON;
-            m_con_time_start[id] = now;
+            m_con_time_start[resource_id] = now;
         }
 
-        LWM2M_INF("Notify /4/0/%d", id);
+        LWM2M_INF("Notify /4/0/%d", resource_id);
         err_code = lwm2m_notify(buffer, buffer_size, p_observer, type);
 
         if (err_code) {
-            LWM2M_INF("Notify /4/0/%d failed: %s (%ld), %s (%d)", id,
+            LWM2M_INF("Notify /4/0/%d failed: %s (%ld), %s (%d)", resource_id,
                     lwm2m_os_log_strdup(strerror(err_code)), err_code,
                     lwm2m_os_log_strdup(strerror(errno)), errno);
 
