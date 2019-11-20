@@ -179,7 +179,7 @@ static volatile uint32_t tick_count = 0;
 
 static void app_misc_data_set_bootstrapped(uint8_t bootstrapped);
 static void app_server_disconnect(uint16_t instance_id);
-static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
+static int app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
 static void app_provision_secret_keys(void);
 static void app_disconnect(void);
 static const char * app_uri_get(char * p_server_uri, uint16_t * p_port, bool * p_secure);
@@ -442,7 +442,7 @@ void lwm2m_system_reset(bool force_reset)
     {
         LWM2M_INF("Reboot deferred by application");
     }
-    
+
 }
 
 /**@brief Setup ADMIN PDN connection */
@@ -561,6 +561,33 @@ static int app_read_sim_values(void)
     return 0;
 }
 
+static bool app_bootstrap_keys_exists(void)
+{
+    bool key_exists = false;
+    uint8_t perm_flags;
+    int err_code;
+
+    err_code = lwm2m_os_sec_identity_exists(APP_BOOTSTRAP_SEC_TAG,
+                                            &key_exists, &perm_flags);
+
+    if (err_code != 0) {
+        LWM2M_ERR("Unable to check if bootstrap Identity exists (%d)", err_code);
+        return false;
+    }
+
+    if (key_exists) {
+        err_code = lwm2m_os_sec_psk_exists(APP_BOOTSTRAP_SEC_TAG,
+                                           &key_exists, &perm_flags);
+
+        if (err_code != 0) {
+            LWM2M_ERR("Unable to check if bootstrap PSK exists (%d)", err_code);
+            return false;
+        }
+    }
+
+    return key_exists;
+}
+
 /**
  * @brief Generate a unique Client ID using device IMEI and MSISDN if available.
  * Factory reset to start bootstrap if MSISDN is different than last start.
@@ -577,6 +604,11 @@ static int app_generate_client_id(void)
 
     if (ret != 0) {
         return ret;
+    }
+
+    if (!app_bootstrap_keys_exists()) {
+        provision_bs_psk = true;
+        provision_diag_psk = true;
     }
 
     // Get the MSISDN with correct format for VZW.
@@ -605,14 +637,14 @@ static int app_generate_client_id(void)
     if (provision_bs_psk || provision_diag_psk) {
         app_offline();
         if (provision_bs_psk) {
-            app_provision_psk(APP_BOOTSTRAP_SEC_TAG, client_id, strlen(client_id),
-                              m_app_config.psk, m_app_config.psk_length);
+            ret = app_provision_psk(APP_BOOTSTRAP_SEC_TAG, client_id, strlen(client_id),
+                                    m_app_config.psk, m_app_config.psk_length);
         }
         if (provision_diag_psk) {
             char app_diagnostics_psk[SHA256_BLOCK_SIZE];
             app_vzw_sha256_psk(m_imei, 101, app_diagnostics_psk);
-            app_provision_psk(APP_DIAGNOSTICS_SEC_TAG, m_imei, strlen(m_imei),
-                              app_diagnostics_psk, sizeof(app_diagnostics_psk));
+            ret = app_provision_psk(APP_DIAGNOSTICS_SEC_TAG, m_imei, strlen(m_imei),
+                                    app_diagnostics_psk, sizeof(app_diagnostics_psk));
         }
         app_init_and_connect();
     }
@@ -621,7 +653,7 @@ static int app_generate_client_id(void)
     m_client_id.len  = strlen(client_id);
     m_client_id.type = LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN;
 
-    return 0;
+    return ret;
 }
 
 /**@brief Application implementation of the root handler interface.
@@ -2211,12 +2243,16 @@ static void app_coap_init(void)
     }
 }
 
-static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len)
+static int app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len)
 {
     uint32_t err_code;
 
     err_code = lwm2m_os_sec_identity_write(sec_tag, identity, identity_len);
-    APP_ERROR_CHECK(err_code);
+
+    if (err_code != 0) {
+        LWM2M_ERR("Unable to write Identity %d (%d)", sec_tag, err_code);
+        return err_code;
+    }
 
     size_t secret_key_nrf9160_style_len = psk_len * 2;
     uint8_t * p_secret_key_nrf9160_style = lwm2m_os_malloc(secret_key_nrf9160_style_len);
@@ -2227,7 +2263,13 @@ static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len
     err_code = lwm2m_os_sec_psk_write(sec_tag, p_secret_key_nrf9160_style,
                                       secret_key_nrf9160_style_len);
     lwm2m_os_free(p_secret_key_nrf9160_style);
-    APP_ERROR_CHECK(err_code);
+
+    if (err_code != 0) {
+        LWM2M_ERR("Unable to write PSK %d (%d)", sec_tag, err_code);
+        return err_code;
+    }
+
+    return 0;
 }
 
 static void app_provision_secret_keys(void)
@@ -2256,12 +2298,20 @@ static void app_provision_secret_keys(void)
             const char * hostname = app_uri_get(p_server_uri_val, &port, &secure);
             ARG_UNUSED(hostname);
 
-            lwm2m_os_free(p_server_uri_val);
-
             if (secure) {
-                LWM2M_TRC("Provisioning key for %s, short-id: %u", lwm2m_os_log_strdup(p_server_uri_val), lwm2m_server_short_server_id_get(i));
-                app_provision_psk(APP_SEC_TAG_OFFSET + i, p_identity, identity_len, p_psk, psk_len);
+                int ret = app_provision_psk(APP_SEC_TAG_OFFSET + i, p_identity, identity_len, p_psk, psk_len);
+                if (ret == 0) {
+                    LWM2M_TRC("Provisioning key for %s, short server id: %u",
+                              lwm2m_os_log_strdup(p_server_uri_val),
+                              lwm2m_server_short_server_id_get(i));
+                } else {
+                    LWM2M_ERR("Provisioning key failed (%d) for %s, short server id: %u (%d)", ret,
+                              lwm2m_os_log_strdup(p_server_uri_val),
+                              lwm2m_server_short_server_id_get(i));
+                }
             }
+
+            lwm2m_os_free(p_server_uri_val);
         }
     }
     LWM2M_INF("Wrote secret keys");
