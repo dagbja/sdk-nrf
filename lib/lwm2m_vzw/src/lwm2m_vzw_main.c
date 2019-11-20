@@ -103,24 +103,6 @@ lwm2m_carrier_config_t m_app_config = {
     .psk_length    = sizeof(m_app_bootstrap_psk)
 };
 
-#define APP_ERROR_CHECK(error_code)                                            \
-    do {                                                                       \
-        if (error_code != 0) {                                                 \
-            LWM2M_ERR("Error: %lu", error_code);                               \
-            while (1)                                                          \
-                ;                                                              \
-        }                                                                      \
-    } while (0)
-#define APP_ERROR_CHECK_BOOL(boolean_value)                                    \
-    do {                                                                       \
-        const uint32_t local_value = (boolean_value);                          \
-        if (!local_value) {                                                    \
-            LWM2M_ERR("BOOL check failure");                                   \
-            while (1)                                                          \
-                ;                                                              \
-        }                                                                      \
-    } while (0)
-
 static lwm2m_server_config_t               m_server_conf[1+LWM2M_MAX_SERVERS];                /**< Server configuration structure. */
 static lwm2m_client_identity_t             m_client_id;                                       /**< Client ID structure to hold the client's UUID. */
 
@@ -1890,30 +1872,51 @@ static void app_server_register(uint16_t instance_id)
 {
     uint32_t err_code;
     uint32_t link_format_string_len = 0;
+    uint8_t * p_link_format_string = NULL;
 
     // Dry run the link format generation, to check how much memory that is needed.
     err_code = lwm2m_coap_handler_gen_link_format(NULL, (uint16_t *)&link_format_string_len);
-    APP_ERROR_CHECK(err_code);
 
-    // Allocate the needed amount of memory.
-    uint8_t * p_link_format_string = lwm2m_os_malloc(link_format_string_len);
+    if (err_code == 0) {
+        // Allocate the needed amount of memory.
+        p_link_format_string = lwm2m_os_malloc(link_format_string_len);
 
-    if (p_link_format_string != NULL)
-    {
+        if (p_link_format_string == NULL) {
+            err_code = ENOMEM;
+        }
+    }
+
+    if (err_code == 0) {
         // Render the link format string.
         err_code = lwm2m_coap_handler_gen_link_format(p_link_format_string, (uint16_t *)&link_format_string_len);
-        APP_ERROR_CHECK(err_code);
+    }
 
+    if (err_code == 0) {
         err_code = lwm2m_register((struct nrf_sockaddr *)&m_remote_server[instance_id],
                                   &m_client_id,
                                   &m_server_conf[instance_id],
                                   m_lwm2m_transport[instance_id],
                                   p_link_format_string,
                                   (uint16_t)link_format_string_len);
-        APP_ERROR_CHECK(err_code);
+    }
 
-        lwm2m_state_set(LWM2M_STATE_SERVER_REGISTER_WAIT);
+    if (p_link_format_string) {
         lwm2m_os_free(p_link_format_string);
+    }
+
+    if (err_code == 0) {
+        lwm2m_state_set(LWM2M_STATE_SERVER_REGISTER_WAIT);
+    } else {
+        LWM2M_INF("Register failed: %s (%d), %s (%d), reconnect (server %d)",
+                    lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                    lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
+                    instance_id);
+
+        app_server_disconnect(instance_id);
+
+        if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
+            app_handle_connect_retry(instance_id, false);
+        }
     }
 }
 
@@ -1937,6 +1940,7 @@ void app_server_update(uint16_t instance_id, bool connect_update)
                       lwm2m_os_log_strdup(strerror(err_code)), err_code,
                       lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
                       instance_id);
+
             app_server_disconnect(instance_id);
             lwm2m_request_server_update(instance_id, true);
 
@@ -1973,7 +1977,13 @@ void app_server_disable(uint16_t instance_id)
 
     err_code = lwm2m_deregister((struct nrf_sockaddr *)&m_remote_server[instance_id],
                                 m_lwm2m_transport[instance_id]);
-    APP_ERROR_CHECK(err_code);
+
+    if (err_code != 0) {
+        LWM2M_ERR("Disable failed: %s (%d), %s (%d) (server %d)",
+                  lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                  lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
+                  instance_id);
+    }
 }
 
 static void app_server_deregister(uint16_t instance_id)
@@ -1984,7 +1994,13 @@ static void app_server_deregister(uint16_t instance_id)
 
     err_code = lwm2m_deregister((struct nrf_sockaddr *)&m_remote_server[instance_id],
                                 m_lwm2m_transport[instance_id]);
-    APP_ERROR_CHECK(err_code);
+
+    if (err_code != 0) {
+        LWM2M_ERR("Deregister failed: %s (%d), %s (%d) (server %d)",
+                  lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                  lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
+                  instance_id);
+    }
 
     lwm2m_state_set(LWM2M_STATE_SERVER_DEREGISTERING);
 }
@@ -2331,7 +2347,7 @@ static int app_lwm2m_process(void)
     return 0;
 }
 
-static void app_coap_init(void)
+static uint32_t app_coap_init(void)
 {
     uint32_t err_code;
 
@@ -2355,14 +2371,14 @@ static void app_coap_init(void)
     };
 
     // Verify that the port count defined in sdk_config.h is matching the one configured for coap_init.
-    APP_ERROR_CHECK_BOOL(((sizeof(local_port_list)) / (sizeof(coap_local_t))) == COAP_PORT_COUNT);
+    BUILD_ASSERT_MSG(ARRAY_SIZE(local_port_list) == COAP_PORT_COUNT,
+                     "Invalid COAP_PORT_COUNT setting");
 
     coap_transport_init_t port_list;
     port_list.port_table = &local_port_list[0];
 
     err_code = coap_init(lwm2m_os_rand_get(), &port_list,
                          lwm2m_os_malloc, lwm2m_os_free);
-    APP_ERROR_CHECK(err_code);
 
     m_coap_transport = local_port_list[0].transport;
     ARG_UNUSED(m_coap_transport);
@@ -2371,11 +2387,13 @@ static void app_coap_init(void)
     {
         m_lwm2m_transport[i] = -1;
     }
+
+    return err_code;
 }
 
 static int app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len)
 {
-    uint32_t err_code;
+    int err_code;
 
     err_code = lwm2m_os_sec_identity_write(sec_tag, identity, identity_len);
 
@@ -2584,7 +2602,10 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     }
 
     // Initialize CoAP.
-    app_coap_init();
+    err = app_coap_init();
+    if (err) {
+        return err;
+    }
 
     // Setup LWM2M endpoints.
     app_lwm2m_setup();
