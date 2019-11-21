@@ -183,6 +183,7 @@ static void app_provision_psk(int sec_tag, char * identity, uint8_t identity_len
 static void app_provision_secret_keys(void);
 static void app_disconnect(void);
 static const char * app_uri_get(char * p_server_uri, uint16_t * p_port, bool * p_secure);
+static void app_lwm2m_observer_process(struct nrf_sockaddr * p_remote_server);
 
 extern int cert_provision();
 
@@ -1013,7 +1014,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
 
             if (lwm2m_remote_reconnecting_get(short_server_id)) {
                 lwm2m_remote_reconnecting_clear(short_server_id);
-                lwm2m_conn_mon_observer_process(p_remote);
+                app_lwm2m_observer_process(p_remote);
             }
         }
     }
@@ -2280,11 +2281,11 @@ static void app_timers_init(void)
     state_update_timer = lwm2m_os_timer_get(app_wait_state_update);
 }
 
-static void app_lwm2m_observer_process(void)
+static void app_lwm2m_observer_process(struct nrf_sockaddr * p_remote_server)
 {
     lwm2m_server_observer_process();
-    lwm2m_conn_mon_observer_process(NULL);
-    lwm2m_firmware_observer_process();
+    lwm2m_conn_mon_observer_process(p_remote_server);
+    lwm2m_firmware_observer_process(p_remote_server);
 }
 
 uint32_t lwm2m_net_reg_stat_get(void)
@@ -2443,7 +2444,7 @@ void lwm2m_carrier_run(void)
 
         if (tick_count % (observable_pmin * 100) == 0)
         {
-            app_lwm2m_observer_process();
+            app_lwm2m_observer_process(NULL);
         }
     }
 }

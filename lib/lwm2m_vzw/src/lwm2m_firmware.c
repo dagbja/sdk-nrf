@@ -15,6 +15,7 @@
 #include <lwm2m_firmware_download.h>
 #include <lwm2m_instance_storage.h>
 #include <lwm2m_vzw_main.h>
+#include <lwm2m_remote.h>
 
 #include <coap_option.h>
 #include <coap_observe_api.h>
@@ -30,7 +31,8 @@ static lwm2m_firmware_t m_instance_firmware;
 static int64_t m_con_time_start[sizeof(((lwm2m_location_t *)0)->resource_ids)];
 
 // Forward declare.
-static void lwm2m_firmware_notify_resource(uint16_t resource_id);
+void lwm2m_firmware_observer_process(struct nrf_sockaddr * p_remote_server);
+static void lwm2m_firmware_notify_resource(struct nrf_sockaddr * p_remote_server, uint16_t resource_id);
 
 char * lwm2m_firmware_package_uri_get(uint16_t instance_id, uint8_t * p_len)
 {
@@ -56,7 +58,7 @@ void lwm2m_firmware_state_set(uint16_t instance_id, uint8_t value)
     if (m_instance_firmware.state != value)
     {
         m_instance_firmware.state  = value;
-        lwm2m_firmware_notify_resource(LWM2M_FIRMWARE_STATE);
+        lwm2m_firmware_notify_resource(NULL, LWM2M_FIRMWARE_STATE);
     }
 }
 
@@ -70,7 +72,7 @@ void lwm2m_firmware_update_result_set(uint16_t instance_id, uint8_t value)
     if (m_instance_firmware.update_result != value)
     {
         m_instance_firmware.update_result  = value;
-        lwm2m_firmware_notify_resource(LWM2M_FIRMWARE_UPDATE_RESULT);
+        lwm2m_firmware_notify_resource(NULL, LWM2M_FIRMWARE_UPDATE_RESULT);
     }
 }
 
@@ -407,28 +409,49 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
     return err_code;
 }
 
-static void lwm2m_firmware_notify_resource(uint16_t resource_id)
+static void lwm2m_firmware_notify_resource(struct nrf_sockaddr * p_remote_server, uint16_t resource_id)
 {
+    uint16_t short_server_id;
     coap_observer_t * p_observer = NULL;
-    while (coap_observe_server_next_get(&p_observer, p_observer, (void *)&m_instance_firmware.resource_ids[resource_id]) == 0)
+
+    while (coap_observe_server_next_get(&p_observer, p_observer,
+               (void *)&m_instance_firmware.resource_ids[resource_id]) == 0)
     {
-        LWM2M_TRC("Observer found");
+        lwm2m_remote_short_server_id_find(&short_server_id, p_observer->remote);
+        if (lwm2m_remote_reconnecting_get(short_server_id)) {
+            /* Wait for reconnection */
+            continue;
+        }
+        
+        if (p_remote_server != NULL) {
+            /* Only notify to given remote */
+            if (memcmp(p_observer->remote, p_remote_server,
+                       sizeof(struct nrf_sockaddr)) != 0) {
+                continue;
+            }
+        }
+
+        uint32_t err_code;
         uint8_t  buffer[200];
         uint32_t buffer_size = sizeof(buffer);
-        uint32_t err_code = lwm2m_tlv_firmware_encode(buffer,
-                                                      &buffer_size,
-                                                      resource_id,
-                                                      &m_instance_firmware);
+        
+        LWM2M_TRC("Observer found");
+        err_code = lwm2m_tlv_firmware_encode(buffer,
+                                             &buffer_size,
+                                             resource_id,
+                                             &m_instance_firmware);
         if (err_code)
         {
-            LWM2M_ERR("Could not encode resource_id %u, error code: %lu", resource_id, err_code);
+            LWM2M_ERR("Could not encode resource_id %u, error code: %lu",
+                      resource_id, err_code);
         }
 
         coap_msg_type_t type = COAP_TYPE_NON;
         int64_t now = lwm2m_os_uptime_get();
 
         // Send CON every configured interval
-        if ((m_con_time_start[resource_id] + (lwm2m_coap_con_interval_get() * 1000)) < now) {
+        if ((m_con_time_start[resource_id] + 
+            (lwm2m_coap_con_interval_get() * 1000)) < now) {
             type = COAP_TYPE_CON;
             m_con_time_start[resource_id] = now;
         }
@@ -449,44 +472,15 @@ static void lwm2m_firmware_notify_resource(uint16_t resource_id)
     }
 }
 
-void lwm2m_firmware_observer_process(void)
+void lwm2m_firmware_observer_process(struct nrf_sockaddr * p_remote_server)
 {
-    coap_observer_t * p_observer = NULL;
-    while (coap_observe_server_next_get(&p_observer, p_observer, (void *)&m_instance_firmware.resource_ids[LWM2M_FIRMWARE_STATE]) == 0)
-    {
-        LWM2M_TRC("Observer found");
-        uint8_t  buffer[200];
-        uint32_t buffer_size = sizeof(buffer);
-        uint32_t err_code = lwm2m_tlv_firmware_encode(buffer,
-                                                      &buffer_size,
-                                                      LWM2M_FIRMWARE_STATE,
-                                                      &m_instance_firmware);
-        if (err_code)
-        {
-            LWM2M_ERR("Could not encode LWM2M_FIRMWARE_STATE, error code: %lu", err_code);
-        }
+    const uint16_t res_id[] = {
+        LWM2M_FIRMWARE_STATE,
+        LWM2M_FIRMWARE_UPDATE_RESULT
+    };
 
-        coap_msg_type_t type = COAP_TYPE_NON;
-        int64_t now = lwm2m_os_uptime_get();
-
-        // Send CON every configured interval
-        if ((m_con_time_start[LWM2M_FIRMWARE_STATE] + (lwm2m_coap_con_interval_get() * 1000)) < now) {
-            type = COAP_TYPE_CON;
-            m_con_time_start[LWM2M_FIRMWARE_STATE] = now;
-        }
-
-        err_code =  lwm2m_notify(buffer,
-                                buffer_size,
-                                p_observer,
-                                type);
-        if (err_code)
-        {
-            LWM2M_INF("Notify /5/0/%d failed: %s (%ld), %s (%d)", LWM2M_FIRMWARE_STATE,
-                      lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                      lwm2m_os_log_strdup(strerror(errno)), errno);
-
-            lwm2m_request_remote_reconnect(p_observer->remote);
-        }
+    for (size_t i = 0; i < ARRAY_SIZE(res_id); i++) {
+        lwm2m_firmware_notify_resource(p_remote_server, res_id[i]);
     }
 }
 

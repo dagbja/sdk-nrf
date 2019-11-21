@@ -36,6 +36,6 @@ lwm2m_firmware_t * lwm2m_firmware_get_instance(uint16_t instance_id);
 
 lwm2m_object_t * lwm2m_firmware_get_object(void);
 
-uint32_t lwm2m_firmware_observer_process(void);
+void lwm2m_firmware_observer_process(struct nrf_sockaddr * p_remote_server);
 
 #endif // LWM2M_FIRWMARE_H__
