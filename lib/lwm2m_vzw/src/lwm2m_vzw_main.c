@@ -1020,6 +1020,11 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             app_server_disconnect(instance_id);
             lwm2m_disconnect_admin_pdn(instance_id);
             lwm2m_request_server_update(instance_id, true);
+
+            if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT) {
+                // Timeout sending update after a server connect, reconnect from idle state.
+                lwm2m_state_set(LWM2M_STATE_IDLE);
+            }
         }
         else if ((coap_code == COAP_CODE_404_NOT_FOUND) || (coap_code == COAP_CODE_400_BAD_REQUEST))
         {
