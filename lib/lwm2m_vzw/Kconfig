@@ -21,7 +21,7 @@ config NRF_LWM2M_VZW_INCLUDE_DEBUG_INFORMATION
 
 config NRF_LWM2M_VZW_COAP_CON_INTERVAL
 	int "CoAP CON interval"
-	default 3600
+	default 86400
 	help
 	  This interval defines how often a CoAP Non-Confirmable notification
 	  is sent as Confirmable, according to RFC 7641 section 4.5.
