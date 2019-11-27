@@ -314,59 +314,124 @@ const char *lwm2m_os_strerror(void);
 /**
  * @brief Check if a certificate chain credential exists in persistent storage.
  *
- * @note  The API is required to report an error code defined in nrf_errno.h.
+ * @param[in]  sec_tag		The tag to search for.
+ * @param[out] exists		Whether the credential exists.
+ *				Only valid if the operation is successful.
+ * @param[out] perm_flags	The permission flags of the credential.
+ *				Only valid if the operation is successful
+ *				and @param exists is @c true.
+ *				Not yet implemented.
+ *
+ * @retval 0		On success.
+ * @retval -ENOBUFS	Insufficient memory.
+ * @retval -EPERM	Insufficient permissions.
+ * @retval -EIO		Internal error.
  */
-int lwm2m_os_sec_ca_chain_exists(uint32_t  sec_tag,
-								 bool     *p_exists,
-								 uint8_t  *p_perm_flags);
+int lwm2m_os_sec_ca_chain_exists(uint32_t sec_tag, bool *exists,
+				 uint8_t *perm_flags);
 
 /**
- * @brief Provision a new or update the existing certificate chain credential
- *        in persistent storage.
+ * @brief Provision a certificate chain or update an existing one.
  *
- * @note  The API is required to report an error code defined in nrf_errno.h.
+ * @note If used when the LTE link is active, the function will return
+ *	 an error (-EACCESS) and the key will not be written.
+ *
+ * @param[in]  sec_tag	Security tag for this credential.
+ * @param[in]  buf	Buffer containing the credential data.
+ * @param[in]  len	Length of the buffer.
+ *
+ * @retval 0		On success.
+ * @retval -EINVAL	Invalid parameters.
+ * @retval -ENOBUFS	Internal buffer is too small.
+ * @retval -EACCES	The operation failed because the LTE link is active.
+ * @retval -ENOMEM	Not enough memory to store the credential.
+ * @retval -ENOENT	The security tag could not be written.
+ * @retval -EPERM	Insufficient permissions.
+ * @retval -EIO		Internal error.
  */
-int lwm2m_os_sec_ca_chain_write(uint32_t  sec_tag,
-						        uint8_t  *p_buffer,
-						        uint16_t  buffer_len);
+int lwm2m_os_sec_ca_chain_write(uint32_t sec_tag, const void *buf,
+				uint16_t len);
 
 /**
- * @brief Check if a pre-shared key credential exists in persistent storage.
+ * @brief Check if a pre-shared key exists in persistent storage.
  *
- * @note  The API is required to report an error code defined in nrf_errno.h.
+ * @param[in]   sec_tag		The tag to search for.
+ * @param[out]  exists		Whether the credential exists.
+ *				Only valid if the operation is successful.
+ * @param[out]  perm_flags	The permission flags of the credential.
+ *				Only valid if the operation is successful
+ *				and @param exists is @c true.
+ *				Not yet implemented.
+ *
+ * @retval 0		On success.
+ * @retval -ENOBUFS	Internal buffer is too small.
+ * @retval -EPERM	Insufficient permissions.
+ * @retval -EIO		Internal error.
  */
-int lwm2m_os_sec_psk_exists(uint32_t  sec_tag,
-						    bool     *p_exists,
-						    uint8_t  *p_perm_flags);
+int lwm2m_os_sec_psk_exists(uint32_t sec_tag, bool *exists,
+			    uint8_t *perm_flags);
 
 /**
- * @brief Provision a new or update the existing pre-shared key credential
- *        in persistent storage.
+ * @brief Provision a new pre-shared key or update an existing one.
  *
- * @note  The API is required to report an error code defined in nrf_errno.h.
+ * @note If used when the LTE link is active, the function will return
+ *	 an error (-EACCESS) and the key will not be written.
+ *
+ * @param[in] sec_tag	Security tag for this credential.
+ * @param[in] buf	Buffer containing the credential data.
+ * @param[in] len	Length of the buffer.
+ *
+ * @retval 0		On success.
+ * @retval -EINVAL	Invalid parameters.
+ * @retval -ENOBUFS	Internal buffer is too small.
+ * @retval -ENOMEM	Not enough memory to store the credential.
+ * @retval -EACCES	The operation failed because the LTE link is active.
+ * @retval -ENOENT	The security tag could not be written.
+ * @retval -EPERM	Insufficient permissions.
+ * @retval -EIO		Internal error.
  */
-int lwm2m_os_sec_psk_write(uint32_t sec_tag,
-						   uint8_t *p_buffer,
-						   uint16_t buffer_len);
+int lwm2m_os_sec_psk_write(uint32_t sec_tag, const void *buf, uint16_t len);
 
 /**
- * @brief Check if a identity credential exists in persistent storage.
+ * @brief Check if an identity credential exists in persistent storage.
  *
- * @note  The API is required to report an error code defined in nrf_errno.h.
+ * @param[in]  sec_tag		The tag to search for.
+ * @param[out] exists		Whether the credential exists.
+ *				Only valid if the operation is successful.
+ * @param[out] perm_flags	The permission flags of the credential.
+ *				Only valid if the operation is successful
+ *				and @param exists is true.
+ *				Not yet implemented.
+ *
+ * @retval 0		On success.
+ * @retval -ENOBUFS	Internal buffer is too small.
+ * @retval -EPERM	Insufficient permissions.
+ * @retval -EIO		Internal error.
  */
-int lwm2m_os_sec_identity_exists(uint32_t  sec_tag,
-								 bool     *p_exists,
-								 uint8_t  *p_perm_flags);
+int lwm2m_os_sec_identity_exists(uint32_t sec_tag, bool *exists,
+				 uint8_t *perm_flags);
 
 /**
- * @brief Provision a new or update the existing identity credential
- *        in persistent storage.
+ * @brief Provision a new identity credential or update an existing one.
  *
- * @note  The API is required to report an error code defined in nrf_errno.h.
+ * @note If used when the LTE link is active, the function will return
+ *	 an error (-EACCESS) and the key will not be written.
+ *
+ * @param[in] sec_tag	Security tag for this credential.
+ * @param[in] buf	Buffer containing the credential data.
+ * @param[in] len	Length of the buffer.
+ *
+ * @retval 0		On success.
+ * @retval -EINVAL	Invalid parameters.
+ * @retval -ENOBUFS	Internal buffer is too small.
+ * @retval -ENOMEM	Not enough memory to store the credential.
+ * @retval -EACCES	Th operation failed because the LTE link is active.
+ * @retval -ENOENT	The security tag could not be written.
+ * @retval -EPERM	Insufficient permissions.
+ * @retval -EIO		Internal error.
  */
-int lwm2m_os_sec_identity_write(uint32_t  sec_tag,
-								uint8_t  *p_buffer,
-								uint16_t  buffer_len);
+int lwm2m_os_sec_identity_write(uint32_t sec_tag, const void *buf,
+				uint16_t len);
 
 /**@} */
 

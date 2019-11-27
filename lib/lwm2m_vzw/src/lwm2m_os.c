@@ -25,8 +25,7 @@
 #include <logging/log.h>
 #include <errno.h>
 #include <nrf_errno.h>
-#include <nrf_inbuilt_key.h>
-#include <nrf_key_mgmt.h>
+#include <modem_key_mgmt.h>
 
 /* NVS-related defines */
 
@@ -731,50 +730,40 @@ const char *lwm2m_os_strerror(void)
 	return strerror(errno);
 }
 
-int lwm2m_os_sec_ca_chain_exists(uint32_t  sec_tag,
-								 bool     *p_exists,
-								 uint8_t  *p_perm_flags)
+int lwm2m_os_sec_ca_chain_exists(uint32_t sec_tag, bool *exists,
+				 uint8_t *perm_flags)
 {
-	return nrf_inbuilt_key_exists(sec_tag, NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
-								  p_exists, p_perm_flags);
+	return modem_key_mgmt_exists(sec_tag, MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN,
+				     exists, perm_flags);
 }
 
-int lwm2m_os_sec_ca_chain_write(uint32_t  sec_tag,
-							    uint8_t  *p_buffer,
-							    uint16_t  buffer_len)
+int lwm2m_os_sec_ca_chain_write(uint32_t sec_tag, const void *buf, uint16_t len)
 {
-	return nrf_inbuilt_key_write(sec_tag, NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
-								 p_buffer, buffer_len);
+	return modem_key_mgmt_write(sec_tag, MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN,
+				    buf, len);
 }
 
-int lwm2m_os_sec_psk_exists(uint32_t  sec_tag,
-						    bool     *p_exists,
-						    uint8_t  *p_perm_flags)
+int lwm2m_os_sec_psk_exists(uint32_t sec_tag, bool *exists, uint8_t *perm_flags)
 {
-	return nrf_inbuilt_key_exists(sec_tag, NRF_KEY_MGMT_CRED_TYPE_PSK,
-								  p_exists, p_perm_flags);
+	return modem_key_mgmt_exists(sec_tag, MODEM_KEY_MGMT_CRED_TYPE_PSK,
+				     exists, perm_flags);
 }
 
-int lwm2m_os_sec_psk_write(uint32_t sec_tag,
-						   uint8_t *p_buffer,
-						   uint16_t buffer_len)
+int lwm2m_os_sec_psk_write(uint32_t sec_tag, const void *buf, uint16_t len)
 {
-	return nrf_inbuilt_key_write(sec_tag, NRF_KEY_MGMT_CRED_TYPE_PSK,
-								 p_buffer, buffer_len);
+	return modem_key_mgmt_write(sec_tag, MODEM_KEY_MGMT_CRED_TYPE_PSK, buf,
+				    len);
 }
 
-int lwm2m_os_sec_identity_exists(uint32_t  sec_tag,
-								 bool     *p_exists,
-								 uint8_t  *p_perm_flags)
+int lwm2m_os_sec_identity_exists(uint32_t sec_tag, bool *exists,
+				 uint8_t *perm_flags)
 {
-	return nrf_inbuilt_key_exists(sec_tag, NRF_KEY_MGMT_CRED_TYPE_IDENTITY,
-								  p_exists, p_perm_flags);
+	return modem_key_mgmt_exists(sec_tag, MODEM_KEY_MGMT_CRED_TYPE_IDENTITY,
+				     exists, perm_flags);
 }
 
-int lwm2m_os_sec_identity_write(uint32_t  sec_tag,
-								uint8_t  *p_buffer,
-								uint16_t  buffer_len)
+int lwm2m_os_sec_identity_write(uint32_t sec_tag, const void *buf, uint16_t len)
 {
-	return nrf_inbuilt_key_write(sec_tag, NRF_KEY_MGMT_CRED_TYPE_IDENTITY,
-								 p_buffer, buffer_len);
+	return modem_key_mgmt_write(sec_tag, MODEM_KEY_MGMT_CRED_TYPE_IDENTITY,
+				    buf, len);
 }

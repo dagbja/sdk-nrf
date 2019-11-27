@@ -22,14 +22,14 @@ manifest:
   projects:
     - name: fw-nrfconnect-nrf
       path: nrf
-      revision: d92eee2424d5be78355d785d12b3fbfa7e4379ee
+      revision: pull/1463/head
     - name: fw-nrfconnect-zephyr
       path: zephyr
       west-commands: scripts/west-commands.yml
-      revision: 9c3f95834f5c021a5c36db6f382a2cfdaff25c06
+      revision: b687d5d02214db82e5bd224e73b8050742a234e0
     - name: nrfxlib
       path: nrfxlib
-      revision: a806f5fcac3bde98c4c7324a0c4d547b4ba89f75
+      revision: pull/98/head
     - name: mbedtls
       repo-path: fw-nrfconnect-mbedtls
       path: modules/crypto/mbedtls
@@ -42,7 +42,7 @@ manifest:
     - name: hal_nordic
       path: modules/hal/nordic
       remote: zephyrproject
-      revision: 1b14177ff2176a1d17f3dd5e7e217f44337255db
+      revision: 080d1dff4a07b5798ab979fde40dde8da452b854
 
   self:
     path: lwm2m
