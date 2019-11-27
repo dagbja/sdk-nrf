@@ -10,8 +10,8 @@
  * @brief API for the PDN management.
  */
 
-#ifndef LWM2M_PDN_H_
-#define LWM2M_PDN_H_
+#ifndef LWM2M_PDN_H__
+#define LWM2M_PDN_H__
 
 /**@brief Connect to a packet data network.
  *
@@ -26,5 +26,4 @@
  */
 int lwm2m_pdn_activate(int *fd, const char *apn);
 
-#endif /* LWM2M_PDN_H_ */
-
+#endif /* LWM2M_PDN_H__ */

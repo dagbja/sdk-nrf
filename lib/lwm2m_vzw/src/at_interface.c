@@ -369,6 +369,7 @@ int at_apn_setup_wait_for_ipv6(int *fd, const char *apn)
         LWM2M_ERR("Timeout while waiting for IPv6 (cid=%u)", cid);
         nrf_close(*fd);
         *fd = -1;
+        return -1;
     }
     else {
         LWM2M_INF("IPv6 link ready for cid %d", cid);

@@ -253,7 +253,8 @@ static void download_task(void *w)
 	if (err) {
 		LWM2M_ERR("Failed to connect %d", lwm2m_os_errno());
 		if (lwm2m_os_errno() == NRF_ENETDOWN) {
-			/* PDN is down. */
+			/* PDN is down. Reuse bootstrap instance to
+			 * make sure ADMIN PDN is used */
 			int32_t pdn_retry_delay = lwm2m_admin_pdn_activate(0);
 			lwm2m_os_timer_start(download_dwork, pdn_retry_delay);
 			return;
