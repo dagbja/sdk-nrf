@@ -567,13 +567,17 @@ static void lwm2m_admin_pdn_deactivate(void)
     }
 }
 
-void lwm2m_request_remote_reconnect(struct nrf_sockaddr *p_remote)
+bool lwm2m_request_remote_reconnect(struct nrf_sockaddr *p_remote)
 {
-    if (m_app_state == LWM2M_STATE_IDLE)
-    {
-        uint16_t short_server_id = 0;
-        uint16_t instance_id = lwm2m_instance_id_from_remote(p_remote, &short_server_id);;
+    bool requested = false;
 
+    uint16_t short_server_id = 0;
+    uint16_t instance_id = lwm2m_instance_id_from_remote(p_remote, &short_server_id);;
+
+    // Reconnect if not already in the connect/register phase for this server.
+    if ((m_app_state == LWM2M_STATE_IDLE) ||
+        (instance_id != m_server_instance))
+    {
         // Only reconnect if remote is found and already connected.
         if ((instance_id != UINT16_MAX) &&
             (m_lwm2m_transport[instance_id] != -1))
@@ -581,8 +585,12 @@ void lwm2m_request_remote_reconnect(struct nrf_sockaddr *p_remote)
             app_server_disconnect(instance_id);
             lwm2m_request_server_update(instance_id, true);
             lwm2m_remote_reconnecting_set(short_server_id);
+
+            requested = true;
         }
     }
+
+    return requested;
 }
 
 static void app_vzw_sha256_psk(char *p_imei, uint16_t short_server_id, char *p_psk)
@@ -1190,8 +1198,7 @@ bool lwm2m_coap_error_handler(uint32_t error_code, coap_message_t * p_message)
 
     // Handle error when not able to send on socket.
     if (error_code == EIO && lwm2m_os_errno() == EOPNOTSUPP) {
-        lwm2m_request_remote_reconnect(p_message->remote);
-        handled = true;
+        handled = lwm2m_request_remote_reconnect(p_message->remote);
     }
 
     return handled;
@@ -1758,6 +1765,7 @@ static void app_server_connect(uint16_t instance_id)
 {
     uint32_t err_code;
     bool secure;
+
     int32_t pdn_retry_delay = lwm2m_admin_pdn_activate(instance_id);
     if (pdn_retry_delay > 0) {
         // Setup ADMIN PDN connection failed, try again
