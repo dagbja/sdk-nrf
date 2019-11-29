@@ -229,20 +229,24 @@ static bool lwm2m_state_set(lwm2m_state_t app_state)
 
 static void app_init_and_connect(void)
 {
+    app_event_notify(LWM2M_CARRIER_EVENT_CONNECTING, NULL);
+
     lwm2m_os_lte_link_up();
 
-    (void)app_event_notify(LWM2M_CARRIER_EVENT_CONNECT, NULL);
+    app_event_notify(LWM2M_CARRIER_EVENT_CONNECTED, NULL);
 }
 
 static void app_offline(void)
 {
-    (void)app_event_notify(LWM2M_CARRIER_EVENT_DISCONNECT, NULL);
+    app_event_notify(LWM2M_CARRIER_EVENT_DISCONNECTING, NULL);
 
     // Set state to DISCONNECTED to avoid detecting "no registered network"
     // when provisioning security keys.
     lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
 
     lwm2m_os_lte_link_down();
+
+    app_event_notify(LWM2M_CARRIER_EVENT_DISCONNECTED, NULL);
 }
 
 static bool lwm2m_is_registration_ready(void)
@@ -304,6 +308,34 @@ static uint16_t lwm2m_instance_id_from_remote(struct nrf_sockaddr *p_remote, uin
 }
 
 /** Functions available from shell access */
+
+void lwm2m_request_link_up(void)
+{
+    switch (m_net_stat) {
+    case APP_NET_REG_STAT_HOME:
+    case APP_NET_REG_STAT_ROAM:
+    case APP_NET_REG_STAT_SEARCHING:
+        LWM2M_WRN("Unexpected net state %d on link up", m_net_stat);
+        break;
+    default:
+        m_app_state = LWM2M_STATE_REQUEST_LINK_UP;
+        break;
+    }
+}
+
+void lwm2m_request_link_down(void)
+{
+    switch (m_net_stat) {
+    case APP_NET_REG_STAT_HOME:
+    case APP_NET_REG_STAT_ROAM:
+    case APP_NET_REG_STAT_SEARCHING:
+        m_app_state = LWM2M_STATE_REQUEST_LINK_DOWN;
+        break;
+    default:
+        LWM2M_WRN("Unexpected net state %d on link down", m_net_stat);
+        break;
+    }
+}
 
 void lwm2m_request_connect(void)
 {
@@ -2190,6 +2222,16 @@ static int app_lwm2m_process(void)
 
     switch (m_app_state)
     {
+        case LWM2M_STATE_REQUEST_LINK_UP:
+        {
+            app_init_and_connect();
+            break;
+        }
+        case LWM2M_STATE_REQUEST_LINK_DOWN:
+        {
+            app_offline();
+            break;
+        }
         case LWM2M_STATE_REQUEST_CONNECT:
         {
             app_connect();

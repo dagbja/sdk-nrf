@@ -28,6 +28,12 @@
 #define PRINTABLE_UUID_LEN (sizeof(nrf_dfu_fw_version_t) + 1)
 /* Byte-length, without NULL termination */
 #define BYTELEN(string) (sizeof(string) - 1)
+/* Interval with which to poll the modem firmware offset to determine if the
+ * erase operation has completed.
+ */
+#define OFFSET_POLL_INTERVAL K_SECONDS(2)
+/* Interval at which to poll for network availability */
+#define NETWORK_POLL_INTERVAL K_SECONDS(6)
 
 static char apn[64];
 static char file[256];
@@ -77,7 +83,7 @@ static int on_fragment(const struct lwm2m_os_download_evt *event)
 			 */
 			LWM2M_WRN("DFU socket error %d", (int)dfu_err);
 			LWM2M_INF("Attempting to clean flash area and retry");
-			lwm2m_os_timer_start(download_dwork, K_MSEC(100));
+			lwm2m_os_timer_start(download_dwork, K_NO_WAIT);
 
 			/* Stop the download, it will be restarted */
 			return -1;
@@ -158,7 +164,7 @@ static int on_error(const struct lwm2m_os_download_evt *event)
 		lwm2m_firmware_image_state_set(FIRMWARE_READY);
 	}
 
-	lwm2m_os_timer_start(download_dwork, K_SECONDS(1));
+	lwm2m_os_timer_start(download_dwork, K_NO_WAIT);
 
 	return 0;
 }
@@ -177,22 +183,48 @@ static int callback(const struct lwm2m_os_download_evt *event)
 	}
 }
 
+static int erase_check_timeout(void)
+{
+	static uint32_t erase_duration_ms;
+
+	erase_duration_ms += OFFSET_POLL_INTERVAL;
+	if (erase_duration_ms <
+	    K_SECONDS(CONFIG_NRF_LWM2M_VZW_ERASE_TIMEOUT_S)) {
+		return 0;
+	}
+
+	LWM2M_WRN("Erase operation timed out");
+	erase_duration_ms = 0;
+
+	return 1;
+}
+
+static void link_down(void)
+{
+	LWM2M_INF("Link down to erase firmware image");
+	lwm2m_request_link_down();
+}
+
+static void link_up(void)
+{
+	LWM2M_INF("Restablishing LTE connection");
+	lwm2m_request_link_up();
+}
+
 static void download_task(void *w)
 {
 	int err;
 	uint32_t off;
+	static bool turn_link_on;
 	enum lwm2m_firmware_image_state state = FIRMWARE_NONE;
 
-	/* Query lwm2m_vzw_main to check if the PDN is ready.
-	 * These two conditions alone are not entirely reliable,
-	 * so we wait a generous delay before starting to download.
-	 * This is hackish, we should have a more reliable check.
+	/* Fetch the offset to determine what to do next.
+	 * If the offset is zero we just follow through, otherwise
+	 * we either begin erasing the firmware if the image is dirty
+	 * or resume the download if it isn't. If we erase the firmware,
+	 * then we reschedule the task until the operation has completed
+	 * and the offset has become zero.
 	 */
-	if (config.apn != NULL && !lwm2m_is_admin_pdn_ready()) {
-		LWM2M_INF("Waiting for PDN setup to resume firmware update");
-		lwm2m_os_timer_start(download_dwork, K_SECONDS(6));
-		return;
-	}
 
 	err = dfusock_offset_get(&off);
 	if (err) {
@@ -204,11 +236,22 @@ static void download_task(void *w)
 			LWM2M_WRN("Waiting for firmware to be deleted (%d)",
 				  err);
 		}
-		lwm2m_os_timer_start(download_dwork, K_SECONDS(2));
+		if (erase_check_timeout()) {
+			link_down();
+			turn_link_on = true;
+		}
+		lwm2m_os_timer_start(download_dwork, OFFSET_POLL_INTERVAL);
 		return;
 	}
 
 	LWM2M_INF("Offset retrieved: %lu", off);
+
+	if (turn_link_on) {
+		link_up();
+		turn_link_on = false;
+		lwm2m_os_timer_start(download_dwork, NETWORK_POLL_INTERVAL);
+		return;
+	}
 
 	/* We rely on the information in flash to interpret whether a non-zero,
 	 * non-dirty firmware offset is a complete firmware image or not.
@@ -233,7 +276,7 @@ static void download_task(void *w)
 			return;
 		}
 		/* Wait until operation has completed */
-		lwm2m_os_timer_start(download_dwork, K_SECONDS(1));
+		lwm2m_os_timer_start(download_dwork, OFFSET_POLL_INTERVAL);
 		return;
 	}
 
@@ -253,10 +296,11 @@ static void download_task(void *w)
 	if (err) {
 		LWM2M_ERR("Failed to connect %d", lwm2m_os_errno());
 		if (lwm2m_os_errno() == NRF_ENETDOWN) {
-			/* PDN is down. Reuse bootstrap instance to
-			 * make sure ADMIN PDN is used */
-			int32_t pdn_retry_delay = lwm2m_admin_pdn_activate(0);
-			lwm2m_os_timer_start(download_dwork, pdn_retry_delay);
+			/* PDN is down, pass bootstrap instance because
+			 * the bootstrap server uses VZWADMIN PDN.
+			 */
+			int32_t retry_delay = lwm2m_admin_pdn_activate(0);
+			lwm2m_os_timer_start(download_dwork, retry_delay);
 			return;
 		}
 
@@ -433,7 +477,7 @@ int lwm2m_firmware_download_uri(char *package_uri, size_t len)
 	};
 	lwm2m_carrier_event_handler(&event);
 
-	lwm2m_os_timer_start(download_dwork, K_SECONDS(1));
+	lwm2m_os_timer_start(download_dwork, K_NO_WAIT);
 
 	return 0;
 }

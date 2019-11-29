@@ -14,13 +14,15 @@
  * @defgroup lwm2m_carrier_event LWM2M carrier library events
  * @{
  */
-#define LWM2M_CARRIER_EVENT_BSDLIB_INIT  1  /**< BSD library initialized. */
-#define LWM2M_CARRIER_EVENT_CONNECT      2  /**< LTE link connected. */
-#define LWM2M_CARRIER_EVENT_DISCONNECT   3  /**< LTE link will disconnect. */
-#define LWM2M_CARRIER_EVENT_BOOTSTRAPPED 4  /**< LWM2M carrier bootstrapped. */
-#define LWM2M_CARRIER_EVENT_READY        5  /**< LWM2M carrier registered. */
-#define LWM2M_CARRIER_EVENT_FOTA_START   6  /**< Modem update started. */
-#define LWM2M_CARRIER_EVENT_REBOOT       10 /**< Application will reboot. */
+#define LWM2M_CARRIER_EVENT_BSDLIB_INIT   1  /**< BSD library initialized. */
+#define LWM2M_CARRIER_EVENT_CONNECTING    2  /**< Connecting to the LTE network. */
+#define LWM2M_CARRIER_EVENT_CONNECTED     3  /**< Connected to the LTE network. */
+#define LWM2M_CARRIER_EVENT_DISCONNECTING 4  /**< Disconnecting from the LTE network. */
+#define LWM2M_CARRIER_EVENT_DISCONNECTED  5  /**< Disconnected from the LTE network. */
+#define LWM2M_CARRIER_EVENT_BOOTSTRAPPED  6  /**< LWM2M carrier bootstrapped. */
+#define LWM2M_CARRIER_EVENT_READY         7  /**< LWM2M carrier registered. */
+#define LWM2M_CARRIER_EVENT_FOTA_START    8  /**< Modem update started. */
+#define LWM2M_CARRIER_EVENT_REBOOT        10 /**< Application will reboot. */
 /**@} */
 
 /**

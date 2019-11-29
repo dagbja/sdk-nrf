@@ -14,6 +14,8 @@ typedef enum
 {
     LWM2M_STATE_BOOTING,
     LWM2M_STATE_IDLE,
+    LWM2M_STATE_REQUEST_LINK_UP,
+    LWM2M_STATE_REQUEST_LINK_DOWN,
     LWM2M_STATE_REQUEST_CONNECT,
     LWM2M_STATE_BS_HOLD_OFF,
     LWM2M_STATE_BS_CONNECT,
@@ -63,6 +65,8 @@ char *lwm2m_msisdn_get(void);
 bool lwm2m_is_admin_pdn_ready(void);
 int lwm2m_admin_pdn_activate(uint16_t instance_id);
 
+void lwm2m_request_link_up(void);
+void lwm2m_request_link_down(void);
 void lwm2m_request_connect(void);
 void lwm2m_request_server_update(uint16_t instance_id, bool reconnect);
 void lwm2m_request_remote_reconnect(struct nrf_sockaddr *p_remote);

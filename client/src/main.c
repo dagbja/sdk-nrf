@@ -5,6 +5,7 @@
  */
 
 #include <zephyr.h>
+#include <lwm2m.h>
 
 #if CONFIG_DK_LIBRARY
 #include <buttons_and_leds.h>
@@ -15,9 +16,38 @@
 
 int lwm2m_carrier_event_handler(const lwm2m_carrier_event_t * event)
 {
-   ARG_UNUSED(event);
+    ARG_UNUSED(event);
 
-   return 0;
+    static const char *str[] = {
+        [LWM2M_CARRIER_EVENT_BSDLIB_INIT] = "LWM2M_CARRIER_EVENT_BSDLIB_INIT",
+        [LWM2M_CARRIER_EVENT_CONNECTING] = "LWM2M_CARRIER_EVENT_CONNECTING",
+        [LWM2M_CARRIER_EVENT_CONNECTED] = "LWM2M_CARRIER_EVENT_CONNECTED",
+        [LWM2M_CARRIER_EVENT_DISCONNECTING] = "LWM2M_CARRIER_EVENT_DISCONNECTING",
+        [LWM2M_CARRIER_EVENT_DISCONNECTED] = "LWM2M_CARRIER_EVENT_DISCONNECTED",
+        [LWM2M_CARRIER_EVENT_BOOTSTRAPPED] = "LWM2M_CARRIER_EVENT_BOOTSTRAPPED",
+        [LWM2M_CARRIER_EVENT_READY] = "LWM2M_CARRIER_EVENT_READY",
+        [LWM2M_CARRIER_EVENT_FOTA_START] = "LWM2M_CARRIER_EVENT_FOTA_START",
+        [LWM2M_CARRIER_EVENT_REBOOT] = "LWM2M_CARRIER_EVENT_REBOOT",
+    };
+
+    switch (event->type) {
+    case LWM2M_CARRIER_EVENT_BSDLIB_INIT:
+    case LWM2M_CARRIER_EVENT_CONNECTING:
+    case LWM2M_CARRIER_EVENT_CONNECTED:
+    case LWM2M_CARRIER_EVENT_DISCONNECTING:
+    case LWM2M_CARRIER_EVENT_DISCONNECTED:
+    case LWM2M_CARRIER_EVENT_BOOTSTRAPPED:
+    case LWM2M_CARRIER_EVENT_READY:
+    case LWM2M_CARRIER_EVENT_FOTA_START:
+    case LWM2M_CARRIER_EVENT_REBOOT:
+        LWM2M_INF("Sent event %s", lwm2m_os_log_strdup(str[event->type]));
+        break;
+    default:
+        /* TODO: assert */
+        break;
+    }
+
+    return 0;
 }
 
 /**@brief Recoverable BSD library error. */

@@ -127,6 +127,8 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
             *on = (DK_LED1_MSK | DK_LED3_MSK);
             break;
 
+        case LWM2M_STATE_REQUEST_LINK_UP:
+        case LWM2M_STATE_REQUEST_LINK_DOWN:
         case LWM2M_STATE_REQUEST_CONNECT:
         case LWM2M_STATE_SERVER_DEREGISTER:
         case LWM2M_STATE_SERVER_DEREGISTERING:
