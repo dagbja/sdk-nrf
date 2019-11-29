@@ -30,6 +30,8 @@ static vzw_conn_mon_class_apn_t        m_vzw_conn_mon_class_apn; /**< Verizon sp
 static int64_t m_con_time_start[sizeof(((lwm2m_connectivity_monitoring_t *)0)->resource_ids)];
 
 static char m_apn_class_scratch_buffer[64];
+// Forward declare.
+static void lwm2m_conn_mon_update_resource(uint16_t resource_id);
 
 // Verizon specific resources.
 
@@ -389,31 +391,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
         }
         else
         {
-            switch (resource_id)
-            {
-                case LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH:
-                case LWM2M_CONN_MON_LINK_QUALITY:
-                    (void)at_read_radio_signal_strength_and_link_quality(&m_instance_conn_mon.radio_signal_strength, &m_instance_conn_mon.link_quality);
-                    break;
-                case LWM2M_CONN_MON_CELL_ID:
-                    (void)at_read_cell_id(&m_instance_conn_mon.cell_id);
-                    break;
-                case LWM2M_CONN_MON_SMNC:
-                case LWM2M_CONN_MON_SMCC:
-                    (void)at_read_smnc_smcc(&m_instance_conn_mon.smnc, &m_instance_conn_mon.smcc);
-                    break;
-                case LWM2M_CONN_MON_IP_ADDRESSES:
-                    (void)at_read_ipaddr(&m_instance_conn_mon.ip_addresses);
-                    break;
-                case LWM2M_NAMED_OBJECT:
-                    (void)at_read_radio_signal_strength_and_link_quality(&m_instance_conn_mon.radio_signal_strength, &m_instance_conn_mon.link_quality);
-                    (void)at_read_cell_id(&m_instance_conn_mon.cell_id);
-                    (void)at_read_smnc_smcc(&m_instance_conn_mon.smnc, &m_instance_conn_mon.smcc);
-                    (void)at_read_ipaddr(&m_instance_conn_mon.ip_addresses);
-                    break;
-                default:
-                    break;
-            }
+            lwm2m_conn_mon_update_resource(resource_id);
 
             err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
                                                                 &buffer_size,
@@ -511,9 +489,9 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
 }
 
 /* Fetch latest resource value */
-static void lwm2m_conn_mon_update_resource(uint16_t id)
+static void lwm2m_conn_mon_update_resource(uint16_t resource_id)
 {
-    switch (id) {
+    switch (resource_id) {
     case LWM2M_CONN_MON_NETWORK_BEARER:
         /* Values is hardcoded */
         break;
@@ -523,11 +501,26 @@ static void lwm2m_conn_mon_update_resource(uint16_t id)
             &m_instance_conn_mon.radio_signal_strength,
             &m_instance_conn_mon.link_quality);
         break;
+    case LWM2M_CONN_MON_IP_ADDRESSES:
+        at_read_ipaddr(&m_instance_conn_mon.ip_addresses);
+        break;
     case LWM2M_CONN_MON_CELL_ID:
         at_read_cell_id(&m_instance_conn_mon.cell_id);
         break;
+    case LWM2M_CONN_MON_SMNC:
+    case LWM2M_CONN_MON_SMCC:
+        at_read_smnc_smcc(&m_instance_conn_mon.smnc, &m_instance_conn_mon.smcc);
+        break;
+    case LWM2M_NAMED_OBJECT:
+        at_read_radio_signal_strength_and_link_quality(
+            &m_instance_conn_mon.radio_signal_strength,
+            &m_instance_conn_mon.link_quality);
+        at_read_cell_id(&m_instance_conn_mon.cell_id);
+        at_read_smnc_smcc(&m_instance_conn_mon.smnc, &m_instance_conn_mon.smcc);
+        at_read_ipaddr(&m_instance_conn_mon.ip_addresses);
+        break;
     default:
-        LWM2M_WRN("Resource /4/0/%d might be out of date", id);
+        LWM2M_WRN("Resource /4/0/%d might be out of date", resource_id);
         break;
     }
 }
