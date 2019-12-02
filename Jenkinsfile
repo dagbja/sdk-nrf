@@ -20,6 +20,7 @@ pipeline {
   parameters {
     string(name: 'jsonstr_CI_STATE', defaultValue: INPUT_STATE, description: 'Default State if no upstream job')
     booleanParam(name: 'GENERATE_OBFUSCATED_LIB', defaultValue: false, description: 'if true generate an obfuscated version of the library')
+    booleanParam(name: 'COMPILE_NRF_CLIENT_APP', defaultValue: false, description: 'if true compile the nrf client application')
   }
 
   agent {
@@ -160,6 +161,15 @@ pipeline {
     }
 
     stage('Build nrf client app') {
+      when {
+        expression {
+          if (params.COMPILE_NRF_CLIENT_APP == false) {
+            ciUtils.lwm2mLog("Skip nrf client application compilation.")
+          }
+          return params.COMPILE_NRF_CLIENT_APP
+        }
+      }
+
       steps { script {
 
         /* Build the client application using library source files. */
