@@ -278,6 +278,8 @@ uint32_t lwm2m_notify(uint8_t         * p_payload,
         return err_code;
     }
 
+    p_observer->last_mid = response_config.id;
+
     // Set custom misc. argument.
     p_response->arg = p_observer;
 

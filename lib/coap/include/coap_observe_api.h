@@ -37,6 +37,9 @@ typedef struct {
 	/** Length of the token. */
 	uint8_t token_len;
 
+	/** Last used message id */
+	uint16_t last_mid;
+
 	/** Content type to use when sending notifications. */
 	coap_content_type_t ct;
 
@@ -141,6 +144,8 @@ uint32_t coap_observe_server_search(uint32_t *handle, struct nrf_sockaddr *obser
 uint32_t coap_observe_server_next_get(coap_observer_t **observer,
 				   coap_observer_t *start,
 				   coap_resource_t *resource);
+
+uint32_t coap_observe_server_handle_get(uint32_t *handle, coap_observer_t *observer);
 
 /**@brief Retrieve the observer based on handle.
  *

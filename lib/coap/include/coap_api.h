@@ -166,6 +166,12 @@ typedef void (*coap_free_t)(void *memory);
 typedef bool (*coap_error_callback_t)(uint32_t error_code,
 				      coap_message_t *message);
 
+/**@brief Callback function to call upon reset message reception.
+ *
+ * @param[in] data Pointer to the observer instance that will be removed.
+ */
+typedef void (*coap_rst_msg_callback_t)(void *data);
+
 /**@brief Callback function to be registered with CoAP messages.
  *
  * @param[in] status  Response status. Possible status codes:
@@ -524,6 +530,18 @@ uint32_t coap_init(uint32_t token_rand_seed, coap_transport_init_t *transport_pa
  * @retval 0 If registration was successful.
  */
 uint32_t coap_error_handler_register(coap_error_callback_t callback);
+
+/**@brief Register rest message handler callback to the CoAP module.
+ *
+ * @details This handler is called when a server returns a RST message
+ *          to a non-confirmable observer notification.
+ *
+ * @param[in] callback Function to be called when the CoAP module receives
+ *                     to a RST message.
+ *
+ * @retval 0 If registration was successful.
+ */
+uint32_t coap_reset_message_handler_register(coap_rst_msg_callback_t callback);
 
 /**@brief Register request handler which should handle all incoming requests.
  *

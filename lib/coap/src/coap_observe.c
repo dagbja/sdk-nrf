@@ -85,6 +85,8 @@ uint32_t internal_coap_observe_server_register(uint32_t *handle,
 		}
 	}
 
+	observer->last_mid = UINT16_MAX;
+
 	COAP_EXIT();
 	return ENOMEM;
 }
@@ -223,6 +225,23 @@ uint32_t internal_coap_observe_server_get(uint32_t handle, coap_observer_t **obs
 	*observer = &observers[handle].observer;
 	return 0;
 }
+
+
+uint32_t internal_coap_observe_server_handle_get(uint32_t *handle, coap_observer_t *p_observer)
+{
+	NULL_PARAM_CHECK(handle);
+	NULL_PARAM_CHECK(p_observer);
+
+	for (uint32_t i = 0; i < COAP_OBSERVE_MAX_NUM_OBSERVERS; i++) {
+		if ((uint32_t)p_observer == (uint32_t)&observers[i].observer) {
+			*handle = i;
+			return 0;
+		}
+	}
+
+	return ENOENT;
+}
+
 #else
 #define observe_server_init(...)
 #endif
@@ -667,6 +686,17 @@ uint32_t coap_observe_server_get(uint32_t handle, coap_observer_t **observer)
 	COAP_MUTEX_UNLOCK();
 
 	uint32_t err_code = internal_coap_observe_server_get(handle, observer);
+
+	COAP_MUTEX_UNLOCK();
+
+	return err_code;
+}
+
+uint32_t coap_observe_server_handle_get(uint32_t *handle, coap_observer_t *p_observer)
+{
+	COAP_MUTEX_LOCK();
+
+	uint32_t err_code = internal_coap_observe_server_handle_get(handle, p_observer);
 
 	COAP_MUTEX_UNLOCK();
 

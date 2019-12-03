@@ -10,12 +10,12 @@
 
 #include <coap_api.h>
 #include <coap_transport.h>
-#include <coap_observe_api.h>
 
 #include "coap.h"
 #include "coap_queue.h"
 #include "coap_resource.h"
 #include "coap_observe.h"
+#include <coap_observe_api.h>
 
 #define COAP_MESSAGE_RST_SET(REMOTE, T_HANDLE, MID) { \
 		coap_empty_message.remote = (REMOTE); \
@@ -30,7 +30,9 @@ static uint32_t token_seed;
 /** Message ID counter, used to generate unique message IDs. */
 static uint32_t message_id_counter;
 /** Function pointer to an application CoAP error handler. */
-static coap_error_callback_t error_callback;
+static coap_error_callback_t   error_callback;
+/** Function pointer to an application reset message handler. */
+static coap_rst_msg_callback_t rst_msg_callback;
 
 /** Request handler where to forward all incoming requests. */
 static coap_request_handler_t request_handler;
@@ -112,6 +114,17 @@ static inline bool app_error_notify(uint32_t err_code, coap_message_t *message)
 	return handled;
 }
 
+static inline void app_reset_handler(coap_observer_t * observer)
+{
+	if (rst_msg_callback != NULL) {
+		COAP_MUTEX_UNLOCK();
+
+		rst_msg_callback((void*)observer);
+
+		COAP_MUTEX_LOCK();
+	}
+}
+
 uint32_t coap_init(uint32_t token_rand_seed,
 		coap_transport_init_t *transport_param,
 		coap_alloc_t alloc_fn,
@@ -128,6 +141,8 @@ uint32_t coap_init(uint32_t token_rand_seed,
 	COAP_MUTEX_LOCK();
 
 	error_callback = NULL;
+	rst_msg_callback = NULL;
+
 	coap_alloc_fn = alloc_fn;
 	coap_free_fn = free_fn;
 	token_seed = token_rand_seed;
@@ -164,6 +179,17 @@ uint32_t coap_error_handler_register(coap_error_callback_t callback)
 	COAP_MUTEX_LOCK();
 
 	error_callback = callback;
+
+	COAP_MUTEX_UNLOCK();
+
+	return 0;
+}
+
+uint32_t coap_reset_message_handler_register(coap_rst_msg_callback_t callback)
+{
+	COAP_MUTEX_LOCK();
+
+	rst_msg_callback = callback;
 
 	COAP_MUTEX_UNLOCK();
 
@@ -476,6 +502,26 @@ uint32_t coap_transport_read(const coap_transport_handle_t transport,
 
 			/* Remove the queue element, as a match occurred. */
 			err_code = coap_queue_remove(item);
+		} else {
+			/* Assuming NON confirming reset. */
+
+			coap_observer_t  * observer = NULL;
+			while (coap_observe_server_next_get(&observer, observer, NULL) == 0)
+			{
+				if (observer->last_mid == message->header.id)
+				{
+					app_reset_handler(observer);
+
+					uint32_t handle;
+					int err = coap_observe_server_handle_get(&handle, observer);
+
+					if (err == 0)
+					{
+						coap_observe_server_unregister(handle);
+						break;
+					}
+				}
+			}
 		}
 	} else if (is_response(message->header.code)) {
 		COAP_TRC("CoAP message type: RESPONSE");
