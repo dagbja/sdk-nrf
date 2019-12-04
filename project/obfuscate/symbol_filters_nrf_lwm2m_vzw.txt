@@ -32,6 +32,7 @@
 
 # lwm2m_os.h
 ^lwm2m_os_errno$
+^lwm2m_os_strerror$
 ^lwm2m_os_free$
 ^lwm2m_os_init$
 ^lwm2m_os_log$

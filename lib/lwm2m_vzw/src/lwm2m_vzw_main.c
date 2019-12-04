@@ -1707,7 +1707,7 @@ static void app_bootstrap_connect(void)
         {
             LWM2M_INF("Connection failed: %s (%ld), %s (%d)",
                       lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                      lwm2m_os_log_strdup(strerror(lwm2m_os_errno())), lwm2m_os_errno());
+                      lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
 
             if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT)) {
                 // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
@@ -1865,7 +1865,7 @@ static void app_server_connect(uint16_t instance_id)
         {
             LWM2M_INF("Connection failed: %s (%ld), %s (%d)",
                       lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                      lwm2m_os_log_strdup(strerror(lwm2m_os_errno())), lwm2m_os_errno());
+                      lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
 
             if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
                 // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
@@ -1935,7 +1935,7 @@ void app_server_update(uint16_t instance_id, bool connect_update)
         if (err_code != 0) {
             LWM2M_INF("Update failed: %s (%d), %s (%d), reconnect (server %d)",
                       lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                      lwm2m_os_log_strdup(strerror(errno)), errno,
+                      lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
                       instance_id);
             app_server_disconnect(instance_id);
             lwm2m_request_server_update(instance_id, true);
@@ -2090,7 +2090,7 @@ static bool app_coap_socket_poll(void)
         return false;
     } else if (ret < 0) {
         LWM2M_ERR("poll error: %s (%d)",
-                  lwm2m_os_log_strdup(strerror(lwm2m_os_errno())), lwm2m_os_errno());
+                  lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
         return false;
     }
 

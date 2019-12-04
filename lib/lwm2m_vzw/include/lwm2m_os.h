@@ -307,6 +307,11 @@ int lwm2m_os_lte_power_down(void);
 int lwm2m_os_errno(void);
 
 /**
+ * @brief Translate the string representation of the error number.
+ */
+const char *lwm2m_os_strerror(void);
+
+/**
  * @brief Check if a certificate chain credential exists in persistent storage.
  *
  * @note  The API is required to report an error code defined in nrf_errno.h.

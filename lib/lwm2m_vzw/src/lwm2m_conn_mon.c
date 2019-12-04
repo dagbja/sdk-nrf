@@ -578,7 +578,7 @@ static void lwm2m_conn_mon_notify_resource(struct nrf_sockaddr * p_remote_server
         if (err_code) {
             LWM2M_INF("Notify /4/0/%d failed: %s (%ld), %s (%d)", resource_id,
                     lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                    lwm2m_os_log_strdup(strerror(errno)), errno);
+                    lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
 
             lwm2m_request_remote_reconnect(p_observer->remote);
         }

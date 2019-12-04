@@ -664,7 +664,7 @@ void lwm2m_device_notify_resource(uint16_t resource_id)
         {
             LWM2M_INF("Notify /3/0/%d failed: %s (%ld), %s (%d)", resource_id,
                       lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                      lwm2m_os_log_strdup(strerror(errno)), errno);
+                      lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
 
             lwm2m_request_remote_reconnect(p_observer->remote);
         }

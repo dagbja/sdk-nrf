@@ -726,6 +726,11 @@ int lwm2m_os_errno(void)
 	}
 }
 
+const char *lwm2m_os_strerror(void)
+{
+	return strerror(errno);
+}
+
 int lwm2m_os_sec_ca_chain_exists(uint32_t  sec_tag,
 								 bool     *p_exists,
 								 uint8_t  *p_perm_flags)

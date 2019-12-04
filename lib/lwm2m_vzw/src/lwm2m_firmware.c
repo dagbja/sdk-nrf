@@ -422,7 +422,7 @@ static void lwm2m_firmware_notify_resource(struct nrf_sockaddr * p_remote_server
             /* Wait for reconnection */
             continue;
         }
-        
+
         if (p_remote_server != NULL) {
             /* Only notify to given remote */
             if (memcmp(p_observer->remote, p_remote_server,
@@ -434,7 +434,7 @@ static void lwm2m_firmware_notify_resource(struct nrf_sockaddr * p_remote_server
         uint32_t err_code;
         uint8_t  buffer[200];
         uint32_t buffer_size = sizeof(buffer);
-        
+
         LWM2M_TRC("Observer found");
         err_code = lwm2m_tlv_firmware_encode(buffer,
                                              &buffer_size,
@@ -450,7 +450,7 @@ static void lwm2m_firmware_notify_resource(struct nrf_sockaddr * p_remote_server
         int64_t now = lwm2m_os_uptime_get();
 
         // Send CON every configured interval
-        if ((m_con_time_start[resource_id] + 
+        if ((m_con_time_start[resource_id] +
             (lwm2m_coap_con_interval_get() * 1000)) < now) {
             type = COAP_TYPE_CON;
             m_con_time_start[resource_id] = now;
@@ -465,7 +465,7 @@ static void lwm2m_firmware_notify_resource(struct nrf_sockaddr * p_remote_server
         {
             LWM2M_INF("Notify /5/0/%d failed: %s (%ld), %s (%d)", resource_id,
                       lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                      lwm2m_os_log_strdup(strerror(errno)), errno);
+                      lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
 
             lwm2m_request_remote_reconnect(p_observer->remote);
         }

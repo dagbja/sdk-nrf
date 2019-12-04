@@ -27,7 +27,7 @@ int lwm2m_pdn_activate(int *fd, const char *apn)
 		err = nrf_getsockopt(*fd, NRF_SOL_PDN, NRF_SO_PDN_STATE, &active, &len);
 		if (err) {
 			LWM2M_ERR("Reading PDN state failed: %s (%d)",
-                  lwm2m_os_log_strdup(strerror(lwm2m_os_errno())), lwm2m_os_errno());
+				  lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
 		}
 		else if (active) {
 			return 0;
@@ -40,7 +40,7 @@ int lwm2m_pdn_activate(int *fd, const char *apn)
 	*fd = nrf_socket(NRF_AF_LTE, NRF_SOCK_MGMT, NRF_PROTO_PDN);
 	if (*fd < 0) {
 		LWM2M_ERR("PDN socket failed: %s (%d)",
-                  lwm2m_os_log_strdup(strerror(lwm2m_os_errno())), lwm2m_os_errno());
+			  lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
 		return -1;
 	}
 
@@ -48,7 +48,7 @@ int lwm2m_pdn_activate(int *fd, const char *apn)
 	err = nrf_connect(*fd, (struct nrf_sockaddr *)apn, strlen(apn));
 	if (err) {
 		LWM2M_ERR("PDN connect failed: %s (%d)",
-                  lwm2m_os_log_strdup(strerror(lwm2m_os_errno())), lwm2m_os_errno());
+			  lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
 		nrf_close(*fd);
 		*fd = -1;
 		return -1;
