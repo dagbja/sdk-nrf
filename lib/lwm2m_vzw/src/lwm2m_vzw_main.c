@@ -2611,6 +2611,11 @@ void lwm2m_net_reg_stat_cb(uint32_t net_stat)
     }
 }
 
+void lwm2m_non_rst_message_cb(void *data)
+{
+    lwm2m_observer_storage_delete((coap_observer_t*)data);
+}
+
 int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 {
     int err;
@@ -2698,6 +2703,9 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 
     // Setup LWM2M storage subsystem.
     lwm2m_instance_storage_init();
+
+    // Register handler for RST messages on NON confirmable CoAP messages
+    coap_reset_message_handler_register(lwm2m_non_rst_message_cb);
 
     // Create LwM2M factory bootstrapped objects.
     app_lwm2m_create_objects();
