@@ -2055,6 +2055,29 @@ void app_server_update(uint16_t instance_id, bool connect_update)
     }
 }
 
+
+static void app_remove_observers_on_deregister(uint16_t instance_id)
+{
+    uint32_t err_code;
+    coap_observer_t *p_observer = NULL;
+
+    while (coap_observe_server_next_get(&p_observer, p_observer, NULL) == 0)
+    {
+        if (memcmp(p_observer->remote, (struct nrf_sockaddr *)&m_remote_server[instance_id], sizeof(struct nrf_sockaddr)) == 0)
+        {
+            err_code = lwm2m_observe_unregister(p_observer->remote, p_observer->resource_of_interest);
+
+            if (err_code != 0)
+            {
+                LWM2M_ERR("Removing observer after deregister failed: %s (%d), %s (%d) (server %d)",
+                          lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                          lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
+                          instance_id);
+            }
+        }
+    }
+}
+
 void app_server_disable(uint16_t instance_id)
 {
     uint32_t err_code;
@@ -2069,6 +2092,10 @@ void app_server_disable(uint16_t instance_id)
                   lwm2m_os_log_strdup(strerror(err_code)), err_code,
                   lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
                   instance_id);
+    }
+    else
+    {
+        app_remove_observers_on_deregister(instance_id);
     }
 }
 
@@ -2089,22 +2116,9 @@ static void app_server_deregister(uint16_t instance_id)
 
        return;
     }
-
-    coap_observer_t *p_observer = NULL;
-
-    while (coap_observe_server_next_get(&p_observer, p_observer, NULL) == 0)
+    else
     {
-        if (memcmp(p_observer->remote, (struct nrf_sockaddr *)&m_remote_server[instance_id], sizeof(struct nrf_sockaddr)) == 0)
-        {
-            err_code = lwm2m_observe_unregister(p_observer->remote, p_observer->resource_of_interest);
-
-            if (err_code != 0) {
-                LWM2M_ERR("Removing observer after deregister failed: %s (%d), %s (%d) (server %d)",
-                          lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                          lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
-                          instance_id);
-            }
-        }
+        app_remove_observers_on_deregister(instance_id);
     }
 
     lwm2m_state_set(LWM2M_STATE_SERVER_DEREGISTERING);
