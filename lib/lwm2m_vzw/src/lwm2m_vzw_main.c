@@ -976,11 +976,11 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t              short_
 }
 
 /**@brief Helper function to handle a connect retry. */
-void app_handle_connect_retry(int instance_id, bool no_reply)
+static void app_handle_connect_retry(int instance_id, bool fallback)
 {
     bool start_retry_delay = true;
 
-    if (no_reply && !lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6) && !lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_FALLBACK))
+    if (fallback && !lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6) && !lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_FALLBACK))
     {
         // Fallback to the other IP version
         m_family_type[instance_id] = (m_family_type[instance_id] == NRF_AF_INET6) ? NRF_AF_INET : NRF_AF_INET6;
@@ -1005,27 +1005,34 @@ void app_handle_connect_retry(int instance_id, bool no_reply)
             return;
         }
 
-        if (is_last) {
-            // This is the last retry delay after ...
-            if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT) {
-                // ... no response from server.
-                // Disconnect the session and retry on timeout.
-                app_server_disconnect(instance_id);
-            } else if (!no_reply) {
-                // ... an inability to establish a DTLS session.
-                // Repeat the bootstrap flow on timeout or reboot.
-                lwm2m_bootstrap_clear();
-                lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT);
-            } else {
-                // ... no response from server when establish a DTLS session.
-                // Retry on timeout.
-            }
+        if (is_last && (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT)) {
+            // This is the last retry delay after no response from server.
+            // Disconnect the session and retry on timeout.
+            app_server_disconnect(instance_id);
         }
 
         LWM2M_INF("Retry delay for %ld minutes (server %u)", retry_delay / 60, instance_id);
         lwm2m_os_timer_start(state_update_timer, retry_delay * 1000);
     } else {
         lwm2m_os_timer_start(state_update_timer, 0);
+    }
+}
+
+static void app_set_bootstrap_if_last_retry_delay(int instance_id)
+{
+    if (instance_id == VZW_MANAGEMENT_INSTANCE_ID ||
+        instance_id == VZW_REPOSITORY_INSTANCE_ID)
+    {
+        // Check if this is the last retry delay after an inability to establish a DTLS session.
+        bool is_last = false;
+        (void) lwm2m_retry_delay_get(instance_id, false, &is_last);
+
+        if (is_last) {
+            // Repeat the bootstrap flow on timeout or reboot.
+            LWM2M_INF("Last retry delay, trigger bootstrap on timeout");
+            lwm2m_bootstrap_clear();
+            lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT);
+        }
     }
 }
 
@@ -1944,6 +1951,10 @@ static void app_server_connect(uint16_t instance_id)
                 } else {
                     app_handle_connect_retry(instance_id, false);
                 }
+
+                if (lwm2m_os_errno() != NRF_ENETUNREACH) {
+                    app_set_bootstrap_if_last_retry_delay(instance_id);
+                }
             }
         }
     }
@@ -2284,6 +2295,10 @@ static bool app_coap_socket_poll(void)
                     app_handle_connect_retry(m_server_instance, true);
                 } else {
                     app_handle_connect_retry(m_server_instance, false);
+                }
+
+                if (error != NRF_ENETUNREACH) {
+                    app_set_bootstrap_if_last_retry_delay(instance_id);
                 }
             }
         }
