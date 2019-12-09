@@ -125,6 +125,9 @@ uint32_t lwm2m_observer_storage_store(coap_observer_t  * p_observer)
     lwm2m_instance_t              * p_instance = (lwm2m_instance_t *)p_observer->p_userdata;
     uint16_t                        short_server_id;
 
+    /* Silence warnings */
+    (void) p_instance;
+
     int err_code = lwm2m_remote_short_server_id_find(&short_server_id, p_observer->remote);
     if (err_code != 0)
     {
@@ -184,6 +187,9 @@ uint32_t lwm2m_observer_storage_delete(coap_observer_t  * p_observer)
     lwm2m_instance_t * p_instance = (lwm2m_instance_t *)p_observer->p_userdata;
     uint16_t short_server_id;
 
+    /* Silence warnings */
+    (void) p_instance;
+
     int err_code = lwm2m_remote_short_server_id_find(&short_server_id, p_observer->remote);
     if (err_code != 0)
     {
@@ -204,7 +210,6 @@ uint32_t lwm2m_observer_storage_delete(coap_observer_t  * p_observer)
 
     err_code = del_callback(sid);
     if (err_code != 0) {
-
         LWM2M_ERR("Failed to delete observer /%d/%d/%d for server %d from storage failed:"
                   "%s (%ld), %s (%d)",
                   p_instance->object_id, p_instance->instance_id, *((uint16_t *)p_observer->resource_of_interest),

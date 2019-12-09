@@ -100,6 +100,11 @@
 ^lwm2m_factory_reset$
 ^lwm2m_family_type_get$
 ^lwm2m_imei_get$
+^lwm2m_instance_storage_init$
+^lwm2m_observer_storage_store$
+^lwm2m_observer_storage_restore$
+^lwm2m_observer_storage_delete$
+^lwm2m_observer_storage_set_callbacks$
 ^lwm2m_instance_storage_security_store$
 ^lwm2m_instance_storage_server_store$
 ^lwm2m_msisdn_get$
@@ -159,6 +164,7 @@
 ^coap_message_ct_mask_get$
 ^coap_observe_server_next_get$
 ^coap_opt_uint_decode$
+^coap_reset_message_handler_register$
 ^coap_security_destroy$
 ^coap_security_setup$
 ^coap_time_tick$
