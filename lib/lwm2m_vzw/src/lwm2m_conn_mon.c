@@ -521,7 +521,6 @@ static void lwm2m_conn_mon_update_resource(uint16_t resource_id)
         at_read_ipaddr(&m_instance_conn_mon.ip_addresses);
         break;
     default:
-        LWM2M_WRN("Resource /4/0/%d might be out of date", resource_id);
         break;
     }
 }
