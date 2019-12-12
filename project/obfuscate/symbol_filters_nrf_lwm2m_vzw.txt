@@ -251,13 +251,8 @@
 ^lte_lc_offline$
 ^lte_lc_power_off$
 ^lte_lc_psm_req$
-^nrf_apn_class_read$
-^nrf_apn_class_update$
 ^nrf_close$
 ^nrf_getsockopt$
-^nrf_inbuilt_key_delete$
-^nrf_inbuilt_key_exists$
-^nrf_inbuilt_key_write$
 ^nrf_setsockopt$
 ^nrf_freeaddrinfo$
 ^nrf_getaddrinfo$
@@ -265,6 +260,6 @@
 ^nrf_recv$
 ^nrf_send$
 ^nrf_socket$
-^pdn_disconnect$
-^pdn_init_and_connect$
+^modem_key_mgmt_write$
+^modem_key_mgmt_exists$
 ^spm_request_system_reboot$
