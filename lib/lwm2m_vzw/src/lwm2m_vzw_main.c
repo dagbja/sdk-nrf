@@ -174,7 +174,7 @@ static volatile uint32_t tick_count = 0;
 static void app_misc_data_set_bootstrapped(uint8_t bootstrapped);
 static void app_server_disconnect(uint16_t instance_id);
 static int app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
-static void app_provision_secret_keys(void);
+static int app_provision_secret_keys(void);
 static void app_disconnect(void);
 static const char * app_uri_get(char * p_server_uri, uint16_t * p_port, bool * p_secure);
 static void app_lwm2m_observer_process(struct nrf_sockaddr * p_remote_server);
@@ -190,6 +190,16 @@ static int app_event_notify(uint32_t type, void * data)
     };
 
     return lwm2m_carrier_event_handler(&event);
+}
+
+static int app_event_error(uint32_t error_code, int32_t error_value)
+{
+    lwm2m_carrier_event_error_t error_event = {
+        .code = error_code,
+        .value = error_value
+    };
+
+    return app_event_notify(LWM2M_CARRIER_EVENT_ERROR, &error_event);
 }
 
 static bool lwm2m_state_set(lwm2m_state_t app_state)
@@ -208,16 +218,22 @@ static bool lwm2m_state_set(lwm2m_state_t app_state)
     return true;
 }
 
-static void app_init_and_connect(void)
+static int app_init_and_connect(void)
 {
     app_event_notify(LWM2M_CARRIER_EVENT_CONNECTING, NULL);
 
-    lwm2m_os_lte_link_up();
+    int err = lwm2m_os_lte_link_up();
 
-    app_event_notify(LWM2M_CARRIER_EVENT_CONNECTED, NULL);
+    if (err == 0) {
+        app_event_notify(LWM2M_CARRIER_EVENT_CONNECTED, NULL);
+    } else {
+        app_event_error(LWM2M_CARRIER_ERROR_CONNECT_FAIL, err);
+    }
+
+    return err;
 }
 
-static void app_offline(void)
+static int app_offline(void)
 {
     app_event_notify(LWM2M_CARRIER_EVENT_DISCONNECTING, NULL);
 
@@ -225,9 +241,15 @@ static void app_offline(void)
     // when provisioning security keys.
     lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
 
-    lwm2m_os_lte_link_down();
+    int err = lwm2m_os_lte_link_down();
 
-    app_event_notify(LWM2M_CARRIER_EVENT_DISCONNECTED, NULL);
+    if (err == 0) {
+        app_event_notify(LWM2M_CARRIER_EVENT_DISCONNECTED, NULL);
+    } else {
+        app_event_error(LWM2M_CARRIER_ERROR_DISCONNECT_FAIL, err);
+    }
+
+    return err;
 }
 
 static bool lwm2m_is_registration_ready(void)
@@ -725,7 +747,11 @@ static int app_generate_client_id(void)
     LWM2M_INF("Client ID: %s", lwm2m_os_log_strdup(client_id));
 
     if (provision_bs_psk || provision_diag_psk) {
-        app_offline();
+        int err = app_offline();
+        if (err != 0) {
+            return err;
+        }
+
         if (provision_bs_psk) {
             ret = app_provision_psk(APP_BOOTSTRAP_SEC_TAG, client_id, strlen(client_id),
                                     m_app_config.psk, m_app_config.psk_length);
@@ -736,7 +762,16 @@ static int app_generate_client_id(void)
             ret = app_provision_psk(APP_DIAGNOSTICS_SEC_TAG, m_imei, strlen(m_imei),
                                     app_diagnostics_psk, sizeof(app_diagnostics_psk));
         }
-        app_init_and_connect();
+
+        if (ret != 0) {
+            app_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, ret);
+        }
+
+        err = app_init_and_connect();
+        if (ret == 0 && err != 0) {
+            // Only set ret from app_init_and_connect() if not already set from a failing app_provision_psk().
+            ret = err;
+        }
     }
 
     memcpy(&m_client_id.value.imei_msisdn[0], client_id, strlen(client_id));
@@ -1001,13 +1036,19 @@ static void app_handle_connect_retry(int instance_id, bool fallback)
             LWM2M_ERR("Bootstrap procedure failed");
             m_app_state = LWM2M_STATE_DISCONNECTED;
             lwm2m_retry_delay_reset(instance_id);
+
+            app_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, 0);
             return;
         }
 
-        if (is_last && (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT)) {
-            // This is the last retry delay after no response from server.
-            // Disconnect the session and retry on timeout.
-            app_server_disconnect(instance_id);
+        if (is_last) {
+            if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT) {
+                // This is the last retry delay after no response from server.
+                // Disconnect the session and retry on timeout.
+                app_server_disconnect(instance_id);
+            }
+
+            app_event_notify(LWM2M_CARRIER_EVENT_DEFERRED, NULL);
         }
 
         LWM2M_INF("Retry delay for %ld minutes (server %u)", retry_delay / 60, instance_id);
@@ -1356,7 +1397,10 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     app_server_disconnect(VZW_BOOTSTRAP_INSTANCE_ID);
     lwm2m_retry_delay_reset(VZW_BOOTSTRAP_INSTANCE_ID);
 
-    app_provision_secret_keys();
+    if (app_provision_secret_keys() != 0) {
+        lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
+        return 0;
+    }
 
     lwm2m_security_bootstrapped_set(VZW_BOOTSTRAP_INSTANCE_ID, true);  // TODO: this should be set by bootstrap server when bootstrapped
     m_did_bootstrap = true;
@@ -2373,12 +2417,12 @@ static int app_lwm2m_process(void)
     {
         case LWM2M_STATE_REQUEST_LINK_UP:
         {
-            app_init_and_connect();
+            (void)app_init_and_connect();
             break;
         }
         case LWM2M_STATE_REQUEST_LINK_DOWN:
         {
-            app_offline();
+            (void)app_offline();
             break;
         }
         case LWM2M_STATE_REQUEST_CONNECT:
@@ -2557,10 +2601,14 @@ static int app_provision_psk(int sec_tag, char * identity, uint8_t identity_len,
     return 0;
 }
 
-static void app_provision_secret_keys(void)
+static int app_provision_secret_keys(void)
 {
-    app_offline();
-    LWM2M_TRC("Offline mode");
+    int ret = 0;
+    int err = app_offline();
+
+    if (err != 0) {
+        return err;
+    }
 
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
@@ -2584,12 +2632,13 @@ static void app_provision_secret_keys(void)
             ARG_UNUSED(hostname);
 
             if (secure) {
-                int ret = app_provision_psk(APP_SEC_TAG_OFFSET + i, p_identity, identity_len, p_psk, psk_len);
-                if (ret == 0) {
+                err = app_provision_psk(APP_SEC_TAG_OFFSET + i, p_identity, identity_len, p_psk, psk_len);
+                if (err == 0) {
                     LWM2M_TRC("Provisioning key for %s, short server id: %u",
                               lwm2m_os_log_strdup(p_server_uri_val),
                               lwm2m_server_short_server_id_get(i));
                 } else {
+                    ret = err;
                     LWM2M_ERR("Provisioning key failed (%d) for %s, short server id: %u (%d)", ret,
                               lwm2m_os_log_strdup(p_server_uri_val),
                               lwm2m_server_short_server_id_get(i));
@@ -2601,13 +2650,21 @@ static void app_provision_secret_keys(void)
     }
     LWM2M_INF("Wrote secret keys");
 
-    app_init_and_connect();
+    if (ret != 0) {
+        app_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, ret);
+    }
+
+    err = app_init_and_connect();
+    if (ret == 0 && err != 0) {
+        // Only set ret from app_init_and_connect() if not already set from a failing app_provision_psk().
+        ret = err;
+    }
 
     // THIS IS A HACK. Temporary solution to give a delay to recover Non-DTLS sockets from CFUN=4.
     // The delay will make TX available after CID again set.
     lwm2m_os_sleep(2000);
 
-    LWM2M_TRC("Normal mode");
+    return ret;
 }
 
 /**@brief Initializes app timers. */
@@ -2718,7 +2775,7 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     // Initialize AT interface
     err = at_if_init();
     if (err) {
-            return err;
+        return err;
     }
 
     // Register network registration status changes
@@ -2734,7 +2791,10 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     // The lc module uses AT notifications.
     lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
 
-    app_init_and_connect();
+    err = app_init_and_connect();
+    if (err != 0) {
+        return err;
+    }
 
     // Read IMEI, which is a static value and will never change.
     err = at_read_imei(m_imei, sizeof(m_imei));

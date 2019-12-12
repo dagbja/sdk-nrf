@@ -21,8 +21,38 @@
 #define LWM2M_CARRIER_EVENT_DISCONNECTED  5  /**< Disconnected from the LTE network. */
 #define LWM2M_CARRIER_EVENT_BOOTSTRAPPED  6  /**< LWM2M carrier bootstrapped. */
 #define LWM2M_CARRIER_EVENT_READY         7  /**< LWM2M carrier registered. */
-#define LWM2M_CARRIER_EVENT_FOTA_START    8  /**< Modem update started. */
+#define LWM2M_CARRIER_EVENT_DEFERRED      8  /**< LWM2M carrier operation is deferred. */
+#define LWM2M_CARRIER_EVENT_FOTA_START    9  /**< Modem update started. */
 #define LWM2M_CARRIER_EVENT_REBOOT        10 /**< Application will reboot. */
+#define LWM2M_CARRIER_EVENT_ERROR         20 /**< An error occurred. */
+
+/**
+ * @brief LWM2M carrier library event structure.
+ */
+typedef struct {
+	/** Event type. */
+	uint32_t type;
+	/** Event data. Can be NULL, depending on event type. */
+	void *data;
+} lwm2m_carrier_event_t;
+
+/**
+ * @brief LWM2M carrier library event error codes.
+ */
+#define LWM2M_CARRIER_ERROR_NO_ERROR        0 /**< No error. */
+#define LWM2M_CARRIER_ERROR_CONNECT_FAIL    1 /**< Failure to bring LTE link up. */
+#define LWM2M_CARRIER_ERROR_DISCONNECT_FAIL 2 /**< Failure to bring LTE link down. */
+#define LWM2M_CARRIER_ERROR_BOOTSTRAP       3 /**< LWM2M carrier bootstrap failed. */
+
+/**
+ * @brief LWM2M carrier library error event structure.
+ */
+typedef struct {
+	/** Error event code. */
+	uint32_t code;
+	/** Error event value. */
+	int32_t  value;
+} lwm2m_carrier_event_error_t;
 /**@} */
 
 /**
@@ -67,16 +97,6 @@
 #define LWM2M_CARRIER_BATTERY_STATUS_LOW_BATTERY     4
 #define LWM2M_CARRIER_BATTERY_STATUS_NOT_INSTALLED   5
 #define LWM2M_CARRIER_BATTERY_STATUS_UNKNOWN         6
-
-/**
- * @brief LWM2M carrier library event structure.
- */
-typedef struct {
-	/** Event type. */
-	uint32_t type;
-	/** Event data. Can be NULL, depending on event type. */
-	void *data;
-} lwm2m_carrier_event_t;
 
 /**
  * @brief Structure holding LWM2M carrier library initialization parameters.
