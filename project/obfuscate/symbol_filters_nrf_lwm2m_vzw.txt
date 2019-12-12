@@ -72,14 +72,15 @@
 ^lwm2m_os_lte_link_up$
 ^lwm2m_os_lte_link_down$
 ^lwm2m_os_lte_power_down$
-^lwm2m_os_pdn_disconnect$
-^lwm2m_os_pdn_init_and_connect$
 ^lwm2m_os_sec_ca_chain_write$
-^lwm2m_os_sec_psk_write$
-^lwm2m_os_sec_identity_write$
 ^lwm2m_os_sec_ca_chain_exists$
+^lwm2m_os_sec_identity_write$
+^lwm2m_os_sec_identity_exists$
+^lwm2m_os_sec_psk_write$
+^lwm2m_os_sec_psk_exists$
 
 # Callbacks
+^lwm2m_coap_error_handler$
 ^lwm2m_coap_handler_root$
 ^lwm2m_handler_error$
 ^lwm2m_notification$
@@ -251,6 +252,7 @@
 ^lte_lc_offline$
 ^lte_lc_power_off$
 ^lte_lc_psm_req$
+^nrf_connect$
 ^nrf_close$
 ^nrf_getsockopt$
 ^nrf_setsockopt$
