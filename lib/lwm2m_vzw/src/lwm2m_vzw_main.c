@@ -2632,7 +2632,8 @@ void lwm2m_net_reg_stat_cb(uint32_t net_stat)
 {
     if (m_net_stat != net_stat)
     {
-        if (net_stat == APP_NET_REG_STAT_HOME)
+        if ((net_stat == APP_NET_REG_STAT_HOME) ||
+            (lwm2m_debug_is_set(LWM2M_DEBUG_ROAM_AS_HOME) && (net_stat == APP_NET_REG_STAT_ROAM)))
         {
             // Home
             lwm2m_request_connect();

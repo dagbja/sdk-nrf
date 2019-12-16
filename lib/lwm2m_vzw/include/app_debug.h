@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 
+#define LWM2M_DEBUG_ROAM_AS_HOME           0x02  /**< Set if Roaming as Home. */
 #define LWM2M_DEBUG_DISABLE_CARRIER_CHECK  0x04  /**< Set if disable carrier check. */
 #define LWM2M_DEBUG_DISABLE_IPv6           0x08  /**< Set if disable IPv6. */
 #define LWM2M_DEBUG_DISABLE_FALLBACK       0x10  /**< Set if disable IP fallback. */

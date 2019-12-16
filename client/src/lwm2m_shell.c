@@ -150,6 +150,7 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "  SIM ICCID      %s", iccid);
     shell_print(shell, "  Logging        %s", modem_logging_get());
     shell_print(shell, "  Carrier check  %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK) ? "No" : "Yes");
+    shell_print(shell, "  Roam as Home   %s", lwm2m_debug_is_set(LWM2M_DEBUG_ROAM_AS_HOME) ? "Yes" : "No");
     shell_print(shell, "  IPv6 enabled   %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6) ? "No" : "Yes");
     shell_print(shell, "  IP fallback    %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_FALLBACK) ? "No" : "Yes");
     shell_print(shell, "  CON interval   %d seconds", (int32_t)lwm2m_coap_con_interval_get());
@@ -221,6 +222,33 @@ static int cmd_debug_carrier_check(const struct shell *shell, size_t argc, char 
     }
 
     shell_print(shell, "Set carrier check: %d", carrier_check);
+
+    return 0;
+}
+
+static int cmd_debug_roam_as_home(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s <value>", argv[0]);
+        shell_print(shell, " 0 = disable");
+        shell_print(shell, " 1 = enable");
+        return 0;
+    }
+
+    int roam_as_home = atoi(argv[1]);
+
+    if (roam_as_home != 0 && roam_as_home != 1) {
+        shell_print(shell, "invalid value, must be 0 or 1");
+        return 0;
+    }
+
+    if (roam_as_home) {
+        lwm2m_debug_set(LWM2M_DEBUG_ROAM_AS_HOME);
+    } else {
+        lwm2m_debug_clear(LWM2M_DEBUG_ROAM_AS_HOME);
+    }
+
+    shell_print(shell, "Set roam as home: %d", roam_as_home);
 
     return 0;
 }
@@ -1061,6 +1089,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(print, NULL, "Print configuration", cmd_debug_print),
     SHELL_CMD(reset, NULL, "Reset configuration", cmd_debug_reset),
     SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
+    SHELL_CMD(roam_as_home, NULL, "Set Roam as Home", cmd_debug_roam_as_home),
     SHELL_CMD(carrier_check, NULL, "Set carrier check", cmd_debug_carrier_check),
     SHELL_CMD(ipv6_enable, NULL, "Set IPv6 enabled", cmd_debug_ipv6_enabled),
     SHELL_CMD(fallback, NULL, "Set IP Fallback", cmd_debug_fallback_disabled),
