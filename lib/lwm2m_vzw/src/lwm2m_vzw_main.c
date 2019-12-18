@@ -39,9 +39,9 @@
 #define APP_ACL_DM_SERVER_HACK          1
 #define APP_USE_CONTABO                 0
 
+#if APP_USE_CONTABO
 #define COAP_LOCAL_LISTENER_PORT              5683                                            /**< Local port to listen on any traffic, client or server. Not bound to any specific LWM2M functionality.*/
 #define LWM2M_LOCAL_LISTENER_PORT             9997                                            /**< Local port to listen on any traffic. Bound to specific LWM2M functionality. */
-#if APP_USE_CONTABO
 #define LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT     5784                                            /**< Local port to connect to the LWM2M bootstrap server. */
 #else
 #define LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT     9998                                            /**< Local port to connect to the LWM2M bootstrap server. */
@@ -111,7 +111,6 @@ static lwm2m_object_t                      m_bootstrap_server;                  
 
 static char m_bootstrap_object_alias_name[] = "bs";                                           /**< Name of the bootstrap complete object. */
 
-static coap_transport_handle_t             m_coap_transport = -1;                             /**< CoAP transport handle for the non bootstrap server. */
 static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS];            /**< CoAP transport handles for the secure servers. Obtained on @coap_security_setup. */
 
 static int   m_admin_pdn_handle = -1;                                                         /**< VZWADMIN PDN connection handle. */
@@ -2485,15 +2484,18 @@ static uint32_t app_coap_init(void)
 {
     uint32_t err_code;
 
+#if APP_USE_CONTABO
     struct nrf_sockaddr_in6 local_addr;
     struct nrf_sockaddr_in6 non_sec_local_addr;
     app_init_sockaddr_in((struct nrf_sockaddr *)&local_addr, NRF_AF_INET, COAP_LOCAL_LISTENER_PORT);
     app_init_sockaddr_in((struct nrf_sockaddr *)&non_sec_local_addr, m_family_type[1], LWM2M_LOCAL_LISTENER_PORT);
+#endif
 
     // If bootstrap server and server is using different port we can
     // register the ports individually.
-    coap_local_t local_port_list[COAP_PORT_COUNT] =
+    coap_local_t local_port_list[] =
     {
+#if APP_USE_CONTABO
         {
             .addr = (struct nrf_sockaddr *)&local_addr
         },
@@ -2502,20 +2504,21 @@ static uint32_t app_coap_init(void)
             .protocol = NRF_IPPROTO_UDP,
             .setting = NULL,
         }
+#endif
     };
 
     // Verify that the port count defined in sdk_config.h is matching the one configured for coap_init.
     BUILD_ASSERT_MSG(ARRAY_SIZE(local_port_list) == COAP_PORT_COUNT,
                      "Invalid COAP_PORT_COUNT setting");
 
-    coap_transport_init_t port_list;
-    port_list.port_table = &local_port_list[0];
+    coap_transport_init_t port_list = {
+#if APP_USE_CONTABO
+        .port_table = &local_port_list[0]
+#endif
+    };
 
     err_code = coap_init(lwm2m_os_rand_get(), &port_list,
                          lwm2m_os_malloc, lwm2m_os_free);
-
-    m_coap_transport = local_port_list[0].transport;
-    ARG_UNUSED(m_coap_transport);
 
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {

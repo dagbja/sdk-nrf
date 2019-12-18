@@ -292,7 +292,9 @@ uint32_t coap_transport_init(coap_transport_init_t *param)
 	uint32_t index;
 
 	NULL_PARAM_CHECK(param);
+#if COAP_PORT_COUNT
 	NULL_PARAM_CHECK(param->port_table);
+#endif
 
 #if (COAP_SESSION_COUNT > 0)
 	memset(session_table, 0, sizeof(session_table));
