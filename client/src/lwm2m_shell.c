@@ -968,6 +968,10 @@ static int cmd_device_print(const struct shell *shell, size_t argc, char **argv)
 
     shell_print(shell, "Battery level     %d%%", device_obj_instance->battery_level);
     shell_print(shell, "Battery status    %d", device_obj_instance->battery_status);
+    shell_print(shell, "Manufacturer      %s", lwm2m_string_get(&device_obj_instance->manufacturer));
+    shell_print(shell, "Model number      %s", lwm2m_string_get(&device_obj_instance->model_number));
+    shell_print(shell, "Serial number     %s", lwm2m_string_get(&device_obj_instance->serial_number));
+    shell_print(shell, "Firmware version  %s", lwm2m_string_get(&device_obj_instance->firmware_version));
     shell_print(shell, "Device type       %s", lwm2m_string_get(&device_obj_instance->device_type));
     shell_print(shell, "Hardware version  %s", lwm2m_string_get(&device_obj_instance->hardware_version));
     shell_print(shell, "Software version  %s", lwm2m_string_get(&device_obj_instance->software_version));
