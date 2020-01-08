@@ -334,7 +334,7 @@ int lwm2m_os_sec_ca_chain_exists(uint32_t sec_tag, bool *exists,
  * @brief Provision a certificate chain or update an existing one.
  *
  * @note If used when the LTE link is active, the function will return
- *	 an error (-EACCESS) and the key will not be written.
+ *	 an error and the key will not be written.
  *
  * @param[in]  sec_tag	Security tag for this credential.
  * @param[in]  buf	Buffer containing the credential data.
@@ -375,7 +375,7 @@ int lwm2m_os_sec_psk_exists(uint32_t sec_tag, bool *exists,
  * @brief Provision a new pre-shared key or update an existing one.
  *
  * @note If used when the LTE link is active, the function will return
- *	 an error (-EACCESS) and the key will not be written.
+ *	 an error and the key will not be written.
  *
  * @param[in] sec_tag	Security tag for this credential.
  * @param[in] buf	Buffer containing the credential data.
@@ -415,7 +415,7 @@ int lwm2m_os_sec_identity_exists(uint32_t sec_tag, bool *exists,
  * @brief Provision a new identity credential or update an existing one.
  *
  * @note If used when the LTE link is active, the function will return
- *	 an error (-EACCESS) and the key will not be written.
+ *	 an error and the key will not be written.
  *
  * @param[in] sec_tag	Security tag for this credential.
  * @param[in] buf	Buffer containing the credential data.
