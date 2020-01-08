@@ -21,7 +21,7 @@
 #define LWM2M_CARRIER_EVENT_DISCONNECTED  5  /**< Disconnected from the LTE network. */
 #define LWM2M_CARRIER_EVENT_BOOTSTRAPPED  6  /**< LWM2M carrier bootstrapped. */
 #define LWM2M_CARRIER_EVENT_READY         7  /**< LWM2M carrier registered. */
-#define LWM2M_CARRIER_EVENT_DEFERRED      8  /**< LWM2M carrier operation is deferred. */
+#define LWM2M_CARRIER_EVENT_DEFERRED      8  /**< LWM2M carrier operation is deferred for 24 hours. */
 #define LWM2M_CARRIER_EVENT_FOTA_START    9  /**< Modem update started. */
 #define LWM2M_CARRIER_EVENT_REBOOT        10 /**< Application will reboot. */
 #define LWM2M_CARRIER_EVENT_ERROR         20 /**< An error occurred. */
@@ -40,8 +40,8 @@ typedef struct {
  * @brief LWM2M carrier library event error codes.
  */
 #define LWM2M_CARRIER_ERROR_NO_ERROR        0 /**< No error. */
-#define LWM2M_CARRIER_ERROR_CONNECT_FAIL    1 /**< Failure to bring LTE link up. */
-#define LWM2M_CARRIER_ERROR_DISCONNECT_FAIL 2 /**< Failure to bring LTE link down. */
+#define LWM2M_CARRIER_ERROR_CONNECT_FAIL    1 /**< Failed to connect to the LTE network. */
+#define LWM2M_CARRIER_ERROR_DISCONNECT_FAIL 2 /**< Failed to disconnect from the LTE network. */
 #define LWM2M_CARRIER_ERROR_BOOTSTRAP       3 /**< LWM2M carrier bootstrap failed. */
 
 /**
@@ -132,11 +132,11 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t *config);
 void lwm2m_carrier_run(void);
 
 /**
- * @brief Function to read all time parameters
+ * @brief Function to read all time parameters.
  *
- * @param[out] utc_time Pointer to time since Epoch in seconds
- * @param[out] offset   Pointer to UTC offset in minutes
- * @param[out] tz       Pointer to null-terminated timezone string pointer
+ * @param[out] utc_time   Pointer to time since Epoch in seconds.
+ * @param[out] utc_offset Pointer to UTC offset in minutes.
+ * @param[out] tz         Pointer to null-terminated timezone string pointer.
  */
 void lwm2m_carrier_time_read(int32_t *utc_time, int *utc_offset,
 			     const char **tz);
@@ -147,17 +147,17 @@ void lwm2m_carrier_time_read(int32_t *utc_time, int *utc_offset,
  * @note This function can be implemented by the application, if custom time
  *       management is needed.
  *
- * @return  Current UTC time since Epoch in seconds
+ * @return  Current UTC time since Epoch in seconds.
  */
 int32_t lwm2m_carrier_utc_time_read(void);
 
 /**
- * @brief Function to read offset to UTC time
+ * @brief Function to read offset to UTC time.
  *
  * @note This function can be implemented by the application, if custom time
  *       management is needed.
  *
- * @return  UTC offset in minutes
+ * @return  UTC offset in minutes.
  */
 int lwm2m_carrier_utc_offset_read(void);
 
@@ -168,7 +168,7 @@ int lwm2m_carrier_utc_offset_read(void);
  *       management is needed.
  *
  * @return  Null-terminated timezone string pointer, IANA Timezone (TZ)
- *          database format
+ *          database format.
  */
 const char *lwm2m_carrier_timezone_read(void);
 
@@ -178,7 +178,7 @@ const char *lwm2m_carrier_timezone_read(void);
  * @note This function can be implemented by the application, if custom time
  *       management is needed.
  *
- * @param[in] time Time since Epoch in seconds
+ * @param[in] time Time since Epoch in seconds.
  *
  * @return 0 on success, negative error code on error.
  */
@@ -190,19 +190,19 @@ int lwm2m_carrier_utc_time_write(int32_t time);
  * @note This function can be implemented by the application, if custom time
  *       management is needed.
  *
- * @param[in] offset UTC offset in minutes
+ * @param[in] offset UTC offset in minutes.
  *
  * @return 0 on success, negative error code on error.
  */
 int lwm2m_carrier_utc_offset_write(int offset);
 
 /**
- * @brief Function to write timezone (LWM2M server write operation)
+ * @brief Function to write timezone (LWM2M server write operation).
  *
  * @note This function can be implemented by the application, if custom time
  *       management is needed.
  *
- * @param[in] tz Null-terminated timezone string pointer
+ * @param[in] tz Null-terminated timezone string pointer.
  *
  * @return 0 on success, negative error code on error.
  */

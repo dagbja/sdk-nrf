@@ -307,7 +307,7 @@ int lwm2m_os_lte_power_down(void);
 int lwm2m_os_errno(void);
 
 /**
- * @brief Translate the string representation of the error number.
+ * @brief Return a textual description for the current error.
  */
 const char *lwm2m_os_strerror(void);
 
