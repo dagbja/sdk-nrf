@@ -666,7 +666,8 @@ uint32_t coap_message_ct_mask_get(coap_message_t *message, uint32_t *mask)
 	(*mask) = 0;
 
 	for (uint8_t index = 0; index < message->options_count; index++) {
-		if (message->options[index].number == COAP_OPT_CONTENT_FORMAT) {
+		if (message->options[index].number == COAP_OPT_CONTENT_FORMAT ||
+		    message->options[index].number == COAP_OPT_ACCEPT) {
 			uint32_t value;
 			uint32_t err_code = coap_opt_uint_decode(
 					&value, message->options[index].length,

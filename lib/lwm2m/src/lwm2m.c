@@ -370,32 +370,51 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
         {
             case LWM2M_OPERATION_CODE_READ:
             {
+                uint32_t acl_buffer_len;
+                uint8_t  acl_buffer[64];
+
                 for(int i = 0; i < m_num_instances; ++i)
                 {
-                    err_code = lwm2m_acl_serialize_tlv(buffer + index, &buffer_len, m_instances[i]);
+                    if (m_instances[i]->object_id == LWM2M_OBJ_SECURITY)
+                    {
+                        // Skip ACL for Security objects.
+                        continue;
+                    }
+
+                    acl_buffer_len = 64;
+                    err_code = lwm2m_acl_serialize_tlv(acl_buffer, &acl_buffer_len, m_instances[i]);
                     if (err_code != 0)
                     {
                         // ENOMEM should not happen. Then it is a bug.
                         break;
                     }
 
+                    lwm2m_tlv_t tlv = {
+                        .id_type = TLV_TYPE_OBJECT,
+                        .id      = m_instances[i]->acl.id,
+                        .length  = acl_buffer_len
+                    };
+                    err_code = lwm2m_tlv_header_encode(buffer + index, &buffer_len, &tlv);
+
                     index += buffer_len;
                     buffer_len = buffer_max_size - index;
 
+                    memcpy(buffer + index, acl_buffer, acl_buffer_len);
+
+                    index += acl_buffer_len;
+                    buffer_len = buffer_max_size - index;
                 }
 
                 err_code = lwm2m_respond_with_payload(buffer, index, COAP_CT_APP_LWM2M_TLV, p_request);
                 break;
             }
 
-            // Fall-through
-            case LWM2M_OPERATION_CODE_WRITE:
-            case LWM2M_OPERATION_CODE_EXECUTE:
-            case LWM2M_OPERATION_CODE_DELETE:
-            case LWM2M_OPERATION_CODE_CREATE:
             case LWM2M_OPERATION_CODE_DISCOVER:
             {
-                err_code = internal_gen_acl_link(buffer, &buffer_len);
+                uint32_t preamble_len = snprintf(buffer, sizeof(buffer), "</2>");
+                buffer_len -= preamble_len;
+
+                err_code = internal_gen_acl_link(&buffer[preamble_len], &buffer_len);
                 if (err_code != 0)
                 {
                     // This should not happen, it is a bug if the buffer is too small.
@@ -405,6 +424,13 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                 err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LINK_FORMAT, p_request);
                 break;
             }
+
+            case LWM2M_OPERATION_CODE_WRITE:
+            case LWM2M_OPERATION_CODE_EXECUTE:
+            case LWM2M_OPERATION_CODE_DELETE:
+            case LWM2M_OPERATION_CODE_CREATE:
+                break;
+
             default:
                 break;
         }
@@ -508,22 +534,18 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                     {
                         err_code = lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
                     }
-
-                    break;
                 }
                 else
                 {
                     err_code = lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-                    break;
                 }
+
+                break;
             }
-            // Fall-through
-            case LWM2M_OPERATION_CODE_EXECUTE:
-            case LWM2M_OPERATION_CODE_DELETE:
-            case LWM2M_OPERATION_CODE_CREATE:
+
             case LWM2M_OPERATION_CODE_DISCOVER:
-            case LWM2M_OPERATION_CODE_OBSERVE:
             {
+                bool found = false;
                 for(int i = 0; i < m_num_instances; ++i)
                 {
                     if (m_instances[i]->acl.id == p_path[1])
@@ -531,20 +553,32 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                         // We always have the same resources.
                         buffer_len = snprintf((char *)buffer,
                                               buffer_max_size,
-                                              "</2/%u/0>,</2/%u/1>,</2/%u/2>,</2/%u/3>",
+                                              "</2/%u>,</2/%u/0>,</2/%u/1>,</2/%u/2>,</2/%u/3>",
+                                              m_instances[i]->acl.id,
                                               m_instances[i]->acl.id,
                                               m_instances[i]->acl.id,
                                               m_instances[i]->acl.id,
                                               m_instances[i]->acl.id);
 
                         err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LINK_FORMAT, p_request);
+                        found = true;
                         break;
                     }
                 }
 
-                err_code = ENOENT;
+                if (!found)
+                {
+                    err_code = ENOENT;
+                }
                 break;
             }
+
+            case LWM2M_OPERATION_CODE_EXECUTE:
+            case LWM2M_OPERATION_CODE_DELETE:
+            case LWM2M_OPERATION_CODE_CREATE:
+            case LWM2M_OPERATION_CODE_OBSERVE:
+                break;
+
             default:
                 break;
         }
@@ -576,6 +610,19 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
         if (current_instance == NULL)
         {
             return ENOENT;
+        }
+
+        if (operation == LWM2M_OPERATION_CODE_DISCOVER)
+        {
+            buffer_len = snprintf((char *)buffer,
+                                    buffer_max_size,
+                                    "</2/%u/%u>",
+                                    current_instance->acl.id,
+                                    p_path[2]);
+
+            err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LINK_FORMAT, p_request);
+
+            return err_code;
         }
 
         switch (p_path[2])
@@ -717,7 +764,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
         case COAP_CODE_GET:
         {
             LWM2M_TRC("CoAP GET request");
-            if (content_type == COAP_CT_APP_LINK_FORMAT) // Discover
+            if (content_type == COAP_CT_MASK_APP_LINK_FORMAT) // Discover
             {
                 operation = LWM2M_OPERATION_CODE_DISCOVER;
             }
