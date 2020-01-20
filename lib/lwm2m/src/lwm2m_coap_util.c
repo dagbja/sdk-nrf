@@ -5,6 +5,7 @@
  */
 
 #include <string.h>
+#include <stdio.h>
 
 #include <lwm2m.h>
 #include <lwm2m_api.h>
@@ -407,4 +408,51 @@ uint32_t lwm2m_respond_with_payload(uint8_t             * p_payload,
     err_code = coap_message_delete(p_response);
 
     return err_code;
+}
+
+uint32_t lwm2m_respond_with_object_link(uint16_t object_id, coap_message_t * p_request)
+{
+    uint8_t  buffer[512];
+    uint32_t buffer_len = sizeof(buffer);
+
+    // Object
+    uint32_t err_code = lwm2m_coap_handler_gen_object_link(object_id, buffer, &buffer_len);
+
+    if (err_code != 0)
+    {
+        (void)lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
+        return err_code;
+    }
+
+    return lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LINK_FORMAT, p_request);
+}
+
+uint32_t lwm2m_respond_with_instance_link(lwm2m_instance_t * p_instance,
+                                          uint16_t           resource_id,
+                                          coap_message_t   * p_request)
+{
+    uint8_t  buffer[512];
+    uint32_t buffer_len = sizeof(buffer);
+
+    if (resource_id == LWM2M_NAMED_OBJECT)
+    {
+        // Object Instance
+        uint32_t err_code = lwm2m_coap_handler_gen_instance_link(p_instance, buffer, &buffer_len);
+
+        if (err_code != 0)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
+            return err_code;
+        }
+    }
+    else
+    {
+        // Resource
+        buffer_len = snprintf(buffer, buffer_len, "</%u/%u/%u>",
+                              p_instance->object_id,
+                              p_instance->instance_id,
+                              resource_id);
+    }
+
+    return lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LINK_FORMAT, p_request);
 }

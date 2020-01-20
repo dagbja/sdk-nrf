@@ -265,6 +265,14 @@ uint32_t conn_stat_instance_callback(lwm2m_instance_t * p_instance,
             }
         }
     }
+    else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
+    {
+        err_code = lwm2m_respond_with_instance_link(p_instance, resource_id, p_request);
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
+    {
+        // Already handled
+    }
     else
     {
         (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
@@ -273,6 +281,27 @@ uint32_t conn_stat_instance_callback(lwm2m_instance_t * p_instance,
     return err_code;
 }
 
+/**@brief Callback function for LWM2M conn_stat objects. */
+uint32_t lwm2m_conn_stat_object_callback(lwm2m_object_t * p_object,
+                                         uint16_t         instance_id,
+                                         uint8_t          op_code,
+                                         coap_message_t * p_request)
+{
+    LWM2M_TRC("conn_stat_object_callback");
+
+    uint32_t err_code = 0;
+
+    if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
+    {
+        err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
+    }
+    else
+    {
+        (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+    }
+
+    return err_code;
+}
 
 void lwm2m_conn_stat_init(void)
 {
@@ -282,6 +311,7 @@ void lwm2m_conn_stat_init(void)
     lwm2m_instance_connectivity_statistics_init(&m_instance_conn_stat);
 
     m_object_conn_stat.object_id = LWM2M_OBJ_CONN_STAT;
+    m_object_conn_stat.callback = lwm2m_conn_stat_object_callback;
 
     m_instance_conn_stat.sms_tx_counter = 0;
     m_instance_conn_stat.sms_rx_counter = 0;

@@ -563,9 +563,35 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
             }
         }
     }
+    else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
+    {
+        err_code = lwm2m_respond_with_instance_link(p_instance, resource_id, p_request);
+    }
     else if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
     {
         // Already handled
+    }
+    else
+    {
+        (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+    }
+
+    return err_code;
+}
+
+/**@brief Callback function for LWM2M device objects. */
+uint32_t lwm2m_device_object_callback(lwm2m_object_t * p_object,
+                                      uint16_t         instance_id,
+                                      uint8_t          op_code,
+                                      coap_message_t * p_request)
+{
+    LWM2M_TRC("device_object_callback");
+
+    uint32_t err_code = 0;
+
+    if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
+    {
+        err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
     }
     else
     {
@@ -590,6 +616,8 @@ void lwm2m_device_init(void)
     lwm2m_instance_device_init(&m_instance_device);
 
     m_object_device.object_id = LWM2M_OBJ_DEVICE;
+    m_object_device.callback = lwm2m_device_object_callback;
+
     m_instance_device.proto.expire_time = 60; // Default to 60 second notifications.
     (void)at_read_manufacturer(&m_instance_device.manufacturer);
     (void)at_read_model_number(&m_instance_device.model_number);

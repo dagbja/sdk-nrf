@@ -382,6 +382,10 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
             }
         }
     }
+    else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
+    {
+        err_code = lwm2m_respond_with_instance_link(p_instance, resource_id, p_request);
+    }
     else
     {
         (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
@@ -422,6 +426,10 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
                                          LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
 
         (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
+    {
+        err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
     }
     else
     {

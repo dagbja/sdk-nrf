@@ -386,6 +386,10 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
             }
         }
     }
+    else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
+    {
+        err_code = lwm2m_respond_with_instance_link(p_instance, resource_id, p_request);
+    }
     else if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
     {
         // Already handled
@@ -473,9 +477,32 @@ void lwm2m_firmware_observer_process(struct nrf_sockaddr * p_remote_server)
     }
 }
 
+/**@brief Callback function for LWM2M firmware objects. */
+uint32_t lwm2m_firmware_object_callback(lwm2m_object_t * p_object,
+                                        uint16_t         instance_id,
+                                        uint8_t          op_code,
+                                        coap_message_t * p_request)
+{
+    LWM2M_TRC("firmware_object_callback");
+
+    uint32_t err_code = 0;
+
+    if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
+    {
+        err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
+    }
+    else
+    {
+        (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+    }
+
+    return err_code;
+}
+
 void lwm2m_firmware_init(void)
 {
     m_object_firmware.object_id = LWM2M_OBJ_FIRMWARE;
+    m_object_firmware.callback = lwm2m_firmware_object_callback;
 
     m_instance_firmware.proto.expire_time = 60; // Default to 60 second notifications.
     m_instance_firmware.proto.callback = firmware_instance_callback;

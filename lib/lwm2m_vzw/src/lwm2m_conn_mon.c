@@ -480,9 +480,35 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
             (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
         }
     }
+    else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
+    {
+        err_code = lwm2m_respond_with_instance_link(p_instance, resource_id, p_request);
+    }
     else if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
     {
         // Already handled
+    }
+    else
+    {
+        (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+    }
+
+    return err_code;
+}
+
+/**@brief Callback function for LWM2M conn_mon objects. */
+uint32_t lwm2m_conn_mon_object_callback(lwm2m_object_t * p_object,
+                                        uint16_t         instance_id,
+                                        uint8_t          op_code,
+                                        coap_message_t * p_request)
+{
+    LWM2M_TRC("conn_mon_object_callback");
+
+    uint32_t err_code = 0;
+
+    if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
+    {
+        err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
     }
     else
     {
@@ -610,6 +636,8 @@ void lwm2m_conn_mon_init(void)
     lwm2m_instance_connectivity_monitoring_init(&m_instance_conn_mon);
 
     m_object_conn_mon.object_id = LWM2M_OBJ_CONN_MON;
+    m_object_conn_mon.callback = lwm2m_conn_mon_object_callback;
+
     m_instance_conn_mon.proto.expire_time = 60; // Default to 60 second notifications.
     m_instance_conn_mon.network_bearer = 6; // LTE-FDD
     m_instance_conn_mon.available_network_bearer.len = 1;

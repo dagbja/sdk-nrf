@@ -209,7 +209,7 @@ typedef uint32_t (* lwm2m_object_callback_t)(lwm2m_object_t * p_object,
                                              coap_message_t * p_request);
 
 /**@brief Callback function to store observer information in non-volatile memory
- * 
+ *
  * @defails This function will be used by the observer restore to store observer
  *          information in non-volatile memory.
  *
@@ -222,7 +222,7 @@ typedef uint32_t (* lwm2m_object_callback_t)(lwm2m_object_t * p_object,
 typedef int (*lwm2m_store_observer_cb_t)(uint32_t sid, void * data, size_t size);
 
 /**@brief Callback function to load observer information from non-volatile memory.
- * 
+ *
  * @details This function will be used by the observer restore to load observer
  *          information in non-volatile memory.
  *
@@ -235,7 +235,7 @@ typedef int (*lwm2m_store_observer_cb_t)(uint32_t sid, void * data, size_t size)
 typedef int (*lwm2m_load_observer_cb_t)(uint32_t sid, void * data, size_t size);
 
 /**@brief Callback function to delete observer information in non-volatile memory.
- * 
+ *
  * @details This function will be used by the observer restore to delete observer
  *          information in non-volatile memory previously stored.
  *
@@ -507,6 +507,32 @@ uint32_t lwm2m_coap_handler_object_delete(lwm2m_object_t * p_object);
  */
 uint32_t lwm2m_coap_handler_gen_link_format(uint8_t * p_buffer, uint16_t * p_buffer_len);
 
+/**@brief Generate link format string based on Object.
+ *
+ * @param[in]    object_id    Identifies the object.
+ * @param[inout] p_buffer     Pointer to a buffer to fill with link format encoded string.
+ * @param[inout] p_buffer_len As input used to indicate length of the buffer. It will return the
+ *                            used amout of buffer length.
+ *
+ * retval NRF_SUCCESS If generation of link format string was successful.
+ */
+uint32_t lwm2m_coap_handler_gen_object_link(uint16_t   object_id,
+                                            uint8_t  * p_buffer,
+                                            uint32_t * p_buffer_len);
+
+/**@brief Generate link format string based on Object Instance.
+ *
+ * @param[in]    p_instance   Pointer to structure to instance.
+ * @param[inout] p_buffer     Pointer to a buffer to fill with link format encoded string.
+ * @param[inout] p_buffer_len As input used to indicate length of the buffer. It will return the
+ *                            used amout of buffer length.
+ *
+ * retval NRF_SUCCESS If generation of link format string was successful.
+ */
+uint32_t lwm2m_coap_handler_gen_instance_link(lwm2m_instance_t * p_instance,
+                                              uint8_t          * p_buffer,
+                                              uint32_t         * p_buffer_len);
+
 /**@brief Send CoAP 2.05 Content response with the payload provided.
  *
  * @param[in] p_payload    Pointer to the payload to send. Must not be NULL.
@@ -529,6 +555,27 @@ uint32_t lwm2m_respond_with_payload(uint8_t             * p_payload,
  * @retval NRF_SUCCESS If the response was sent out successfully.
  */
 uint32_t lwm2m_respond_with_code(coap_msg_code_t code, coap_message_t * p_request);
+
+/**@brief Send CoAP response with a Object link-format.
+ *
+ * @param[in] object_id  Identifies the object.
+ * @param[in] p_request  Original CoAP request. Must not be NULL.
+ *
+ * @retval NRF_SUCCESS If the response was sent out successfully.
+ */
+uint32_t lwm2m_respond_with_object_link(uint16_t object_id, coap_message_t * p_request);
+
+/**@brief Send CoAP response with a Object Instance link-format.
+ *
+ * @param[in] p_instance  Pointer to structure to instance.
+ * @param[in] resource_id Resource ID.
+ * @param[in] p_request   Original CoAP request. Must not be NULL.
+ *
+ * @retval NRF_SUCCESS If the response was sent out successfully.
+ */
+uint32_t lwm2m_respond_with_instance_link(lwm2m_instance_t * p_instance,
+                                          uint16_t           resource_id,
+                                          coap_message_t   * p_request);
 
 /**@brief Register observer with initial value notification
  *
@@ -608,7 +655,7 @@ uint32_t lwm2m_observer_storage_delete(coap_observer_t  * p_observer);
 
 /**@brief Register functions for store, load and delete operation.
  *
- * @details This function is used to register functions to store, load and 
+ * @details This function is used to register functions to store, load and
  *          delete data on the non-volatile storage backend.
  *
  * @retval 0      If callback functions was registered.

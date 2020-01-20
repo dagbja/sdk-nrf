@@ -744,6 +744,125 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
 }
 
 
+uint32_t lwm2m_coap_handler_gen_object_link(uint16_t   object_id,
+                                            uint8_t  * p_buffer,
+                                            uint32_t * p_buffer_len)
+{
+    uint32_t err_code = 0;
+    uint32_t buffer_index    = 0;
+    uint32_t buffer_max_size = *p_buffer_len;
+    uint32_t buffer_len;
+    uint8_t  dry_run_buffer[16]; // Maximum: ",</65535/65535>"
+
+    buffer_len = snprintf((char *)dry_run_buffer,
+                          sizeof(dry_run_buffer),
+                          "</%u>",
+                          object_id);
+
+    if (buffer_index + buffer_len <= buffer_max_size)
+    {
+        memcpy(&p_buffer[buffer_index], dry_run_buffer, buffer_len);
+        buffer_index += buffer_len;
+    }
+    else
+    {
+        return ENOMEM;
+    }
+
+    for (int i = 0; i < m_num_instances; ++i)
+    {
+        if (m_instances[i]->object_id == object_id)
+        {
+            if (buffer_index + 1 <= buffer_max_size)
+            {
+                memcpy(&p_buffer[buffer_index], ",", 1);
+                buffer_index += 1;
+            }
+            else
+            {
+                return ENOMEM;
+            }
+
+            uint32_t added_len = buffer_max_size - buffer_index;
+            err_code = lwm2m_coap_handler_gen_instance_link(m_instances[i], &p_buffer[buffer_index], &added_len);
+            if (err_code != 0)
+            {
+                return err_code;
+            }
+            buffer_index += added_len;
+        }
+    }
+
+    *p_buffer_len = buffer_index;
+
+    return 0;
+}
+
+
+uint32_t lwm2m_coap_handler_gen_instance_link(lwm2m_instance_t * p_instance,
+                                              uint8_t          * p_buffer,
+                                              uint32_t         * p_buffer_len)
+{
+    uint32_t err_code;
+    uint32_t buffer_index    = 0;
+    uint32_t buffer_max_size = *p_buffer_len;
+    uint32_t buffer_len;
+    uint8_t  dry_run_buffer[22]; // Maximum: ",</65535/65535/65535>"
+
+    buffer_len = snprintf((char *)dry_run_buffer,
+                          sizeof(dry_run_buffer),
+                          "</%u/%u>",
+                          p_instance->object_id,
+                          p_instance->instance_id);
+
+    if (buffer_index + buffer_len <= buffer_max_size)
+    {
+        memcpy(&p_buffer[buffer_index], dry_run_buffer, buffer_len);
+        buffer_index += buffer_len;
+    }
+    else
+    {
+        return ENOMEM;
+    }
+
+    for (int i = 0; i < p_instance->num_resources; ++i)
+    {
+        uint8_t resource_operation = 0;
+        err_code = op_code_resolve(p_instance, i, &resource_operation);
+
+        if (err_code != 0)
+        {
+            // Op code for requested resource not found.
+            continue;
+        }
+
+        if (resource_operation != 0)
+        {
+            buffer_len = snprintf((char *)dry_run_buffer,
+                                  sizeof(dry_run_buffer),
+                                  ",</%u/%u/%u>",
+                                  p_instance->object_id,
+                                  p_instance->instance_id,
+                                  i);
+
+            if (buffer_index + buffer_len <= buffer_max_size)
+            {
+                memcpy(&p_buffer[buffer_index], dry_run_buffer, buffer_len);
+                buffer_index += buffer_len;
+            }
+            else
+            {
+                return ENOMEM;
+            }
+        }
+    }
+
+    *p_buffer_len = buffer_index;
+
+    return 0;
+}
+
+
 static uint32_t internal_request_handle(coap_message_t * p_request,
                                         uint16_t       * p_path,
                                         uint8_t          path_len,
