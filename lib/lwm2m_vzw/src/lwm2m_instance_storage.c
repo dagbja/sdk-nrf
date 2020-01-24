@@ -327,7 +327,7 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
 
     uint8_t carrier_specific_len = 0;
     if (p_storage_server->offset_carrier_specific != LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET) {
-        carrier_specific_len = (uint32_t)&p_scratch_buffer[read_count] - (uint32_t)&p_scratch_buffer[p_storage_server->offset_carrier_specific];
+        carrier_specific_len = (uint32_t)&p_scratch_buffer[read_count] - (uint32_t)&p_scratch_buffer[p_storage_server->offset_carrier_specific] - sizeof(lwm2m_instance_acl_t);
     }
 
     uint8_t location_len = 0;
@@ -340,7 +340,7 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
     }
 
     // Set binding.
-    uint8_t binding_len = (uint32_t)&p_scratch_buffer[read_count - carrier_specific_len - location_len] - (uint32_t)&p_scratch_buffer[p_storage_server->offset_binding];
+    uint8_t binding_len = (uint32_t)&p_scratch_buffer[read_count - carrier_specific_len - location_len - sizeof(lwm2m_instance_acl_t)] - (uint32_t)&p_scratch_buffer[p_storage_server->offset_binding];
     lwm2m_server_binding_set(instance_id, &p_scratch_buffer[p_storage_server->offset_binding], binding_len);
 
     // Set server location.
