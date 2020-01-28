@@ -487,7 +487,24 @@ uint32_t lwm2m_firmware_object_callback(lwm2m_object_t * p_object,
 
     uint32_t err_code = 0;
 
-    if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
+    if (op_code == LWM2M_OPERATION_CODE_READ)
+    {
+        uint32_t buffer_len = 255;
+        uint8_t  buffer[buffer_len];
+
+        err_code = lwm2m_tlv_firmware_encode(buffer + 3, &buffer_len,
+                                             LWM2M_NAMED_OBJECT,
+                                             &m_instance_firmware);
+        lwm2m_tlv_t tlv = {
+            .id_type = TLV_TYPE_OBJECT,
+            .length = buffer_len
+        };
+        err_code = lwm2m_tlv_header_encode(buffer, &buffer_len, &tlv);
+        buffer_len += tlv.length;
+
+        err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LWM2M_TLV, p_request);
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
     {
         err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
     }

@@ -404,7 +404,63 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
 
     uint32_t err_code = 0;
 
-    if (op_code == LWM2M_OPERATION_CODE_WRITE)
+    if (op_code == LWM2M_OPERATION_CODE_READ)
+    {
+        uint32_t           buffer_max_size = 1024;
+        uint32_t           buffer_len      = buffer_max_size;
+        uint8_t            buffer[buffer_max_size];
+        uint32_t           index           = 0;
+
+        uint32_t instance_buffer_len = 256;
+        uint8_t  instance_buffer[instance_buffer_len];
+
+        for (int i = 0; i < LWM2M_MAX_SERVERS+1; i++)
+        {
+            if (lwm2m_server_short_server_id_get(i) == 0)
+            {
+                continue;
+            }
+
+            uint16_t access = 0;
+            lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(i);
+            uint32_t err_code = common_lwm2m_access_remote_get(&access,
+                                                               p_instance,
+                                                               p_request->remote);
+            if (err_code != 0 || (access & op_code) == 0)
+            {
+                continue;
+            }
+
+            instance_buffer_len = 256;
+            err_code = lwm2m_tlv_server_encode(instance_buffer,
+                                               &instance_buffer_len,
+                                               LWM2M_NAMED_OBJECT,
+                                               lwm2m_server_get_instance(i));
+            if (err_code != 0)
+            {
+                // ENOMEM should not happen. Then it is a bug.
+                break;
+            }
+
+            lwm2m_tlv_t tlv = {
+                .id_type = TLV_TYPE_OBJECT,
+                .id = i,
+                .length = instance_buffer_len
+            };
+            err_code = lwm2m_tlv_header_encode(buffer + index, &buffer_len, &tlv);
+
+            index += buffer_len;
+            buffer_len = buffer_max_size - index;
+
+            memcpy(buffer + index, instance_buffer, instance_buffer_len);
+
+            index += instance_buffer_len;
+            buffer_len = buffer_max_size - index;
+        }
+
+        err_code = lwm2m_respond_with_payload(buffer, index, COAP_CT_APP_LWM2M_TLV, p_request);
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
         (void)lwm2m_tlv_server_decode(&m_instance_server[instance_id],
                                       p_request->payload,
