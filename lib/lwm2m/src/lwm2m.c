@@ -195,7 +195,7 @@ static uint32_t op_code_resolve(lwm2m_instance_t * p_instance,
 }
 
 
-static uint32_t internal_gen_acl_link(uint8_t * p_buffer, uint32_t * p_len)
+static uint32_t internal_gen_acl_link(uint8_t * p_buffer, uint32_t * p_len, uint16_t short_server_id)
 {
     uint32_t buffer_index    = 0;
     uint32_t buffer_max_size = *p_len;
@@ -218,6 +218,13 @@ static uint32_t internal_gen_acl_link(uint8_t * p_buffer, uint32_t * p_len)
         if (m_instances[i]->object_id == LWM2M_OBJ_SECURITY)
         {
             // Skip ACL for Security objects.
+            continue;
+        }
+
+        uint16_t allowed_ops = internal_get_allowed_operations(m_instances[i], short_server_id);
+        if (allowed_ops == 0)
+        {
+            // No access.
             continue;
         }
 
@@ -381,6 +388,13 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                         continue;
                     }
 
+                    uint16_t allowed_ops = internal_get_allowed_operations(m_instances[i], short_server_id);
+                    if (allowed_ops == 0)
+                    {
+                        // No access.
+                        continue;
+                    }
+
                     acl_buffer_len = 64;
                     err_code = lwm2m_acl_serialize_tlv(acl_buffer, &acl_buffer_len, m_instances[i]);
                     if (err_code != 0)
@@ -414,7 +428,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                 uint32_t preamble_len = snprintf(buffer, sizeof(buffer), "</2>");
                 buffer_len -= preamble_len;
 
-                err_code = internal_gen_acl_link(&buffer[preamble_len], &buffer_len);
+                err_code = internal_gen_acl_link(&buffer[preamble_len], &buffer_len, short_server_id);
                 if (err_code != 0)
                 {
                     // This should not happen, it is a bug if the buffer is too small.
@@ -745,6 +759,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
 
 
 uint32_t lwm2m_coap_handler_gen_object_link(uint16_t   object_id,
+                                            uint16_t   short_server_id,
                                             uint8_t  * p_buffer,
                                             uint32_t * p_buffer_len)
 {
@@ -773,6 +788,13 @@ uint32_t lwm2m_coap_handler_gen_object_link(uint16_t   object_id,
     {
         if (m_instances[i]->object_id == object_id)
         {
+            uint16_t allowed_ops = internal_get_allowed_operations(m_instances[i], short_server_id);
+            if (allowed_ops == 0)
+            {
+                // No access.
+                continue;
+            }
+
             if (buffer_index + 1 <= buffer_max_size)
             {
                 memcpy(&p_buffer[buffer_index], ",", 1);
@@ -1573,7 +1595,7 @@ uint32_t lwm2m_coap_handler_object_delete(lwm2m_object_t * p_object)
 }
 
 
-uint32_t lwm2m_coap_handler_gen_link_format(uint8_t * p_buffer, uint16_t * p_buffer_len)
+uint32_t lwm2m_coap_handler_gen_link_format(uint16_t short_server_id, uint8_t * p_buffer, uint16_t * p_buffer_len)
 {
 
     LWM2M_ENTRY();
@@ -1629,6 +1651,13 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint8_t * p_buffer, uint16_t * p_buf
         {
             if (m_instances[j]->object_id == curr_object)
             {
+                uint16_t allowed_ops = internal_get_allowed_operations(m_instances[j], short_server_id);
+                if (allowed_ops == 0)
+                {
+                    // No access.
+                    continue;
+                }
+
                 instance_present = true;
 
                 buffer_len = snprintf((char *)dry_run_buffer,
@@ -1688,13 +1717,13 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint8_t * p_buffer, uint16_t * p_buf
     if (dry_run == true)
     {
         acl_link_size = 0;
-        err_code = internal_gen_acl_link(NULL, &acl_link_size);
+        err_code = internal_gen_acl_link(NULL, &acl_link_size, short_server_id);
         *p_buffer_len = dry_run_size + acl_link_size;
     }
     else
     {
         acl_link_size = buffer_max_size - buffer_index;
-        err_code = internal_gen_acl_link(&p_string_buffer[buffer_index], &acl_link_size);
+        err_code = internal_gen_acl_link(&p_string_buffer[buffer_index], &acl_link_size, short_server_id);
         *p_buffer_len = buffer_index + acl_link_size;
     }
 

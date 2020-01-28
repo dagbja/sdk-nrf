@@ -2119,8 +2119,10 @@ static void app_server_register(uint16_t instance_id)
     uint32_t link_format_string_len = 0;
     uint8_t * p_link_format_string = NULL;
 
+    uint16_t short_server_id = lwm2m_server_short_server_id_get(instance_id);
+
     // Dry run the link format generation, to check how much memory that is needed.
-    err_code = lwm2m_coap_handler_gen_link_format(NULL, (uint16_t *)&link_format_string_len);
+    err_code = lwm2m_coap_handler_gen_link_format(short_server_id, NULL, (uint16_t *)&link_format_string_len);
 
     if (err_code == 0) {
         // Allocate the needed amount of memory.
@@ -2133,7 +2135,7 @@ static void app_server_register(uint16_t instance_id)
 
     if (err_code == 0) {
         // Render the link format string.
-        err_code = lwm2m_coap_handler_gen_link_format(p_link_format_string, (uint16_t *)&link_format_string_len);
+        err_code = lwm2m_coap_handler_gen_link_format(short_server_id, p_link_format_string, (uint16_t *)&link_format_string_len);
     }
 
     if (err_code == 0) {

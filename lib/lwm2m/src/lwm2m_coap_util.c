@@ -11,6 +11,7 @@
 #include <lwm2m_api.h>
 #include <coap_api.h>
 #include <lwm2m_remote.h>
+#include <lwm2m_acl.h>
 
 static uint32_t m_observer_sequence_num = 0;
 
@@ -415,8 +416,18 @@ uint32_t lwm2m_respond_with_object_link(uint16_t object_id, coap_message_t * p_r
     uint8_t  buffer[512];
     uint32_t buffer_len = sizeof(buffer);
 
+    uint16_t short_server_id = 0;
+    uint32_t err_code;
+
+    err_code = lwm2m_remote_short_server_id_find(&short_server_id, p_request->remote);
+    if (err_code != 0)
+    {
+        // LWM2M remote not found. Setting it to be default short server id.
+        short_server_id = LWM2M_ACL_DEFAULT_SHORT_SERVER_ID;
+    }
+
     // Object
-    uint32_t err_code = lwm2m_coap_handler_gen_object_link(object_id, buffer, &buffer_len);
+    err_code = lwm2m_coap_handler_gen_object_link(object_id, short_server_id, buffer, &buffer_len);
 
     if (err_code != 0)
     {

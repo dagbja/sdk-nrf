@@ -493,30 +493,33 @@ uint32_t lwm2m_coap_handler_object_delete(lwm2m_object_t * p_object);
  * @note For generation of links to work properly it is required that objects is added
  *       before instances.
  *
- * @param[inout] p_buffer     Pointer to a buffer to fill with link format encoded string. If
- *                            a NULL pointer is provided the function will dry-run the function
- *                            in order to calculate how much memory that is needed for the link
- *                            format string.
- * @param[inout] p_buffer_len As input used to indicate the length of the buffer. It will return the
- *                            used amount of buffer length by reference in response. If NULL pointer
- *                            is provided for p_buffer, the value by reference output will be the number
- *                            of bytes needed to generate the link format string.
+ * @param[in]    short_server_id Short server id of the requesting server.
+ * @param[inout] p_buffer        Pointer to a buffer to fill with link format encoded string. If
+ *                               a NULL pointer is provided the function will dry-run the function
+ *                               in order to calculate how much memory that is needed for the link
+ *                               format string.
+ * @param[inout] p_buffer_len    As input used to indicate the length of the buffer. It will return the
+ *                               used amount of buffer length by reference in response. If NULL pointer
+ *                               is provided for p_buffer, the value by reference output will be the number
+ *                               of bytes needed to generate the link format string.
  *
  * @retval        NRF_SUCCESS      If generation of link format string was successful.
  * @retval        NRF_ERROR_NO_MEM If the provided memory was not large enough.
  */
-uint32_t lwm2m_coap_handler_gen_link_format(uint8_t * p_buffer, uint16_t * p_buffer_len);
+uint32_t lwm2m_coap_handler_gen_link_format(uint16_t short_server_id, uint8_t * p_buffer, uint16_t * p_buffer_len);
 
 /**@brief Generate link format string based on Object.
  *
- * @param[in]    object_id    Identifies the object.
- * @param[inout] p_buffer     Pointer to a buffer to fill with link format encoded string.
- * @param[inout] p_buffer_len As input used to indicate length of the buffer. It will return the
- *                            used amout of buffer length.
+ * @param[in]    object_id       Identifies the object.
+ * @param[in]    short_server_id Short server id of the requesting server.
+ * @param[inout] p_buffer        Pointer to a buffer to fill with link format encoded string.
+ * @param[inout] p_buffer_len    As input used to indicate length of the buffer. It will return the
+ *                               used amout of buffer length.
  *
  * retval NRF_SUCCESS If generation of link format string was successful.
  */
 uint32_t lwm2m_coap_handler_gen_object_link(uint16_t   object_id,
+                                            uint16_t   short_server_id,
                                             uint8_t  * p_buffer,
                                             uint32_t * p_buffer_len);
 
