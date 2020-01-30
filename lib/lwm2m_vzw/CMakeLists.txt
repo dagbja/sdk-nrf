@@ -43,6 +43,7 @@ zephyr_library_sources(
     src/lwm2m_security.c
     src/lwm2m_server.c
     src/lwm2m_time.c
+    src/operator_check.c
     src/sha256.c
     src/sms_receive.c
     src/lwm2m_carrier_api.c

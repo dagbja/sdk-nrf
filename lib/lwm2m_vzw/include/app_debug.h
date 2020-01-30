@@ -17,7 +17,8 @@
 /**@brief Configurable device values. */
 typedef struct {
     int64_t coap_con_interval;    /**< When to send CON instead of NON in CoAP observables. */
-    char dummy1[8];               /**< Currently unused value, previous used for static configured IMEI. */
+    uint32_t operator_id;         /**< Used to set a specific operator behaviour. */
+    char dummy1[4];               /**< Currently unused value, previous used for static configured IMEI. */
     char dummy2[16];              /**< Currently unused value, previous used for static configured MSISDN. */
     char dummy3[65];              /**< Currently unused value, previous used for modem logging. */
     uint32_t flags;               /**< Flags to control application behaviour. */
@@ -28,6 +29,9 @@ void lwm2m_debug_reset(void);
 
 int32_t lwm2m_debug_con_interval_set(int64_t con_interval);
 int64_t lwm2m_debug_con_interval_get(void);
+
+int32_t lwm2m_debug_operator_id_set(uint32_t operator_id);
+uint32_t lwm2m_debug_operator_id_get(void);
 
 bool lwm2m_debug_is_set(uint32_t flag);
 int32_t lwm2m_debug_set(uint32_t flag);

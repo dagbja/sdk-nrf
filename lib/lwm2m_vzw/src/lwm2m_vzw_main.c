@@ -29,6 +29,7 @@
 
 #include <app_debug.h>
 #include <at_interface.h>
+#include <operator_check.h>
 #include <nrf_socket.h>
 #include <nrf_errno.h>
 #include <sms_receive.h>
@@ -73,8 +74,6 @@
                                          0x35, 0x34, 0x1d, 0x00, \
                                          0x0a, 0x91, 0xe7, 0x47} /**< Pre-shared key used for bootstrap server in hex format. */
 #endif
-
-#define APP_OPERATOR_ID_VZW             1                                                   /**< Operator id for Verizon SIM. */
 
 #define VZW_BOOTSTRAP_INSTANCE_ID       0                                                   /**< Verizon Bootstrap server instance id. */
 #define VZW_MANAGEMENT_INSTANCE_ID      1                                                   /**< Verizon Device Management server instance id. */
@@ -130,7 +129,6 @@ static char m_imei[16];
  */
 static char m_msisdn[16];
 
-static uint32_t m_operator_id;
 static uint32_t m_net_stat;
 
 // TODO: Use observable settings pr. resource
@@ -400,7 +398,7 @@ char *lwm2m_imei_get(void)
     return m_imei;
 }
 
-/** Return a 10 digits MSISDN. */
+/** Return MSISDN. For VzW this must be exactly 10 digits. */
 char *lwm2m_msisdn_get(void)
 {
     char * p_msisdn = m_msisdn;
@@ -410,12 +408,13 @@ char *lwm2m_msisdn_get(void)
         return p_msisdn;
     }
 
-    if (m_operator_id == APP_OPERATOR_ID_VZW) {
+    if (operator_is_vzw(false))
+    {
         // MSISDN is read from Modem and includes country code.
         // The country code "+1" should not be used in VZW network.
         p_msisdn = &m_msisdn[2]; // Remove country code "+1".
     }
-    else
+    else if (operator_is_vzw(true))
     {
         // Make sure the MSISDN value is 10 digits long.
         size_t len = strlen(m_msisdn);
@@ -423,8 +422,12 @@ char *lwm2m_msisdn_get(void)
         p_msisdn = &m_msisdn[len - 10];
     }
 
-    // MSISDN is used to generate the Client ID. Must be 10 digits in VZW.
-    __ASSERT(strlen(p_msisdn) == 10, "Invalid MSISDN length");
+    if (operator_is_vzw(true))
+    {
+        // MSISDN is used to generate the Client ID. Must be 10 digits in VZW.
+        __ASSERT(strlen(p_msisdn) == 10, "Invalid MSISDN length");
+    }
+
     return p_msisdn;
 }
 
@@ -533,7 +536,7 @@ int lwm2m_admin_pdn_activate(uint16_t instance_id)
 {
     int rc;
 
-    if ((m_operator_id != APP_OPERATOR_ID_VZW) ||
+    if (!operator_is_vzw(false) ||
         !m_use_admin_pdn[instance_id]) {
         /* Nothing to do */
         lwm2m_pdn_activate_delay_reset();
@@ -649,9 +652,9 @@ static int app_read_sim_values(void)
 
     if (ret != 0)
     {
-        if (m_operator_id == APP_OPERATOR_ID_VZW)
+        if (operator_is_supported(false))
         {
-            // MSISDN is mandatory on VZW network. Cannot continue.
+            // MSISDN is mandatory on VZW and AT&T network. Cannot continue.
             LWM2M_ERR("No MSISDN available, cannot generate client ID");
             return EACCES;
         }
@@ -1690,14 +1693,13 @@ static void app_connect(void)
     // First ensure all existing connections are disconnected.
     app_disconnect();
 
-    // Check if operator ID has changed.
-    at_read_operator_id(&m_operator_id);
+    // Read operator ID.
+    operator_id_read();
 
-    if (((m_net_stat == APP_NET_REG_STAT_HOME) && (m_operator_id == APP_OPERATOR_ID_VZW)) ||
-         lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK))
+    if ((m_net_stat == APP_NET_REG_STAT_HOME) && operator_is_supported(true))
     {
-        LWM2M_INF("Registered to home network");
-        if (m_operator_id == APP_OPERATOR_ID_VZW) {
+        LWM2M_INF("Registered to home network (%s)", lwm2m_os_log_strdup(operator_id_string(OPERATOR_ID_CURRENT)));
+        if (operator_is_supported(false)) {
             lwm2m_sms_receiver_enable();
         }
 
@@ -1881,7 +1883,7 @@ static void app_server_connect(uint16_t instance_id)
     memset(&m_server_conf[instance_id], 0, sizeof(lwm2m_server_config_t));
     m_server_conf[instance_id].lifetime = lwm2m_server_lifetime_get(instance_id);
 
-    if (m_operator_id == APP_OPERATOR_ID_VZW)
+    if (operator_is_supported(false))
     {
         m_server_conf[instance_id].binding.p_val = "UQS";
         m_server_conf[instance_id].binding.len = 3;

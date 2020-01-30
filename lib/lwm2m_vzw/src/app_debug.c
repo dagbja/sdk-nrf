@@ -43,6 +43,18 @@ int64_t lwm2m_debug_con_interval_get(void)
     return m_debug_settings.coap_con_interval;
 }
 
+int32_t lwm2m_debug_operator_id_set(uint32_t operator_id)
+{
+    m_debug_settings.operator_id = operator_id;
+
+    return lwm2m_debug_settings_store(&m_debug_settings);
+}
+
+uint32_t lwm2m_debug_operator_id_get(void)
+{
+    return m_debug_settings.operator_id;
+}
+
 bool lwm2m_debug_is_set(uint32_t flag)
 {
     return ((m_debug_settings.flags & flag) == flag);

@@ -20,6 +20,7 @@
 #include <lwm2m_retry_delay.h>
 #include <lwm2m_instance_storage.h>
 #include <at_interface.h>
+#include <operator_check.h>
 #include <sms_receive.h>
 #include <lwm2m_vzw_main.h>
 #include <modem_logging.h>
@@ -149,7 +150,12 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
 
     shell_print(shell, "  SIM ICCID      %s", iccid);
     shell_print(shell, "  Logging        %s", modem_logging_get());
+    shell_print(shell, "  Real carrier   %s", operator_id_string(OPERATOR_ID_CURRENT));
     shell_print(shell, "  Carrier check  %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK) ? "No" : "Yes");
+    if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
+        uint32_t operator_id = lwm2m_debug_operator_id_get();
+        shell_print(shell, "   Debug carrier %u (%s)", operator_id, operator_id_string(operator_id));
+    }
     shell_print(shell, "  Roam as Home   %s", lwm2m_debug_is_set(LWM2M_DEBUG_ROAM_AS_HOME) ? "Yes" : "No");
     shell_print(shell, "  IPv6 enabled   %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6) ? "No" : "Yes");
     shell_print(shell, "  IP fallback    %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_FALLBACK) ? "No" : "Yes");
@@ -350,6 +356,32 @@ static int cmd_debug_con_interval(const struct shell *shell, size_t argc, char *
     lwm2m_debug_con_interval_set(con_interval);
 
     shell_print(shell, "Set CoAP CON interval: %d seconds", con_interval);
+
+    return 0;
+}
+
+static int cmd_debug_operator_id(const struct shell *shell, size_t argc, char **argv)
+{
+    uint32_t operator_max = operator_id_max();
+
+    if (argc != 2) {
+        shell_print(shell, "%s <id>", argv[0]);
+        for (int i = 0; i <= operator_max; i++) {
+            shell_print(shell, " %u = %s", i, operator_id_string(i));
+        }
+        return 0;
+    }
+
+    int operator_id = atoi(argv[1]);
+
+    if (operator_id < 0 || operator_id > operator_max) {
+        shell_print(shell, "invalid value, must be between 0 and %u", operator_max);
+        return 0;
+    }
+
+    lwm2m_debug_operator_id_set(operator_id);
+
+    shell_print(shell, "Set carrier: %u (%s)", operator_id, operator_id_string(operator_id));
 
     return 0;
 }
@@ -1091,6 +1123,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
     SHELL_CMD(roam_as_home, NULL, "Set Roam as Home", cmd_debug_roam_as_home),
     SHELL_CMD(carrier_check, NULL, "Set carrier check", cmd_debug_carrier_check),
+    SHELL_CMD(carrier_set, NULL, "Set debug carrier", cmd_debug_operator_id),
     SHELL_CMD(ipv6_enable, NULL, "Set IPv6 enabled", cmd_debug_ipv6_enabled),
     SHELL_CMD(fallback, NULL, "Set IP Fallback", cmd_debug_fallback_disabled),
     SHELL_CMD(con_interval, NULL, "Set CoAP CON timer", cmd_debug_con_interval),
