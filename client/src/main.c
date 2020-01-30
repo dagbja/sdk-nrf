@@ -94,14 +94,10 @@ void lwm2m_vzw_thread_run(void)
     // Start FIDO trace first to ensure we capture lwm2m_carrier_init().
     modem_trace_enable();
 
-    const lwm2m_carrier_config_t carrier_config = {
-        .bootstrap_uri = "coaps://xvzwcdpii.xdev.motive.com:5684"
-    };
-
-    int err = lwm2m_carrier_init(&carrier_config);
+    int err = lwm2m_carrier_init(NULL);
     if (err != 0) {
-        printk("Failed to initialize the VZW LWM2M carrier library (%d). Exit!\n", err);
-        __ASSERT(false, "Failed to initialize the VZW LWM2M carrier library (%d). Exit!\n", err);
+        printk("Failed to initialize the LWM2M carrier library (%d). Exit!\n", err);
+        __ASSERT(false, "Failed to initialize the LWM2M carrier library (%d). Exit!\n", err);
         return;
     }
 

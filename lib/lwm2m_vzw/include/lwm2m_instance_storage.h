@@ -55,6 +55,9 @@ int32_t lwm2m_instance_storage_conn_stat_delete(uint16_t instance_id);
 int32_t lwm2m_last_used_msisdn_get(char * p_msisdn, uint8_t max_len);
 int32_t lwm2m_last_used_msisdn_set(const char * p_msisdn, uint8_t len);
 
+int32_t lwm2m_last_used_operator_id_get(uint32_t * p_operator_id);
+int32_t lwm2m_last_used_operator_id_set(uint32_t operator_id);
+
 int32_t lwm2m_debug_settings_load(debug_settings_t * debug_settings);
 int32_t lwm2m_debug_settings_store(const debug_settings_t * debug_settings);
 

@@ -20,7 +20,6 @@
 
 #define LWM2M_INSTANCE_STORAGE_FIELD_NOT_SET   0xFFFF
 
-#define LWM2M_INSTANCE_STORAGE_TYPE_MAX_COUNT  10
 #define LWM2M_INSTANCE_STORAGE_MISC_DATA       (LWM2M_OS_STORAGE_END)
 #define LWM2M_INSTANCE_STORAGE_DEVICE          (LWM2M_OS_STORAGE_END - 1)
 #define LWM2M_INSTANCE_STORAGE_CONN_MON        (LWM2M_OS_STORAGE_END - 2)
@@ -32,6 +31,7 @@
 #define LWM2M_MODEM_FIRMWARE_READY             (LWM2M_OS_STORAGE_END - 8)
 #define LWM2M_MODEM_FIRMWARE_UPDATE            (LWM2M_OS_STORAGE_END - 9)
 #define LWM2M_MODEM_FIRMWARE_URI               (LWM2M_OS_STORAGE_END - 10)
+#define LWM2M_INSTANCE_STORAGE_OPERATOR_ID     (LWM2M_OS_STORAGE_END - 11)
 #define LWM2M_INSTANCE_STORAGE_BASE_SECURITY   (LWM2M_OS_STORAGE_BASE)
 #define LWM2M_INSTANCE_STORAGE_BASE_SERVER     (LWM2M_OS_STORAGE_BASE + 10)
 #define LWM2M_OBSERVERS_BASE                   (LWM2M_OS_STORAGE_BASE + 20)
@@ -803,6 +803,17 @@ int32_t lwm2m_last_used_msisdn_set(const char * p_msisdn, uint8_t len)
 {
     return lwm2m_os_storage_write(LWM2M_INSTANCE_STORAGE_MSISDN, p_msisdn, len);
 }
+
+int32_t lwm2m_last_used_operator_id_get(uint32_t * p_operator_id)
+{
+    return lwm2m_os_storage_read(LWM2M_INSTANCE_STORAGE_OPERATOR_ID, p_operator_id, sizeof(*p_operator_id));
+}
+
+int32_t lwm2m_last_used_operator_id_set(uint32_t operator_id)
+{
+    return lwm2m_os_storage_write(LWM2M_INSTANCE_STORAGE_OPERATOR_ID, &operator_id, sizeof(operator_id));
+}
+
 
 int32_t lwm2m_debug_settings_load(debug_settings_t * debug_settings)
 {

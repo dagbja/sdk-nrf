@@ -386,6 +386,19 @@ static int cmd_debug_operator_id(const struct shell *shell, size_t argc, char **
     return 0;
 }
 
+static int cmd_lwm2m_bootstrap(const struct shell *shell, size_t argc, char **argv)
+{
+    if ((lwm2m_state_get() == LWM2M_STATE_IDLE) ||
+        (lwm2m_state_get() == LWM2M_STATE_DISCONNECTED))
+    {
+        lwm2m_request_bootstrap();
+    } else {
+        shell_print(shell, "Wrong state for bootstrap");
+    }
+
+    return 0;
+}
+
 static int cmd_lwm2m_register(const struct shell *shell, size_t argc, char **argv)
 {
     if (lwm2m_state_get() == LWM2M_STATE_DISCONNECTED) {
@@ -1134,6 +1147,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_lwm2m,
     SHELL_CMD(status, NULL, "Application status", cmd_lwm2m_status),
+    SHELL_CMD(bootstrap, NULL, "Bootstrap", cmd_lwm2m_bootstrap),
     SHELL_CMD(register, NULL, "Register server", cmd_lwm2m_register),
     SHELL_CMD(update, NULL, "Update server", cmd_lwm2m_update),
     SHELL_CMD(deregister, NULL, "Deregister server", cmd_lwm2m_deregister),

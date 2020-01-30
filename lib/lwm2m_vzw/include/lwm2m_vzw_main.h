@@ -67,6 +67,7 @@ int lwm2m_admin_pdn_activate(uint16_t instance_id);
 
 void lwm2m_request_link_up(void);
 void lwm2m_request_link_down(void);
+void lwm2m_request_bootstrap(void);
 void lwm2m_request_connect(void);
 void lwm2m_request_server_update(uint16_t instance_id, bool reconnect);
 bool lwm2m_request_remote_reconnect(struct nrf_sockaddr *p_remote);
