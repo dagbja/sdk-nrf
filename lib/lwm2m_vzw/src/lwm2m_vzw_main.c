@@ -1200,7 +1200,9 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
                 lwm2m_state_set(LWM2M_STATE_IDLE);
             }
         }
-        else if ((coap_code == COAP_CODE_404_NOT_FOUND) || (coap_code == COAP_CODE_400_BAD_REQUEST))
+        else if ((coap_code == COAP_CODE_400_BAD_REQUEST) ||
+                 (coap_code == COAP_CODE_403_FORBIDDEN) ||    // AT&T reports this when different DTLS session
+                 (coap_code == COAP_CODE_404_NOT_FOUND))
         {
             // If not found, ignore.
             (void)lwm2m_remote_location_delete(short_server_id);
