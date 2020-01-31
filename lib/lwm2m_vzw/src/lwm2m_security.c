@@ -361,10 +361,32 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
         // Cast the instance to its prototype and add it to the CoAP handler to become a
         // public instance. We can only have one so we delete the first if any.
         (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_security[instance_id]);
-
         (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_security[instance_id]);
 
         (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_DELETE)
+    {
+        if (instance_id == LWM2M_INVALID_INSTANCE)
+        {
+            // Delete all instances except Bootstrap server
+            for (uint32_t i = 1; i < 1 + LWM2M_MAX_SERVERS; i++)
+            {
+                (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_security[i]);
+            }
+        }
+        else
+        {
+            if (instance_id == 0)
+            {
+                // Do not delete Bootstrap server
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+                return 0;
+            }
+
+            (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_security[instance_id]);
+        }
+        (void)lwm2m_respond_with_code(COAP_CODE_202_DELETED, p_request);
     }
     else
     {

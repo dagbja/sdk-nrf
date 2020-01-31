@@ -1626,6 +1626,9 @@ static void app_factory_bootstrap_initialize(uint16_t instance_id)
         lwm2m_instance_storage_security_store(instance_id);
         lwm2m_instance_storage_server_store(instance_id);
 
+        lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_security_get_instance(instance_id));
+        lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_security_get_instance(instance_id));
+
         lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_server_get_instance(instance_id));
         lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_server_get_instance(instance_id));
     }
@@ -1786,6 +1789,7 @@ static void app_load_flash_objects(void)
         if (lwm2m_security_is_bootstrap_server_get(i) ||
             lwm2m_server_short_server_id_get(i) != 0)
         {
+            lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_security_get_instance(i));
             lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_server_get_instance(i));
         }
     }

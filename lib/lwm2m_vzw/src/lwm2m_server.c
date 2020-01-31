@@ -563,6 +563,30 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
 
         (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
     }
+    else if (op_code == LWM2M_OPERATION_CODE_DELETE)
+    {
+        if (instance_id == LWM2M_INVALID_INSTANCE)
+        {
+            // Delete all instances except Bootstrap server
+            for (uint32_t i = 1; i < 1 + LWM2M_MAX_SERVERS; i++)
+            {
+                (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_server[i]);
+            }
+        }
+        else
+        {
+            if (instance_id == 0)
+            {
+                // Do not delete Bootstrap server
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+                return 0;
+            }
+
+            (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_server[instance_id]);
+        }
+
+        (void)lwm2m_respond_with_code(COAP_CODE_202_DELETED, p_request);
+    }
     else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
     {
         err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
@@ -587,10 +611,6 @@ void lwm2m_server_init(void)
     {
         lwm2m_instance_server_init(&m_instance_server[i]);
         m_instance_server[i].proto.instance_id = i;
-    }
-
-    for (uint32_t i = 0; i < 1 + LWM2M_MAX_SERVERS; i++)
-    {
         m_instance_server[i].proto.callback = server_instance_callback;
     }
 }
