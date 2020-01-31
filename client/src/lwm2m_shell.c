@@ -56,7 +56,9 @@ static int cmd_config_print(const struct shell *shell, size_t argc, char **argv)
     char terminated_uri[128];
 
     for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++) {
-        if (lwm2m_server_short_server_id_get(i)) {
+        if (lwm2m_security_is_bootstrap_server_get(i) ||
+            lwm2m_server_short_server_id_get(i))
+        {
             lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(i);
             char * server_uri = lwm2m_security_server_uri_get(i, &uri_len);
             if (uri_len > 127) {
@@ -1136,7 +1138,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
     SHELL_CMD(roam_as_home, NULL, "Set Roam as Home", cmd_debug_roam_as_home),
     SHELL_CMD(carrier_check, NULL, "Set carrier check", cmd_debug_carrier_check),
-    SHELL_CMD(carrier_set, NULL, "Set debug carrier", cmd_debug_operator_id),
+    SHELL_CMD(carrier, NULL, "Set debug carrier", cmd_debug_operator_id),
     SHELL_CMD(ipv6_enable, NULL, "Set IPv6 enabled", cmd_debug_ipv6_enabled),
     SHELL_CMD(fallback, NULL, "Set IP Fallback", cmd_debug_fallback_disabled),
     SHELL_CMD(con_interval, NULL, "Set CoAP CON timer", cmd_debug_con_interval),

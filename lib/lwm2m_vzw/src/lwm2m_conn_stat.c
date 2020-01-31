@@ -320,6 +320,11 @@ uint32_t lwm2m_conn_stat_object_callback(lwm2m_object_t * p_object,
     return err_code;
 }
 
+void lwm2m_conn_stat_init_acl(void)
+{
+    common_lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_conn_stat);
+}
+
 void lwm2m_conn_stat_init(void)
 {
     //
@@ -347,28 +352,7 @@ void lwm2m_conn_stat_init(void)
     (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_conn_stat,
                                      LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
 
-    // Set default access to LWM2M_PERMISSION_READ.
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_conn_stat,
-                                    LWM2M_PERMISSION_READ,
-                                    LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
-
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_conn_stat,
-                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE |
-                                     LWM2M_PERMISSION_OBSERVE),
-                                    101);
-
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_conn_stat,
-                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE |
-                                     LWM2M_PERMISSION_OBSERVE),
-                                    102);
-
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_conn_stat,
-                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE |
-                                     LWM2M_PERMISSION_OBSERVE),
-                                    1000);
+    lwm2m_conn_stat_init_acl();
 
     (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_conn_stat);
 }

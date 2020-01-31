@@ -27,6 +27,7 @@
 #include <lwm2m_pdn.h>
 #include <lwm2m_os.h>
 
+#include <common.h>
 #include <app_debug.h>
 #include <at_interface.h>
 #include <operator_check.h>
@@ -1258,7 +1259,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         {
             // If not found, ignore.
             (void)lwm2m_remote_location_delete(short_server_id);
-            lwm2m_server_registered_set(instance_id, 0);
+            lwm2m_server_registered_set(instance_id, false);
             lwm2m_instance_storage_server_store(instance_id);
 
             // Reset state to get back to registration.
@@ -1461,8 +1462,12 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 
     LWM2M_INF("Store bootstrap settings");
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-        lwm2m_instance_storage_security_store(i);
-        lwm2m_instance_storage_server_store(i);
+        if (lwm2m_security_is_bootstrap_server_get(i) ||
+            lwm2m_server_short_server_id_get(i) != 0)
+        {
+            lwm2m_instance_storage_security_store(i);
+            lwm2m_instance_storage_server_store(i);
+        }
     }
 
     (void)app_event_notify(LWM2M_CARRIER_EVENT_BOOTSTRAPPED, NULL);
@@ -1470,117 +1475,159 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     return 0;
 }
 
-static void app_init_server_acl(uint16_t instance_id)
-{
-    lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
-
-    // Initialize ACL on the instance.
-    (void)lwm2m_acl_permissions_init(p_instance, LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-}
-
-static void app_set_server_acl(uint16_t instance_id, lwm2m_instance_acl_t *acl)
-{
-    lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
-
-    // Reset ACL on the instance.
-    (void)lwm2m_acl_permissions_reset(p_instance, acl->owner);
-
-    // Set default access to LWM2M_PERMISSION_READ.
-    (void)lwm2m_acl_permissions_add(p_instance,
-                                    LWM2M_PERMISSION_READ,
-                                    LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
-
-    for (uint32_t j = 0; j < ARRAY_SIZE(acl->server); j++)
-    {
-        if (acl->server[j] != 0)
-        {
-            // Set server access.
-            (void)lwm2m_acl_permissions_add(p_instance, acl->access[j], acl->server[j]);
-        }
-    }
-}
-
-/**@brief Create factory bootstrapped server objects.
- *        Depends on carrier, this is Verizon / MotiveBridge.
- */
-static void app_factory_bootstrap_server_object(uint16_t instance_id)
+static bool app_factory_bootstrap_initialize_vzw(uint16_t instance_id, uint16_t *default_access, lwm2m_instance_acl_t * p_acl)
 {
     uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
                             LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE);
 
-    lwm2m_instance_acl_t acl = {
-        .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID
-    };
-
-    lwm2m_security_reset(instance_id);
-    lwm2m_server_reset(instance_id);
+    bool initialized = true;
 
     switch (instance_id)
     {
         case VZW_BOOTSTRAP_INSTANCE_ID:
         {
-            lwm2m_server_short_server_id_set(VZW_BOOTSTRAP_INSTANCE_ID, 100);
-            lwm2m_server_client_hold_off_timer_set(VZW_BOOTSTRAP_INSTANCE_ID, 0);
+            lwm2m_security_short_server_id_set(instance_id, 100);
+            lwm2m_security_is_bootstrap_server_set(instance_id, true);
+            lwm2m_security_bootstrapped_set(instance_id, false);
+            lwm2m_security_hold_off_timer_set(instance_id, 10);
 
-            lwm2m_security_is_bootstrap_server_set(VZW_BOOTSTRAP_INSTANCE_ID, true);
-            lwm2m_security_bootstrapped_set(VZW_BOOTSTRAP_INSTANCE_ID, false);
-            lwm2m_security_hold_off_timer_set(VZW_BOOTSTRAP_INSTANCE_ID, 10);
+            lwm2m_server_short_server_id_set(instance_id, 100);
+            lwm2m_server_client_hold_off_timer_set(instance_id, 0);
 
-            acl.access[0] = rwde_access;
-            acl.server[0] = 102;
+            p_acl->access[0] = rwde_access;
+            p_acl->server[0] = 102;
             break;
         }
 
         case VZW_MANAGEMENT_INSTANCE_ID:
         {
-            acl.access[0] = rwde_access;
-            acl.server[0] = 101;
-            acl.access[1] = rwde_access;
-            acl.server[1] = 102;
-            acl.access[2] = rwde_access;
-            acl.server[2] = 1000;
+            p_acl->access[0] = rwde_access;
+            p_acl->server[0] = 101;
+            p_acl->access[1] = rwde_access;
+            p_acl->server[1] = 102;
+            p_acl->access[2] = rwde_access;
+            p_acl->server[2] = 1000;
             break;
         }
 
         case VZW_DIAGNOSTICS_INSTANCE_ID:
         {
-            lwm2m_server_short_server_id_set(VZW_DIAGNOSTICS_INSTANCE_ID, 101);
-            lwm2m_server_client_hold_off_timer_set(VZW_DIAGNOSTICS_INSTANCE_ID, 30);
+            lwm2m_security_short_server_id_set(instance_id, 101);
+            if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
+                lwm2m_security_server_uri_set(instance_id, DIAGNOSTICS_URI_VZW_TEST, strlen(DIAGNOSTICS_URI_VZW_TEST));
+            } else {
+                lwm2m_security_server_uri_set(instance_id, DIAGNOSTICS_URI_VZW, strlen(DIAGNOSTICS_URI_VZW));
+            }
 
-            lwm2m_security_server_uri_set(VZW_DIAGNOSTICS_INSTANCE_ID, DIAGNOSTICS_URI_VZW, strlen(DIAGNOSTICS_URI_VZW));
-            lwm2m_server_lifetime_set(VZW_DIAGNOSTICS_INSTANCE_ID, 86400);
-            lwm2m_server_min_period_set(VZW_DIAGNOSTICS_INSTANCE_ID, 300);
-            lwm2m_server_max_period_set(VZW_DIAGNOSTICS_INSTANCE_ID, 6000);
-            lwm2m_server_notif_storing_set(VZW_DIAGNOSTICS_INSTANCE_ID, 1);
-            lwm2m_server_binding_set(VZW_DIAGNOSTICS_INSTANCE_ID, "UQS", 3);
+            lwm2m_server_short_server_id_set(instance_id, 101);
+            lwm2m_server_client_hold_off_timer_set(instance_id, 30);
+            lwm2m_server_lifetime_set(instance_id, 86400);
+            lwm2m_server_min_period_set(instance_id, 300);
+            lwm2m_server_max_period_set(instance_id, 6000);
+            lwm2m_server_notif_storing_set(instance_id, 1);
+            lwm2m_server_binding_set(instance_id, "UQS", 3);
 
-            acl.access[0] = rwde_access;
-            acl.server[0] = 102;
-            acl.owner = 101;
+            p_acl->access[0] = rwde_access;
+            p_acl->server[0] = 102;
+            p_acl->owner = 101;
             break;
         }
 
         case VZW_REPOSITORY_INSTANCE_ID:
         {
-            acl.access[0] = rwde_access;
-            acl.server[0] = 101;
-            acl.access[1] = rwde_access;
-            acl.server[1] = 102;
-            acl.access[2] = rwde_access;
-            acl.server[2] = 1000;
+            p_acl->access[0] = rwde_access;
+            p_acl->server[0] = 101;
+            p_acl->access[1] = rwde_access;
+            p_acl->server[1] = 102;
+            p_acl->access[2] = rwde_access;
+            p_acl->server[2] = 1000;
             break;
         }
 
         default:
+            initialized = false;
             break;
     }
 
-    app_set_server_acl(instance_id, &acl);
+    return initialized;
+}
 
-    if (lwm2m_server_short_server_id_get(instance_id) > 0)
+static bool app_factory_bootstrap_initialize_att(uint16_t instance_id, uint16_t *default_access, lwm2m_instance_acl_t * p_acl)
+{
+    bool initialized = true;
+
+    switch (instance_id)
+    {
+        case VZW_BOOTSTRAP_INSTANCE_ID:
+        {
+            lwm2m_security_short_server_id_set(instance_id, 0);
+            lwm2m_security_is_bootstrap_server_set(instance_id, true);
+
+            lwm2m_server_short_server_id_set(instance_id, 0);
+
+            *default_access = 0;
+            break;
+        }
+
+        case 2:
+        {
+            p_acl->access[0] = LWM2M_ACL_RWEDO_PERM;
+            p_acl->server[0] = 1;
+            break;
+        }
+
+        default:
+            initialized = false;
+            break;
+    }
+
+    return initialized;
+}
+
+/**@brief Reset factory bootstrapped objects. */
+static void app_factory_bootstrap_reset(uint16_t instance_id)
+{
+    lwm2m_security_reset(instance_id);
+    lwm2m_server_reset(instance_id);
+
+    // Reset VzW specific values
+    lwm2m_security_hold_off_timer_set(instance_id, false);
+    lwm2m_security_is_bootstrap_server_set(instance_id, false);
+    lwm2m_server_registered_set(instance_id, false);
+    lwm2m_server_client_hold_off_timer_set(instance_id, 0);
+}
+
+/**@brief Initialize factory bootstrapped objects. */
+static void app_factory_bootstrap_initialize(uint16_t instance_id)
+{
+    uint16_t default_access = LWM2M_PERMISSION_READ;
+    bool initialized = false;
+
+    lwm2m_instance_acl_t acl = {
+        .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID
+    };
+
+    app_factory_bootstrap_reset(instance_id);
+
+    if (operator_is_vzw(true))
+    {
+        initialized = app_factory_bootstrap_initialize_vzw(instance_id, &default_access, &acl);
+    }
+    else if (operator_is_att(true))
+    {
+        initialized = app_factory_bootstrap_initialize_att(instance_id, &default_access, &acl);
+    }
+
+    lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
+    common_lwm2m_set_instance_acl(p_instance, default_access, &acl);
+
+    if (initialized)
     {
         lwm2m_instance_storage_security_store(instance_id);
         lwm2m_instance_storage_server_store(instance_id);
+
+        lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_server_get_instance(instance_id));
+        lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_server_get_instance(instance_id));
     }
 }
 
@@ -1644,8 +1691,13 @@ static bool lwm2m_bootstrap_settings_update(void)
     uint8_t p_len = 0;
     char * p = lwm2m_security_server_uri_get(VZW_BOOTSTRAP_INSTANCE_ID, &p_len);
     if (bootstrap_uri && (p_len == 0 || strncmp(p, bootstrap_uri, p_len) != 0)) {
+        // Initial startup (no server URI) or server URI has changed (carrier changed).
+        // Clear all bootstrap settings and load factory settings.
+        app_factory_bootstrap_initialize(VZW_BOOTSTRAP_INSTANCE_ID);
+
         lwm2m_security_server_uri_set(VZW_BOOTSTRAP_INSTANCE_ID, bootstrap_uri, strlen(bootstrap_uri));
         lwm2m_instance_storage_security_store(VZW_BOOTSTRAP_INSTANCE_ID);
+        lwm2m_instance_storage_server_store(VZW_BOOTSTRAP_INSTANCE_ID);
 
         settings_changed = true;
     }
@@ -1672,10 +1724,14 @@ void lwm2m_bootstrap_reset(void)
     for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
         lwm2m_instance_storage_security_delete(i);
         lwm2m_instance_storage_server_delete(i);
-        lwm2m_server_short_server_id_set(i, 0);
 
-        app_factory_bootstrap_server_object(i);
+        app_factory_bootstrap_initialize(i);
     }
+
+    lwm2m_device_init_acl();
+    lwm2m_conn_mon_init_acl();
+    lwm2m_firmware_init_acl();
+    lwm2m_conn_stat_init_acl();
 
     for (uint32_t i = 0; i < CONFIG_NRF_COAP_OBSERVE_MAX_NUM_OBSERVERS; i++)
     {
@@ -1685,7 +1741,7 @@ void lwm2m_bootstrap_reset(void)
 
 void lwm2m_factory_reset(void)
 {
-    app_misc_data_set_bootstrapped(VZW_BOOTSTRAP_INSTANCE_ID);
+    app_misc_data_set_bootstrapped(0);
 
     // Provision bootstrap PSK and diagnostic PSK at next startup
     lwm2m_last_used_msisdn_set("", 0);
@@ -1698,7 +1754,8 @@ void lwm2m_factory_reset(void)
     }
 }
 
-static void app_load_flash_objects(void)
+/**@brief Initialize server ACLs in a specific order. */
+static void app_server_acl_init(void)
 {
 #if APP_ACL_DM_SERVER_HACK
     // FIXME: Init ACL for DM server[1] first to get ACL /2/0 which is according to Verizon spec
@@ -1710,18 +1767,26 @@ static void app_load_flash_objects(void)
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
 #endif
+        lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(i);
+
+        // Initialize ACL on the instance.
+        // The owner (second parameter) is set to LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID.
+        // This will grant the Bootstrap server full permission to this instance.
+        (void)lwm2m_acl_permissions_init(p_instance, LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
+    }
+}
+
+static void app_load_flash_objects(void)
+{
+    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+    {
         lwm2m_instance_storage_security_load(i);
         lwm2m_instance_storage_server_load(i);
 
-        if (lwm2m_server_short_server_id_get(i) == 0)
+        if (lwm2m_security_is_bootstrap_server_get(i) ||
+            lwm2m_server_short_server_id_get(i) != 0)
         {
-            // Instance not loaded from flash, init server ACL
-            app_init_server_acl(i);
-
-            if (i == VZW_BOOTSTRAP_INSTANCE_ID) {
-                // Init factory defaults for bootstrap server
-                app_factory_bootstrap_server_object(i);
-            }
+            lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_server_get_instance(i));
         }
     }
 
@@ -1742,6 +1807,7 @@ static void app_lwm2m_create_objects(void)
 {
     lwm2m_security_init();
     lwm2m_server_init();
+    app_server_acl_init();
 
     // Initialize security, server and acl from flash.
     app_load_flash_objects();

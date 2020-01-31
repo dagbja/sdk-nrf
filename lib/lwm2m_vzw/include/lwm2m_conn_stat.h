@@ -13,6 +13,7 @@
 
 // LWM2M core resources.
 
+void lwm2m_conn_stat_init_acl(void);
 void lwm2m_conn_stat_init(void);
 
 lwm2m_connectivity_statistics_t * lwm2m_conn_stat_get_instance(uint16_t instance_id);

@@ -13,6 +13,7 @@
 #include <lwm2m_objects_plain_text.h>
 #include <lwm2m_vzw_main.h>
 #include <lwm2m_remote.h>
+#include <operator_check.h>
 
 #include <coap_option.h>
 #include <coap_observe_api.h>
@@ -516,6 +517,26 @@ uint32_t lwm2m_firmware_object_callback(lwm2m_object_t * p_object,
     return err_code;
 }
 
+void lwm2m_firmware_init_acl(void)
+{
+    lwm2m_instance_acl_t acl = {
+        .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID
+    };
+
+    if (operator_is_vzw(true))
+    {
+        acl.access[0] = LWM2M_ACL_RWEDO_PERM;
+        acl.server[0] = 102;
+    }
+    else if (operator_is_att(true))
+    {
+        acl.access[0] = LWM2M_ACL_RWEDO_PERM;
+        acl.server[0] = 1;
+    }
+
+    common_lwm2m_set_instance_acl((lwm2m_instance_t *)&m_instance_firmware, LWM2M_PERMISSION_READ, &acl);
+}
+
 void lwm2m_firmware_init(void)
 {
     m_object_firmware.object_id = LWM2M_OBJ_FIRMWARE;
@@ -543,16 +564,7 @@ void lwm2m_firmware_init(void)
     (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_firmware,
                                      LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
 
-    // Set default access to LWM2M_PERMISSION_READ.
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_firmware,
-                                    LWM2M_PERMISSION_READ,
-                                    LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
-
-    (void)lwm2m_acl_permissions_add((lwm2m_instance_t *)&m_instance_firmware,
-                                    (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                                     LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE |
-                                     LWM2M_PERMISSION_OBSERVE),
-                                    102);
+    lwm2m_firmware_init_acl();
 
     uint32_t errcode = lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_firmware);
     if (errcode == ENOMEM)

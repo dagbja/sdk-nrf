@@ -367,7 +367,7 @@ int32_t lwm2m_instance_storage_server_load(uint16_t instance_id)
     lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
     lwm2m_instance_acl_t * p_acl = (lwm2m_instance_acl_t *)&p_scratch_buffer[p_storage_server->offset_acl];
 
-    uint32_t err_code = lwm2m_acl_permissions_init(p_instance, p_acl->owner);
+    uint32_t err_code = lwm2m_acl_permissions_reset(p_instance, p_acl->owner);
     for (uint8_t i = 0; i < (1 + LWM2M_MAX_SERVERS); i++)
     {
         err_code = lwm2m_acl_permissions_add(p_instance, p_acl->access[i], p_acl->server[i]);
@@ -502,7 +502,7 @@ int32_t lwm2m_instance_storage_device_load(uint16_t instance_id)
     lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_device_get_instance(instance_id);
     lwm2m_instance_acl_t * p_acl = (lwm2m_instance_acl_t *)&p_scratch_buffer[p_storage_device->offset_acl];
 
-    uint32_t err_code = lwm2m_acl_permissions_init(p_instance, p_acl->owner);
+    uint32_t err_code = lwm2m_acl_permissions_reset(p_instance, p_acl->owner);
     for (uint8_t i = 0; i < (1 + LWM2M_MAX_SERVERS); i++)
     {
         err_code = lwm2m_acl_permissions_add(p_instance, p_acl->access[i], p_acl->server[i]);
@@ -582,7 +582,7 @@ int32_t lwm2m_instance_storage_conn_mon_load(uint16_t instance_id)
     lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_conn_mon_get_instance(instance_id);
     lwm2m_instance_acl_t * p_acl = (lwm2m_instance_acl_t *)&p_scratch_buffer[p_storage_conn_mon->offset_acl];
 
-    uint32_t err_code = lwm2m_acl_permissions_init(p_instance, p_acl->owner);
+    uint32_t err_code = lwm2m_acl_permissions_reset(p_instance, p_acl->owner);
     for (uint8_t i = 0; i < (1 + LWM2M_MAX_SERVERS); i++)
     {
         err_code = lwm2m_acl_permissions_add(p_instance, p_acl->access[i], p_acl->server[i]);
@@ -662,7 +662,7 @@ int32_t lwm2m_instance_storage_firmware_load(uint16_t instance_id)
     lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_firmware_get_instance(instance_id);
     lwm2m_instance_acl_t * p_acl = (lwm2m_instance_acl_t *)&p_scratch_buffer[p_storage_firmware->offset_acl];
 
-    uint32_t err_code = lwm2m_acl_permissions_init(p_instance, p_acl->owner);
+    uint32_t err_code = lwm2m_acl_permissions_reset(p_instance, p_acl->owner);
     for (uint8_t i = 0; i < (1 + LWM2M_MAX_SERVERS); i++)
     {
         err_code = lwm2m_acl_permissions_add(p_instance, p_acl->access[i], p_acl->server[i]);
@@ -743,7 +743,7 @@ int32_t lwm2m_instance_storage_conn_stat_load(uint16_t instance_id)
     lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_conn_stat_get_instance(instance_id);
     lwm2m_instance_acl_t * p_acl = (lwm2m_instance_acl_t *)&p_scratch_buffer[p_storage_conn_stat->offset_acl];
 
-    uint32_t err_code = lwm2m_acl_permissions_init(p_instance, p_acl->owner);
+    uint32_t err_code = lwm2m_acl_permissions_reset(p_instance, p_acl->owner);
     for (uint8_t i = 0; i < (1 + LWM2M_MAX_SERVERS); i++)
     {
         err_code = lwm2m_acl_permissions_add(p_instance, p_acl->access[i], p_acl->server[i]);

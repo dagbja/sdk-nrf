@@ -10,6 +10,7 @@
 #ifndef LWM2M_FIRWMARE_H__
 #define LWM2M_FIRMWARE_H__
 
+void lwm2m_firmware_init_acl(void);
 void lwm2m_firmware_init(void);
 
 char * lwm2m_firmware_package_uri_get(uint16_t instance_id, uint8_t * p_len);

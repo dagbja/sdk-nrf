@@ -13,3 +13,11 @@
 uint32_t common_lwm2m_access_remote_get(uint16_t            *p_access,
                                         lwm2m_instance_t    *p_instance,
                                         struct nrf_sockaddr *p_remote);
+
+/**@brief Helper function to set ACL on an instance. */
+void common_lwm2m_set_instance_acl(lwm2m_instance_t     *p_instance,
+                                   uint16_t              default_access,
+                                   lwm2m_instance_acl_t *acl);
+
+/**@brief Helper function to set default carrier ACL on an instance. */
+void common_lwm2m_set_carrier_acl(lwm2m_instance_t *p_instance);

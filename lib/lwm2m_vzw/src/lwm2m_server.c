@@ -561,12 +561,6 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
         (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_server[instance_id]);
         (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[instance_id]);
 
-        // Initialize ACL on the instance
-        // The owner (second parameter) is set to LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID.
-        // This will grant the Bootstrap server full permission to this instance.
-        (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_server[instance_id],
-                                         LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-
         (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
     }
     else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
@@ -598,8 +592,6 @@ void lwm2m_server_init(void)
     for (uint32_t i = 0; i < 1 + LWM2M_MAX_SERVERS; i++)
     {
         m_instance_server[i].proto.callback = server_instance_callback;
-
-        (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[i]);
     }
 }
 
