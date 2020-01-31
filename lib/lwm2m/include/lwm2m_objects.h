@@ -39,6 +39,7 @@ extern "C" {
 
 /* @brief LWM2M Registry Objects */
 #define LWM2M_OBJ_SOFTWARE_UPDATE             9
+#define LWM2M_OBJ_APN_CONNECTION_PROFILE      11
 
 /* LWM2M Security Resource IDs Appendix E.1 */
 #define LWM2M_SECURITY_SERVER_URI             0
@@ -191,6 +192,18 @@ extern "C" {
 #define LWM2M_SW_UPDATE_UNINSTALL               6
 #define LWM2M_SW_UPDATE_UPDATE_STATE            7
 #define LWM2M_SW_UPDATE_SUPPORTED_OBJECTS       8
+
+/* LWM2M APN Connection Profile */
+#define LWM2M_APN_CONN_PROF_PROFILE_NAME          0
+#define LWM2M_APN_CONN_PROF_APN                   1
+#define LWM2M_APN_CONN_PROF_ENABLE_STATUS         3
+#define LWM2M_APN_CONN_PROF_AUTH_TYPE             4
+#define LWM2M_APN_CONN_PROF_CONN_EST_TIME         9
+#define LWM2M_APN_CONN_PROF_CONN_EST_RESULT       10
+#define LWM2M_APN_CONN_PROF_CONN_EST_REJECT_CAUSE 11
+#define LWM2M_APN_CONN_PROF_CONN_END_TIME         12
+
+#define LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS        5
 
 /**
  * LWM2M Enabler
@@ -362,6 +375,24 @@ typedef struct
 
 } lwm2m_software_update_t;
 
+typedef struct
+{
+    lwm2m_instance_t           proto;
+    uint8_t                    operations[8];
+    uint16_t                   resource_ids[8];
+
+    /* Public members. */
+    lwm2m_string_t             profile_name;
+    lwm2m_string_t             apn;
+    bool                       enable_status;
+    uint8_t                    authentication_type;   // 0: PAP; 1: CHAP
+    lwm2m_list_t               conn_est_time;         // UTC Time of connection request
+    lwm2m_list_t               conn_est_result;       // 0: accepted; 1: rejected
+    lwm2m_list_t               conn_est_reject_cause; // 3GPP TS 24.008
+    lwm2m_list_t               conn_end_time;         // UTC Time of connection end
+
+} lwm2m_apn_conn_prof_t;
+
 /**@brief Allocate lwm2m_string_t memory to hold a string.
  *
  * @param[in]  p_payload Buffer which holds a string.
@@ -474,6 +505,14 @@ void lwm2m_instance_location_init(lwm2m_location_t * p_instance);
  * @param[in] p_instance Pointer to instance structure to initialize.
  */
 void lwm2m_instance_software_update_init(lwm2m_software_update_t * p_instance);
+
+/**@brief Initialize a LWM2M APN Connection Profile object instance
+ *
+ * @details Must be called before any use of the instance.
+ *
+ * @param[in] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_instance_apn_connection_profile_init(lwm2m_apn_conn_prof_t * p_instance);
 
 #ifdef __cplusplus
 }

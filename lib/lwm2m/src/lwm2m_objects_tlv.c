@@ -92,6 +92,15 @@ uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
                 break;
             }
 
+            case LWM2M_OBJ_APN_CONNECTION_PROFILE:
+            {
+                err_code = lwm2m_tlv_apn_connection_profile_encode(p_buffer + index,
+                                                                   p_buffer_len,
+                                                                   p_resource_ids[i],
+                                                                   (lwm2m_apn_conn_prof_t *)p_instance);
+                break;
+            }
+
             default:
             {
                 err_code = ENOENT;
@@ -1400,6 +1409,166 @@ uint32_t lwm2m_tlv_connectivity_statistics_encode(uint8_t                       
             err_code = lwm2m_tlv_instance_encode(p_buffer,
                                                  p_buffer_len,
                                                  (lwm2m_instance_t *)p_conn_stat);
+            break;
+        }
+
+        default:
+        {
+            err_code = ENOENT;
+            break;
+        }
+    }
+
+    return err_code;
+}
+
+uint32_t lwm2m_tlv_apn_connection_profile_decode(lwm2m_apn_conn_prof_t * p_apn_conn_prof,
+                                                 uint8_t               * p_buffer,
+                                                 uint32_t                buffer_len,
+                                                 lwm2m_tlv_callback_t    resource_callback)
+{
+    NULL_PARAM_CHECK(p_apn_conn_prof);
+    NULL_PARAM_CHECK(p_buffer);
+
+    uint32_t     err_code;
+    uint32_t     index = 0;
+    lwm2m_tlv_t  tlv;
+
+    while (index < buffer_len)
+    {
+        err_code = lwm2m_tlv_decode(&tlv, &index, p_buffer, buffer_len);
+
+        if (err_code != 0)
+        {
+            return err_code;
+        }
+
+        switch (tlv.id)
+        {
+            case LWM2M_APN_CONN_PROF_PROFILE_NAME:
+            {
+                err_code = lwm2m_bytebuffer_to_string(tlv.value,
+                                                      tlv.length,
+                                                      &p_apn_conn_prof->profile_name);
+                break;
+            }
+
+            case LWM2M_APN_CONN_PROF_APN:
+            {
+                err_code = lwm2m_bytebuffer_to_string(tlv.value,
+                                                      tlv.length,
+                                                      &p_apn_conn_prof->apn);
+                break;
+            }
+
+            case LWM2M_APN_CONN_PROF_ENABLE_STATUS:
+            {
+                p_apn_conn_prof->enable_status = tlv.value[0];
+                break;
+            }
+
+            default:
+            {
+                if (resource_callback)
+                {
+                    err_code = resource_callback(((lwm2m_instance_t *)p_apn_conn_prof)->instance_id, &tlv);
+                }
+                break;
+            }
+        }
+
+        if (err_code != 0)
+        {
+            return EINVAL;
+        }
+    }
+
+    return 0;
+}
+
+
+uint32_t lwm2m_tlv_apn_connection_profile_encode(uint8_t               * p_buffer,
+                                                 uint32_t              * p_buffer_len,
+                                                 uint16_t                resource_id,
+                                                 lwm2m_apn_conn_prof_t * p_apn_conn_prof)
+{
+    NULL_PARAM_CHECK(p_buffer);
+    NULL_PARAM_CHECK(p_buffer_len);
+    NULL_PARAM_CHECK(p_apn_conn_prof);
+
+    uint32_t err_code;
+
+    switch (resource_id)
+    {
+        case LWM2M_APN_CONN_PROF_PROFILE_NAME:
+        {
+            err_code = lwm2m_tlv_string_encode(p_buffer,
+                                               p_buffer_len,
+                                               resource_id,
+                                               p_apn_conn_prof->profile_name);
+            break;
+        }
+
+        case LWM2M_APN_CONN_PROF_APN:
+        {
+            err_code = lwm2m_tlv_string_encode(p_buffer,
+                                               p_buffer_len,
+                                               resource_id,
+                                               p_apn_conn_prof->apn);
+            break;
+        }
+
+        case LWM2M_APN_CONN_PROF_ENABLE_STATUS:
+        {
+            err_code = lwm2m_tlv_bool_encode(p_buffer,
+                                             p_buffer_len,
+                                             resource_id,
+                                             p_apn_conn_prof->enable_status);
+            break;
+        }
+
+        case LWM2M_APN_CONN_PROF_CONN_EST_TIME:
+        {
+            err_code = lwm2m_tlv_list_encode(p_buffer,
+                                             p_buffer_len,
+                                             LWM2M_APN_CONN_PROF_CONN_EST_TIME,
+                                             &p_apn_conn_prof->conn_est_time);
+            break;
+        }
+
+        case LWM2M_APN_CONN_PROF_CONN_EST_RESULT:
+        {
+            err_code = lwm2m_tlv_list_encode(p_buffer,
+                                             p_buffer_len,
+                                             LWM2M_APN_CONN_PROF_CONN_EST_RESULT,
+                                             &p_apn_conn_prof->conn_est_result);
+            break;
+        }
+
+        case LWM2M_APN_CONN_PROF_CONN_EST_REJECT_CAUSE:
+        {
+            err_code = lwm2m_tlv_list_encode(p_buffer,
+                                             p_buffer_len,
+                                             LWM2M_APN_CONN_PROF_CONN_EST_REJECT_CAUSE,
+                                             &p_apn_conn_prof->conn_est_reject_cause);
+            break;
+        }
+
+        case LWM2M_APN_CONN_PROF_CONN_END_TIME:
+        {
+            err_code = lwm2m_tlv_list_encode(p_buffer,
+                                             p_buffer_len,
+                                             LWM2M_APN_CONN_PROF_CONN_END_TIME,
+                                             &p_apn_conn_prof->conn_end_time);
+            break;
+        }
+
+        case LWM2M_NAMED_OBJECT:
+        {
+            // This is a callback to the instance, not a specific resource.
+            err_code = lwm2m_tlv_instance_encode(p_buffer,
+                                                 p_buffer_len,
+                                                 (lwm2m_instance_t *)p_apn_conn_prof);
             break;
         }
 

@@ -22,6 +22,12 @@ static int32_t        m_power_source_voltage[LWM2M_DEVICE_MAX_POWER_SOURCES];
 static int32_t        m_power_source_current[LWM2M_DEVICE_MAX_POWER_SOURCES];
 static int32_t        m_error_codes[LWM2M_DEVICE_MAX_ERROR_CODES];
 
+// APN Connection Profile object
+static int32_t        m_conn_est_time[LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
+static uint8_t        m_conn_est_result[LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
+static uint8_t        m_conn_est_reject_cause[LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
+static int32_t        m_conn_end_time[LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
+
 // lint -e516 -save // Symbol '__INTADDR__()' has arg. type conflict
 #define LWM2M_INSTANCE_OFFSET_SET(instance, type)                     \
     instance->proto.operations_offset   = offsetof(type, operations); \
@@ -466,4 +472,63 @@ void lwm2m_instance_software_update_init(lwm2m_software_update_t * p_instance)
     p_instance->resource_ids[6] = LWM2M_SW_UPDATE_UNINSTALL;
     p_instance->resource_ids[7] = LWM2M_SW_UPDATE_UPDATE_STATE;
     p_instance->resource_ids[8] = LWM2M_SW_UPDATE_SUPPORTED_OBJECTS;
+}
+
+
+void lwm2m_instance_apn_connection_profile_init(lwm2m_apn_conn_prof_t * p_instance)
+{
+    // Set prototype variables.
+    LWM2M_INSTANCE_OFFSET_SET(p_instance, lwm2m_apn_conn_prof_t);
+
+    p_instance->proto.object_id     = LWM2M_OBJ_APN_CONNECTION_PROFILE;
+    p_instance->proto.instance_id   = 0;
+    p_instance->proto.num_resources = sizeof(((lwm2m_apn_conn_prof_t *)0)->operations);
+
+    // Clear ACL.
+    memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
+
+    // Set access types.
+    p_instance->operations[0] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
+    p_instance->operations[1] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
+    p_instance->operations[2] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
+    p_instance->operations[3] = LWM2M_OPERATION_CODE_NONE;
+    p_instance->operations[4] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[5] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[6] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[7] = LWM2M_OPERATION_CODE_READ;
+
+    // Set resource IDs.
+    p_instance->resource_ids[0] = LWM2M_APN_CONN_PROF_PROFILE_NAME;
+    p_instance->resource_ids[1] = LWM2M_APN_CONN_PROF_APN;
+    p_instance->resource_ids[2] = LWM2M_APN_CONN_PROF_ENABLE_STATUS;
+    p_instance->resource_ids[3] = LWM2M_APN_CONN_PROF_AUTH_TYPE;
+    p_instance->resource_ids[4] = LWM2M_APN_CONN_PROF_CONN_EST_TIME;
+    p_instance->resource_ids[5] = LWM2M_APN_CONN_PROF_CONN_EST_RESULT;
+    p_instance->resource_ids[6] = LWM2M_APN_CONN_PROF_CONN_EST_REJECT_CAUSE;
+    p_instance->resource_ids[7] = LWM2M_APN_CONN_PROF_CONN_END_TIME;
+
+    // Setup lists.
+    p_instance->conn_est_time.type                = LWM2M_LIST_TYPE_INT32;
+    p_instance->conn_est_time.p_id                = NULL;
+    p_instance->conn_est_time.val.p_int32         = m_conn_est_time;
+    p_instance->conn_est_time.max_len             = LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS;
+    p_instance->conn_est_time.len                 = 1;
+
+    p_instance->conn_est_result.type              = LWM2M_LIST_TYPE_UINT8;
+    p_instance->conn_est_result.p_id              = NULL;
+    p_instance->conn_est_result.val.p_uint8       = m_conn_est_result;
+    p_instance->conn_est_result.max_len           = LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS;
+    p_instance->conn_est_result.len               = 1;
+
+    p_instance->conn_est_reject_cause.type        = LWM2M_LIST_TYPE_UINT8;
+    p_instance->conn_est_reject_cause.p_id        = NULL;
+    p_instance->conn_est_reject_cause.val.p_uint8 = m_conn_est_reject_cause;
+    p_instance->conn_est_reject_cause.max_len     = LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS;
+    p_instance->conn_est_reject_cause.len         = 1;
+
+    p_instance->conn_end_time.type                = LWM2M_LIST_TYPE_INT32;
+    p_instance->conn_end_time.p_id                = NULL;
+    p_instance->conn_end_time.val.p_int32         = m_conn_end_time;
+    p_instance->conn_end_time.max_len             = LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS;
+    p_instance->conn_end_time.len                 = 1;
 }

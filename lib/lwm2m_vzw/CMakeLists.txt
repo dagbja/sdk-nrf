@@ -31,6 +31,7 @@ zephyr_library_sources(
     src/at_interface.c
     src/common.c
     src/dfusock.c
+    src/lwm2m_apn_conn_prof.c
     src/lwm2m_conn_mon.c
     src/lwm2m_conn_stat.c
     src/lwm2m_vzw_main.c
