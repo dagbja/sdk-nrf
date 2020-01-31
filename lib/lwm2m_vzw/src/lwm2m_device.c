@@ -624,7 +624,7 @@ void lwm2m_device_init(void)
     (void)lwm2m_carrier_error_code_add(LWM2M_CARRIER_ERROR_CODE_NO_ERROR);
     (void)lwm2m_bytebuffer_to_string("UQS", 3, &m_instance_device.supported_bindings);
     (void)lwm2m_carrier_device_type_set("Smart Device");
-    (void)lwm2m_carrier_software_version_set("LwM2M 0.8.1");
+    (void)lwm2m_carrier_software_version_set("LwM2M 0.9");
     (void)lwm2m_carrier_hardware_version_set("1.0");
     (void)lwm2m_carrier_battery_status_set(LWM2M_CARRIER_BATTERY_STATUS_NOT_INSTALLED);
 
