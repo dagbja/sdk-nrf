@@ -187,6 +187,7 @@
 ^lwm2m_deregister$
 ^lwm2m_init$
 ^lwm2m_instance_apn_connection_profile_init$
+^lwm2m_instance_connectivity_extension_init$
 ^lwm2m_instance_connectivity_monitoring_init$
 ^lwm2m_instance_connectivity_statistics_init$
 ^lwm2m_instance_device_init$
@@ -216,6 +217,8 @@
 ^lwm2m_tlv_bytebuffer_to_int32$
 ^lwm2m_tlv_apn_connection_profile_decode$
 ^lwm2m_tlv_apn_connection_profile_encode$
+^lwm2m_tlv_connectivity_extension_decode$
+^lwm2m_tlv_connectivity_extension_encode$
 ^lwm2m_tlv_connectivity_monitoring_decode$
 ^lwm2m_tlv_connectivity_monitoring_encode$
 ^lwm2m_tlv_connectivity_statistics_decode$

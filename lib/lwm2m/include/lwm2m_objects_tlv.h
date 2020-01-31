@@ -282,6 +282,42 @@ uint32_t lwm2m_tlv_apn_connection_profile_encode(uint8_t               * p_buffe
                                                  uint16_t                resource_id,
                                                  lwm2m_apn_conn_prof_t * p_apn_conn_prof);
 
+/**@brief Decode an AT&T connectivity extension object from a TLV byte buffer.
+ *
+ * @note    Resource values NOT found in the TLV will not be altered.
+ *
+ * @warning lwm2m_string_t values will point to the byte buffer and needs
+ *          to be copied by the application before the byte buffer is freed.
+ *
+ * @param[out] p_conn_ext      Pointer to an AT&T connectivity extension object to be filled by
+ *                             the decoded TLVs.
+ * @param[in]  p_buffer        Pointer to the TLV byte buffer to be decoded.
+ * @param[in]  buffer_len      Size of the buffer to be decoded.
+ * @param[in]  resource_callback Callback function to handle vendor specific TLV resources.
+ *
+ * @retval NRF_SUCCESS If decoding was successful.
+ */
+uint32_t lwm2m_tlv_connectivity_extension_decode(lwm2m_connectivity_extension_t  * p_conn_ext,
+                                                 uint8_t                         * p_buffer,
+                                                 uint32_t                          buffer_len,
+                                                 lwm2m_tlv_callback_t              resource_callback);
+
+/**@brief Encode an AT&T connectivity extension object to a TLV byte buffer.
+ *
+ * @param[out]   p_buffer         Pointer to a byte buffer to be used to fill the encoded TLVs.
+ * @param[inout] p_buffer_len     Value by reference indicating the size of the buffer provided.
+ *                                Will return the number of used bytes on return.
+ * @param[in]    resource_id      Resource identifier to encode. LWM2M_NAMED_OBJECT to encode all.
+ * @param[in]    p_conn_ext       Pointer to the LWM2M connectivity extension object to be
+ *                                encoded into TLVs.
+ *
+ * @retval NRF_SUCCESS If the encoded was successful.
+ */
+uint32_t lwm2m_tlv_connectivity_extension_encode(uint8_t                        * p_buffer,
+                                                 uint32_t                       * p_buffer_len,
+                                                 uint16_t                         resource_id,
+                                                 lwm2m_connectivity_extension_t * p_conn_ext);
+
 /**@brief Decode a LWM2M Portfolio object from a TLV byte buffer.
  *
  * @note    Resource values NOT found in the TLV will not be altered.

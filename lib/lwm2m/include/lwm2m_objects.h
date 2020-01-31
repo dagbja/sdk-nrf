@@ -42,6 +42,9 @@ extern "C" {
 #define LWM2M_OBJ_APN_CONNECTION_PROFILE      11
 #define LWM2M_OBJ_PORTFOLIO                   16
 
+/* @brief AT&T Connectivity Extension Object */
+#define LWM2M_OBJ_CONN_EXT                    10308
+
 /* LWM2M Security Resource IDs Appendix E.1 */
 #define LWM2M_SECURITY_SERVER_URI             0
 #define LWM2M_SECURITY_BOOTSTRAP_SERVER       1
@@ -214,6 +217,19 @@ extern "C" {
 #define LWM2M_PORTFOLIO_HOST_DEVICE_MODEL        2
 #define LWM2M_PORTFOLIO_HOST_DEVICE_SW_VERSION   3
 #define LWM2M_PORTFOLIO_IDENTITY_INSTANCES       4
+
+/* AT&T Connectivity extension */
+#define LWM2M_CONN_EXT_ICCID                     1
+#define LWM2M_CONN_EXT_IMSI                      2
+#define LWM2M_CONN_EXT_MSISDN                    3
+#define LWM2M_CONN_EXT_APN_RETRIES               4
+#define LWM2M_CONN_EXT_APN_RETRY_PERIOD          5
+#define LWM2M_CONN_EXT_APN_RETRY_BACK_OFF_PERIOD 6
+#define LWM2M_CONN_EXT_SINR                      7
+#define LWM2M_CONN_EXT_SRXLEV                    8
+#define LWM2M_CONN_EXT_CE_MODE                   9
+
+#define LWM2M_CONN_EXT_MAX_APN_COUNT             5 // TODO: What is the maximum number?
 
 /**
  * LWM2M Enabler
@@ -414,6 +430,25 @@ typedef struct
 
 } lwm2m_portfolio_t;
 
+typedef struct
+{
+    lwm2m_instance_t           proto;
+    uint8_t                    operations[9];
+    uint16_t                   resource_ids[9];
+
+    /* Public members. */
+    lwm2m_string_t             iccid;
+    lwm2m_string_t             imsi;
+    lwm2m_string_t             msisdn;
+    lwm2m_list_t               apn_retries;
+    lwm2m_list_t               apn_retry_period; // Unit: s
+    lwm2m_list_t               apn_retry_back_off_period; // Unit: s
+    int32_t                    sinr;
+    int32_t                    srxlev;
+    lwm2m_string_t             ce_mode;
+
+} lwm2m_connectivity_extension_t;
+
 
 /**@brief Allocate lwm2m_string_t memory to hold a string.
  *
@@ -543,6 +578,14 @@ void lwm2m_instance_apn_connection_profile_init(lwm2m_apn_conn_prof_t * p_instan
  * @param[in] p_instance Pointer to instance structure to initialize.
  */
 void lwm2m_instance_portfolio_init(lwm2m_portfolio_t * p_instance);
+
+/**@brief Initialize an AT&T connectivity extension object instance
+ *
+ * @details Must be called before any use of the instance.
+ *
+ * @param[in] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_instance_connectivity_extension_init(lwm2m_connectivity_extension_t * p_instance);
 
 #ifdef __cplusplus
 }

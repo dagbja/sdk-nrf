@@ -17,6 +17,7 @@
 #include <lwm2m_conn_stat.h>
 #include <lwm2m_apn_conn_prof.h>
 #include <lwm2m_portfolio.h>
+#include <lwm2m_conn_ext.h>
 #include <lwm2m_vzw_main.h>
 #include <lwm2m_device.h>
 #include <lwm2m_firmware.h>
@@ -1758,6 +1759,7 @@ void lwm2m_bootstrap_reset(void)
     lwm2m_conn_stat_init_acl();
     lwm2m_apn_conn_prof_init_acl();
     lwm2m_portfolio_init_acl();
+    lwm2m_conn_ext_init_acl();
 
     lwm2m_device_update_software_version();
 
@@ -1848,6 +1850,7 @@ static void app_lwm2m_create_objects(void)
     lwm2m_conn_stat_init();
     lwm2m_apn_conn_prof_init();
     lwm2m_portfolio_init();
+    lwm2m_conn_ext_init();
 }
 
 /**@brief LWM2M initialization.
@@ -1890,6 +1893,9 @@ static void app_lwm2m_setup(void)
 
     // Add portfolio support.
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_portfolio_get_object());
+
+    // Add connectivity extension support.
+    (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_conn_ext_get_object());
 }
 
 static void app_connect(void)

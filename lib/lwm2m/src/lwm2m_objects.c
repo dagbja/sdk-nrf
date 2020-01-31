@@ -28,6 +28,11 @@ static uint8_t        m_conn_est_result[LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
 static uint8_t        m_conn_est_reject_cause[LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
 static int32_t        m_conn_end_time[LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
 
+// AT&T Connectivity extension object
+static uint8_t        m_apn_retries[LWM2M_CONN_EXT_MAX_APN_COUNT];
+static int32_t        m_apn_retry_period[LWM2M_CONN_EXT_MAX_APN_COUNT];
+static int32_t        m_apn_retry_back_off_period[LWM2M_CONN_EXT_MAX_APN_COUNT];
+
 // lint -e516 -save // Symbol '__INTADDR__()' has arg. type conflict
 #define LWM2M_INSTANCE_OFFSET_SET(instance, type)                     \
     instance->proto.operations_offset   = offsetof(type, operations); \
@@ -555,4 +560,55 @@ void lwm2m_instance_portfolio_init(lwm2m_portfolio_t * p_instance)
     p_instance->identity.p_id                = NULL;
     p_instance->identity.val.p_string        = NULL;
     p_instance->identity.max_len             = LWM2M_PORTFOLIO_IDENTITY_INSTANCES;
+}
+
+void lwm2m_instance_connectivity_extension_init(lwm2m_connectivity_extension_t * p_instance)
+{
+    // Set prototype variables.
+    LWM2M_INSTANCE_OFFSET_SET(p_instance, lwm2m_connectivity_extension_t);
+
+    p_instance->proto.object_id     = LWM2M_OBJ_CONN_EXT;
+    p_instance->proto.instance_id   = 0;
+    p_instance->proto.num_resources = sizeof(((lwm2m_connectivity_extension_t *)0)->operations);
+
+    // Clear ACL.
+    memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
+
+    // Set access types.
+    p_instance->operations[0] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[1] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[2] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
+    p_instance->operations[3] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
+    p_instance->operations[4] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
+    p_instance->operations[5] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
+    p_instance->operations[6] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[7] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[8] = LWM2M_OPERATION_CODE_READ;
+
+    // Set resource IDs.
+    p_instance->resource_ids[0] = LWM2M_CONN_EXT_ICCID;
+    p_instance->resource_ids[1] = LWM2M_CONN_EXT_IMSI;
+    p_instance->resource_ids[2] = LWM2M_CONN_EXT_MSISDN;
+    p_instance->resource_ids[3] = LWM2M_CONN_EXT_APN_RETRIES;
+    p_instance->resource_ids[4] = LWM2M_CONN_EXT_APN_RETRY_PERIOD;
+    p_instance->resource_ids[5] = LWM2M_CONN_EXT_APN_RETRY_BACK_OFF_PERIOD;
+    p_instance->resource_ids[6] = LWM2M_CONN_EXT_SINR;
+    p_instance->resource_ids[7] = LWM2M_CONN_EXT_SRXLEV;
+    p_instance->resource_ids[8] = LWM2M_CONN_EXT_CE_MODE;
+
+    // Setup lists.
+    p_instance->apn_retries.type                      = LWM2M_LIST_TYPE_UINT8;
+    p_instance->apn_retries.p_id                      = NULL;
+    p_instance->apn_retries.val.p_uint8               = m_apn_retries;
+    p_instance->apn_retries.max_len                   = LWM2M_CONN_EXT_MAX_APN_COUNT;
+
+    p_instance->apn_retry_period.type                 = LWM2M_LIST_TYPE_INT32;
+    p_instance->apn_retry_period.p_id                 = NULL;
+    p_instance->apn_retry_period.val.p_int32          = m_apn_retry_period;
+    p_instance->apn_retry_period.max_len              = LWM2M_CONN_EXT_MAX_APN_COUNT;
+
+    p_instance->apn_retry_back_off_period.type        = LWM2M_LIST_TYPE_INT32;
+    p_instance->apn_retry_back_off_period.p_id        = NULL;
+    p_instance->apn_retry_back_off_period.val.p_int32 = m_apn_retry_back_off_period;
+    p_instance->apn_retry_back_off_period.max_len     = LWM2M_CONN_EXT_MAX_APN_COUNT;
 }

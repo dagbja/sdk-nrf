@@ -107,6 +107,14 @@ uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
                                                       p_buffer_len,
                                                       p_resource_ids[i],
                                                       (lwm2m_portfolio_t *)p_instance);
+            }
+
+            case LWM2M_OBJ_CONN_EXT:
+            {
+                err_code = lwm2m_tlv_connectivity_extension_encode(p_buffer + index,
+                                                                   p_buffer_len,
+                                                                   p_resource_ids[i],
+                                                                   (lwm2m_connectivity_extension_t *)p_instance);
                 break;
             }
 
@@ -1674,6 +1682,188 @@ uint32_t lwm2m_tlv_portfolio_encode(uint8_t           * p_buffer,
             err_code = lwm2m_tlv_instance_encode(p_buffer,
                                                  p_buffer_len,
                                                  (lwm2m_instance_t *)p_portfolio);
+            break;
+        }
+
+        default:
+        {
+            err_code = ENOENT;
+            break;
+        }
+    }
+
+    return err_code;
+}
+
+uint32_t lwm2m_tlv_connectivity_extension_decode(lwm2m_connectivity_extension_t * p_conn_ext,
+                                                 uint8_t                        * p_buffer,
+                                                 uint32_t                         buffer_len,
+                                                 lwm2m_tlv_callback_t             resource_callback)
+{
+    NULL_PARAM_CHECK(p_conn_ext);
+    NULL_PARAM_CHECK(p_buffer);
+
+    uint32_t     err_code;
+    uint32_t     index = 0;
+    lwm2m_tlv_t  tlv;
+
+    while (index < buffer_len)
+    {
+        err_code = lwm2m_tlv_decode(&tlv, &index, p_buffer, buffer_len);
+
+        if (err_code != 0)
+        {
+            return err_code;
+        }
+
+        switch (tlv.id)
+        {
+            case LWM2M_CONN_EXT_MSISDN:
+            {
+                err_code = lwm2m_bytebuffer_to_string(tlv.value,
+                                                      tlv.length,
+                                                      &p_conn_ext->msisdn);
+                break;
+            }
+
+            case LWM2M_CONN_EXT_APN_RETRIES:
+            {
+                err_code = lwm2m_tlv_list_decode(tlv, &p_conn_ext->apn_retries);
+                break;
+            }
+
+            case LWM2M_CONN_EXT_APN_RETRY_PERIOD:
+            {
+                err_code = lwm2m_tlv_list_decode(tlv, &p_conn_ext->apn_retry_period);
+                break;
+            }
+
+            case LWM2M_CONN_EXT_APN_RETRY_BACK_OFF_PERIOD:
+            {
+                err_code = lwm2m_tlv_list_decode(tlv, &p_conn_ext->apn_retry_back_off_period);
+                break;
+            }
+
+            default:
+            {
+                if (resource_callback)
+                {
+                    err_code = resource_callback(((lwm2m_instance_t *)p_conn_ext)->instance_id, &tlv);
+                }
+                break;
+            }
+        }
+
+        if (err_code != 0)
+        {
+            return EINVAL;
+        }
+    }
+
+    return 0;
+}
+
+
+uint32_t lwm2m_tlv_connectivity_extension_encode(uint8_t                        * p_buffer,
+                                                 uint32_t                       * p_buffer_len,
+                                                 uint16_t                         resource_id,
+                                                 lwm2m_connectivity_extension_t * p_conn_ext)
+{
+    NULL_PARAM_CHECK(p_buffer);
+    NULL_PARAM_CHECK(p_buffer_len);
+    NULL_PARAM_CHECK(p_conn_ext);
+
+    uint32_t err_code;
+
+    switch (resource_id)
+    {
+        case LWM2M_CONN_EXT_ICCID:
+        {
+            err_code = lwm2m_tlv_string_encode(p_buffer,
+                                               p_buffer_len,
+                                               resource_id,
+                                               p_conn_ext->iccid);
+            break;
+        }
+
+        case LWM2M_CONN_EXT_IMSI:
+        {
+            err_code = lwm2m_tlv_string_encode(p_buffer,
+                                               p_buffer_len,
+                                               resource_id,
+                                               p_conn_ext->imsi);
+            break;
+        }
+
+        case LWM2M_CONN_EXT_MSISDN:
+        {
+            err_code = lwm2m_tlv_string_encode(p_buffer,
+                                               p_buffer_len,
+                                               resource_id,
+                                               p_conn_ext->msisdn);
+            break;
+        }
+
+        case LWM2M_CONN_EXT_APN_RETRIES:
+        {
+            err_code = lwm2m_tlv_list_encode(p_buffer,
+                                             p_buffer_len,
+                                             LWM2M_CONN_EXT_APN_RETRIES,
+                                             &p_conn_ext->apn_retries);
+            break;
+        }
+
+        case LWM2M_CONN_EXT_APN_RETRY_PERIOD:
+        {
+            err_code = lwm2m_tlv_list_encode(p_buffer,
+                                             p_buffer_len,
+                                             LWM2M_CONN_EXT_APN_RETRY_PERIOD,
+                                             &p_conn_ext->apn_retry_period);
+            break;
+        }
+
+        case LWM2M_CONN_EXT_APN_RETRY_BACK_OFF_PERIOD:
+        {
+            err_code = lwm2m_tlv_list_encode(p_buffer,
+                                             p_buffer_len,
+                                             LWM2M_CONN_EXT_APN_RETRY_BACK_OFF_PERIOD,
+                                             &p_conn_ext->apn_retry_back_off_period);
+            break;
+        }
+
+        case LWM2M_CONN_EXT_SINR:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                LWM2M_CONN_EXT_SINR,
+                                                p_conn_ext->sinr);
+            break;
+        }
+
+        case LWM2M_CONN_EXT_SRXLEV:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                LWM2M_CONN_EXT_SRXLEV,
+                                                p_conn_ext->srxlev);
+            break;
+        }
+
+        case LWM2M_CONN_EXT_CE_MODE:
+        {
+            err_code = lwm2m_tlv_string_encode(p_buffer,
+                                               p_buffer_len,
+                                               resource_id,
+                                               p_conn_ext->ce_mode);
+            break;
+        }
+
+        case LWM2M_NAMED_OBJECT:
+        {
+            // This is a callback to the instance, not a specific resource.
+            err_code = lwm2m_tlv_instance_encode(p_buffer,
+                                                 p_buffer_len,
+                                                 (lwm2m_instance_t *)p_conn_ext);
             break;
         }
 
