@@ -16,6 +16,7 @@
 #include <coap_message.h>
 #include <common.h>
 #include <lwm2m_vzw_main.h>
+#include <operator_check.h>
 #include <at_interface.h>
 #include <app_debug.h>
 #include <lwm2m_remote.h>
@@ -386,7 +387,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
 
     if (op_code == LWM2M_OPERATION_CODE_READ)
     {
-        if (resource_id == VERIZON_RESOURCE)
+        if (resource_id == VERIZON_RESOURCE && operator_is_vzw(true))
         {
             err_code = tlv_conn_mon_verizon_encode(instance_id, buffer, &buffer_size);
         }
@@ -406,9 +407,11 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
 
             if (resource_id == LWM2M_NAMED_OBJECT)
             {
-                uint32_t added_size = sizeof(buffer) - buffer_size;
-                err_code = tlv_conn_mon_verizon_encode(instance_id, buffer + buffer_size, &added_size);
-                buffer_size += added_size;
+                if (operator_is_vzw(true)) {
+                    uint32_t added_size = sizeof(buffer) - buffer_size;
+                    err_code = tlv_conn_mon_verizon_encode(instance_id, buffer + buffer_size, &added_size);
+                    buffer_size += added_size;
+                }
             }
         }
 

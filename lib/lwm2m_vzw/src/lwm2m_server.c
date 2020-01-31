@@ -13,6 +13,7 @@
 #include <lwm2m_objects_plain_text.h>
 #include <lwm2m_server.h>
 #include <lwm2m_instance_storage.h>
+#include <operator_check.h>
 
 #include <coap_option.h>
 #include <coap_observe_api.h>
@@ -264,7 +265,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
         uint8_t  buffer[200];
         uint32_t buffer_size = sizeof(buffer);
 
-        if (resource_id == VERIZON_RESOURCE)
+        if (resource_id == VERIZON_RESOURCE && operator_is_vzw(true))
         {
             err_code = tlv_server_verizon_encode(instance_id, buffer, &buffer_size);
         }
@@ -283,9 +284,11 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
 
             if (resource_id == LWM2M_NAMED_OBJECT)
             {
-                uint32_t added_size = sizeof(buffer) - buffer_size;
-                err_code = tlv_server_verizon_encode(instance_id, buffer + buffer_size, &added_size);
-                buffer_size += added_size;
+                if (operator_is_vzw(true)) {
+                    uint32_t added_size = sizeof(buffer) - buffer_size;
+                    err_code = tlv_server_verizon_encode(instance_id, buffer + buffer_size, &added_size);
+                    buffer_size += added_size;
+                }
             }
         }
 
