@@ -40,6 +40,7 @@ extern "C" {
 /* @brief LWM2M Registry Objects */
 #define LWM2M_OBJ_SOFTWARE_UPDATE             9
 #define LWM2M_OBJ_APN_CONNECTION_PROFILE      11
+#define LWM2M_OBJ_PORTFOLIO                   16
 
 /* LWM2M Security Resource IDs Appendix E.1 */
 #define LWM2M_SECURITY_SERVER_URI             0
@@ -204,6 +205,15 @@ extern "C" {
 #define LWM2M_APN_CONN_PROF_CONN_END_TIME         12
 
 #define LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS        5
+
+/* LWM2M Portfolio */
+#define LWM2M_PORTFOLIO_IDENTITY                0
+
+#define LWM2M_PORTFOLIO_HOST_DEVICE_ID           0
+#define LWM2M_PORTFOLIO_HOST_DEVICE_MANUFACTURER 1
+#define LWM2M_PORTFOLIO_HOST_DEVICE_MODEL        2
+#define LWM2M_PORTFOLIO_HOST_DEVICE_SW_VERSION   3
+#define LWM2M_PORTFOLIO_IDENTITY_INSTANCES       4
 
 /**
  * LWM2M Enabler
@@ -393,6 +403,18 @@ typedef struct
 
 } lwm2m_apn_conn_prof_t;
 
+typedef struct 
+{
+    lwm2m_instance_t           proto;
+    uint8_t                    operations[1];
+    uint16_t                   resource_ids[1];
+
+    /* Public members. */
+    lwm2m_list_t               identity;
+
+} lwm2m_portfolio_t;
+
+
 /**@brief Allocate lwm2m_string_t memory to hold a string.
  *
  * @param[in]  p_payload Buffer which holds a string.
@@ -513,6 +535,14 @@ void lwm2m_instance_software_update_init(lwm2m_software_update_t * p_instance);
  * @param[in] p_instance Pointer to instance structure to initialize.
  */
 void lwm2m_instance_apn_connection_profile_init(lwm2m_apn_conn_prof_t * p_instance);
+
+/**@brief Initialize a LWM2M Portfolio object instance
+ *
+ * @details Must be called before any use of the instance.
+ *
+ * @param[in] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_instance_portfolio_init(lwm2m_portfolio_t * p_instance);
 
 #ifdef __cplusplus
 }

@@ -191,6 +191,7 @@
 ^lwm2m_instance_connectivity_statistics_init$
 ^lwm2m_instance_device_init$
 ^lwm2m_instance_firmware_init$
+^lwm2m_instance_portfolio_init$
 ^lwm2m_instance_security_init$
 ^lwm2m_instance_server_init$
 ^lwm2m_net_reg_stat_cb$
@@ -225,6 +226,8 @@
 ^lwm2m_tlv_firmware_decode$
 ^lwm2m_tlv_firmware_encode$
 ^lwm2m_tlv_list_encode$
+^lwm2m_tlv_portfolio_decode$
+^lwm2m_tlv_portfolio_encode$
 ^lwm2m_tlv_security_decode$
 ^lwm2m_tlv_server_decode$
 ^lwm2m_tlv_server_encode$

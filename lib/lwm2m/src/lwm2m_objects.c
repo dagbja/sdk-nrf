@@ -474,7 +474,6 @@ void lwm2m_instance_software_update_init(lwm2m_software_update_t * p_instance)
     p_instance->resource_ids[8] = LWM2M_SW_UPDATE_SUPPORTED_OBJECTS;
 }
 
-
 void lwm2m_instance_apn_connection_profile_init(lwm2m_apn_conn_prof_t * p_instance)
 {
     // Set prototype variables.
@@ -531,4 +530,29 @@ void lwm2m_instance_apn_connection_profile_init(lwm2m_apn_conn_prof_t * p_instan
     p_instance->conn_end_time.val.p_int32         = m_conn_end_time;
     p_instance->conn_end_time.max_len             = LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS;
     p_instance->conn_end_time.len                 = 1;
+}
+
+void lwm2m_instance_portfolio_init(lwm2m_portfolio_t * p_instance)
+{
+    // Set prototype variables.
+    LWM2M_INSTANCE_OFFSET_SET(p_instance, lwm2m_portfolio_t);
+
+    p_instance->proto.object_id     = LWM2M_OBJ_PORTFOLIO;
+    p_instance->proto.instance_id   = 0;
+    p_instance->proto.num_resources = sizeof(((lwm2m_portfolio_t *)0)->operations);
+
+    // Clear ACL.
+    memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
+
+    // Set access types.
+    p_instance->operations[0] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
+
+    // Set resource IDs.
+    p_instance->resource_ids[0] = LWM2M_PORTFOLIO_IDENTITY;
+
+    // Setup lists.
+    p_instance->identity.type                = LWM2M_LIST_TYPE_STRING;
+    p_instance->identity.p_id                = NULL;
+    p_instance->identity.val.p_string        = NULL;
+    p_instance->identity.max_len             = LWM2M_PORTFOLIO_IDENTITY_INSTANCES;
 }

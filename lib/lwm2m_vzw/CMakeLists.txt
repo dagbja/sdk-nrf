@@ -40,6 +40,7 @@ zephyr_library_sources(
     src/lwm2m_firmware.c
     src/lwm2m_firmware_download.c
     src/lwm2m_instance_storage.c
+    src/lwm2m_portfolio.c
     src/lwm2m_retry_delay.c
     src/lwm2m_security.c
     src/lwm2m_server.c

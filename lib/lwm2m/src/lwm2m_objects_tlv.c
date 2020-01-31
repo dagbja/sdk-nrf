@@ -101,6 +101,15 @@ uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
                 break;
             }
 
+            case LWM2M_OBJ_PORTFOLIO:
+            {
+                err_code = lwm2m_tlv_portfolio_encode(p_buffer + index,
+                                                      p_buffer_len,
+                                                      p_resource_ids[i],
+                                                      (lwm2m_portfolio_t *)p_instance);
+                break;
+            }
+
             default:
             {
                 err_code = ENOENT;
@@ -1493,7 +1502,6 @@ uint32_t lwm2m_tlv_apn_connection_profile_decode(lwm2m_apn_conn_prof_t * p_apn_c
     return 0;
 }
 
-
 uint32_t lwm2m_tlv_apn_connection_profile_encode(uint8_t               * p_buffer,
                                                  uint32_t              * p_buffer_len,
                                                  uint16_t                resource_id,
@@ -1576,6 +1584,96 @@ uint32_t lwm2m_tlv_apn_connection_profile_encode(uint8_t               * p_buffe
             err_code = lwm2m_tlv_instance_encode(p_buffer,
                                                  p_buffer_len,
                                                  (lwm2m_instance_t *)p_apn_conn_prof);
+            break;
+        }
+
+        default:
+        {
+            err_code = ENOENT;
+            break;
+        }
+    }
+
+    return err_code;
+}
+
+uint32_t lwm2m_tlv_portfolio_decode(lwm2m_portfolio_t     * p_portfolio,
+                                    uint8_t               * p_buffer,
+                                    uint32_t                buffer_len,
+                                    lwm2m_tlv_callback_t    resource_callback)
+{
+    NULL_PARAM_CHECK(p_portfolio);
+    NULL_PARAM_CHECK(p_buffer);
+
+    uint32_t     err_code;
+    uint32_t     index = 0;
+    lwm2m_tlv_t  tlv;
+
+    while (index < buffer_len)
+    {
+        err_code = lwm2m_tlv_decode(&tlv, &index, p_buffer, buffer_len);
+
+        if (err_code != 0)
+        {
+            return err_code;
+        }
+
+        switch (tlv.id)
+        {
+            case LWM2M_PORTFOLIO_IDENTITY:
+            {
+                err_code = lwm2m_tlv_list_decode(tlv, &p_portfolio->identity);
+                break;
+            }
+
+            default:
+            {
+                if (resource_callback)
+                {
+                    err_code = resource_callback(((lwm2m_instance_t *)p_portfolio)->instance_id, &tlv);
+                }
+                break;
+            }
+        }
+
+        if (err_code != 0)
+        {
+            return EINVAL;
+        }
+    }
+
+    return 0;
+}
+
+
+uint32_t lwm2m_tlv_portfolio_encode(uint8_t           * p_buffer,
+                                    uint32_t          * p_buffer_len,
+                                    uint16_t            resource_id,
+                                    lwm2m_portfolio_t * p_portfolio)
+{
+    NULL_PARAM_CHECK(p_buffer);
+    NULL_PARAM_CHECK(p_buffer_len);
+    NULL_PARAM_CHECK(p_portfolio);
+
+    uint32_t err_code;
+
+    switch (resource_id)
+    {
+        case LWM2M_PORTFOLIO_IDENTITY:
+        {
+            err_code = lwm2m_tlv_list_encode(p_buffer,
+                                             p_buffer_len,
+                                             resource_id,
+                                             &p_portfolio->identity);
+            break;
+        }
+
+        case LWM2M_NAMED_OBJECT:
+        {
+            // This is a callback to the instance, not a specific resource.
+            err_code = lwm2m_tlv_instance_encode(p_buffer,
+                                                 p_buffer_len,
+                                                 (lwm2m_instance_t *)p_portfolio);
             break;
         }
 
