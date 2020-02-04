@@ -35,6 +35,7 @@
 #define LWM2M_INSTANCE_STORAGE_BASE_SECURITY   (LWM2M_OS_STORAGE_BASE)
 #define LWM2M_INSTANCE_STORAGE_BASE_SERVER     (LWM2M_OS_STORAGE_BASE + 10)
 #define LWM2M_OBSERVERS_BASE                   (LWM2M_OS_STORAGE_BASE + 20)
+#define LWM2M_NOTIF_ATTR_BASE                  (LWM2M_OBSERVERS_BASE + CONFIG_NRF_COAP_OBSERVE_MAX_NUM_OBSERVERS)
 /*
  * The storage range base after LWM2M_OBSERVERS will start at
  * LWM2M_OBSERVERS_BASE + CONFIG_NRF_COAP_OBSERVE_MAX_NUM_OBSERVERS.
@@ -105,6 +106,10 @@ int32_t lwm2m_instance_storage_init(void)
     lwm2m_observer_storage_set_callbacks(lwm2m_observer_store,
                                          lwm2m_observer_load,
                                          lwm2m_observer_delete);
+
+    lwm2m_notif_attr_storage_set_callbacks(lwm2m_notif_attr_store,
+                                           lwm2m_notif_attr_load,
+                                           lwm2m_notif_attr_delete);
 
     return 0;
 }
@@ -982,3 +987,39 @@ int lwm2m_observer_delete(uint32_t sid)
     return 0;
 }
 
+int lwm2m_notif_attr_store(uint32_t sid, void * data, size_t size)
+{
+    ssize_t rc;
+
+    rc = lwm2m_os_storage_write(LWM2M_NOTIF_ATTR_BASE + sid, data, size);
+    if (rc < 0)
+    {
+        return rc;
+    }
+
+    return 0;
+}
+
+int lwm2m_notif_attr_load(uint32_t sid, void * data, size_t size)
+{
+    ssize_t rc;
+
+    rc = lwm2m_os_storage_read(LWM2M_NOTIF_ATTR_BASE + sid, data, size);
+    if (rc < 0)
+    {
+        return rc;
+    }
+
+    return 0;
+}
+
+int lwm2m_notif_attr_delete(uint32_t sid)
+{
+    int rc = lwm2m_os_storage_delete(LWM2M_NOTIF_ATTR_BASE + sid);
+    if (rc < 0)
+    {
+        return rc;
+    }
+
+    return 0;
+}

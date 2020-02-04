@@ -99,4 +99,8 @@ int lwm2m_observer_store(uint32_t sid, void * data, size_t size);
 int lwm2m_observer_load(uint32_t sid, void * data, size_t size);
 int lwm2m_observer_delete(uint32_t sid);
 
+int lwm2m_notif_attr_store(uint32_t sid, void * data, size_t size);
+int lwm2m_notif_attr_load(uint32_t sid, void * data, size_t size);
+int lwm2m_notif_attr_delete(uint32_t sid);
+
 #endif // LWM2M_INSTANCE_STORAGE_H__

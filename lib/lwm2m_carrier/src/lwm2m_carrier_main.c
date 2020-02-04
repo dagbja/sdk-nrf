@@ -103,10 +103,6 @@ static char m_msisdn[16];
 
 static uint32_t m_net_stat;
 
-// TODO: Use observable settings pr. resource
-static uint32_t observable_pmin = 15;
-static uint32_t observable_pmax = 60;
-
 static uint32_t m_coap_con_interval = CONFIG_NRF_LWM2M_CARRIER_COAP_CON_INTERVAL;
 
 /* Structures for timers */
@@ -140,7 +136,6 @@ static int app_provision_psk(int sec_tag, char * identity, uint8_t identity_len,
 static int app_provision_secret_keys(void);
 static void app_disconnect(void);
 static const char * app_uri_get(char * p_server_uri, uint16_t * p_port, bool * p_secure);
-static void app_lwm2m_observer_process(struct nrf_sockaddr * p_remote_server);
 
 extern int cert_provision();
 
@@ -352,16 +347,6 @@ void lwm2m_request_disconnect(void)
 void lwm2m_request_reset(void)
 {
     m_app_state = LWM2M_STATE_RESET;
-}
-
-void lwm2m_observable_pmin_set(uint32_t pmin)
-{
-    observable_pmin = pmin;
-}
-
-void lwm2m_observable_pmax_set(uint32_t pmax)
-{
-    observable_pmax = pmax;
 }
 
 lwm2m_state_t lwm2m_state_get(void)
@@ -808,6 +793,143 @@ uint32_t lwm2m_coap_handler_root(uint8_t op_code, coap_message_t * p_request)
     return 0;
 }
 
+const void * lwm2m_observable_reference_get(const uint16_t *p_path, uint8_t path_len, uint8_t *p_type)
+{
+    const void * value = NULL;
+    lwm2m_object_t *object;
+    lwm2m_instance_t *instance;
+    int ret;
+
+    if (p_path == NULL || path_len <= 0 || p_type == NULL)
+    {
+        return value;
+    }
+
+    if (path_len == 1)
+    {
+        *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
+        ret = lwm2m_lookup_object(&object, p_path[0]);
+        if (ret != 0)
+        {
+            return NULL;
+        }
+        else
+        {
+            return object;
+        }
+    }
+
+    if (path_len == 2)
+    {
+        *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
+        ret = lwm2m_lookup_instance(&instance, p_path[0], p_path[1]);
+        if (ret != 0)
+        {
+            return NULL;
+        }
+        else
+        {
+            return instance;
+        }
+    }
+
+    switch (p_path[0])
+    {
+    case LWM2M_OBJ_DEVICE:
+        value = lwm2m_device_resource_reference_get(p_path[2], p_type);
+        break;
+    case LWM2M_OBJ_CONN_MON:
+        value = lwm2m_conn_mon_resource_reference_get(p_path[2], p_type);
+        break;
+    case LWM2M_OBJ_FIRMWARE:
+        value = lwm2m_firmware_resource_reference_get(p_path[2], p_type);
+        break;
+    case LWM2M_OBJ_SERVER:
+        value = lwm2m_server_resource_reference_get(p_path[1], p_path[2], p_type);
+        break;
+    case LWM2M_OBJ_SECURITY:
+    case LWM2M_OBJ_ACL:
+    case LWM2M_OBJ_LOCATION:
+    case LWM2M_OBJ_CONN_STAT:
+        // Unsupported observables.
+        *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
+        break;
+    default:
+        // Unsupported observables.
+        *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
+        break;
+    }
+
+    return value;
+}
+
+void lwm2m_observer_notify_path(const uint16_t *p_path, uint8_t path_len, struct nrf_sockaddr *p_remote_server)
+{
+    // Currently, we only support observe on resource level.
+    if (path_len < 3)
+    {
+        return;
+    }
+    // TODO: Assert p_path is not NULL.
+    uint16_t object_id = p_path[0];
+    uint16_t instance_id = p_path[1];
+    uint16_t resource_id = p_path[2];
+    switch (object_id)
+    {
+    case LWM2M_OBJ_DEVICE:
+        lwm2m_device_notify_resource(resource_id);
+        break;
+    case LWM2M_OBJ_CONN_MON:
+        lwm2m_conn_mon_notify_resource(p_remote_server, resource_id);
+        break;
+    case LWM2M_OBJ_FIRMWARE:
+        lwm2m_firmware_notify_resource(p_remote_server, resource_id);
+        break;
+    case LWM2M_OBJ_SERVER:
+        lwm2m_server_notify_resource(p_remote_server, instance_id, resource_id);
+        break;
+    case LWM2M_OBJ_SECURITY:
+    case LWM2M_OBJ_ACL:
+    case LWM2M_OBJ_LOCATION:
+    case LWM2M_OBJ_CONN_STAT:
+        // Unsupported observables.
+        break;
+    default:
+        break;
+    }
+}
+
+static void lwm2m_notif_attribute_default_value_set(uint8_t type, void * p_value, struct nrf_sockaddr *p_remote_server)
+{
+    // TODO: Assert value != NULL && p_remote_server != NULL
+    uint16_t server_id;
+
+    lwm2m_remote_short_server_id_find(&server_id, p_remote_server);
+    server_id = lwm2m_server_short_server_id_get(server_id);
+
+    switch (type)
+    {
+    case LWM2M_ATTRIBUTE_TYPE_MIN_PERIOD:
+        *(int32_t *)p_value = lwm2m_server_get_instance(server_id)->default_minimum_period;
+        break;
+    case LWM2M_ATTRIBUTE_TYPE_MAX_PERIOD:
+        *(int32_t *)p_value = lwm2m_server_get_instance(server_id)->default_maximum_period;
+        break;
+    case LWM2M_ATTRIBUTE_TYPE_GREATER_THAN:
+        *(int32_t *)p_value = INT32_MAX;
+        break;
+    case LWM2M_ATTRIBUTE_TYPE_LESS_THAN:
+        *(int32_t *)p_value = -INT32_MAX;
+        break;
+    case LWM2M_ATTRIBUTE_TYPE_STEP:
+        *(int32_t *)p_value = INT32_MAX;
+        break;
+    default:
+        // TODO: Assert for unsupported type.
+        break;
+    }
+}
+
 static void app_init_sockaddr_in(struct nrf_sockaddr *addr, nrf_sa_family_t ai_family, uint16_t port)
 {
     memset(addr, 0, sizeof(struct nrf_sockaddr_in6));
@@ -1184,6 +1306,8 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             // Refresh stored server object, to also include is_connected status and registration ID.
             lwm2m_instance_storage_server_store(instance_id);
 
+            lwm2m_notif_attr_storage_restore(short_server_id);
+
             if (!m_registration_ready && lwm2m_is_registration_ready()) {
                 m_use_client_holdoff_timer = false;
                 m_registration_ready = true;
@@ -1244,6 +1368,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
 
             if (!m_registration_ready) {
                 lwm2m_observer_storage_restore(short_server_id, m_lwm2m_transport[instance_id]);
+                lwm2m_notif_attr_storage_restore(short_server_id);
             }
 
             // Reset connection update in case this has been requested while connecting
@@ -1268,7 +1393,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
                         p_observer->transport = m_lwm2m_transport[instance_id];
                     }
                 }
-                lwm2m_conn_mon_observer_process(p_remote);
+                lwm2m_observer_process(true);
             }
         }
     }
@@ -1505,6 +1630,9 @@ void lwm2m_factory_reset(void)
     // Delete the observers from the storage
     lwm2m_observer_storage_delete_all();
 
+    // Delete the notification attributes from the storage
+    lwm2m_notif_attr_storage_delete_all();
+
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
         lwm2m_instance_storage_security_delete(i);
@@ -1627,6 +1755,18 @@ static void app_lwm2m_setup(void)
 
     // Add connectivity extension support.
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_conn_ext_get_object());
+
+    // Add observer notification support.
+    lwm2m_observers_notify_path_cb_set(lwm2m_observer_notify_path);
+
+    // Add callback to set default notification attribute values.
+    lwm2m_notif_attribute_default_cb_set(lwm2m_notif_attribute_default_value_set);
+
+    // Add callback to get pointers to observables.
+    lwm2m_observable_reference_get_cb_set(lwm2m_observable_reference_get);
+
+    // Add callback to get the uptime in milliseconds and initialize the timer.
+    lwm2m_observable_uptime_cb_initialize(lwm2m_os_uptime_get);
 }
 
 static void app_connect(void)
@@ -2593,13 +2733,6 @@ static void app_timers_init(void)
     state_update_timer = lwm2m_os_timer_get(app_wait_state_update);
 }
 
-static void app_lwm2m_observer_process(struct nrf_sockaddr * p_remote_server)
-{
-    lwm2m_server_observer_process(p_remote_server);
-    lwm2m_conn_mon_observer_process(p_remote_server);
-    lwm2m_firmware_observer_process(p_remote_server);
-}
-
 uint32_t lwm2m_net_reg_stat_get(void)
 {
     return m_net_stat;
@@ -2768,9 +2901,9 @@ void lwm2m_carrier_run(void)
             break;
         }
 
-        if (tick_count % (observable_pmin * 100) == 0)
+        if ((tick_count % 100) == 0)
         {
-            app_lwm2m_observer_process(NULL);
+            lwm2m_observer_process(false);
         }
     }
 }

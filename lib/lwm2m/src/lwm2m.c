@@ -154,7 +154,7 @@ static uint16_t internal_get_allowed_operations(lwm2m_instance_t * p_instance,
 }
 
 
-uint32_t lwm2m_lookup_instance(lwm2m_instance_t  ** p_instance,
+uint32_t lwm2m_lookup_instance(lwm2m_instance_t  ** pp_instance,
                                uint16_t             object_id,
                                uint16_t             instance_id)
 {
@@ -168,7 +168,7 @@ uint32_t lwm2m_lookup_instance(lwm2m_instance_t  ** p_instance,
                 return EINVAL;
             }
 
-            *p_instance = m_instances[i];
+            *pp_instance = m_instances[i];
 
             return 0;
         }
@@ -178,8 +178,8 @@ uint32_t lwm2m_lookup_instance(lwm2m_instance_t  ** p_instance,
 }
 
 
-static uint32_t object_resolve(lwm2m_object_t  ** p_instance,
-                               uint16_t           object_id)
+uint32_t lwm2m_lookup_object(lwm2m_object_t  ** pp_object,
+                             uint16_t           object_id)
 {
     for (int i = 0; i < m_num_objects; ++i)
     {
@@ -190,7 +190,7 @@ static uint32_t object_resolve(lwm2m_object_t  ** p_instance,
                 return EINVAL;
             }
 
-            *p_instance = m_objects[i];
+            *pp_object = m_objects[i];
 
             return 0;
         }
@@ -1061,7 +1061,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
             lwm2m_object_t * p_object;
 
-            err_code = object_resolve(&p_object, p_path[0]);
+            err_code = lwm2m_lookup_object(&p_object, p_path[0]);
 
             if (err_code != 0)
             {
@@ -1162,7 +1162,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
                 lwm2m_object_t * p_object;
 
-                err_code = object_resolve(&p_object, p_path[0]);
+                err_code = lwm2m_lookup_object(&p_object, p_path[0]);
 
                 if (err_code != 0)
                 {
@@ -1205,7 +1205,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
                 lwm2m_object_t * p_object;
 
-                err_code = object_resolve(&p_object, p_path[0]);
+                err_code = lwm2m_lookup_object(&p_object, p_path[0]);
 
                 if (err_code != 0)
                 {

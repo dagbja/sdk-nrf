@@ -40,14 +40,9 @@ int lwm2m_carrier_avail_power_sources_set(const uint8_t *power_sources, uint8_t 
         device_obj_instance->power_source_current.val.p_int32[i] = 0;
         device_obj_instance->power_source_voltage.val.p_int32[i] = 0;
     }
-    lwm2m_device_notify_resource(LWM2M_DEVICE_AVAILABLE_POWER_SOURCES);
-    lwm2m_device_notify_resource(LWM2M_DEVICE_POWER_SOURCE_CURRENT);
-    lwm2m_device_notify_resource(LWM2M_DEVICE_POWER_SOURCE_VOLTAGE);
 
     device_obj_instance->battery_status = LWM2M_CARRIER_BATTERY_STATUS_UNKNOWN;
     device_obj_instance->battery_level = 0;
-    lwm2m_device_notify_resource(LWM2M_DEVICE_BATTERY_STATUS);
-    lwm2m_device_notify_resource(LWM2M_DEVICE_BATTERY_LEVEL);
 
     return 0;
 }
@@ -66,8 +61,6 @@ int lwm2m_carrier_power_source_voltage_set(uint8_t power_source, int32_t value)
         if (device_obj_instance->avail_power_sources.val.p_uint8[i] == power_source)
         {
             device_obj_instance->power_source_voltage.val.p_int32[i] = value;
-            lwm2m_device_notify_resource(LWM2M_DEVICE_POWER_SOURCE_VOLTAGE);
-
             return 0;
         }
     }
@@ -89,8 +82,6 @@ int lwm2m_carrier_power_source_current_set(uint8_t power_source, int32_t value)
         if (device_obj_instance->avail_power_sources.val.p_uint8[i] == power_source)
         {
             device_obj_instance->power_source_current.val.p_int32[i] = value;
-            lwm2m_device_notify_resource(LWM2M_DEVICE_POWER_SOURCE_CURRENT);
-
             return 0;
         }
     }
@@ -112,7 +103,6 @@ int lwm2m_carrier_battery_level_set(uint8_t battery_level)
         if (device_obj_instance->avail_power_sources.val.p_uint8[i] == LWM2M_CARRIER_POWER_SOURCE_INTERNAL_BATTERY)
         {
             device_obj_instance->battery_level = battery_level;
-            lwm2m_device_notify_resource(LWM2M_DEVICE_BATTERY_LEVEL);
             return 0;
         }
     }
@@ -135,7 +125,6 @@ int lwm2m_carrier_battery_status_set(int32_t battery_status)
         if (device_obj_instance->avail_power_sources.val.p_uint8[i] == LWM2M_CARRIER_POWER_SOURCE_INTERNAL_BATTERY)
         {
             device_obj_instance->battery_status = battery_status;
-            lwm2m_device_notify_resource(LWM2M_DEVICE_BATTERY_STATUS);
             return 0;
         }
     }
@@ -159,7 +148,6 @@ int lwm2m_carrier_device_type_set(const char *device_type)
     }
 
     retval = (int)lwm2m_bytebuffer_to_string(device_type, strlen(device_type), &(device_obj_instance->device_type));
-    lwm2m_device_notify_resource(LWM2M_DEVICE_DEVICE_TYPE);
 
     return -retval;
 }
@@ -179,7 +167,6 @@ int lwm2m_carrier_hardware_version_set(const char * hardware_version)
     }
 
     retval = (int)lwm2m_bytebuffer_to_string(hardware_version, strlen(hardware_version), &(device_obj_instance->hardware_version));
-    lwm2m_device_notify_resource(LWM2M_DEVICE_HARDWARE_VERSION);
 
     return -retval;
 }
@@ -199,7 +186,6 @@ int lwm2m_carrier_software_version_set(const char * software_version)
     }
 
     retval = (int)lwm2m_bytebuffer_to_string(software_version, strlen(software_version), &(device_obj_instance->software_version));
-    lwm2m_device_notify_resource(LWM2M_DEVICE_SOFTWARE_VERSION);
 
     return -retval;
 }
@@ -218,14 +204,12 @@ int lwm2m_carrier_error_code_add(int32_t error)
     {
         device_obj_instance->error_code.len = 1;
         device_obj_instance->error_code.val.p_int32[0] = error;
-        lwm2m_device_notify_resource(LWM2M_DEVICE_ERROR_CODE);
         return 0;
     }
 
     if ((len == 1) && (device_obj_instance->error_code.val.p_int32[0] == LWM2M_CARRIER_ERROR_CODE_NO_ERROR))
     {
         device_obj_instance->error_code.val.p_int32[0] = error;
-        lwm2m_device_notify_resource(LWM2M_DEVICE_ERROR_CODE);
         return 0;
     }
 
@@ -239,7 +223,6 @@ int lwm2m_carrier_error_code_add(int32_t error)
 
     device_obj_instance->error_code.len++;
     device_obj_instance->error_code.val.p_int32[len] = error;
-    lwm2m_device_notify_resource(LWM2M_DEVICE_ERROR_CODE);
 
     return 0;
 }
@@ -261,7 +244,6 @@ int lwm2m_carrier_error_code_remove(int32_t error)
             if (len == 1)
             {
                 device_obj_instance->error_code.val.p_int32[0] = LWM2M_CARRIER_ERROR_CODE_NO_ERROR;
-                lwm2m_device_notify_resource(LWM2M_DEVICE_ERROR_CODE);
                 return 0;
             }
             else
@@ -272,7 +254,6 @@ int lwm2m_carrier_error_code_remove(int32_t error)
                 {
                     device_obj_instance->error_code.val.p_int32[j] = device_obj_instance->error_code.val.p_int32[j + 1];
                 }
-                lwm2m_device_notify_resource(LWM2M_DEVICE_ERROR_CODE);
                 return 0;
             }
         }
@@ -290,7 +271,6 @@ int lwm2m_carrier_memory_total_set(uint32_t memory_total)
         return -EINVAL;
     }
     device_obj_instance->memory_total = (int32_t)memory_total;
-    lwm2m_device_notify_resource(LWM2M_DEVICE_MEMORY_TOTAL);
 
     return 0;
 }

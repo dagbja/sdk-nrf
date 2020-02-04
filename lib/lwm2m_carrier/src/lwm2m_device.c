@@ -41,7 +41,6 @@ static lwm2m_string_t m_verizon_resources[2];
 
 static int64_t m_con_time_start[sizeof(((lwm2m_device_t *)0)->resource_ids)];
 
-void lwm2m_device_notify_resource(uint16_t resource_id); // Forward declare.
 
 static uint32_t tlv_device_verizon_encode(uint16_t instance_id, uint8_t * p_buffer, uint32_t * p_buffer_len)
 {
@@ -312,6 +311,8 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
 
         if (err_code == 0)
         {
+            uint16_t path[] = {LWM2M_OBJ_DEVICE, 0, resource_id};
+
             if (observe_option == 0) // Observe start
             {
                 // Whitelist the resources that support observe.
@@ -351,6 +352,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
                                                         resource_id,
                                                         p_instance);
 
+                        lwm2m_observable_metadata_init(p_request->remote, path, ARRAY_SIZE(path));
                         m_con_time_start[resource_id] = lwm2m_os_uptime_get();
                         break;
                     }
@@ -379,6 +381,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
                 } else {
                     LWM2M_INF("Observe cancel on resource /3/%i/%i", p_instance->instance_id, resource_id);
                     lwm2m_observe_unregister(p_request->remote, (void *)&m_instance_device.resource_ids[resource_id]);
+                    lwm2m_notif_attr_storage_update(path, ARRAY_SIZE(path), p_request->remote);
                 }
 
                 // Process the GET request as usual.
@@ -451,6 +454,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
     else if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
         uint32_t mask = 0;
+
         err_code = coap_message_ct_mask_get(p_request, &mask);
 
         if (err_code != 0)
@@ -472,6 +476,23 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
                                                       resource_id,
                                                       p_request->payload,
                                                       p_request->payload_len);
+        }
+        else if (mask == 0)
+        {
+            uint16_t path[] = { p_instance->object_id, p_instance->instance_id, resource_id };
+            uint16_t path_len = (resource_id == LWM2M_INVALID_RESOURCE) ? ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
+
+            err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
+            if (err_code != 0)
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            }
+
+            return 0;
         }
         else
         {
@@ -610,6 +631,43 @@ uint32_t lwm2m_device_object_callback(lwm2m_object_t * p_object,
     {
         err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
     }
+    else if (op_code == LWM2M_OPERATION_CODE_WRITE)
+    {
+        if (instance_id != LWM2M_INVALID_INSTANCE)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            return 0;
+        }
+
+        uint32_t mask = 0;
+        err_code = coap_message_ct_mask_get(p_request, &mask);
+
+        if (err_code != 0)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            return 0;
+        }
+
+        // A Write-Attribute request do not contain a Content-Format option.
+        if (mask == 0)
+        {
+            uint16_t path[] = { p_object->object_id };
+
+            err_code = lwm2m_write_attribute_handler(path, ARRAY_SIZE(path), p_request);
+            if (err_code != 0)
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            }
+        }
+        else
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+        }
+    }
     else
     {
         (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
@@ -654,7 +712,6 @@ void lwm2m_device_init(void)
 
     m_object_device.object_id = LWM2M_OBJ_DEVICE;
     m_object_device.callback = lwm2m_device_object_callback;
-
     m_instance_device.proto.expire_time = 60; // Default to 60 second notifications.
     (void)at_read_manufacturer(&m_instance_device.manufacturer);
     (void)at_read_model_number(&m_instance_device.model_number);
@@ -713,6 +770,50 @@ void lwm2m_device_init(void)
     lwm2m_device_init_acl();
 
     (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_device);
+}
+
+const void * lwm2m_device_resource_reference_get(uint16_t resource_id, uint8_t *p_type)
+{
+    // TODO: Assert type != NULL
+    switch (resource_id)
+    {
+    case LWM2M_DEVICE_AVAILABLE_POWER_SOURCES:
+        *p_type = LWM2M_OBSERVABLE_TYPE_LIST;
+        return &m_instance_device.avail_power_sources;
+    case LWM2M_DEVICE_POWER_SOURCE_VOLTAGE:
+        *p_type = LWM2M_OBSERVABLE_TYPE_LIST;
+        return &m_instance_device.power_source_voltage;
+    case LWM2M_DEVICE_POWER_SOURCE_CURRENT:
+        *p_type = LWM2M_OBSERVABLE_TYPE_LIST;
+        return &m_instance_device.power_source_current;
+    case LWM2M_DEVICE_ERROR_CODE:
+        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+        return &m_instance_device.error_code;
+    case LWM2M_DEVICE_DEVICE_TYPE:
+        *p_type = LWM2M_OBSERVABLE_TYPE_STR;
+        return &m_instance_device.device_type;
+    case LWM2M_DEVICE_HARDWARE_VERSION:
+        *p_type = LWM2M_OBSERVABLE_TYPE_STR;
+        return &m_instance_device.hardware_version;
+    case LWM2M_DEVICE_SOFTWARE_VERSION:
+        *p_type = LWM2M_OBSERVABLE_TYPE_STR;
+        return &m_instance_device.software_version;
+    case LWM2M_DEVICE_BATTERY_LEVEL:
+        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+        return &m_instance_device.battery_level;
+    case LWM2M_DEVICE_SUPPORTED_BINDINGS:
+        *p_type = LWM2M_OBSERVABLE_TYPE_STR;
+        return &m_instance_device.supported_bindings;
+    case LWM2M_DEVICE_BATTERY_STATUS:
+        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+        return &m_instance_device.battery_status;
+    case LWM2M_DEVICE_MEMORY_TOTAL:
+        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+        return &m_instance_device.memory_total;
+    default:
+        *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
+        return NULL;
+    }
 }
 
 void lwm2m_device_notify_resource(uint16_t resource_id)

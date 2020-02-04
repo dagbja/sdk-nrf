@@ -6,6 +6,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #include <lwm2m.h>
 #include <lwm2m_api.h>
@@ -222,6 +223,37 @@ uint32_t lwm2m_observe_unregister(struct nrf_sockaddr  * p_remote,
     }
 
     return err_code;
+}
+
+bool lwm2m_is_observed(uint16_t short_server_id, const lwm2m_instance_t * p_instance, uint16_t resource_id)
+{
+    coap_resource_t *p_resource;
+    struct nrf_sockaddr *p_remote;
+    uint32_t err_code;
+    uint32_t handle;
+    uint16_t *p_resource_ids;
+
+    if (!p_instance)
+    {
+        return false;
+    }
+
+    err_code = lwm2m_short_server_id_remote_find(&p_remote, short_server_id);
+    if (err_code != 0)
+    {
+        return false;
+    }
+
+    p_resource_ids = (uint16_t *)((uint8_t *)p_instance + p_instance->resource_ids_offset);
+    p_resource = (coap_resource_t *)&p_resource_ids[resource_id];
+
+    err_code = coap_observe_server_search(&handle, p_remote, p_resource);
+    if (err_code == 0)
+    {
+        return true;
+    }
+
+    return false;
 }
 
 static void observer_con_message_callback(uint32_t status, void * arg, coap_message_t * p_response)

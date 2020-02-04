@@ -9,6 +9,7 @@
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
 #include <lwm2m_acl.h>
+#include <lwm2m_firmware.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
 #include <lwm2m_carrier_main.h>
@@ -27,10 +28,6 @@ static lwm2m_object_t   m_object_firmware;
 static lwm2m_firmware_t m_instance_firmware;
 
 static int64_t m_con_time_start[sizeof(((lwm2m_location_t *)0)->resource_ids)];
-
-// Forward declare.
-void lwm2m_firmware_observer_process(struct nrf_sockaddr * p_remote_server);
-static void lwm2m_firmware_notify_resource(struct nrf_sockaddr * p_remote_server, uint16_t resource_id);
 
 char * lwm2m_firmware_package_uri_get(uint16_t instance_id, uint8_t * p_len)
 {
@@ -162,6 +159,8 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
 
         if (err_code == 0)
         {
+            uint16_t path[] = { LWM2M_OBJ_FIRMWARE, 0, resource_id };
+
             if (observe_option == 0) // Observe start
             {
                 // Whitelist the resources that support observe.
@@ -189,6 +188,7 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
                                                           resource_id,
                                                           p_instance);
 
+                        lwm2m_observable_metadata_init(p_request->remote, path, ARRAY_SIZE(path));
                         m_con_time_start[resource_id] = lwm2m_os_uptime_get();
                         break;
                     }
@@ -217,6 +217,7 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
                 } else {
                     LWM2M_INF("Observe cancel on resource /5/%i/%i", p_instance->instance_id, resource_id);
                     lwm2m_observe_unregister(p_request->remote, (void *)&m_instance_firmware.resource_ids[resource_id]);
+                    lwm2m_notif_attr_storage_update(path, ARRAY_SIZE(path), p_request->remote);
                 }
 
                 // Process the GET request as usual.
@@ -253,6 +254,7 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
     else if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
         uint32_t mask = 0;
+
         err_code = coap_message_ct_mask_get(p_request, &mask);
 
         if (err_code != 0)
@@ -340,6 +342,13 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
                     LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI);
             }
         }
+        else if (mask == 0)
+        {
+            uint16_t path[] = { p_instance->object_id, p_instance->instance_id, resource_id };
+            uint16_t path_len = (resource_id == LWM2M_INVALID_RESOURCE) ? ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
+
+            err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
+        }
         else
         {
             (void)lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_request);
@@ -403,7 +412,24 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
     return err_code;
 }
 
-static void lwm2m_firmware_notify_resource(struct nrf_sockaddr * p_remote_server, uint16_t resource_id)
+const void * lwm2m_firmware_resource_reference_get(uint16_t resource_id, uint8_t *p_type)
+{
+    // TODO: Assert type != NULL
+    switch (resource_id)
+    {
+        case LWM2M_FIRMWARE_STATE:
+            *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+            return &m_instance_firmware.state;
+        case LWM2M_FIRMWARE_UPDATE_RESULT:
+            *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+            return &m_instance_firmware.update_result;
+        default:
+            *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
+            return NULL;
+    }
+}
+
+void lwm2m_firmware_notify_resource(struct nrf_sockaddr * p_remote_server, uint16_t resource_id)
 {
     uint16_t short_server_id;
     coap_observer_t * p_observer = NULL;
@@ -466,18 +492,6 @@ static void lwm2m_firmware_notify_resource(struct nrf_sockaddr * p_remote_server
     }
 }
 
-void lwm2m_firmware_observer_process(struct nrf_sockaddr * p_remote_server)
-{
-    const uint16_t res_id[] = {
-        LWM2M_FIRMWARE_STATE,
-        LWM2M_FIRMWARE_UPDATE_RESULT
-    };
-
-    for (size_t i = 0; i < ARRAY_SIZE(res_id); i++) {
-        lwm2m_firmware_notify_resource(p_remote_server, res_id[i]);
-    }
-}
-
 /**@brief Callback function for LWM2M firmware objects. */
 uint32_t lwm2m_firmware_object_callback(lwm2m_object_t * p_object,
                                         uint16_t         instance_id,
@@ -508,6 +522,43 @@ uint32_t lwm2m_firmware_object_callback(lwm2m_object_t * p_object,
     else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
     {
         err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_WRITE)
+    {
+        if (instance_id != LWM2M_INVALID_INSTANCE)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            return 0;
+        }
+
+        uint32_t mask = 0;
+        err_code = coap_message_ct_mask_get(p_request, &mask);
+
+        if (err_code != 0)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            return 0;
+        }
+
+        // A Write-Attribute request do not contain a Content-Format option.
+        if (mask == 0)
+        {
+            uint16_t path[] = { p_object->object_id };
+
+            err_code = lwm2m_write_attribute_handler(path, ARRAY_SIZE(path), p_request);
+            if (err_code != 0)
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            }
+        }
+        else
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+        }
     }
     else
     {

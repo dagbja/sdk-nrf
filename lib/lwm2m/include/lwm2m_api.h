@@ -15,9 +15,11 @@
 #define LWM2M_API_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include <coap_api.h>
 #include <coap_observe_api.h>
+#include <nrf_socket.h>
 
 #include <lwm2m_cfg.h>
 
@@ -129,7 +131,7 @@ typedef struct
 
 /**@addtogroup LWM2M_defines Defines
  * @{
- * @brief LWMW2M operation code and invalid object/instance definitions.
+ * @brief LWMW2M operation code, invalid object/instance and notification attribute definitions.
  */
 
 /**
@@ -155,6 +157,21 @@ typedef struct
 #define LWM2M_OPERATION_CODE_CREATE   LWM2M_PERMISSION_CREATE  /**< Bit mask for LWM2M create operation. */
 #define LWM2M_OPERATION_CODE_DISCOVER 0x20                     /**< Bit mask for LWM2M discover operation. */
 #define LWM2M_OPERATION_CODE_OBSERVE  LWM2M_PERMISSION_OBSERVE /**< Bit mask for LWM2M observe operation. */
+
+#define LWM2M_ATTRIBUTE_TYPE_MIN_PERIOD        0 /**< p_min notification attribute type. */
+#define LWM2M_ATTRIBUTE_TYPE_MAX_PERIOD        1 /**< p_max notification attribute type. */
+#define LWM2M_ATTRIBUTE_TYPE_GREATER_THAN      2 /**< gt notification attribute type. */
+#define LWM2M_ATTRIBUTE_TYPE_LESS_THAN         3 /**< lt notification attribute type. */
+#define LWM2M_ATTRIBUTE_TYPE_STEP              4 /**< st notification attribute type. */
+#define LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE         5 /**< Number of supported notification attribute types. */
+#define LWM2M_MAX_OBSERVABLES_WITH_ATTRIBUTES 30 /**< Number of supported observable items which may have assigned notification attributes. */
+
+#define LWM2M_OBSERVABLE_TYPE_INT         0x01 /**< Observable structure of integer type. */
+#define LWM2M_OBSERVABLE_TYPE_STR         0x02 /**< Observable structure of string type. */
+#define LWM2M_OBSERVABLE_TYPE_LIST        0x04 /**< Observable structure of lwm2m_list_t type. */
+#define LWM2M_OBSERVABLE_TYPE_NO_CHECK    0x0E /**< Observable structure of a noncomparable data type. */
+
+#define LWM2M_URI_PATH_MAX_LEN            4 /**< Maximum supported length of the URI path to identify an LwM2M resource. */
 /**@} */
 
 /**@cond */
@@ -261,6 +278,73 @@ typedef int (*lwm2m_load_observer_cb_t)(uint32_t sid, void * data, size_t size);
  */
 typedef int (*lwm2m_del_observer_cb_t)(uint32_t sid);
 
+/**@brief Callback function to store notification attributes in non-volatile memory.
+ *
+ * @param[in] sid  Unique ID that identifies this storage unit.
+ * @param[in] data Pointer to data to be stored.
+ * @param[in] size The size of the data to be stored.
+ *
+ * @retval    Non-zero value will tell the notification attribute restore feature
+ *            that the store failed.
+ */
+typedef int (*lwm2m_store_notif_attr_cb_t)(uint32_t sid, void * p_data, size_t size);
+
+/**@brief Callback function to load notification attributes from non-volatile memory.
+ *
+ * @param[in] sid  Unique ID that identifies a storage unit previously stored.
+ * @param[in] data Pointer to a buffer that the loaded data can be stored in.
+ * @param[in] size The size of the data buffer.
+ *
+ * @retval    Non-zero value will tell the notification attribute restore feature
+ *            that the load failed.
+ */
+typedef int (*lwm2m_load_notif_attr_cb_t)(uint32_t sid, void * p_data, size_t size);
+
+/**@brief Callback function to delete notification attributes in non-volatile memory.
+ *
+ * @param[in] sid  Unique ID that identifies a storage unit previously stored.
+ *
+ * @retval    Non-zero value will tell the notification attribute restore feature
+ *            that the delete failed.
+ */
+typedef int (*lwm2m_del_notif_attr_cb_t)(uint32_t sid);
+
+/**@brief Callback function to set the default notification attribute values.
+ *
+ * @details Will be called when a new notification attribute is initialized. LWM2M_ATTRIBUTE_TYPE_MIN_PERIOD
+ *          and LWM2M_ATTRIBUTE_TYPE_MAX_PERIOD are always initialized upon observer registration.
+ *
+ * @param[in]    type            Notification attribute type whose default value is to be retrieved.
+ * @param[inout] p_value         Pointer to the memory where the default value of the attribute is to be stored.
+ * @param[in]    p_remote_server Structure containing address information and port number to the remote server
+ *                               that made the OBSERVE request.
+ */
+typedef void (*lwm2m_notif_attribute_default_cb_t)(uint8_t type, void *p_value, struct nrf_sockaddr *p_remote_server);
+
+/**@brief Callback function to notify the observers of the item identified by its URI path.
+ *
+ * @param[in] p_path           URI path that identifies the observable item.
+ * @param[in] path_len         Length of the URI path that identifies the observable item.
+ * @param[in] p_remote_server  Structure containing address information and port number to the remote observer.
+ */
+typedef void (*lwm2m_observers_notify_path_cb_t)(const uint16_t *p_path, uint8_t path_len, struct nrf_sockaddr *p_remote_server);
+
+/**@brief Callback function to retrieve a pointer to the value of the observable item.
+ *
+ * @param[in]    p_path     URI path that identifies the observable item.
+ * @oaram[in]    path_len   Length of the URI path that identifies the observable item.
+ * @param[inout] p_type     Pointer to the memory where the data type of the observable item is stored.
+ *
+ * @return  Pointer to the observable item data.
+ */
+typedef const void * (*lwm2m_observable_reference_get_cb_t)(const uint16_t *p_path, uint8_t path_len, uint8_t *p_type);
+
+/**@brief Callback function to retrieve the uptime in milliseconds (ms).
+ *
+ * @return  Uptime in milliseconds (ms).
+ */
+typedef int64_t (*lwm2m_uptime_get_cb_t)(void);
+
 /**@brief LWM2M object prototype structure.
  *
  * @details Each instance will have this structure in the front of its instance structure.
@@ -307,6 +391,34 @@ struct lwm2m_instance_t
     lwm2m_instance_callback_t callback;            /**< Called when an operation is done on this instance. */
     lwm2m_instance_acl_t      acl;                 /**< ACL entry. */
 };
+
+/**@brief LWM2M notification attribute structure. */
+typedef struct
+{
+    union
+    {
+        int32_t i;                  /**< Used for p_min and p_max notification attributes. */
+        float   f;                  /**< Used for gt, lt and st notification attributes. */
+    } value;                        /**< Value assigned to the notification attribute. */
+    int8_t assignment_level;        /**< Notification attribute assignment level. */
+} lwm2m_notif_attribute_t;
+
+/**@brief LWM2M observable metadata structure.
+ *
+ * @details Structure used to identify the items that are being observed, as well as their assigned notification attributes.
+ */
+typedef struct
+{
+    uint16_t                 path[LWM2M_URI_PATH_MAX_LEN];               /**< URI path of the observable structure. */
+    uint8_t                  path_len;                                   /**< Length of the URI path of the observable structure. */
+    lwm2m_notif_attribute_t  attributes[LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE]; /**< Notification attributes of this observable. */
+    lwm2m_time_t             last_notification;                          /**< Time elapsed from the last notification sent. */
+    const void               *observable;                                 /**< Pointer to the observable structure. */
+    int32_t                  prev_value;                                 /**< The value of the observable structure that was reported in the last notification. */
+    uint8_t                  type;                                       /**< Bitcode that identifies the data type of the observable. */
+    uint8_t                  flags;                                      /**< Flags indicating whether the conditions defined by the attributes have been fulfilled. */
+    uint16_t                 ssid;                                       /**< Short ID of the server that performed an OBSERVE or a WRITE-ATTRIBUTE request on the observable. */
+} lwm2m_observable_metadata_t;
 
 /**@brief Callback interface from the enabler interface (bootstrap/register) to the application.
  *
@@ -448,18 +560,29 @@ uint32_t lwm2m_deregister(struct nrf_sockaddr * p_remote, coap_transport_handle_
 
 /**@brief Get reference to instance.
  *
- * @param[out] p_instance  Pointer to structure to instance.
- * @param[in]  object_id   Object identifier of instance.
- * @param[in]  instance_id Instance identifier of instance.
+ * @param[out] pp_instance  Pointer to structure to instance.
+ * @param[in]  object_id    Object identifier of instance.
+ * @param[in]  instance_id  Instance identifier of instance.
  *
  * @retval NRF_SUCCESS If instance is found.
  * @retval EINVAL      If instance is not located.
  * @retval EINVAL      If instance is not valid.
  */
-
-uint32_t lwm2m_lookup_instance(lwm2m_instance_t ** p_instance,
+uint32_t lwm2m_lookup_instance(lwm2m_instance_t ** pp_instance,
                                uint16_t object_id,
                                uint16_t instance_id);
+
+/**@brief Get reference to object.
+ *
+ * @param[out] pp_object    Pointer to structure to object.
+ * @param[in]  object_id    Object identifier.
+ *
+ * @retval NRF_SUCCESS If object is found.
+ * @retval EINVAL      If object is not located.
+ * @retval EINVAL      If object is not valid.
+ */
+uint32_t lwm2m_lookup_object(lwm2m_object_t  ** pp_object,
+                             uint16_t           object_id);
 
 /**@brief Add an instance to coap_handler in order to match requests to the given instance.
  *
@@ -662,7 +785,19 @@ uint32_t lwm2m_notify(uint8_t         * p_payload,
  */
 uint32_t lwm2m_observer_storage_store(coap_observer_t  * p_observer);
 
-/**@brief Restore observers for a specified server for the.
+/**@brief Store notification attributes of a given observable so that they
+ *        can be restored after a power cycle.
+ *
+ * @param p_observer[in] Pointer to an observable metadata structure to store.
+ *
+ * @retval 0      If observable metadata structure has been stored successfully.
+ * @retval ENOMEM If not able to find a free slot to store the observable
+ *                metadata.
+ * @retval EIO    If storage interface returned error on store operation.
+ */
+uint32_t lwm2m_notif_attr_storage_store(const lwm2m_observable_metadata_t * p_metadata);
+
+/**@brief Restore observers for a specified server.
  *
  * @details This function will read the session data and restore any
  *          observer for a specified server over the specified transport.
@@ -676,6 +811,21 @@ uint32_t lwm2m_observer_storage_store(coap_observer_t  * p_observer);
  */
 uint32_t lwm2m_observer_storage_restore(uint16_t                  short_server_id,
                                         coap_transport_handle_t   transport);
+
+/**@brief Restore any notification attributes from non-volatile memory.
+ *
+ * @details This function will reinitialize any notification attributes
+ *          that have been modified by a server before the power cycle.
+ *
+ *  @param[in] short_server_id  A unique identifier for the server owning the
+ *                              notification attributes that will be restored.
+ *
+ * @retval  0      If the notification attributes have been reinitialized
+ *                 successfully, if any.
+ * @retval  EINVAL If a callback function for loading notification attributes
+ *                 from non-volatile storage has not been set.
+ */
+uint32_t lwm2m_notif_attr_storage_restore(uint16_t short_server_id);
 
 /**@brief Delete an observer from storage.
  *
@@ -698,12 +848,44 @@ uint32_t lwm2m_observer_storage_delete(coap_observer_t  * p_observer);
  */
 void lwm2m_observer_storage_delete_all(void);
 
-/**@brief Register functions for store, load and delete operation.
+/**@brief Delete notification attributes of a given observable from storage.
+ *
+ * @param[in] p_observer A pointer to an observable metadata structure.
+ *
+ * @retval 0      If delete process was successful.
+ * @retval ENOMEM If unable to allocate memory to store the storage entry.
+ * @retval EIO    If storage interface returned error on deletion operation.
+ *
+ */
+uint32_t lwm2m_notif_attr_storage_delete(const lwm2m_observable_metadata_t * p_metadata);
+
+/**@brief Update the storage of the notification attributes assigned to the given
+ *        observable to reflect their current state.
+ *
+ * @details This function should be called whenever an observation is cancelled on
+ *          a given observable.
+ *
+ * @param[in] p_path    URI path that identifies the observable item.
+ * @param[in] path_len  Length of the URI path that identifies the observable item.
+ * @param[in] p_remote  Structure containing address information and port number to the remote observer.
+ */
+void lwm2m_notif_attr_storage_update(const uint16_t *p_path, uint16_t path_len, struct nrf_sockaddr *p_remote);
+
+/**@brief Delete all the stored notification attributes from storage.
+ *
+ * @details This function will delete all the notification attributes that have
+ *          been stored in the non-volatile storage so far. Should be called
+ *          upon any factory reset execution.
+ */
+void lwm2m_notif_attr_storage_delete_all(void);
+
+/**@brief Register functions for storing, loading and deleting observer
+ *        information in non-volatile storage.
  *
  * @details This function is used to register functions to store, load and
  *          delete data on the non-volatile storage backend.
  *
- * @retval 0      If callback functions was registered.
+ * @retval 0      If callback functions were registered.
  * @retval EINVAL If any of the callback functions pointers are NULL pointers.
  *
  */
@@ -711,6 +893,94 @@ uint32_t lwm2m_observer_storage_set_callbacks(lwm2m_store_observer_cb_t store_cb
                                               lwm2m_load_observer_cb_t load_cb,
                                               lwm2m_del_observer_cb_t del_cb);
 
+/**@brief Register functions for storing, loading and deleting notification
+ *        attributes in non-volatile storage.
+ *
+ * @retval 0      If callback functions were registered.
+ * @retval EINVAL If any of the callback functions pointers are NULL pointers.
+ *
+ */
+uint32_t lwm2m_notif_attr_storage_set_callbacks(lwm2m_store_notif_attr_cb_t store_cb,
+                                                lwm2m_load_notif_attr_cb_t load_cb,
+                                                lwm2m_del_notif_attr_cb_t del_cb);
+
+/**@brief Initialize a new observable metadata structure.
+ *
+ * @details Will be called whenever an OBSERVE or a WRITE-ATTRIBUTE operation is
+ *          requested on an item that was previously not being observed.
+ *
+ * @param[in] p_remote    Structure containing address information and port number
+ *                        to the remote server that made the request.
+ * @param[in] p_path      URI path that identifies the observable item.
+ * @param[in] path_len    Length of the URI path that identifies the observable item.
+ *
+ * @return  A positive value indicating the entry number of the observable in the table,
+ *          or a negative value indicating failure and the error code.
+ */
+int lwm2m_observable_metadata_init(struct nrf_sockaddr *p_remote,
+                                   const uint16_t *p_path,
+                                   uint8_t path_len);
+
+/**@brief Iterate the registered observers and send notifications if the conditions
+ *        established by the corresponding notification attributes are fulfilled.
+ *
+ * @details This function will iterate the initialized observables and check whether
+ *          the notification conditions (determined by the notification attributes)
+ *          have been fulfilled since the last notification sent, in which case the
+ *          observer will be notified.
+ *
+ * @param[in] bool      If true, notify the observers regardless of whether the notification
+ *                      conditions have been fulfilled, as the LWM2M client has reestablished
+ *                      the connection with the server(s).
+ */
+void lwm2m_observer_process(bool reconnect);
+
+/**@brief Set the callback function to notify the observers of the item identified by
+ *        its URI path.
+ *
+ * @param[in] callback  Callback function to be registered.
+ */
+void lwm2m_observers_notify_path_cb_set(lwm2m_observers_notify_path_cb_t callback);
+
+/**@brief Set the callback function to set the default notification attribute values.
+ *
+ * @param[in] callback  Callback function to be registered.
+ */
+void lwm2m_notif_attribute_default_cb_set(lwm2m_notif_attribute_default_cb_t callback);
+
+/**@brief Set the callback function to retrieve a pointer to the value of the observable item.
+ *
+ * @param[in] callback  Callback function to be registered.
+ */
+void lwm2m_observable_reference_get_cb_set(lwm2m_observable_reference_get_cb_t callback);
+
+/**@brief Set the callback function to retrieve the uptime in milliseconds and initialize
+ *        the reference timer that will be used to handle the information reporting interface.
+ *
+ * @param[in] callback  Callback function to be registered.
+ */
+void lwm2m_observable_uptime_cb_initialize(lwm2m_uptime_get_cb_t callback);
+
+/**@brief Handler function for incoming write-attribute requests from the LWM2M server.
+ *
+ * @param[in] p_path     URI path specified in the write-attributes request CoAP message.
+ * @param[in] path_len   Length of the URI path specified in the write-attributes request CoAP message.
+ * @param[in] p_request  The write-attributes CoAP request message.
+ *
+ * @return 0  If the notification attributes have been updated successfully or an error code on
+ *            failure.
+ */
+int lwm2m_write_attribute_handler(const uint16_t *p_path, uint16_t path_len, const coap_message_t *p_request);
+
+/**@brief Determine whether the given LWM2M resource is being observed by the given server.
+ *
+ * @param[in] short_server_id  Short server ID of the potential observer.
+ * @param[in] p_instance       Instance of the object that owns the resource.
+ * @param[in] resource_id      ID of the observable resource.
+ *
+ * @return  true if the resource has a registered observer, false otherwise.
+ */
+bool lwm2m_is_observed(uint16_t short_server_id, const lwm2m_instance_t * p_instance, uint16_t resource_id);
 
 #ifdef __cplusplus
 }

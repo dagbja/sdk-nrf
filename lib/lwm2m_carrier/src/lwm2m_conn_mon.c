@@ -313,6 +313,8 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
 
         if (err_code == 0)
         {
+            uint16_t path[] = { LWM2M_OBJ_CONN_MON, 0, resource_id };
+
             if (observe_option == 0) // Observe start
             {
                 // Whitelist the resources that support observe.
@@ -344,6 +346,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                                                         resource_id,
                                                         p_instance);
 
+                        lwm2m_observable_metadata_init(p_request->remote, path, ARRAY_SIZE(path));
                         m_con_time_start[resource_id] = lwm2m_os_uptime_get();
                         break;
                     }
@@ -372,6 +375,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                 } else {
                     LWM2M_INF("Observe cancel on resource /4/%i/%i", p_instance->instance_id, resource_id);
                     lwm2m_observe_unregister(p_request->remote, (void *)&m_instance_conn_mon.resource_ids[resource_id]);
+                    lwm2m_notif_attr_storage_update(path, ARRAY_SIZE(path), p_request->remote);
                 }
 
                 // Process the GET request as usual.
@@ -394,7 +398,6 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
         else
         {
             lwm2m_conn_mon_update_resource(resource_id);
-
             err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
                                                                 &buffer_size,
                                                                 resource_id,
@@ -425,6 +428,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
     else if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
         uint32_t mask = 0;
+
         err_code = coap_message_ct_mask_get(p_request, &mask);
 
         if (err_code != 0)
@@ -442,24 +446,10 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
         }
         else if (mask == 0)
         {
-            // TODO: Setting options should be a generic operation, not specific in conn_mon.
-            //       Only using pmin and pmax for now.
-            char option[255];
-            for (int i = 0; i < p_request->options_count; i++) {
-                memcpy(option, p_request->options[i].data, p_request->options[i].length);
-                option[p_request->options[i].length] = 0;
+            uint16_t path[] = { p_instance->object_id, p_instance->instance_id, resource_id };
+            uint16_t path_len = (resource_id == LWM2M_INVALID_RESOURCE) ? ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
 
-                if (strncmp(option, "pmin=", 5) == 0) {
-                    uint32_t p_min = strtol(&option[5], NULL, 10);
-                    lwm2m_observable_pmin_set(p_min);
-                } else if (strncmp(option, "pmax=", 5) == 0) {
-                    uint32_t p_max = strtol(&option[5], NULL, 10);
-                    lwm2m_observable_pmax_set(p_max);
-                }
-            }
-
-            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-            return 0;
+            err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
         }
         else
         {
@@ -527,6 +517,43 @@ uint32_t lwm2m_conn_mon_object_callback(lwm2m_object_t * p_object,
     {
         err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
     }
+    else if (op_code == LWM2M_OPERATION_CODE_WRITE)
+    {
+        if (instance_id != LWM2M_INVALID_INSTANCE)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            return 0;
+        }
+
+        uint32_t mask = 0;
+        err_code = coap_message_ct_mask_get(p_request, &mask);
+
+        if (err_code != 0)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            return 0;
+        }
+
+        // A Write-Attribute request do not contain a Content-Format option.
+        if (mask == 0)
+        {
+            uint16_t path[] = { p_object->object_id };
+
+            err_code = lwm2m_write_attribute_handler(path, ARRAY_SIZE(path), p_request);
+            if (err_code != 0)
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            }
+        }
+        else
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+        }
+    }
     else
     {
         (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
@@ -571,7 +598,30 @@ static void lwm2m_conn_mon_update_resource(uint16_t resource_id)
     }
 }
 
-static void lwm2m_conn_mon_notify_resource(struct nrf_sockaddr * p_remote_server, int16_t resource_id)
+const void * lwm2m_conn_mon_resource_reference_get(uint16_t resource_id, uint8_t *p_type)
+{
+    // TODO: Assert type != NULL
+    switch (resource_id)
+    {
+        case LWM2M_CONN_MON_NETWORK_BEARER:
+            *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+            return &m_instance_conn_mon.network_bearer;
+        case LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH:
+            *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+            return &m_instance_conn_mon.radio_signal_strength;
+        case LWM2M_CONN_MON_LINK_QUALITY:
+            *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+            return &m_instance_conn_mon.link_quality;
+        case LWM2M_CONN_MON_CELL_ID:
+            *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+            return &m_instance_conn_mon.cell_id;
+        default:
+            *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
+            return NULL;
+    }
+}
+
+void lwm2m_conn_mon_notify_resource(struct nrf_sockaddr * p_remote_server, int16_t resource_id)
 {
     uint16_t short_server_id;
     coap_observer_t *p_observer = NULL;
@@ -631,20 +681,6 @@ static void lwm2m_conn_mon_notify_resource(struct nrf_sockaddr * p_remote_server
     }
 }
 
-void lwm2m_conn_mon_observer_process(struct nrf_sockaddr * p_remote_server)
-{
-    const uint16_t res_id[] = {
-        LWM2M_CONN_MON_NETWORK_BEARER,
-        LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH,
-        LWM2M_CONN_MON_LINK_QUALITY,
-        LWM2M_CONN_MON_CELL_ID,
-    };
-
-    for (size_t i = 0; i < ARRAY_SIZE(res_id); i++) {
-        lwm2m_conn_mon_notify_resource(p_remote_server, res_id[i]);
-    }
-}
-
 void lwm2m_conn_mon_init_acl(void)
 {
     lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_conn_mon);
@@ -659,7 +695,6 @@ void lwm2m_conn_mon_init(void)
 
     m_object_conn_mon.object_id = LWM2M_OBJ_CONN_MON;
     m_object_conn_mon.callback = lwm2m_conn_mon_object_callback;
-
     m_instance_conn_mon.proto.expire_time = 60; // Default to 60 second notifications.
     m_instance_conn_mon.network_bearer = 6; // LTE-FDD
     m_instance_conn_mon.available_network_bearer.len = 1;

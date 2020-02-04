@@ -277,6 +277,8 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
 
         if (err_code == 0)
         {
+            uint16_t path[] = { LWM2M_OBJ_SERVER, p_instance->instance_id, resource_id };
+
             if (observe_option == 0) // Observe start
             {
                 // Whitelist the resources that support observe.
@@ -304,6 +306,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                                                         resource_id,
                                                         p_instance);
 
+                        lwm2m_observable_metadata_init(p_request->remote, path, ARRAY_SIZE(path));
                         m_con_time_start[resource_id] = lwm2m_os_uptime_get();
                         break;
                     }
@@ -332,6 +335,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                 } else {
                     LWM2M_INF("Observe cancel on resource /1/%i/%i", instance_id, resource_id);
                     lwm2m_observe_unregister(p_request->remote, (void *)&lwm2m_server_get_instance(instance_id)->resource_ids[resource_id]);
+                    lwm2m_notif_attr_storage_update(path, ARRAY_SIZE(path), p_request->remote);
                 }
 
                 // Process the GET request as usual.
@@ -384,6 +388,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
     else if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
         uint32_t mask = 0;
+
         err_code = coap_message_ct_mask_get(p_request, &mask);
 
         if (err_code != 0)
@@ -405,6 +410,23 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                                                       resource_id,
                                                       p_request->payload,
                                                       p_request->payload_len);
+        }
+        else if (mask == 0)
+        {
+            uint16_t path[] = { p_instance->object_id, p_instance->instance_id, resource_id };
+            uint16_t path_len = (resource_id == LWM2M_INVALID_RESOURCE) ? ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
+
+            err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
+            if (err_code != 0)
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            }
+
+            return 0;
         }
         else
         {
@@ -548,20 +570,44 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
     }
     else if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
-        (void)lwm2m_tlv_server_decode(&m_instance_server[instance_id],
-                                      p_request->payload,
-                                      p_request->payload_len,
-                                      tlv_server_resource_decode);
+        uint32_t mask = 0;
+        err_code = coap_message_ct_mask_get(p_request, &mask);
+        // A Write-Attribute request do not contain a Content-Format option.
+        if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
+        {
+            (void)lwm2m_tlv_server_decode(&m_instance_server[instance_id],
+                                        p_request->payload,
+                                        p_request->payload_len,
+                                        tlv_server_resource_decode);
 
-        m_instance_server[instance_id].proto.instance_id = instance_id;
-        m_instance_server[instance_id].proto.object_id   = p_object->object_id;
-        m_instance_server[instance_id].proto.callback    = server_instance_callback;
+            m_instance_server[instance_id].proto.instance_id = instance_id;
+            m_instance_server[instance_id].proto.object_id   = p_object->object_id;
+            m_instance_server[instance_id].proto.callback    = server_instance_callback;
 
-        // Cast the instance to its prototype and add it.
-        (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_server[instance_id]);
-        (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[instance_id]);
+            // Cast the instance to its prototype and add it.
+            (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_server[instance_id]);
+            (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[instance_id]);
 
-        (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+        }
+        else if (mask == 0)
+        {
+            uint16_t path[] = { p_object->object_id };
+
+            err_code = lwm2m_write_attribute_handler(path, ARRAY_SIZE(path), p_request);
+            if (err_code != 0)
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            }
+        }
+        else
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+        }
     }
     else if (op_code == LWM2M_OPERATION_CODE_DELETE)
     {
@@ -639,7 +685,7 @@ void lwm2m_server_reset(uint16_t instance_id)
     lwm2m_string_free(&p_instance->binding);
 }
 
-static void lwm2m_server_notify_resource(struct nrf_sockaddr *p_remote_server, uint16_t instance_id, uint16_t resource_id)
+void lwm2m_server_notify_resource(struct nrf_sockaddr *p_remote_server, uint16_t instance_id, uint16_t resource_id)
 {
     uint16_t short_server_id;
     coap_observer_t * p_observer = NULL;
@@ -697,16 +743,28 @@ static void lwm2m_server_notify_resource(struct nrf_sockaddr *p_remote_server, u
     }
 }
 
-void lwm2m_server_observer_process(struct nrf_sockaddr *p_remote_server)
+const void * lwm2m_server_resource_reference_get(uint16_t instance_id, uint16_t resource_id, uint8_t *p_type)
 {
-    const uint16_t res_id[] = {
-        LWM2M_SERVER_SHORT_SERVER_ID
-    };
-
-    for (int i = 1; i < LWM2M_MAX_SERVERS; i++)
+    // TODO: Assert type != NULL
+    switch (resource_id)
     {
-        for (size_t j = 0; j < ARRAY_SIZE(res_id); j++) {
-            lwm2m_server_notify_resource(p_remote_server, i, res_id[j]);
-        }
+    case LWM2M_SERVER_SHORT_SERVER_ID:
+        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+        return &m_instance_server[instance_id].short_server_id;
+    case LWM2M_SERVER_LIFETIME:
+        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+        return &m_instance_server[instance_id].lifetime;
+    case LWM2M_SERVER_DEFAULT_MIN_PERIOD:
+        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+        return &m_instance_server[instance_id].default_minimum_period;
+    case LWM2M_SERVER_DEFAULT_MAX_PERIOD:
+        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+        return &m_instance_server[instance_id].default_maximum_period;
+    case LWM2M_SERVER_DISABLE_TIMEOUT:
+        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
+        return &m_instance_server[instance_id].disable_timeout;
+    default:
+        *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
+        return NULL;
     }
 }
