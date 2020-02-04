@@ -314,7 +314,7 @@ int at_apn_register_for_packet_events(void)
     // The unsolicited result code is +CGEV: XXX.
     int err = lwm2m_os_at_cmd_write("AT+CGEREP=1", NULL, 0);
 
-    if (err != 0) 
+    if (err != 0)
     {
         // Check if subscription went OK.
         LWM2M_ERR("Unable to register to CGEV events for IPv6 APN");
@@ -874,6 +874,8 @@ int at_read_time(int32_t *p_time, int32_t *p_utc_offset, int32_t *p_dst_adjustme
             LWM2M_ERR("Reading modem time failed: %d", err);
             retval = -EIO;
         }
+
+        lwm2m_os_at_params_list_free(&cclk_params);
     }
     else
     {
@@ -933,6 +935,8 @@ int at_read_ipaddr(lwm2m_list_t * p_ipaddr_list)
             LWM2M_ERR("Reading IP addresses failed: %d", err);
             retval = -EIO;
         }
+
+        lwm2m_os_at_params_list_free(&cgpaddr_params);
     }
     else
     {
