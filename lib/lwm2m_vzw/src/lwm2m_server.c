@@ -11,8 +11,10 @@
 #include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
+#include <lwm2m_remote.h>
 #include <lwm2m_server.h>
 #include <lwm2m_instance_storage.h>
+#include <lwm2m_vzw_main.h>
 #include <operator_check.h>
 
 #include <coap_option.h>
@@ -30,6 +32,8 @@ extern void app_server_update(uint16_t instance_id, bool connect_update);
 
 static lwm2m_server_t                      m_instance_server[1+LWM2M_MAX_SERVERS];            /**< Server object instance to be filled by the bootstrap server. */
 static lwm2m_object_t                      m_object_server;                                   /**< LWM2M server base object. */
+
+static int64_t m_con_time_start[sizeof(((lwm2m_server_t *)0)->resource_ids)];
 
 // Verizon specific resources.
 static vzw_server_settings_t vzw_server_settings[1+LWM2M_MAX_SERVERS];
@@ -144,11 +148,6 @@ lwm2m_object_t * lwm2m_server_get_object(void)
     return &m_object_server;
 }
 
-uint32_t lwm2m_server_observer_process(void)
-{
-    return 0;
-}
-
 static uint32_t tlv_server_verizon_encode(uint16_t instance_id, uint8_t * p_buffer, uint32_t * p_buffer_len)
 {
     int32_t list_values[2] =
@@ -259,12 +258,95 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
     }
 
     uint16_t instance_id = p_instance->instance_id;
+    uint8_t  buffer[200];
+    uint32_t buffer_size = sizeof(buffer);
+
+    if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
+    {
+        uint32_t observe_option = 0;
+        for (uint8_t index = 0; index < p_request->options_count; index++)
+        {
+            if (p_request->options[index].number == COAP_OPT_OBSERVE)
+            {
+                err_code = coap_opt_uint_decode(&observe_option,
+                                                p_request->options[index].length,
+                                                p_request->options[index].data);
+                break;
+            }
+        }
+
+        if (err_code == 0)
+        {
+            if (observe_option == 0) // Observe start
+            {
+                // Whitelist the resources that support observe.
+                switch (resource_id)
+                {
+                    case LWM2M_SERVER_SHORT_SERVER_ID:
+                    //case LWM2M_SERVER_LIFETIME:
+                    //case LWM2M_SERVER_DEFAULT_MIN_PERIOD:
+                    //case LWM2M_SERVER_DEFAULT_MAX_PERIOD:
+                    //case LWM2M_SERVER_DISABLE_TIMEOUT:
+                    //case LWM2M_SERVER_NOTIFY_WHEN_DISABLED:
+                    //case LWM2M_SERVER_BINDING:
+                    {
+                        LWM2M_INF("Observe requested on resource /1/%i/%i", instance_id, resource_id);
+                        err_code = lwm2m_tlv_server_encode(buffer,
+                                                        &buffer_size,
+                                                        resource_id,
+                                                        lwm2m_server_get_instance(instance_id));
+
+                        err_code = lwm2m_observe_register(buffer,
+                                                        buffer_size,
+                                                        lwm2m_server_get_instance(instance_id)->proto.expire_time,
+                                                        p_request,
+                                                        COAP_CT_APP_LWM2M_TLV,
+                                                        resource_id,
+                                                        p_instance);
+
+                        m_con_time_start[resource_id] = lwm2m_os_uptime_get();
+                        break;
+                    }
+
+                    case LWM2M_INVALID_RESOURCE: // By design LWM2M_INVALID_RESOURCE indicates that this is on instance level.
+                    {
+                        // Process the GET request as usual.
+                        LWM2M_INF("Observe requested on instance /1/%i, no slots", instance_id);
+                        op_code = LWM2M_OPERATION_CODE_READ;
+                        break;
+                    }
+
+                    default:
+                    {
+                        // Process the GET request as usual.
+                        LWM2M_INF("Observe requested on resource /1/%i/%i, no slots", instance_id, resource_id);
+                        op_code = LWM2M_OPERATION_CODE_READ;
+                        break;
+                    }
+                }
+            }
+            else if (observe_option == 1) // Observe stop
+            {
+                if (resource_id == LWM2M_INVALID_RESOURCE) {
+                    LWM2M_INF("Observe cancel on instance /1/%i, no  match", instance_id);
+                } else {
+                    LWM2M_INF("Observe cancel on resource /1/%i/%i", instance_id, resource_id);
+                    lwm2m_observe_unregister(p_request->remote, (void *)&lwm2m_server_get_instance(instance_id)->resource_ids[resource_id]);
+                }
+
+                // Process the GET request as usual.
+                op_code = LWM2M_OPERATION_CODE_READ;
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+                return 0;
+            }
+        }
+    }
 
     if (op_code == LWM2M_OPERATION_CODE_READ)
     {
-        uint8_t  buffer[200];
-        uint32_t buffer_size = sizeof(buffer);
-
         if (resource_id == VERIZON_RESOURCE && operator_is_vzw(true))
         {
             err_code = tlv_server_verizon_encode(instance_id, buffer, &buffer_size);
@@ -385,6 +467,10 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
     else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
     {
         err_code = lwm2m_respond_with_instance_link(p_instance, resource_id, p_request);
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
+    {
+        // Already handled
     }
     else
     {
@@ -529,4 +615,76 @@ void lwm2m_server_reset(uint16_t instance_id)
     p_instance->notification_storing_on_disabled = false;
 
     lwm2m_string_free(&p_instance->binding);
+}
+
+static void lwm2m_server_notify_resource(struct nrf_sockaddr *p_remote_server, uint16_t instance_id, uint16_t resource_id)
+{
+    uint16_t short_server_id;
+    coap_observer_t * p_observer = NULL;
+
+    while (coap_observe_server_next_get(&p_observer, p_observer, (void *)&lwm2m_server_get_instance(instance_id)->resource_ids[resource_id]) == 0)
+    {
+        lwm2m_remote_short_server_id_find(&short_server_id, p_observer->remote);
+        if (lwm2m_remote_reconnecting_get(short_server_id)) {
+            /* Wait for reconnection */
+            continue;
+        }
+
+        if (p_remote_server != NULL) {
+            /* Only notify to given remote */
+            if (memcmp(p_observer->remote, p_remote_server,
+                       sizeof(struct nrf_sockaddr)) != 0) {
+                continue;
+            }
+        }
+
+        LWM2M_TRC("Observer found");
+        uint8_t  buffer[200];
+        uint32_t buffer_size = sizeof(buffer);
+        uint32_t err_code = lwm2m_tlv_server_encode(buffer,
+                                                    &buffer_size,
+                                                    resource_id,
+                                                    lwm2m_server_get_instance(instance_id));
+        if (err_code)
+        {
+            LWM2M_ERR("Could not encode resource_id %u, error code: %lu", resource_id, err_code);
+        }
+
+        coap_msg_type_t type = COAP_TYPE_NON;
+        int64_t now = lwm2m_os_uptime_get();
+
+        // Send CON every configured interval
+        if ((m_con_time_start[resource_id] + (lwm2m_coap_con_interval_get() * 1000)) < now) {
+            type = COAP_TYPE_CON;
+            m_con_time_start[resource_id] = now;
+        }
+
+        LWM2M_INF("Notify /1/%d/%d", instance_id, resource_id);
+        err_code =  lwm2m_notify(buffer,
+                                 buffer_size,
+                                 p_observer,
+                                 type);
+        if (err_code)
+        {
+            LWM2M_INF("Notify /1/%d/%d failed: %s (%ld), %s (%d)", instance_id, resource_id,
+                      lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                      lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
+
+            lwm2m_request_remote_reconnect(p_observer->remote);
+        }
+    }
+}
+
+void lwm2m_server_observer_process(struct nrf_sockaddr *p_remote_server)
+{
+    const uint16_t res_id[] = {
+        LWM2M_SERVER_SHORT_SERVER_ID
+    };
+
+    for (int i = 1; i < LWM2M_MAX_SERVERS; i++)
+    {
+        for (size_t j = 0; j < ARRAY_SIZE(res_id); j++) {
+            lwm2m_server_notify_resource(p_remote_server, i, res_id[j]);
+        }
+    }
 }

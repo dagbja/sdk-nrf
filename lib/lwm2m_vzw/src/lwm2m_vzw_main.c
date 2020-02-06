@@ -2782,7 +2782,7 @@ static void app_timers_init(void)
 
 static void app_lwm2m_observer_process(struct nrf_sockaddr * p_remote_server)
 {
-    lwm2m_server_observer_process();
+    lwm2m_server_observer_process(p_remote_server);
     lwm2m_conn_mon_observer_process(p_remote_server);
     lwm2m_firmware_observer_process(p_remote_server);
 }
