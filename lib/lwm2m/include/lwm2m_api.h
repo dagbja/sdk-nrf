@@ -493,6 +493,7 @@ uint32_t lwm2m_coap_handler_object_delete(lwm2m_object_t * p_object);
  * @note For generation of links to work properly it is required that objects is added
  *       before instances.
  *
+ * @param[in]    object_id       Identifies a specific object, or LWM2M_INVALID_INSTANCE for all.
  * @param[in]    short_server_id Short server id of the requesting server.
  * @param[inout] p_buffer        Pointer to a buffer to fill with link format encoded string. If
  *                               a NULL pointer is provided the function will dry-run the function
@@ -506,7 +507,10 @@ uint32_t lwm2m_coap_handler_object_delete(lwm2m_object_t * p_object);
  * @retval        NRF_SUCCESS      If generation of link format string was successful.
  * @retval        NRF_ERROR_NO_MEM If the provided memory was not large enough.
  */
-uint32_t lwm2m_coap_handler_gen_link_format(uint16_t short_server_id, uint8_t * p_buffer, uint16_t * p_buffer_len);
+uint32_t lwm2m_coap_handler_gen_link_format(uint16_t   object_id,
+                                            uint16_t   short_server_id,
+                                            uint8_t  * p_buffer,
+                                            uint16_t * p_buffer_len);
 
 /**@brief Generate link format string based on Object.
  *
@@ -558,6 +562,15 @@ uint32_t lwm2m_respond_with_payload(uint8_t             * p_payload,
  * @retval NRF_SUCCESS If the response was sent out successfully.
  */
 uint32_t lwm2m_respond_with_code(coap_msg_code_t code, coap_message_t * p_request);
+
+/**@brief Send CoAP response with a Bootstrap DISCOVER link-format.
+ *
+ * @param[in] object_id  Identifies the object.
+ * @param[in] p_request  Original CoAP request. Must not be NULL.
+ *
+ * @retval NRF_SUCCESS If the response was sent out successfully.
+ */
+uint32_t lwm2m_respond_with_bs_discover_link(uint16_t object_id, coap_message_t * p_request);
 
 /**@brief Send CoAP response with a Object link-format.
  *

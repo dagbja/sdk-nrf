@@ -411,6 +411,43 @@ uint32_t lwm2m_respond_with_payload(uint8_t             * p_payload,
     return err_code;
 }
 
+uint32_t lwm2m_respond_with_bs_discover_link(uint16_t object_id, coap_message_t * p_request)
+{
+    uint32_t  link_format_string_len = 0;
+    uint8_t * p_link_format_string   = NULL;
+
+    // Dry run the link format generation, to check how much memory that is needed.
+    uint32_t err_code = lwm2m_coap_handler_gen_link_format(object_id, LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID, NULL, (uint16_t *)&link_format_string_len);
+
+    if (err_code == 0) {
+        // Allocate the needed amount of memory.
+        p_link_format_string = lwm2m_os_malloc(link_format_string_len);
+
+        if (p_link_format_string == NULL) {
+            err_code = ENOMEM;
+        }
+    }
+
+    if (err_code == 0) {
+        // Render the link format string.
+        err_code = lwm2m_coap_handler_gen_link_format(object_id, LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID, p_link_format_string, (uint16_t *)&link_format_string_len);
+    }
+
+    if (err_code == 0) {
+        err_code = lwm2m_respond_with_payload(p_link_format_string, link_format_string_len, COAP_CT_APP_LINK_FORMAT, p_request);
+    }
+
+    if (err_code != 0) {
+        (void)lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
+    }
+
+    if (p_link_format_string) {
+        lwm2m_os_free(p_link_format_string);
+    }
+
+    return err_code;
+}
+
 uint32_t lwm2m_respond_with_object_link(uint16_t object_id, coap_message_t * p_request)
 {
     uint8_t  buffer[512];

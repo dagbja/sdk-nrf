@@ -12,6 +12,7 @@
 #include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
+#include <lwm2m_remote.h>
 #include <lwm2m_security.h>
 #include <lwm2m_instance_storage.h>
 
@@ -387,6 +388,20 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
             (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_security[instance_id]);
         }
         (void)lwm2m_respond_with_code(COAP_CODE_202_DELETED, p_request);
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
+    {
+        uint16_t short_server_id = 0;
+        lwm2m_remote_short_server_id_find(&short_server_id, p_request->remote);
+
+        if (short_server_id == LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID)
+        {
+            (void)lwm2m_respond_with_bs_discover_link(p_object->object_id, p_request);
+        }
+        else
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+        }
     }
     else
     {

@@ -1561,10 +1561,10 @@ static bool app_factory_bootstrap_initialize_att(uint16_t instance_id, uint16_t 
     {
         case VZW_BOOTSTRAP_INSTANCE_ID:
         {
-            lwm2m_security_short_server_id_set(instance_id, 0);
+            lwm2m_security_short_server_id_set(instance_id, LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
             lwm2m_security_is_bootstrap_server_set(instance_id, true);
 
-            lwm2m_server_short_server_id_set(instance_id, 0);
+            lwm2m_server_short_server_id_set(instance_id, LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
 
             *default_access = 0;
             break;
@@ -2200,7 +2200,7 @@ static void app_server_register(uint16_t instance_id)
     uint16_t short_server_id = lwm2m_server_short_server_id_get(instance_id);
 
     // Dry run the link format generation, to check how much memory that is needed.
-    err_code = lwm2m_coap_handler_gen_link_format(short_server_id, NULL, (uint16_t *)&link_format_string_len);
+    err_code = lwm2m_coap_handler_gen_link_format(LWM2M_INVALID_INSTANCE, short_server_id, NULL, (uint16_t *)&link_format_string_len);
 
     if (err_code == 0) {
         // Allocate the needed amount of memory.
@@ -2213,7 +2213,7 @@ static void app_server_register(uint16_t instance_id)
 
     if (err_code == 0) {
         // Render the link format string.
-        err_code = lwm2m_coap_handler_gen_link_format(short_server_id, p_link_format_string, (uint16_t *)&link_format_string_len);
+        err_code = lwm2m_coap_handler_gen_link_format(LWM2M_INVALID_INSTANCE, short_server_id, p_link_format_string, (uint16_t *)&link_format_string_len);
     }
 
     if (err_code == 0) {

@@ -995,6 +995,18 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
                 LWM2M_TRC("<< %s root /",
                           m_operation_desc[op_desc_idx_lookup(operation)]);
             }
+            else if (operation == LWM2M_OPERATION_CODE_DISCOVER)
+            {
+                if (short_server_id == LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID)
+                {
+                    // Bootstrap DISCOVER
+                    err_code = lwm2m_respond_with_bs_discover_link(LWM2M_INVALID_INSTANCE, p_request);
+                }
+                else
+                {
+                    err_code = lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+                }
+            }
             else
             {
                 LWM2M_MUTEX_UNLOCK();
@@ -1597,7 +1609,7 @@ uint32_t lwm2m_coap_handler_object_delete(lwm2m_object_t * p_object)
 }
 
 
-uint32_t lwm2m_coap_handler_gen_link_format(uint16_t short_server_id, uint8_t * p_buffer, uint16_t * p_buffer_len)
+uint32_t lwm2m_coap_handler_gen_link_format(uint16_t object_id, uint16_t short_server_id, uint8_t * p_buffer, uint16_t * p_buffer_len)
 {
 
     LWM2M_ENTRY();
@@ -1610,8 +1622,8 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint16_t short_server_id, uint8_t * 
     uint16_t  buffer_len;
     uint8_t * p_string_buffer;
     uint16_t  buffer_max_size;
-    uint32_t  acl_link_size;
-    uint32_t  err_code;
+    uint32_t  acl_link_size = 0;
+    uint32_t  err_code = 0;
     bool      first_entry = true;
 
     uint8_t  dry_run_buffer[16]; // Maximum: "</65535/65535>,"
@@ -1631,6 +1643,31 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint16_t short_server_id, uint8_t * 
         buffer_max_size = *p_buffer_len;
     }
 
+    if (short_server_id == LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID)
+    {
+        // Bootstrap DISCOVER
+        buffer_len = snprintf((char *)dry_run_buffer,
+                              sizeof(dry_run_buffer),
+                              "lwm2m=\"1.0\"");
+        if (dry_run == true)
+        {
+            dry_run_size += buffer_len;
+        }
+        else if (buffer_index + buffer_len <= buffer_max_size)
+        {
+            memcpy(&p_string_buffer[buffer_index], dry_run_buffer, buffer_len);
+            buffer_index += buffer_len;
+        }
+        else
+        {
+            LWM2M_MUTEX_UNLOCK();
+
+            return ENOMEM;
+        }
+
+        first_entry = false;
+    }
+
     for (int i = 0; i < m_num_objects; ++i)
     {
         uint16_t curr_object = m_objects[i]->object_id;
@@ -1641,7 +1678,13 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint16_t short_server_id, uint8_t * 
             continue;
         }
 
-        if (curr_object == LWM2M_OBJ_SECURITY)
+        if (object_id != LWM2M_INVALID_INSTANCE && object_id != curr_object)
+        {
+            // Not interested in this object.
+            continue;
+        }
+
+        if (short_server_id != LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID && curr_object == LWM2M_OBJ_SECURITY)
         {
             // Skip Security objects.
             continue;
@@ -1653,11 +1696,14 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint16_t short_server_id, uint8_t * 
         {
             if (m_instances[j]->object_id == curr_object)
             {
-                uint16_t allowed_ops = internal_get_allowed_operations(m_instances[j], short_server_id);
-                if (allowed_ops == 0)
+                if (short_server_id != LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID)
                 {
-                    // No access.
-                    continue;
+                    uint16_t allowed_ops = internal_get_allowed_operations(m_instances[j], short_server_id);
+                    if (allowed_ops == 0)
+                    {
+                        // No access.
+                        continue;
+                    }
                 }
 
                 instance_present = true;
@@ -1682,6 +1728,43 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint16_t short_server_id, uint8_t * 
                     LWM2M_MUTEX_UNLOCK();
 
                     return ENOMEM;
+                }
+
+                if (short_server_id == LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID) {
+                    // Bootstrap DISCOVER
+
+                    uint16_t ssid = 0;
+                    if (m_instances[i]->object_id == LWM2M_OBJ_SECURITY)
+                    {
+                        ssid = ((lwm2m_security_t *)m_instances[i])->short_server_id;
+                    }
+                    else if (m_instances[i]->object_id == LWM2M_OBJ_SERVER)
+                    {
+                        ssid = ((lwm2m_server_t *)m_instances[i])->short_server_id;
+                    }
+
+                    if (ssid != LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID)
+                    {
+                        buffer_len = snprintf((char *)dry_run_buffer,
+                                            sizeof(dry_run_buffer),
+                                            ";ssid=%u",
+                                            ssid);
+                        if (dry_run == true)
+                        {
+                            dry_run_size += buffer_len;
+                        }
+                        else if (buffer_index + buffer_len <= buffer_max_size)
+                        {
+                            memcpy(&p_string_buffer[buffer_index], dry_run_buffer, buffer_len);
+                            buffer_index += buffer_len;
+                        }
+                        else
+                        {
+                            LWM2M_MUTEX_UNLOCK();
+
+                            return ENOMEM;
+                        }
+                    }
                 }
 
                 first_entry = false;
@@ -1715,17 +1798,28 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint16_t short_server_id, uint8_t * 
         }
     }
 
-    // Write ACL object
+    // Do not add ACL for Bootstrap DISCOVER
+    if (short_server_id != LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID)
+    {
+        // Write ACL object
+        if (dry_run == true)
+        {
+            acl_link_size = 0;
+            err_code = internal_gen_acl_link(NULL, &acl_link_size, short_server_id);
+        }
+        else
+        {
+            acl_link_size = buffer_max_size - buffer_index;
+            err_code = internal_gen_acl_link(&p_string_buffer[buffer_index], &acl_link_size, short_server_id);
+        }
+    }
+
     if (dry_run == true)
     {
-        acl_link_size = 0;
-        err_code = internal_gen_acl_link(NULL, &acl_link_size, short_server_id);
         *p_buffer_len = dry_run_size + acl_link_size;
     }
     else
     {
-        acl_link_size = buffer_max_size - buffer_index;
-        err_code = internal_gen_acl_link(&p_string_buffer[buffer_index], &acl_link_size, short_server_id);
         *p_buffer_len = buffer_index + acl_link_size;
     }
 

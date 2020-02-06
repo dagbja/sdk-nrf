@@ -589,7 +589,17 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
     }
     else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
     {
-        err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
+        uint16_t short_server_id = 0;
+        lwm2m_remote_short_server_id_find(&short_server_id, p_request->remote);
+
+        if (short_server_id == LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID)
+        {
+            err_code = lwm2m_respond_with_bs_discover_link(p_object->object_id, p_request);
+        }
+        else
+        {
+            err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
+        }
     }
     else
     {
