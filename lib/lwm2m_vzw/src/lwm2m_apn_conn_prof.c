@@ -195,10 +195,8 @@ void lwm2m_apn_conn_prof_init(void)
 
     m_object_apn_conn_prof.object_id = LWM2M_OBJ_APN_CONNECTION_PROFILE;
 
-    m_instance_apn_conn_prof.profile_name.p_val = DEFAULT_PROFILE_NAME;
-    m_instance_apn_conn_prof.profile_name.len = strlen(DEFAULT_PROFILE_NAME);
-    m_instance_apn_conn_prof.apn.p_val = DEFAULT_APN;
-    m_instance_apn_conn_prof.apn.len = strlen(DEFAULT_APN);
+    (void)lwm2m_bytebuffer_to_string(DEFAULT_PROFILE_NAME, strlen(DEFAULT_PROFILE_NAME), &m_instance_apn_conn_prof.profile_name);
+    (void)lwm2m_bytebuffer_to_string(DEFAULT_APN, strlen(DEFAULT_APN), &m_instance_apn_conn_prof.apn);
     m_instance_apn_conn_prof.enable_status = true;
     m_instance_apn_conn_prof.authentication_type = 0;
 
