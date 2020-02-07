@@ -847,10 +847,12 @@ uint32_t lwm2m_coap_handler_gen_instance_link(lwm2m_instance_t * p_instance,
         return ENOMEM;
     }
 
+    uint16_t * p_resource_ids = (uint16_t *)((uint8_t *)p_instance + p_instance->resource_ids_offset);
+
     for (int i = 0; i < p_instance->num_resources; ++i)
     {
         uint8_t resource_operation = 0;
-        err_code = op_code_resolve(p_instance, i, &resource_operation);
+        err_code = op_code_resolve(p_instance, p_resource_ids[i], &resource_operation);
 
         if (err_code != 0)
         {
@@ -865,7 +867,7 @@ uint32_t lwm2m_coap_handler_gen_instance_link(lwm2m_instance_t * p_instance,
                                   ",</%u/%u/%u>",
                                   p_instance->object_id,
                                   p_instance->instance_id,
-                                  i);
+                                  p_resource_ids[i]);
 
             if (buffer_index + buffer_len <= buffer_max_size)
             {
