@@ -843,9 +843,14 @@ static int app_generate_client_id(void)
  */
 uint32_t lwm2m_coap_handler_root(uint8_t op_code, coap_message_t * p_request)
 {
-    (void)lwm2m_respond_with_code(COAP_CODE_202_DELETED, p_request);
+    // Delete all instances except Bootstrap server
+    for (uint32_t i = 1; i < 1 + LWM2M_MAX_SERVERS; i++)
+    {
+        (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_security_get_instance(i));
+        (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_server_get_instance(i));
+    }
 
-    // Delete any existing objects or instances if needed.
+    (void)lwm2m_respond_with_code(COAP_CODE_202_DELETED, p_request);
 
     return 0;
 }
