@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <lwm2m_objects.h>
 
+void lwm2m_device_update_software_version(void);
 void lwm2m_device_init_acl(void);
 void lwm2m_device_init(void);
 

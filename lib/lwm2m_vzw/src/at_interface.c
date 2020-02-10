@@ -462,6 +462,29 @@ int at_read_imei(char * const p_imei, int imei_len)
     return retval;
 }
 
+int at_read_svn(char * const p_svn, int svn_len)
+{
+    int retval = 0;
+
+    if (p_svn == NULL || svn_len < 3) {
+        return EINVAL;
+    }
+
+    // Read IMEI.
+    int len = svn_len;
+    int err = at_response_param_to_string("AT+CGSN=3", 2, 1, p_svn, &len);
+
+    if (err != 0)
+    {
+        // AT command error
+        LWM2M_ERR("Unable to read SVN. AT command error %d.", err);
+        retval = EIO;
+    }
+
+    return retval;
+}
+
+
 int at_read_msisdn(char * const p_msisdn, int msisdn_len)
 {
     int retval = 0;

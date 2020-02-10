@@ -1738,6 +1738,8 @@ void lwm2m_bootstrap_reset(void)
     lwm2m_conn_stat_init_acl();
     lwm2m_apn_conn_prof_init_acl();
 
+    lwm2m_device_update_software_version();
+
     for (uint32_t i = 0; i < CONFIG_NRF_COAP_OBSERVE_MAX_NUM_OBSERVERS; i++)
     {
         lwm2m_observer_delete(i);

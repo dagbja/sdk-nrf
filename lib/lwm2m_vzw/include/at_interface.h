@@ -88,6 +88,20 @@ int at_write_apn_class(uint8_t apn_class, const char * p_apn, int apn_len);
 int at_read_imei(char * const p_imei, int imei_len);
 
 /**
+ * @brief Read device SVN.
+ * SVN is always 2 digits.
+ *
+ * @param p_svn[in] Buffer to store SVN. Stored as a NULL-terminated String with 2 digits.
+ * @param svn_len[in] Size of the buffer. Must be at least 3 bytes.
+ *
+ * @return Result of the SVN read AT command.
+ * @retval EINVAL Invalid parameters.
+ * @retval EIO AT command error.
+ * @retval 0 Success.
+ */
+int at_read_svn(char * const p_svn, int svn_len);
+
+/**
  * @brief Read subscriber number (MSISDN).
  * MSISDN is maximum 15 digits. Length may varies based on the operator.
  * MSISDN may not always be available depending on the SIM card.
