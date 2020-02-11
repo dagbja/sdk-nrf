@@ -13,7 +13,7 @@
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_conn_stat.h>
 #include <coap_message.h>
-#include <common.h>
+#include <lwm2m_common.h>
 #include <lwm2m_vzw_main.h>
 #include <at_interface.h>
 
@@ -54,7 +54,7 @@ uint32_t conn_stat_instance_callback(lwm2m_instance_t * p_instance,
     LWM2M_TRC("conn_stat_instance_callback");
 
     uint16_t access = 0;
-    uint32_t err_code = common_lwm2m_access_remote_get(&access,
+    uint32_t err_code = lwm2m_access_remote_get(&access,
                                                        p_instance,
                                                        p_request->remote);
     if (err_code != 0)
@@ -322,7 +322,7 @@ uint32_t lwm2m_conn_stat_object_callback(lwm2m_object_t * p_object,
 
 void lwm2m_conn_stat_init_acl(void)
 {
-    common_lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_conn_stat);
+    lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_conn_stat);
 }
 
 void lwm2m_conn_stat_init(void)

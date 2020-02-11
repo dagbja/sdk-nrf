@@ -13,9 +13,9 @@
 #include <operator_check.h>
 
 /**@brief Helper function to get the access from an instance and a remote. */
-uint32_t common_lwm2m_access_remote_get(uint16_t            * p_access,
-                                        lwm2m_instance_t    * p_instance,
-                                        struct nrf_sockaddr * p_remote)
+uint32_t lwm2m_access_remote_get(uint16_t            * p_access,
+                                 lwm2m_instance_t    * p_instance,
+                                 struct nrf_sockaddr * p_remote)
 {
     uint16_t short_server_id;
     uint32_t err_code = lwm2m_remote_short_server_id_find(&short_server_id, p_remote);
@@ -42,27 +42,29 @@ uint32_t common_lwm2m_access_remote_get(uint16_t            * p_access,
     return err_code;
 }
 
-void common_lwm2m_set_instance_acl(lwm2m_instance_t * p_instance, uint16_t default_access, lwm2m_instance_acl_t *acl)
+void lwm2m_set_instance_acl(lwm2m_instance_t * p_instance,
+                            uint16_t default_access,
+                            lwm2m_instance_acl_t * p_acl)
 {
     // Reset ACL on the instance.
-    (void)lwm2m_acl_permissions_reset(p_instance, acl->owner);
+    (void)lwm2m_acl_permissions_reset(p_instance, p_acl->owner);
 
     // Set default access.
     (void)lwm2m_acl_permissions_add(p_instance,
                                     default_access,
                                     LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
 
-    for (uint32_t i = 0; i < ARRAY_SIZE(acl->server); i++)
+    for (uint32_t i = 0; i < ARRAY_SIZE(p_acl->server); i++)
     {
-        if (acl->server[i] != 0)
+        if (p_acl->server[i] != 0)
         {
             // Set server access.
-            (void)lwm2m_acl_permissions_add(p_instance, acl->access[i], acl->server[i]);
+            (void)lwm2m_acl_permissions_add(p_instance, p_acl->access[i], p_acl->server[i]);
         }
     }
 }
 
-void common_lwm2m_set_carrier_acl(lwm2m_instance_t * p_instance)
+void lwm2m_set_carrier_acl(lwm2m_instance_t * p_instance)
 {
     lwm2m_instance_acl_t acl = {
         .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID
@@ -83,5 +85,5 @@ void common_lwm2m_set_carrier_acl(lwm2m_instance_t * p_instance)
         acl.server[0] = 1;
     }
 
-    common_lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
+    lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
 }

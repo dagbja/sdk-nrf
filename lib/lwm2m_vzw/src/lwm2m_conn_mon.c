@@ -14,7 +14,7 @@
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_conn_mon.h>
 #include <coap_message.h>
-#include <common.h>
+#include <lwm2m_common.h>
 #include <lwm2m_vzw_main.h>
 #include <operator_check.h>
 #include <at_interface.h>
@@ -268,7 +268,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
     LWM2M_TRC("conn_mon_instance_callback");
 
     uint16_t access = 0;
-    uint32_t err_code = common_lwm2m_access_remote_get(&access,
+    uint32_t err_code = lwm2m_access_remote_get(&access,
                                                        p_instance,
                                                        p_request->remote);
     if (err_code != 0)
@@ -647,7 +647,7 @@ void lwm2m_conn_mon_observer_process(struct nrf_sockaddr * p_remote_server)
 
 void lwm2m_conn_mon_init_acl(void)
 {
-    common_lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_conn_mon);
+    lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_conn_mon);
 }
 
 void lwm2m_conn_mon_init(void)

@@ -17,7 +17,7 @@
 #include <lwm2m_objects_plain_text.h>
 #include <lwm2m_os.h>
 #include <coap_message.h>
-#include <common.h>
+#include <lwm2m_common.h>
 #include <at_interface.h>
 #include <lwm2m_vzw_main.h>
 #include <operator_check.h>
@@ -267,7 +267,7 @@ uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
     LWM2M_TRC("device_instance_callback");
 
     uint16_t access = 0;
-    uint32_t err_code = common_lwm2m_access_remote_get(&access,
+    uint32_t err_code = lwm2m_access_remote_get(&access,
                                                        p_instance,
                                                        p_request->remote);
     if (err_code != 0)
@@ -645,7 +645,7 @@ void lwm2m_device_update_software_version(void)
 
 void lwm2m_device_init_acl(void)
 {
-    common_lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_device);
+    lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_device);
 }
 
 void lwm2m_device_init(void)

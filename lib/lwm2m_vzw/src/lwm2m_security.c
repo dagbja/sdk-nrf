@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <lwm2m.h>
 #include <lwm2m_api.h>
+#include <lwm2m_common.h>
 #include <lwm2m_objects.h>
 #include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
@@ -20,7 +21,6 @@
 #include <coap_observe_api.h>
 #include <coap_message.h>
 
-#include <common.h>
 
 #define VERIZON_RESOURCE                30000
 
@@ -210,7 +210,7 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
     LWM2M_TRC("security_instance_callback");
 
     uint16_t access = 0;
-    uint32_t err_code = common_lwm2m_access_remote_get(&access,
+    uint32_t err_code = lwm2m_access_remote_get(&access,
                                                        p_instance,
                                                        p_request->remote);
     if (err_code != 0)

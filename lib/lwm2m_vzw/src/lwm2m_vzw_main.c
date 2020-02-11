@@ -13,12 +13,14 @@
 #include <lwm2m_acl.h>
 #include <lwm2m_api.h>
 #include <lwm2m_carrier.h>
+#include <lwm2m_common.h>
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_conn_stat.h>
 #include <lwm2m_apn_conn_prof.h>
 #include <lwm2m_portfolio.h>
 #include <lwm2m_conn_ext.h>
 #include <lwm2m_vzw_main.h>
+#include <lwm2m_factory_bootstrap.h>
 #include <lwm2m_device.h>
 #include <lwm2m_firmware.h>
 #include <lwm2m_instance_storage.h>
@@ -30,7 +32,6 @@
 #include <lwm2m_pdn.h>
 #include <lwm2m_os.h>
 
-#include <common.h>
 #include <app_debug.h>
 #include <at_interface.h>
 #include <operator_check.h>
@@ -53,51 +54,11 @@
 #endif
 #define LWM2M_LOCAL_CLIENT_PORT_OFFSET        9999                                            /**< Local port to connect to the LWM2M server. */
 
-#if APP_USE_CONTABO
-#define BOOTSTRAP_URI_CONTABO           "coaps://vmi36865.contabo.host:5784"                  /**< Server URI to the bootstrap server when using security (DTLS). */
-#define DIAGNOSTICS_URI_CONTABO         ""                                                    /**< Server URI to the diagnostics server when using security (DTLS). */
-#endif
-
-#define BOOTSTRAP_URI_VZW               "coaps://boot.lwm2m.vzwdm.com:5684"                   /**< Server URI to the bootstrap server when using security (DTLS). */
-#define DIAGNOSTICS_URI_VZW             "coaps://diag.lwm2m.vzwdm.com:5684"                   /**< Server URI to the diagnostics server when using security (DTLS). */
-
-#define BOOTSTRAP_URI_VZW_TEST          "coaps://xvzwcdpii.xdev.motive.com:5684"              /**< Server URI to the bootstrap server when using security (DTLS). */
-#define DIAGNOSTICS_URI_VZW_TEST        ""                                                    /**< Server URI to the diagnostics server when using security (DTLS). */
-
-#define BOOTSTRAP_URI_ATT               "coaps://InteropBootstrap.dm.iot.att.com:5694"        /**< Server URI to the bootstrap server when using security (DTLS). */
-#define DIAGNOSTICS_URI_ATT             "coaps://InteropLwM2M.dm.iot.att.com:5684"            /**< Server URI to the diagnostics server when using security (DTLS). */
-
-#define BOOTSTRAP_URI_ATT_TEST          "coaps://InteropBootstrap.dm.iot.att.com:5694"        /**< Server URI to the bootstrap server when using security (DTLS). */
-#define DIAGNOSTICS_URI_ATT_TEST        "coaps://InteropLwM2M.dm.iot.att.com:5684"            /**< Server URI to the diagnostics server when using security (DTLS). */
-
-
 #define APP_SEC_TAG_OFFSET              25
 
 #define APP_BOOTSTRAP_SEC_TAG           (APP_SEC_TAG_OFFSET + 0)                              /**< Tag used to identify security credentials used by the client for bootstrapping. */
 #define APP_DIAGNOSTICS_SEC_TAG         (APP_SEC_TAG_OFFSET + 2)                              /**< Tag used to identify security credentials used by the client for diagnostics server. */
 
-#if APP_USE_CONTABO
-#define APP_BOOTSTRAP_SEC_PSK_CONTABO  { 'n', 'o', 'r', 'd', 'i', 'c', 's', 'e', 'c', 'r', 'e', 't' }  /**< Pre-shared key used for bootstrap server in hex format. */
-#endif
-
-// PSK: d6160c2e7c90399ee7d207a22611e3d3a87241b0462976b935341d000a91e747
-#define APP_BOOTSTRAP_SEC_PSK_VZW      { 0xd6, 0x16, 0x0c, 0x2e, \
-                                         0x7c, 0x90, 0x39, 0x9e, \
-                                         0xe7, 0xd2, 0x07, 0xa2, \
-                                         0x26, 0x11, 0xe3, 0xd3, \
-                                         0xa8, 0x72, 0x41, 0xb0, \
-                                         0x46, 0x29, 0x76, 0xb9, \
-                                         0x35, 0x34, 0x1d, 0x00, \
-                                         0x0a, 0x91, 0xe7, 0x47 } /**< Pre-shared key used for bootstrap server in hex format. */
-
-// PSK: ccb7e44cb5890c9095157506c650ee05
-#define APP_BOOTSTRAP_SEC_PSK_ATT      { 0xcc, 0xb7, 0xe4, 0x4c, \
-                                         0xb5, 0x89, 0x0c, 0x90, \
-                                         0x95, 0x15, 0x75, 0x06, \
-                                         0xc6, 0x50, 0xee, 0x05 } /**< Pre-shared key used for bootstrap server in hex format. */
-
-
-#define VZW_BOOTSTRAP_INSTANCE_ID       0                                                   /**< Verizon Bootstrap server instance id. */
 #define VZW_MANAGEMENT_INSTANCE_ID      1                                                   /**< Verizon Device Management server instance id. */
 #define VZW_DIAGNOSTICS_INSTANCE_ID     2                                                   /**< Verizon Diagnostics server instance id. */
 #define VZW_REPOSITORY_INSTANCE_ID      3                                                   /**< Verizon Data Repository server instance id. */
@@ -117,12 +78,8 @@ static char m_apn_name_buf[APP_APN_NAME_BUF_LENGTH];                            
 static int32_t m_pdn_retry_delay[] = { K_SECONDS(2), K_SECONDS(60), K_SECONDS(1800) };      /**< PDN activation deleays. */
 static int32_t m_pdn_retry_count;                                                           /**< PDN activation count. */
 
-static char m_app_bootstrap_psk_vzw[] = APP_BOOTSTRAP_SEC_PSK_VZW;
-static char m_app_bootstrap_psk_att[] = APP_BOOTSTRAP_SEC_PSK_ATT;
-
 /* Initialize config with default values. */
 static lwm2m_carrier_config_t              m_app_config;
-static bool                                m_bootstrap_uri_configured;                        /**< Set if Bootstrap URI is configured from application. */
 
 static lwm2m_server_config_t               m_server_conf[1+LWM2M_MAX_SERVERS];                /**< Server configuration structure. */
 static lwm2m_client_identity_t             m_client_id;                                       /**< Client ID structure to hold the client's UUID. */
@@ -191,8 +148,6 @@ static struct nrf_sockaddr_in6 m_bs_remote_server;                              
 static struct nrf_sockaddr_in6 m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
 static volatile uint32_t tick_count = 0;
 
-static void app_misc_data_set_bootstrapped(uint8_t bootstrapped);
-static bool lwm2m_bootstrap_settings_update(void);
 static void app_server_disconnect(uint16_t instance_id);
 static int app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
 static int app_provision_secret_keys(void);
@@ -760,7 +715,7 @@ static int app_generate_client_id(void)
 
     if (last_used_operator_id != operator_id(true)) {
         LWM2M_INF("Carrier change detected: %u -> %u", last_used_operator_id, operator_id(true));
-        if (lwm2m_bootstrap_settings_update()) {
+        if (lwm2m_factory_bootstrap_update(&m_app_config)) {
             clear_bootstrap = true;
         }
 
@@ -804,7 +759,7 @@ static int app_generate_client_id(void)
 
     if (clear_bootstrap) {
         lwm2m_bootstrap_clear();
-        lwm2m_retry_delay_reset(VZW_BOOTSTRAP_INSTANCE_ID);
+        lwm2m_retry_delay_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
         provision_bs_psk = true;
     }
 
@@ -1193,15 +1148,15 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         {
             // No response or received a 4.03 error.
             if (lwm2m_state_set(LWM2M_STATE_BOOTSTRAP_WAIT)) {
-                app_handle_connect_retry(VZW_BOOTSTRAP_INSTANCE_ID, false);
+                app_handle_connect_retry(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
             }
         }
         else
         {
             LWM2M_ERR("Bootstrap procedure failed (%d.%02d)", coap_code >> 5, coap_code & 0x1f);
             m_app_state = LWM2M_STATE_DISCONNECTED;
-            app_server_disconnect(VZW_BOOTSTRAP_INSTANCE_ID);
-            lwm2m_retry_delay_reset(VZW_BOOTSTRAP_INSTANCE_ID);
+            app_server_disconnect(LWM2M_BOOTSTRAP_INSTANCE_ID);
+            lwm2m_retry_delay_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
 
             app_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, 0);
         }
@@ -1427,17 +1382,11 @@ static void app_connection_update(void *timer)
 
 static void app_init_connection_update(void)
 {
-    // Enable Diagnostics server only when using live VZW bootstrap server
-    bool enable_diagnostics_server = !m_bootstrap_uri_configured && (operator_is_vzw(false) || operator_is_att(true));
-
     // Register all servers having a URI.
     for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
         uint8_t uri_len = 0;
 
-        if ((i != VZW_DIAGNOSTICS_INSTANCE_ID) || enable_diagnostics_server) {
-            (void)lwm2m_security_server_uri_get(i, &uri_len);
-        }
-
+        (void)lwm2m_security_server_uri_get(i, &uri_len);
         if (uri_len > 0) {
             lwm2m_request_server_update(i, true);
             if (m_connection_update[i].timer == NULL) {
@@ -1455,6 +1404,14 @@ static void app_init_connection_update(void)
     }
 }
 
+static void app_misc_data_set_bootstrapped(bool bootstrapped)
+{
+    lwm2m_instance_storage_misc_data_t misc_data = { 0 };
+    lwm2m_instance_storage_misc_data_load(&misc_data);
+    misc_data.bootstrapped = bootstrapped ? 1 : 0;
+    lwm2m_instance_storage_misc_data_store(&misc_data);
+}
+
 /**@brief Callback function for the named bootstrap complete object. */
 uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
                                    uint16_t         instance_id,
@@ -1468,19 +1425,19 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     lwm2m_os_sleep(10); // TODO: figure out why this is needed before closing the connection
 
     // Close connection to bootstrap server.
-    app_server_disconnect(VZW_BOOTSTRAP_INSTANCE_ID);
-    lwm2m_retry_delay_reset(VZW_BOOTSTRAP_INSTANCE_ID);
+    app_server_disconnect(LWM2M_BOOTSTRAP_INSTANCE_ID);
+    lwm2m_retry_delay_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
 
     if (app_provision_secret_keys() != 0) {
         lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
         return 0;
     }
 
-    lwm2m_security_bootstrapped_set(VZW_BOOTSTRAP_INSTANCE_ID, true);  // TODO: this should be set by bootstrap server when bootstrapped
+    lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, true);  // TODO: this should be set by bootstrap server when bootstrapped
     m_did_bootstrap = true;
 
     // Clean bootstrap.
-    app_misc_data_set_bootstrapped(1);
+    app_misc_data_set_bootstrapped(true);
 
     LWM2M_INF("Store bootstrap settings");
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
@@ -1497,260 +1454,33 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     return 0;
 }
 
-static bool app_factory_bootstrap_initialize_vzw(uint16_t instance_id, uint16_t *default_access, lwm2m_instance_acl_t * p_acl)
-{
-    uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
-                            LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE);
-
-    bool initialized = true;
-
-    switch (instance_id)
-    {
-        case VZW_BOOTSTRAP_INSTANCE_ID:
-        {
-            lwm2m_security_short_server_id_set(instance_id, 100);
-            lwm2m_security_is_bootstrap_server_set(instance_id, true);
-            lwm2m_security_bootstrapped_set(instance_id, false);
-            lwm2m_security_hold_off_timer_set(instance_id, 10);
-
-            lwm2m_server_short_server_id_set(instance_id, 100);
-            lwm2m_server_client_hold_off_timer_set(instance_id, 0);
-
-            p_acl->access[0] = rwde_access;
-            p_acl->server[0] = 102;
-            break;
-        }
-
-        case VZW_MANAGEMENT_INSTANCE_ID:
-        {
-            p_acl->access[0] = rwde_access;
-            p_acl->server[0] = 101;
-            p_acl->access[1] = rwde_access;
-            p_acl->server[1] = 102;
-            p_acl->access[2] = rwde_access;
-            p_acl->server[2] = 1000;
-            break;
-        }
-
-        case VZW_DIAGNOSTICS_INSTANCE_ID:
-        {
-            lwm2m_security_short_server_id_set(instance_id, 101);
-            if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
-                lwm2m_security_server_uri_set(instance_id, DIAGNOSTICS_URI_VZW_TEST, strlen(DIAGNOSTICS_URI_VZW_TEST));
-            } else {
-                lwm2m_security_server_uri_set(instance_id, DIAGNOSTICS_URI_VZW, strlen(DIAGNOSTICS_URI_VZW));
-            }
-
-            lwm2m_server_short_server_id_set(instance_id, 101);
-            lwm2m_server_client_hold_off_timer_set(instance_id, 30);
-            lwm2m_server_lifetime_set(instance_id, 86400);
-            lwm2m_server_min_period_set(instance_id, 300);
-            lwm2m_server_max_period_set(instance_id, 6000);
-            lwm2m_server_notif_storing_set(instance_id, 1);
-            lwm2m_server_binding_set(instance_id, "UQS", 3);
-
-            p_acl->access[0] = rwde_access;
-            p_acl->server[0] = 102;
-            p_acl->owner = 101;
-            break;
-        }
-
-        case VZW_REPOSITORY_INSTANCE_ID:
-        {
-            p_acl->access[0] = rwde_access;
-            p_acl->server[0] = 101;
-            p_acl->access[1] = rwde_access;
-            p_acl->server[1] = 102;
-            p_acl->access[2] = rwde_access;
-            p_acl->server[2] = 1000;
-            break;
-        }
-
-        default:
-            initialized = false;
-            break;
-    }
-
-    return initialized;
-}
-
-static bool app_factory_bootstrap_initialize_att(uint16_t instance_id, uint16_t *default_access, lwm2m_instance_acl_t * p_acl)
-{
-    bool initialized = true;
-
-    switch (instance_id)
-    {
-        case VZW_BOOTSTRAP_INSTANCE_ID:
-        {
-            lwm2m_security_short_server_id_set(instance_id, LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-            lwm2m_security_is_bootstrap_server_set(instance_id, true);
-
-            lwm2m_server_short_server_id_set(instance_id, LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-
-            *default_access = 0;
-            break;
-        }
-
-        case 2:
-        {
-            p_acl->access[0] = LWM2M_ACL_RWEDO_PERM;
-            p_acl->server[0] = 1;
-            break;
-        }
-
-        default:
-            initialized = false;
-            break;
-    }
-
-    return initialized;
-}
-
-/**@brief Reset factory bootstrapped objects. */
-static void app_factory_bootstrap_reset(uint16_t instance_id)
-{
-    lwm2m_security_reset(instance_id);
-    lwm2m_server_reset(instance_id);
-
-    // Reset VzW specific values
-    lwm2m_security_hold_off_timer_set(instance_id, false);
-    lwm2m_security_is_bootstrap_server_set(instance_id, false);
-    lwm2m_server_registered_set(instance_id, false);
-    lwm2m_server_client_hold_off_timer_set(instance_id, 0);
-}
-
-/**@brief Initialize factory bootstrapped objects. */
-static void app_factory_bootstrap_initialize(uint16_t instance_id)
-{
-    uint16_t default_access = LWM2M_PERMISSION_READ;
-    bool initialized = false;
-
-    lwm2m_instance_acl_t acl = {
-        .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID
-    };
-
-    app_factory_bootstrap_reset(instance_id);
-
-    if (operator_is_vzw(true))
-    {
-        initialized = app_factory_bootstrap_initialize_vzw(instance_id, &default_access, &acl);
-    }
-    else if (operator_is_att(true))
-    {
-        initialized = app_factory_bootstrap_initialize_att(instance_id, &default_access, &acl);
-    }
-
-    lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
-    common_lwm2m_set_instance_acl(p_instance, default_access, &acl);
-
-    if (initialized)
-    {
-        lwm2m_instance_storage_security_store(instance_id);
-        lwm2m_instance_storage_server_store(instance_id);
-
-        lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_security_get_instance(instance_id));
-        lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_security_get_instance(instance_id));
-
-        lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_server_get_instance(instance_id));
-        lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_server_get_instance(instance_id));
-    }
-}
-
-static void app_misc_data_set_bootstrapped(uint8_t bootstrapped)
-{
-    lwm2m_instance_storage_misc_data_t misc_data = { 0 };
-    lwm2m_instance_storage_misc_data_load(&misc_data);
-    misc_data.bootstrapped = bootstrapped;
-    lwm2m_instance_storage_misc_data_store(&misc_data);
-}
-
 void lwm2m_bootstrap_clear(void)
 {
-    app_misc_data_set_bootstrapped(0);
-    lwm2m_security_bootstrapped_set(VZW_BOOTSTRAP_INSTANCE_ID, false);
-}
-
-static bool lwm2m_bootstrap_settings_update(void)
-{
-    char * bootstrap_uri = NULL;
-    bool   settings_changed = false;
-
-    if (m_bootstrap_uri_configured) {
-        bootstrap_uri = m_app_config.bootstrap_uri;
-    }
-    else if (operator_is_vzw(true))
-    {
-        LWM2M_INF("Setting VzW bootstrap");
-        if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
-            // Carrier check is disabled, connect to test servers
-            bootstrap_uri = BOOTSTRAP_URI_VZW_TEST;
-        } else {
-            // Carrier check is enabled, connect to live servers
-            bootstrap_uri = BOOTSTRAP_URI_VZW;
-        }
-        m_app_config.psk = m_app_bootstrap_psk_vzw;
-        m_app_config.psk_length = sizeof(m_app_bootstrap_psk_vzw);
-    }
-    else if (operator_is_att(true))
-    {
-        LWM2M_INF("Setting AT&T bootstrap");
-        if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
-            // Carrier check is disabled, connect to test servers
-            bootstrap_uri = BOOTSTRAP_URI_ATT_TEST;
-        } else {
-            // Carrier check is enabled, connect to live servers
-            bootstrap_uri = BOOTSTRAP_URI_ATT;
-        }
-        m_app_config.psk = m_app_bootstrap_psk_att;
-        m_app_config.psk_length = sizeof(m_app_bootstrap_psk_att);
-    }
-#if USE_CONTABO
-    else
-    {
-        bootstrap_uri = BOOTSTRAP_URI_CONTABO;
-        m_app_config.psk = APP_BOOTSTRAP_SEC_PSK_CONTABO;
-        m_app_config.psk_length = sizeof(APP_BOOTSTRAP_SEC_PSK_CONTABO);
-    }
-#endif
-
-    uint8_t p_len = 0;
-    char * p = lwm2m_security_server_uri_get(VZW_BOOTSTRAP_INSTANCE_ID, &p_len);
-    if (bootstrap_uri && (p_len == 0 || strncmp(p, bootstrap_uri, p_len) != 0)) {
-        // Initial startup (no server URI) or server URI has changed (carrier changed).
-        // Clear all bootstrap settings and load factory settings.
-        app_factory_bootstrap_initialize(VZW_BOOTSTRAP_INSTANCE_ID);
-
-        lwm2m_security_server_uri_set(VZW_BOOTSTRAP_INSTANCE_ID, bootstrap_uri, strlen(bootstrap_uri));
-        lwm2m_instance_storage_security_store(VZW_BOOTSTRAP_INSTANCE_ID);
-        lwm2m_instance_storage_server_store(VZW_BOOTSTRAP_INSTANCE_ID);
-
-        settings_changed = true;
-    }
-
-    return settings_changed;
+    app_misc_data_set_bootstrapped(false);
+    lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
 }
 
 void lwm2m_bootstrap_reset(void)
 {
-    if (lwm2m_security_short_server_id_get(VZW_BOOTSTRAP_INSTANCE_ID) == 0) {
+    if (lwm2m_security_short_server_id_get(LWM2M_BOOTSTRAP_INSTANCE_ID) == 0) {
         // Server object not loaded yet
-        lwm2m_instance_storage_security_load(VZW_BOOTSTRAP_INSTANCE_ID);
+        lwm2m_instance_storage_security_load(LWM2M_BOOTSTRAP_INSTANCE_ID);
     }
 
-    if (lwm2m_security_bootstrapped_get(VZW_BOOTSTRAP_INSTANCE_ID)) {
+    if (lwm2m_security_bootstrapped_get(LWM2M_BOOTSTRAP_INSTANCE_ID)) {
         // Security object exists and bootstrap is done
-        lwm2m_security_bootstrapped_set(VZW_BOOTSTRAP_INSTANCE_ID, false);
-        lwm2m_instance_storage_security_store(VZW_BOOTSTRAP_INSTANCE_ID);
+        lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
+        lwm2m_instance_storage_security_store(LWM2M_BOOTSTRAP_INSTANCE_ID);
     }
 
-    app_misc_data_set_bootstrapped(VZW_BOOTSTRAP_INSTANCE_ID);
+    app_misc_data_set_bootstrapped(false);
 
     // Delete existing servers and init factory defaults
     for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
         lwm2m_instance_storage_security_delete(i);
         lwm2m_instance_storage_server_delete(i);
 
-        app_factory_bootstrap_initialize(i);
+        lwm2m_factory_bootstrap_init(i);
     }
 
     lwm2m_device_init_acl();
@@ -1771,7 +1501,7 @@ void lwm2m_bootstrap_reset(void)
 
 void lwm2m_factory_reset(void)
 {
-    app_misc_data_set_bootstrapped(0);
+    app_misc_data_set_bootstrapped(false);
 
     // Provision bootstrap PSK and diagnostic PSK at next startup
     lwm2m_last_used_msisdn_set("", 0);
@@ -1825,12 +1555,12 @@ static void app_load_flash_objects(void)
     int32_t result = lwm2m_instance_storage_misc_data_load(&misc_data);
     if (result == 0 && misc_data.bootstrapped)
     {
-        lwm2m_security_bootstrapped_set(VZW_BOOTSTRAP_INSTANCE_ID, true);
+        lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, true);
     }
     else
     {
         // storage reports that bootstrap has not been done, continue with bootstrap.
-        lwm2m_security_bootstrapped_set(VZW_BOOTSTRAP_INSTANCE_ID, false);
+        lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
     }
 }
 
@@ -1916,7 +1646,7 @@ static void app_connect(void)
         // Generate a unique Client ID.
         if (app_generate_client_id() != 0) {
             lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
-        } else if (lwm2m_security_bootstrapped_get(VZW_BOOTSTRAP_INSTANCE_ID)) {
+        } else if (lwm2m_security_bootstrapped_get(LWM2M_BOOTSTRAP_INSTANCE_ID)) {
             lwm2m_state_set(LWM2M_STATE_IDLE);
             app_init_connection_update();
         } else {
@@ -1924,7 +1654,7 @@ static void app_connect(void)
             // On contabo we don't use hold off timer
             lwm2m_state_set(LWM2M_STATE_BS_CONNECT);
 #else
-            int32_t hold_off_time = lwm2m_security_hold_off_timer_get(VZW_BOOTSTRAP_INSTANCE_ID);
+            int32_t hold_off_time = lwm2m_security_hold_off_timer_get(LWM2M_BOOTSTRAP_INSTANCE_ID);
             if (hold_off_time > 0) {
                 if (lwm2m_state_set(LWM2M_STATE_BS_HOLD_OFF)) {
                     LWM2M_INF("Bootstrap hold off timer [%ld seconds]", hold_off_time);
@@ -1947,7 +1677,7 @@ static void app_bootstrap_connect(void)
     uint32_t err_code;
     bool secure;
 
-    int32_t pdn_retry_delay = lwm2m_admin_pdn_activate(VZW_BOOTSTRAP_INSTANCE_ID);
+    int32_t pdn_retry_delay = lwm2m_admin_pdn_activate(LWM2M_BOOTSTRAP_INSTANCE_ID);
     if (pdn_retry_delay > 0) {
         // Setup ADMIN PDN connection failed, try again
         if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT)) {
@@ -1959,7 +1689,7 @@ static void app_bootstrap_connect(void)
 
     // Save the remote address of the bootstrap server.
     uint8_t uri_len = 0;
-    char * p_server_uri = lwm2m_security_server_uri_get(VZW_BOOTSTRAP_INSTANCE_ID, &uri_len);
+    char * p_server_uri = lwm2m_security_server_uri_get(LWM2M_BOOTSTRAP_INSTANCE_ID, &uri_len);
     err_code = app_lwm2m_parse_uri_and_save_remote(LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
                                                    p_server_uri,
                                                    uri_len,
@@ -1973,9 +1703,9 @@ static void app_bootstrap_connect(void)
 
         if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT)) {
             if (err_code == EINVAL) {
-                app_handle_connect_retry(VZW_BOOTSTRAP_INSTANCE_ID, true);
+                app_handle_connect_retry(LWM2M_BOOTSTRAP_INSTANCE_ID, true);
             } else {
-                app_handle_connect_retry(VZW_BOOTSTRAP_INSTANCE_ID, false);
+                app_handle_connect_retry(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
             }
         }
         return;
@@ -2045,9 +1775,9 @@ static void app_bootstrap_connect(void)
                 if (err_code == EIO && (lwm2m_os_errno() == NRF_EINVAL ||
                                         lwm2m_os_errno() == NRF_EOPNOTSUPP ||
                                         lwm2m_os_errno() == NRF_ENETUNREACH)) {
-                    app_handle_connect_retry(VZW_BOOTSTRAP_INSTANCE_ID, true);
+                    app_handle_connect_retry(LWM2M_BOOTSTRAP_INSTANCE_ID, true);
                  } else {
-                    app_handle_connect_retry(VZW_BOOTSTRAP_INSTANCE_ID, false);
+                    app_handle_connect_retry(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
                 }
             }
         }
@@ -2657,7 +2387,7 @@ static int app_lwm2m_process(void)
             LWM2M_INF("Bootstrap timed out");
             app_disconnect();
             if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT)) {
-                app_handle_connect_retry(VZW_BOOTSTRAP_INSTANCE_ID, false);
+                app_handle_connect_retry(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
             }
             break;
         }
@@ -2951,7 +2681,6 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 #else
     if ((config != NULL) && (config->bootstrap_uri != NULL)) {
         m_app_config.bootstrap_uri = config->bootstrap_uri;
-        m_bootstrap_uri_configured = true;
     }
 
     if ((config != NULL) && (config->psk != NULL)) {

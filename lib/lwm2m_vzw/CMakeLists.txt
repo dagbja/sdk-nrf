@@ -29,12 +29,13 @@ zephyr_library_sources(
     src/cert.c
     src/app_debug.c
     src/at_interface.c
-    src/common.c
     src/dfusock.c
     src/lwm2m_apn_conn_prof.c
     src/lwm2m_conn_ext.c
     src/lwm2m_conn_mon.c
     src/lwm2m_conn_stat.c
+    src/lwm2m_common.c
+    src/lwm2m_factory_bootstrap.c
     src/lwm2m_vzw_main.c
     src/lwm2m_device.c
     src/lwm2m_gsma_objects.c

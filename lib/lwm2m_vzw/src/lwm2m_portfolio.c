@@ -13,7 +13,7 @@
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_portfolio.h>
 #include <coap_message.h>
-#include <common.h>
+#include <lwm2m_common.h>
 #include <lwm2m_vzw_main.h>
 #include <at_interface.h>
 
@@ -57,9 +57,9 @@ uint32_t portfolio_instance_callback(lwm2m_instance_t * p_instance,
     LWM2M_TRC("portfolio_instance_callback");
 
     uint16_t access = 0;
-    uint32_t err_code = common_lwm2m_access_remote_get(&access,
-                                                       p_instance,
-                                                       p_request->remote);
+    uint32_t err_code = lwm2m_access_remote_get(&access,
+                                                p_instance,
+                                                p_request->remote);
     if (err_code != 0)
     {
         return err_code;
@@ -179,9 +179,9 @@ uint32_t lwm2m_portfolio_object_callback(lwm2m_object_t * p_object,
         {
             uint16_t access = 0;
             lwm2m_instance_t * p_instance = (lwm2m_instance_t *)&m_instance_portfolio[i];
-            uint32_t err_code = common_lwm2m_access_remote_get(&access,
-                                                               p_instance,
-                                                               p_request->remote);
+            uint32_t err_code = lwm2m_access_remote_get(&access,
+                                                        p_instance,
+                                                        p_request->remote);
             if (err_code != 0 || (access & op_code) == 0)
             {
                 continue;
@@ -232,7 +232,7 @@ void lwm2m_portfolio_init_acl(void)
 {
     for (int i = 0; i < ARRAY_SIZE(m_instance_portfolio); i++)
     {
-        common_lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_portfolio[i]);
+        lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_portfolio[i]);
     }
 }
 
