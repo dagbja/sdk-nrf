@@ -796,7 +796,7 @@ void lwm2m_device_init(void)
     (void)lwm2m_carrier_error_code_add(LWM2M_CARRIER_ERROR_CODE_NO_ERROR);
     (void)lwm2m_bytebuffer_to_string("UQS", 3, &m_instance_device.supported_bindings);
     lwm2m_device_update_carrier_specific_settings();
-    (void)lwm2m_carrier_hardware_version_set("1.0");
+    at_read_hardware_version(&m_instance_device.hardware_version);
     (void)lwm2m_carrier_battery_status_set(LWM2M_CARRIER_BATTERY_STATUS_NOT_INSTALLED);
 
     m_instance_device.proto.callback = device_instance_callback;

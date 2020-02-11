@@ -606,6 +606,32 @@ int at_read_firmware_version(lwm2m_string_t *p_manufacturer_id)
     return retval;
 }
 
+int at_read_hardware_version(lwm2m_string_t *p_hardware_version)
+{
+    int retval = 0;
+
+    if (p_hardware_version == NULL) {
+        return EINVAL;
+    }
+
+    // Read hardware version
+    retval = lwm2m_os_at_cmd_write("AT%HWVERSION", m_at_buffer, sizeof(m_at_buffer));
+
+    if (retval == 0 && strncmp(m_at_buffer, "%HWVERSION: ", 12) == 0)
+    {
+        // TODO: Use at_response_param_to_string() when this can handle strings without quotes
+        char *p_end = strchr(m_at_buffer, '\r');
+        (void)lwm2m_bytebuffer_to_string(&m_at_buffer[12], p_end - &m_at_buffer[12], p_hardware_version);
+    }
+    else
+    {
+        LWM2M_ERR("Unable to read AT%HWVERSION");
+        retval = EIO;
+    }
+
+    return retval;
+}
+
 int at_read_operator_id(uint32_t  *p_operator_id)
 {
     int retval = 0;

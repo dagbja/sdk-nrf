@@ -146,6 +146,15 @@ int at_read_sim_iccid(char *p_iccid, uint32_t * p_iccid_len);
 int at_read_firmware_version(lwm2m_string_t *p_manufacturer_id);
 
 /**
+ * @brief Read the hardware version.
+ *
+ * @param[out] p_hardware_version Pointer to store the hardware version
+ *
+ * Version is something like "nRF9160 SICA B0A".
+ */
+int at_read_hardware_version(lwm2m_string_t *p_hardware_version);
+
+/**
  * @brief Read operator ID from modem as defined in XOPERID at command.
  *
  * @param[out] p_oper_id Pointer to store the operator ID
