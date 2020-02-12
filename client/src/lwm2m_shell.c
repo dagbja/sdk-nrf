@@ -26,6 +26,7 @@
 #include <modem_logging.h>
 #include <lwm2m_carrier.h>
 #include <lwm2m_objects.h>
+#include <lwm2m_observer.h>
 
 static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
 {
@@ -1162,6 +1163,114 @@ static int cmd_apn_get(const struct shell *shell, size_t argc, char **argv)
     return 0;
 }
 
+
+// Compare if obs1 is greater than obs2
+static bool observable_greater_than(lwm2m_observable_metadata_t *obs1, lwm2m_observable_metadata_t *obs2)
+{
+    if (obs1 == NULL) {
+        return true;
+    }
+
+    if (obs2 == NULL) {
+        return false;
+    }
+
+    for (int i = 0; i < obs1->path_len; i++)
+    {
+        if ((i >= obs2->path_len) ||
+            (obs1->path[i] > obs2->path[i]))
+        {
+            return true;
+        }
+
+        if (obs1->path[i] < obs2->path[i])
+        {
+            return false;
+        }
+    }
+
+    return false;
+}
+
+
+static int cmd_attribute_print(const struct shell *shell, size_t argc, char **argv)
+{
+    char buf[255];
+    uint16_t len;
+    int offset;
+    const lwm2m_observable_metadata_t * const * observables = lwm2m_observables_get(&len);
+    lwm2m_observable_metadata_t *observables_srt[len];
+    lwm2m_observable_metadata_t *obs;
+    const char *lwm2m_notif_attribute_name[] = { "pmin", "pmax", "gt",
+                                                "lt", "st" };
+
+    if (!observables)
+    {
+        return 0;
+    }
+
+    memcpy(observables_srt, observables, sizeof(observables_srt));
+
+    for (int i = 1; i < len; i++)
+    {
+        obs = observables_srt[i];
+
+        int j = i - 1;
+        while (j >= 0 && observable_greater_than(observables_srt[j], obs))
+        {
+            observables_srt[j + 1] = observables_srt[j];
+            j--;
+        }
+
+        observables_srt[j + 1] = obs;
+    }
+
+    for (int i = 0; i < len; i++)
+    {
+        if (!observables_srt[i])
+        {
+            continue;
+        }
+
+        memset(buf, 0, sizeof(buf));
+        offset = 0;
+
+        offset += snprintf(&buf[offset], sizeof(buf) - offset, "<");
+
+        for (int j = 0; j < observables_srt[i]->path_len; j++)
+        {
+            offset += snprintf(&buf[offset], sizeof(buf) - offset, "/%d", observables_srt[i]->path[j]);
+        }
+
+        offset += snprintf(&buf[offset], sizeof(buf) - offset, ">; ssid=%d;", observables_srt[i]->ssid);
+
+        for (int k = 0; k < LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE; k++)
+        {
+            if (observables_srt[i]->attributes[k].assignment_level != LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL)
+            {
+                if (observables_srt[i]->path_len != observables_srt[i]->attributes[k].assignment_level)
+                {
+                    offset += snprintf(&buf[offset], sizeof(buf) - offset, " [%d", observables_srt[i]->attributes[k].assignment_level);
+                }
+
+                offset += snprintf(&buf[offset], sizeof(buf) - offset, " %s=%d;", lwm2m_notif_attribute_name[k], observables_srt[i]->attributes[k].value.i);
+
+                if (observables_srt[i]->path_len != observables_srt[i]->attributes[k].assignment_level)
+                {
+                    offset += snprintf(&buf[offset], sizeof(buf) - offset, "]");
+                }
+            }
+        }
+
+        buf[offset] = '\0';
+
+        shell_print(shell, "%s", buf);
+    }
+
+    return 0;
+}
+
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_security,
     SHELL_CMD(print, NULL, "Print security objects", cmd_security_print),
     SHELL_CMD(uri, NULL, "Set URI", cmd_security_uri),
@@ -1177,6 +1286,11 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_server,
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_apn,
     SHELL_CMD(get, NULL, "Read APN", cmd_apn_get),
     SHELL_CMD(set, NULL, "Write APN", cmd_apn_set),
+    SHELL_SUBCMD_SET_END /* Array terminated. */
+);
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_attribute,
+    SHELL_CMD(print, NULL, "Print notification attributes", cmd_attribute_print),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );
 
@@ -1228,6 +1342,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_device,
 
 SHELL_CMD_REGISTER(apn, &sub_apn, "APN Table", NULL);
 SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
+SHELL_CMD_REGISTER(attribute, &sub_attribute, "Notification attributes operations", NULL);
 SHELL_CMD_REGISTER(debug, &sub_debug, "Debug configuration", NULL);
 SHELL_CMD_REGISTER(device, &sub_device, "Update or retrieve device information", NULL);
 SHELL_CMD_REGISTER(lwm2m, &sub_lwm2m, "LwM2M operations", NULL);
