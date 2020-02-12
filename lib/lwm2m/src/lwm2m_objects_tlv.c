@@ -147,8 +147,9 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
         {
             case LWM2M_SECURITY_SERVER_URI:
             {
-                p_security->server_uri.p_val = (char *)tlv.value;
-                p_security->server_uri.len   = tlv.length;
+                err_code = lwm2m_bytebuffer_to_string((char *)tlv.value,
+                                                      tlv.length,
+                                                      &p_security->server_uri);
                 break;
             }
 
@@ -166,22 +167,25 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
 
             case LWM2M_SECURITY_PUBLIC_KEY:
             {
-                p_security->public_key.p_val = tlv.value;
-                p_security->public_key.len   = tlv.length;
+                err_code = lwm2m_bytebuffer_to_opaque((char *)tlv.value,
+                                                      tlv.length,
+                                                      &p_security->public_key);
                 break;
             }
 
             case LWM2M_SECURITY_SERVER_PUBLIC_KEY:
             {
-                p_security->server_public_key.p_val = tlv.value;
-                p_security->server_public_key.len   = tlv.length;
+                err_code = lwm2m_bytebuffer_to_opaque((char *)tlv.value,
+                                                      tlv.length,
+                                                      &p_security->server_public_key);
                 break;
             }
 
             case LWM2M_SECURITY_SECRET_KEY:
             {
-                p_security->secret_key.p_val = tlv.value;
-                p_security->secret_key.len   = tlv.length;
+                err_code = lwm2m_bytebuffer_to_opaque((char *)tlv.value,
+                                                      tlv.length,
+                                                      &p_security->secret_key);
                 break;
             }
 
@@ -193,22 +197,25 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
 
             case LWM2M_SECURITY_SMS_BINDING_KEY_PARAM:
             {
-                p_security->sms_binding_key_param.p_val = tlv.value;
-                p_security->sms_binding_key_param.len   = tlv.length;
+                err_code = lwm2m_bytebuffer_to_opaque((char *)tlv.value,
+                                                      tlv.length,
+                                                      &p_security->sms_binding_key_param);
                 break;
             }
 
             case LWM2M_SECURITY_SMS_BINDING_SECRET_KEY:
             {
-                p_security->sms_binding_secret_keys.p_val = tlv.value;
-                p_security->sms_binding_secret_keys.len   = tlv.length;
+                err_code = lwm2m_bytebuffer_to_opaque((char *)tlv.value,
+                                                      tlv.length,
+                                                      &p_security->sms_binding_secret_keys);
                 break;
             }
 
             case LWM2M_SECURITY_SERVER_SMS_NUMBER:
             {
-                p_security->sms_number.p_val = (char *)tlv.value;
-                p_security->sms_number.len   = tlv.length;
+                err_code = lwm2m_bytebuffer_to_string((char *)tlv.value,
+                                                      tlv.length,
+                                                      &p_security->sms_number);
                 break;
             }
 

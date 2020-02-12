@@ -228,6 +228,8 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
         return 0;
     }
 
+    uint16_t instance_id = p_instance->instance_id;
+
     if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
         uint32_t mask = 0;
@@ -240,55 +242,10 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
         }
         if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
         {
-            uint16_t instance_id = p_instance->instance_id;
-
-            lwm2m_security_t unpack_struct;
-            memset(&unpack_struct, 0, sizeof(lwm2m_firmware_t));
-
-            err_code = lwm2m_tlv_security_decode(&unpack_struct,
-                                                p_request->payload,
-                                                p_request->payload_len,
-                                                NULL);
-            if (err_code != 0)
-            {
-                return err_code;
-            }
-
-            if (resource_id == LWM2M_NAMED_OBJECT)
-            {
-                // Write the whole object instance.
-                lwm2m_security_server_uri_set(instance_id, unpack_struct.server_uri.p_val, unpack_struct.server_uri.len);
-                lwm2m_security_identity_set(instance_id, unpack_struct.public_key.p_val, unpack_struct.public_key.len);
-                lwm2m_security_psk_set(instance_id, unpack_struct.secret_key.p_val, unpack_struct.secret_key.len);
-            }
-            else
-            {
-                switch (resource_id)
-                {
-                    case LWM2M_SECURITY_SERVER_URI:
-                    {
-                        lwm2m_security_server_uri_set(instance_id, unpack_struct.server_uri.p_val, unpack_struct.server_uri.len);
-                        break;
-                    }
-
-                    case LWM2M_SECURITY_PUBLIC_KEY:
-                    {
-                        lwm2m_security_identity_set(instance_id, unpack_struct.public_key.p_val, unpack_struct.public_key.len);
-                        break;
-                    }
-
-                    case LWM2M_SECURITY_SECRET_KEY:
-                    {
-                        lwm2m_security_psk_set(instance_id, unpack_struct.secret_key.p_val, unpack_struct.secret_key.len);
-                        break;
-                    }
-
-                    default:
-                        // Default to BAD_REQUEST error.
-                        err_code = EINVAL;
-                        break;
-                }
-            }
+            err_code = lwm2m_tlv_security_decode(&m_instance_security[instance_id],
+                                                 p_request->payload,
+                                                 p_request->payload_len,
+                                                 NULL);
         }
         else if ((mask & COAP_CT_MASK_PLAIN_TEXT) || (mask & COAP_CT_MASK_APP_OCTET_STREAM))
         {
@@ -302,7 +259,14 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
 
         if (err_code == 0)
         {
-            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            if (lwm2m_instance_storage_security_store(instance_id) == 0)
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            }
         }
         else if (err_code == ENOTSUP)
         {
@@ -332,10 +296,7 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
 
     if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
-        lwm2m_security_t unpack_struct;
-        memset(&unpack_struct, 0, sizeof(lwm2m_security_t));
-
-        uint32_t err_code = lwm2m_tlv_security_decode(&unpack_struct,
+        uint32_t err_code = lwm2m_tlv_security_decode(&m_instance_security[instance_id],
                                                       p_request->payload,
                                                       p_request->payload_len,
                                                       tlv_security_resource_decode);
@@ -343,14 +304,6 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
         {
             return 0;
         }
-
-        // Copy fields from parsed TLV to the instance.
-        // Server URI.
-        lwm2m_security_server_uri_set(instance_id, unpack_struct.server_uri.p_val, unpack_struct.server_uri.len);
-        // identity.
-        lwm2m_security_identity_set(instance_id, unpack_struct.public_key.p_val, unpack_struct.public_key.len);
-        // PSK.
-        lwm2m_security_psk_set(instance_id, unpack_struct.secret_key.p_val, unpack_struct.secret_key.len);
 
         m_instance_security[instance_id].proto.instance_id = instance_id;
         m_instance_security[instance_id].proto.object_id   = p_object->object_id;
