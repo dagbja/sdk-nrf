@@ -15,6 +15,7 @@
 #include <lwm2m_device.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
+#include <lwm2m_remote.h>
 #include <lwm2m_os.h>
 #include <coap_message.h>
 #include <lwm2m_common.h>
@@ -816,18 +817,33 @@ const void * lwm2m_device_resource_reference_get(uint16_t resource_id, uint8_t *
     }
 }
 
-void lwm2m_device_notify_resource(uint16_t resource_id)
+void lwm2m_device_notify_resource(struct nrf_sockaddr * p_remote_server, uint16_t resource_id)
 {
+    uint16_t short_server_id;
     coap_observer_t * p_observer = NULL;
+
     while (coap_observe_server_next_get(&p_observer, p_observer, (void *)&m_instance_device.resource_ids[resource_id]) == 0)
     {
-        LWM2M_TRC("Observer found");
+        lwm2m_remote_short_server_id_find(&short_server_id, p_observer->remote);
+        if (lwm2m_remote_reconnecting_get(short_server_id)) {
+            /* Wait for reconnection */
+            continue;
+        }
+
+        if (p_remote_server != NULL) {
+            /* Only notify to given remote */
+            if (memcmp(p_observer->remote, p_remote_server,
+                       sizeof(struct nrf_sockaddr)) != 0) {
+                continue;
+            }
+        }
+
+        uint32_t err_code;
         uint8_t  buffer[200];
         uint32_t buffer_size = sizeof(buffer);
-        uint32_t err_code = lwm2m_tlv_device_encode(buffer,
-                                                      &buffer_size,
-                                                      resource_id,
-                                                      &m_instance_device);
+
+        LWM2M_TRC("Observer found");
+        err_code = lwm2m_tlv_device_encode(buffer, &buffer_size, resource_id, &m_instance_device);
         if (err_code)
         {
             LWM2M_ERR("Could not encode resource_id %u, error code: %lu", resource_id, err_code);

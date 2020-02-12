@@ -877,7 +877,7 @@ void lwm2m_observer_notify_path(const uint16_t *p_path, uint8_t path_len, struct
     switch (object_id)
     {
     case LWM2M_OBJ_DEVICE:
-        lwm2m_device_notify_resource(resource_id);
+        lwm2m_device_notify_resource(p_remote_server, resource_id);
         break;
     case LWM2M_OBJ_CONN_MON:
         lwm2m_conn_mon_notify_resource(p_remote_server, resource_id);

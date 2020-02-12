@@ -20,6 +20,6 @@ int lwm2m_device_set_sim_iccid(char *p_iccid, uint32_t iccid_len);
 
 int32_t lwm2m_device_battery_status_get(void);
 
-void lwm2m_device_notify_resource(uint16_t resource_id);
+void lwm2m_device_notify_resource(struct nrf_sockaddr * p_remote_server, uint16_t resource_id);
 
 const void * lwm2m_device_resource_reference_get(uint16_t resource_id, uint8_t *p_type);
