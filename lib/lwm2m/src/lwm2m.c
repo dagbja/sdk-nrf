@@ -1730,17 +1730,17 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint16_t object_id, uint16_t short_s
                     return ENOMEM;
                 }
 
-                if (short_server_id == LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID) {
+                if (short_server_id == LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID)
+                {
                     // Bootstrap DISCOVER
-
-                    uint16_t ssid = 0;
-                    if (m_instances[i]->object_id == LWM2M_OBJ_SECURITY)
+                    uint16_t ssid = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID;
+                    if (m_instances[j]->object_id == LWM2M_OBJ_SECURITY)
                     {
-                        ssid = ((lwm2m_security_t *)m_instances[i])->short_server_id;
+                        ssid = ((lwm2m_security_t *)m_instances[j])->short_server_id;
                     }
-                    else if (m_instances[i]->object_id == LWM2M_OBJ_SERVER)
+                    else if (m_instances[j]->object_id == LWM2M_OBJ_SERVER)
                     {
-                        ssid = ((lwm2m_server_t *)m_instances[i])->short_server_id;
+                        ssid = ((lwm2m_server_t *)m_instances[j])->short_server_id;
                     }
 
                     if (ssid != LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID)
