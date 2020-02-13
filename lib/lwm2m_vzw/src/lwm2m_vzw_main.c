@@ -109,6 +109,8 @@
 
 #define APP_APN_NAME_BUF_LENGTH         64                                                  /**< Buffer size to store APN name. */
 
+#define SECONDS_TO_UPDATE_EARLY         4                                                   /**< Number of seconds to Update early. */
+
 static char m_apn_name_buf[APP_APN_NAME_BUF_LENGTH];                                        /**< Buffer to store APN name. */
 
 static int32_t m_pdn_retry_delay[] = { K_SECONDS(2), K_SECONDS(60), K_SECONDS(1800) };      /**< PDN activation deleays. */
@@ -1138,7 +1140,14 @@ static void app_set_bootstrap_if_last_retry_delay(int instance_id)
 
 static void app_restart_lifetime_timer(uint8_t instance_id)
 {
-    int32_t timeout = (int32_t)(lwm2m_server_lifetime_get(instance_id) * 1000);
+    lwm2m_time_t lifetime = lwm2m_server_lifetime_get(instance_id);
+
+    if (lifetime > SECONDS_TO_UPDATE_EARLY) {
+        // Set timeout before lifetime expires to ensure we Update within the timeout
+        lifetime -= SECONDS_TO_UPDATE_EARLY;
+    }
+
+    int32_t timeout = (int32_t)(lifetime * 1000);
     if (timeout <= 0) {
         // FIXME: Lifetime timer too big for Zephyr, set to maximum possible value for now
         timeout = INT32_MAX;
