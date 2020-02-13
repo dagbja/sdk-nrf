@@ -1187,7 +1187,12 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         }
         else
         {
-            // TODO: What to do here?
+            LWM2M_ERR("Bootstrap procedure failed (%d.%02d)", coap_code >> 5, coap_code & 0x1f);
+            m_app_state = LWM2M_STATE_DISCONNECTED;
+            app_server_disconnect(VZW_BOOTSTRAP_INSTANCE_ID);
+            lwm2m_retry_delay_reset(VZW_BOOTSTRAP_INSTANCE_ID);
+
+            app_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, 0);
         }
         return;
     }
