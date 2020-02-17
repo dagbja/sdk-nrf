@@ -71,6 +71,21 @@ extern "C" {
 
 #endif // LWM2M_DISABLE_API_PARAM_CHECK
 
+
+/**@brief Memory allocator function.
+ *
+ * @param[in] size Size of memory to be used.
+ *
+ * @retval A valid memory address on success, else NULL.
+ */
+void * lwm2m_malloc(size_t size);
+
+/**@brief Memory free function.
+ *
+ * @param[in] p_memory Address of memory to be freed.
+ */
+void lwm2m_free(void * p_memory);
+
 /**@brief Function for encoding a uint16 value.
  *
  * @param[in]   value            Value to be encoded.

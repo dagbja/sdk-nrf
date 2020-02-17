@@ -421,7 +421,7 @@ uint32_t lwm2m_respond_with_bs_discover_link(uint16_t object_id, coap_message_t 
 
     if (err_code == 0) {
         // Allocate the needed amount of memory.
-        p_link_format_string = lwm2m_os_malloc(link_format_string_len);
+        p_link_format_string = lwm2m_malloc(link_format_string_len);
 
         if (p_link_format_string == NULL) {
             err_code = ENOMEM;
@@ -442,7 +442,7 @@ uint32_t lwm2m_respond_with_bs_discover_link(uint16_t object_id, coap_message_t 
     }
 
     if (p_link_format_string) {
-        lwm2m_os_free(p_link_format_string);
+        lwm2m_free(p_link_format_string);
     }
 
     return err_code;

@@ -19,6 +19,32 @@
 #include <lwm2m_remote.h>
 #include <coap_message.h>
 
+static lwm2m_alloc_t   m_alloc_fn = NULL;  /**< Memory allocator function, populated on @lwm2m_init. */
+static lwm2m_free_t    m_free_fn = NULL;   /**< Memory free function, populated on @lwm2m_init. */
+
+
+void * lwm2m_malloc(size_t size)
+{
+    if (m_alloc_fn)
+    {
+        return m_alloc_fn(size);
+    }
+    else
+    {
+        return NULL;
+    }
+}
+
+
+void lwm2m_free(void * p_memory)
+{
+    if (m_free_fn)
+    {
+        m_free_fn(p_memory);
+    }
+}
+
+
 #if defined(CONFIG_NRF_LWM2M_ENABLE_LOGS)
 
 static uint8_t op_desc_idx_lookup(uint8_t bitmask)
@@ -1829,8 +1855,13 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint16_t object_id, uint16_t short_s
 }
 
 
-uint32_t lwm2m_init()
+uint32_t lwm2m_init(lwm2m_alloc_t alloc_fn, lwm2m_free_t free_fn)
 {
+    if ((alloc_fn == NULL) || (free_fn == NULL))
+    {
+        return EINVAL;
+    }
+
 /* Disable mutex for now.
     k_mutex_init(&m_lwm2m_mutex);
 */
@@ -1838,6 +1869,9 @@ uint32_t lwm2m_init()
     LWM2M_MUTEX_LOCK();
 
     uint32_t err_code;
+
+    m_alloc_fn = alloc_fn;
+    m_free_fn  = free_fn;
 
     err_code = internal_lwm2m_register_init();
     if (err_code != 0)

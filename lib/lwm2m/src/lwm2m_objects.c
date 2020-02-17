@@ -45,7 +45,7 @@ uint32_t lwm2m_bytebuffer_to_string(const char * p_payload, uint16_t payload_len
     NULL_PARAM_CHECK(p_payload);
     NULL_PARAM_CHECK(p_string);
 
-    char * p_value = (char *)lwm2m_os_malloc(payload_len);
+    char * p_value = (char *)lwm2m_malloc(payload_len);
 
     if (p_value == NULL)
     {
@@ -56,7 +56,7 @@ uint32_t lwm2m_bytebuffer_to_string(const char * p_payload, uint16_t payload_len
 
     if (p_string->p_val)
     {
-        lwm2m_os_free(p_string->p_val);
+        lwm2m_free(p_string->p_val);
     }
 
     p_string->p_val = p_value;
@@ -75,7 +75,7 @@ uint32_t lwm2m_bytebuffer_to_list(const char * p_payload, uint16_t payload_len, 
     NULL_PARAM_CHECK(p_payload);
     NULL_PARAM_CHECK(p_list);
 
-    char * p_value = (char *)lwm2m_os_malloc(payload_len);
+    char * p_value = (char *)lwm2m_malloc(payload_len);
 
     if (p_value == NULL)
     {
@@ -86,7 +86,7 @@ uint32_t lwm2m_bytebuffer_to_list(const char * p_payload, uint16_t payload_len, 
 
     if (p_list->val.p_uint8)
     {
-        lwm2m_os_free(p_list->val.p_uint8);
+        lwm2m_free(p_list->val.p_uint8);
     }
 
     p_list->val.p_uint8 = p_value;
@@ -99,7 +99,7 @@ uint32_t lwm2m_string_free(lwm2m_string_t * p_string)
 {
     if (p_string->p_val)
     {
-        lwm2m_os_free(p_string->p_val);
+        lwm2m_free(p_string->p_val);
     }
 
     p_string->p_val = NULL;

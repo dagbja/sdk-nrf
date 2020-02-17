@@ -185,6 +185,7 @@
 ^lwm2m_coap_handler_instance_delete$
 ^lwm2m_coap_handler_object_add$
 ^lwm2m_deregister$
+^lwm2m_free$
 ^lwm2m_init$
 ^lwm2m_instance_apn_connection_profile_init$
 ^lwm2m_instance_connectivity_extension_init$
@@ -195,6 +196,7 @@
 ^lwm2m_instance_portfolio_init$
 ^lwm2m_instance_security_init$
 ^lwm2m_instance_server_init$
+^lwm2m_malloc$
 ^lwm2m_net_reg_stat_cb$
 ^lwm2m_net_reg_stat_get$
 ^lwm2m_notify$
