@@ -690,6 +690,14 @@ uint32_t lwm2m_observer_storage_restore(uint16_t                  short_server_i
  */
 uint32_t lwm2m_observer_storage_delete(coap_observer_t  * p_observer);
 
+/**@brief Delete all the observers from storage.
+ *
+ * @details This function will delete the stored information regarding all the
+ *          observers from the non-volatile storage. It should be called upon
+ *          a factory reset.
+ */
+void lwm2m_observer_storage_delete_all(void);
+
 /**@brief Register functions for store, load and delete operation.
  *
  * @details This function is used to register functions to store, load and

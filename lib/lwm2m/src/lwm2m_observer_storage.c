@@ -8,6 +8,7 @@
 #include <lwm2m_api.h>
 #include <lwm2m_remote.h>
 #include <coap_api.h>
+#include <coap_observe_api.h>
 
 #define ENTRY_SIZE              sizeof(lwm2m_observer_storage_entry_t)
 #define ENTRY_SIZE_EXCEPT_TOKEN (ENTRY_SIZE - (COAP_MESSAGE_TOKEN_MAX_LEN + sizeof(uint8_t)))
@@ -300,3 +301,12 @@ uint32_t lwm2m_observer_storage_restore(uint16_t                short_server_id,
     return observer_count;
 }
 
+void lwm2m_observer_storage_delete_all(void)
+{
+    coap_observer_t * p_observer = NULL;
+
+    while (coap_observe_server_next_get(&p_observer, p_observer, NULL) == 0)
+    {
+        lwm2m_observer_storage_delete(p_observer);
+    }
+}

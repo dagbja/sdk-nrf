@@ -1505,6 +1505,9 @@ void lwm2m_factory_reset(void)
     lwm2m_last_used_msisdn_set("", 0);
     lwm2m_last_used_operator_id_set(OPERATOR_ID_UNSET);
 
+    // Delete the observers from the storage
+    lwm2m_observer_storage_delete_all();
+
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
         lwm2m_instance_storage_security_delete(i);
@@ -2076,6 +2079,16 @@ static void app_remove_observers_on_deregister(uint16_t instance_id)
             if (err_code != 0)
             {
                 LWM2M_ERR("Removing observer after deregister failed: %s (%d), %s (%d) (server %d)",
+                          lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                          lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
+                          instance_id);
+            }
+
+            err_code = lwm2m_observer_storage_delete(p_observer);
+
+            if (err_code != 0)
+            {
+                LWM2M_ERR("Removing observer from flash failed: %s (%d), %s (%d) (server %d)",
                           lwm2m_os_log_strdup(strerror(err_code)), err_code,
                           lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
                           instance_id);

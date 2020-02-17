@@ -105,6 +105,7 @@
 ^lwm2m_observer_storage_store$
 ^lwm2m_observer_storage_restore$
 ^lwm2m_observer_storage_delete$
+^lwm2m_observer_storage_delete_all$
 ^lwm2m_observer_storage_set_callbacks$
 ^lwm2m_instance_storage_security_store$
 ^lwm2m_instance_storage_server_store$

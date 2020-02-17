@@ -133,11 +133,9 @@ uint32_t coap_observe_server_search(uint32_t *handle, struct nrf_sockaddr *obser
  *                      the next observer starting from the observer pointer
  *                      provided. Should not be NULL.
  * @param[in]  start    Pointer to the observer where to start the search.
- * @param[in]  resource Pointer to the resource of interest. Should not be NULL.
  * @param[in]  resource Pointer to the resource of interest.
  *
  * @retval 0      If observer was found.
- * @retval EINVAL If observer or resource pointer is NULL.
  * @retval EINVAL If observer is NULL.
  * @retval ENOENT If next observer was not found.
  */
