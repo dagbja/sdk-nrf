@@ -244,9 +244,6 @@ void lwm2m_portfolio_init(void)
     m_object_portfolio.object_id = LWM2M_OBJ_PORTFOLIO;
     m_object_portfolio.callback = lwm2m_portfolio_object_callback;
 
-    // Initialize ACL
-    lwm2m_portfolio_init_acl();
-
     // Initialize the instances.
     for (uint32_t i = 0; i < ARRAY_SIZE(m_instance_portfolio); i++)
     {
@@ -266,4 +263,7 @@ void lwm2m_portfolio_init(void)
                                         LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
         (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_portfolio[i]);
     }
+
+    // Initialize ACL
+    lwm2m_portfolio_init_acl();
 }
