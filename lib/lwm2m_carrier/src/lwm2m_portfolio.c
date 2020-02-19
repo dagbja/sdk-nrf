@@ -14,7 +14,7 @@
 #include <lwm2m_portfolio.h>
 #include <coap_message.h>
 #include <lwm2m_common.h>
-#include <lwm2m_vzw_main.h>
+#include <lwm2m_carrier_main.h>
 #include <at_interface.h>
 
 #define HOST_DEVICE_ID_0           "HUID0"

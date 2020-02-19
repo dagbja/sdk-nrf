@@ -22,7 +22,7 @@
 #include <at_interface.h>
 #include <operator_check.h>
 #include <sms_receive.h>
-#include <lwm2m_vzw_main.h>
+#include <lwm2m_carrier_main.h>
 #include <modem_logging.h>
 #include <lwm2m_carrier.h>
 #include <lwm2m_objects.h>

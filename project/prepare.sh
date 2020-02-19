@@ -39,16 +39,16 @@ declare -a lib_variants=("hard-float"
 
 declare -a lib_names=("nrf_coap"
 		      "nrf_lwm2m"
-		      "nrf_lwm2m_vzw")
+		      "nrf_lwm2m_carrier")
 
 declare -A lib_paths=([${lib_names[0]}]="coap"
 		      [${lib_names[1]}]="lwm2m"
-		      [${lib_names[2]}]="lwm2m_vzw")
+		      [${lib_names[2]}]="lwm2m_carrier")
 
-declare -a api_headers_nrf_lwm2m_vzw=("lwm2m_carrier.h"
+declare -a api_headers_nrf_lwm2m_carrier=("lwm2m_carrier.h"
 				      "lwm2m_os.h")
 
-declare -a api_impl_nrf_lwm2m_vzw=("lwm2m_os.c")
+declare -a api_impl_nrf_lwm2m_carrier=("lwm2m_os.c")
 
 function obfuscate {
 	# $1 library name
@@ -106,7 +106,7 @@ done
 if [ "$debug" = false ] ; then
 	for i in "${lib_variants[@]}"
 	do
-		obfuscate "nrf_lwm2m_vzw" $cpu_variant $i
+		obfuscate "nrf_lwm2m_carrier" $cpu_variant $i
 	done
 fi
 
@@ -133,18 +133,18 @@ done
 
 mkdir -p $project_dir/$output_dir/include
 
-for i in "${api_headers_nrf_lwm2m_vzw[@]}"
+for i in "${api_headers_nrf_lwm2m_carrier[@]}"
 do
-	cp $project_dir/../lib/lwm2m_vzw/include/$i $project_dir/$output_dir/include
+	cp $project_dir/../lib/lwm2m_carrier/include/$i $project_dir/$output_dir/include
 done
 
 # Copy OS glue
 
 mkdir -p $project_dir/$output_dir/os
 
-for i in "${api_impl_nrf_lwm2m_vzw[@]}"
+for i in "${api_impl_nrf_lwm2m_carrier[@]}"
 do
-	cp $project_dir/../lib/lwm2m_vzw/src/$i $project_dir/$output_dir/os
+	cp $project_dir/../lib/lwm2m_carrier/src/$i $project_dir/$output_dir/os
 done
 
 # TODO This is not needed at the moment, we do not make other headers public

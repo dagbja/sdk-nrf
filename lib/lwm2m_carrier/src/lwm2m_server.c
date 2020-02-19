@@ -15,7 +15,7 @@
 #include <lwm2m_remote.h>
 #include <lwm2m_server.h>
 #include <lwm2m_instance_storage.h>
-#include <lwm2m_vzw_main.h>
+#include <lwm2m_carrier_main.h>
 #include <operator_check.h>
 
 #include <coap_option.h>

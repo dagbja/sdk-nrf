@@ -6,4 +6,4 @@
 
 rsource "coap/Kconfig"
 rsource "lwm2m/Kconfig"
-rsource "lwm2m_vzw/Kconfig"
+rsource "lwm2m_carrier/Kconfig"

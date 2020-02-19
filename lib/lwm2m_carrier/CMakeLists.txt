@@ -4,9 +4,9 @@
 # SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
 #
 
-zephyr_library_named(nrf_lwm2m_vzw)
+zephyr_library_named(nrf_lwm2m_carrier)
 
-if (CONFIG_NRF_LWM2M_VZW_STANDALONE_LIBRARY)
+if (CONFIG_NRF_LWM2M_CARRIER_STANDALONE_LIBRARY)
 zephyr_library_cc_option(
     -nostdlib
     -nodefaultlibs
@@ -15,7 +15,7 @@ zephyr_library_cc_option(
 )
 endif()
 
-if (NOT CONFIG_NRF_LWM2M_VZW_INCLUDE_DEBUG_INFORMATION)
+if (NOT CONFIG_NRF_LWM2M_CARRIER_INCLUDE_DEBUG_INFORMATION)
 zephyr_library_cc_option(
     -g0
     -fno-function-sections
@@ -31,12 +31,12 @@ zephyr_library_sources(
     src/at_interface.c
     src/dfusock.c
     src/lwm2m_apn_conn_prof.c
+    src/lwm2m_carrier_main.c
     src/lwm2m_conn_ext.c
     src/lwm2m_conn_mon.c
     src/lwm2m_conn_stat.c
     src/lwm2m_common.c
     src/lwm2m_factory_bootstrap.c
-    src/lwm2m_vzw_main.c
     src/lwm2m_device.c
     src/lwm2m_gsma_objects.c
     src/lwm2m_firmware.c
@@ -54,7 +54,7 @@ zephyr_library_sources(
     src/lwm2m_pdn.c
 )
 
-if (NOT CONFIG_NRF_LWM2M_VZW_STANDALONE_LIBRARY)
+if (NOT CONFIG_NRF_LWM2M_CARRIER_STANDALONE_LIBRARY)
 zephyr_library_sources(
     src/lwm2m_os.c
 )

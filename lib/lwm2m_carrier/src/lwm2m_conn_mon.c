@@ -15,7 +15,7 @@
 #include <lwm2m_conn_mon.h>
 #include <coap_message.h>
 #include <lwm2m_common.h>
-#include <lwm2m_vzw_main.h>
+#include <lwm2m_carrier_main.h>
 #include <operator_check.h>
 #include <at_interface.h>
 #include <app_debug.h>

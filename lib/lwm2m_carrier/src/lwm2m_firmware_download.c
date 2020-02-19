@@ -16,7 +16,7 @@
 #include <lwm2m_server.h>
 #include <lwm2m_firmware.h>
 #include <lwm2m_firmware_download.h>
-#include <lwm2m_vzw_main.h>
+#include <lwm2m_carrier_main.h>
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_instance_storage.h>
 #include <lwm2m_device.h>
@@ -51,7 +51,7 @@ static char *img_state_str[] = {
 static void *download_dwork;
 static void *reboot_dwork;
 static struct lwm2m_os_download_cfg config = {
-	.sec_tag = CONFIG_NRF_LWM2M_VZW_SEC_TAG,
+	.sec_tag = CONFIG_NRF_LWM2M_CARRIER_SEC_TAG,
 };
 
 int lwm2m_firmware_download_uri(char *package_uri, size_t len);
@@ -193,7 +193,7 @@ static int erase_check_timeout(void)
 
 	erase_duration_ms += OFFSET_POLL_INTERVAL;
 	if (erase_duration_ms <
-	    K_SECONDS(CONFIG_NRF_LWM2M_VZW_ERASE_TIMEOUT_S)) {
+	    K_SECONDS(CONFIG_NRF_LWM2M_CARRIER_ERASE_TIMEOUT_S)) {
 		return 0;
 	}
 

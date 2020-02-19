@@ -10,7 +10,7 @@
 #include <lwm2m_instance_storage.h>
 #include <app_debug.h>
 #include <at_interface.h>
-#include <lwm2m_vzw_main.h>
+#include <lwm2m_carrier_main.h>
 
 
 static debug_settings_t m_debug_settings;

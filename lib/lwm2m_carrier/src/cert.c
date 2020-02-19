@@ -26,9 +26,9 @@ int cert_provision(void)
 	uint8_t dummy;
 	ARG_UNUSED(dummy);
 
-	uint32_t tag = CONFIG_NRF_LWM2M_VZW_SEC_TAG;
+	uint32_t tag = CONFIG_NRF_LWM2M_CARRIER_SEC_TAG;
 
-	if (CONFIG_NRF_LWM2M_VZW_SEC_TAG == -1) {
+	if (CONFIG_NRF_LWM2M_CARRIER_SEC_TAG == -1) {
 		LWM2M_WRN("No certificates to be provisioned.");
 		return 0;
 	}

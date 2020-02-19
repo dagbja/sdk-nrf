@@ -11,7 +11,7 @@
 #include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
-#include <lwm2m_vzw_main.h>
+#include <lwm2m_carrier_main.h>
 #include <lwm2m_remote.h>
 #include <operator_check.h>
 

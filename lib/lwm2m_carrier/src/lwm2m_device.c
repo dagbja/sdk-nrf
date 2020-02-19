@@ -19,7 +19,7 @@
 #include <coap_message.h>
 #include <lwm2m_common.h>
 #include <at_interface.h>
-#include <lwm2m_vzw_main.h>
+#include <lwm2m_carrier_main.h>
 #include <operator_check.h>
 #include <dfusock.h>
 #include <nrf_socket.h>

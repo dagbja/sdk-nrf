@@ -4,7 +4,7 @@
 # The use, copying, transfer or disclosure of such information is prohibited except by
 # express written agreement with Nordic Semiconductor ASA.
 #
-# Symbol filter list used by obfuscate_symbols.py on VZW LWM2M
+# Symbol filter list used by obfuscate_symbols.py on CARRIER LWM2M
 
 # lwm2m_carrier.h
 ^lwm2m_carrier_avail_power_sources_set$

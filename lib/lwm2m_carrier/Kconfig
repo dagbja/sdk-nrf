@@ -4,22 +4,22 @@
 # SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
 #
 
-config NRF_LWM2M_VZW
+config NRF_LWM2M_CARRIER
 	bool "Nordic LwM2M library support"
 	select NRF_LWM2M
 	help
-	  "Enable Verizon LwM2M library"
+	  "Enable LwM2M Carrier library"
 
-if NRF_LWM2M_VZW
+if NRF_LWM2M_CARRIER
 
-config NRF_LWM2M_VZW_STANDALONE_LIBRARY
-	bool "Compile VZW LWM2M as a standalone library"
+config NRF_LWM2M_CARRIER_STANDALONE_LIBRARY
+	bool "Compile CARRIER LWM2M as a standalone library"
 
-config NRF_LWM2M_VZW_INCLUDE_DEBUG_INFORMATION
+config NRF_LWM2M_CARRIER_INCLUDE_DEBUG_INFORMATION
 	bool "Include debug information in the output library"
-	depends on NRF_LWM2M_VZW_STANDALONE_LIBRARY
+	depends on NRF_LWM2M_CARRIER_STANDALONE_LIBRARY
 
-config NRF_LWM2M_VZW_ERASE_TIMEOUT_S
+config NRF_LWM2M_CARRIER_ERASE_TIMEOUT_S
 	int "Modem patch erase timeout [s]"
 	default 45
 	help
@@ -28,18 +28,18 @@ config NRF_LWM2M_VZW_ERASE_TIMEOUT_S
 	  after which the library will inform the application that
 	  the link will be turned off to continue.
 
-config NRF_LWM2M_VZW_COAP_CON_INTERVAL
+config NRF_LWM2M_CARRIER_COAP_CON_INTERVAL
 	int "CoAP CON interval"
 	default 86400
 	help
 	  This interval defines how often a CoAP Non-Confirmable notification
 	  is sent as Confirmable, according to RFC 7641 section 4.5.
 
-config NRF_LWM2M_VZW_SEC_TAG
+config NRF_LWM2M_CARRIER_SEC_TAG
 	int "TLS security tag for Firmware downloads"
 	default 11
 	help
 	  TLS security tag associated with Verizon certificates.
 	  Set to -1 to disable TLS.
 
-endif # NRF_LWM2M_VZW
+endif # NRF_LWM2M_CARRIER

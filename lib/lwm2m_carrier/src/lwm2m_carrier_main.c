@@ -19,7 +19,7 @@
 #include <lwm2m_apn_conn_prof.h>
 #include <lwm2m_portfolio.h>
 #include <lwm2m_conn_ext.h>
-#include <lwm2m_vzw_main.h>
+#include <lwm2m_carrier_main.h>
 #include <lwm2m_factory_bootstrap.h>
 #include <lwm2m_device.h>
 #include <lwm2m_firmware.h>
@@ -114,7 +114,7 @@ static uint32_t m_net_stat;
 static uint32_t observable_pmin = 15;
 static uint32_t observable_pmax = 60;
 
-static uint32_t m_coap_con_interval = CONFIG_NRF_LWM2M_VZW_COAP_CON_INTERVAL;
+static uint32_t m_coap_con_interval = CONFIG_NRF_LWM2M_CARRIER_COAP_CON_INTERVAL;
 
 /* Structures for timers */
 static void *state_update_timer;

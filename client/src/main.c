@@ -86,10 +86,10 @@ int main(void)
 /* LWM2M background thread - should become a separate module. */
 
 /* These should be configurable. */
-#define LWM2M_VZW_THREAD_STACK_SIZE 8192
-#define LWLM2_VZW_THREAD_PRIORITY K_LOWEST_APPLICATION_THREAD_PRIO
+#define LWM2M_CARRIER_THREAD_STACK_SIZE 8192
+#define LWLM2_CARRIER_THREAD_PRIORITY K_LOWEST_APPLICATION_THREAD_PRIO
 
-void lwm2m_vzw_thread_run(void)
+void lwm2m_carrier_thread_run(void)
 {
     // Start FIDO trace first to ensure we capture lwm2m_carrier_init().
     modem_trace_enable();
@@ -108,7 +108,7 @@ void lwm2m_vzw_thread_run(void)
     lwm2m_carrier_run();
 }
 
-K_THREAD_DEFINE(lwm2m_vzw_thread, LWM2M_VZW_THREAD_STACK_SIZE,
-                lwm2m_vzw_thread_run, NULL, NULL, NULL,
-                LWLM2_VZW_THREAD_PRIORITY, 0, K_NO_WAIT);
+K_THREAD_DEFINE(lwm2m_carrier_thread, LWM2M_CARRIER_THREAD_STACK_SIZE,
+                lwm2m_carrier_thread_run, NULL, NULL, NULL,
+                LWLM2_CARRIER_THREAD_PRIORITY, 0, K_NO_WAIT);
 #endif

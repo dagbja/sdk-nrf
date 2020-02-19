@@ -9,7 +9,7 @@
 
 #include <lwm2m.h>
 #include <sms_receive.h>
-#include <lwm2m_vzw_main.h>
+#include <lwm2m_carrier_main.h>
 
 static bool sms_initialized;
 static uint32_t receive_count;

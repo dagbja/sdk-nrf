@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#ifndef LWM2M_VZW_MAIN_H__
+#ifndef LWM2M_CARRIER_MAIN_H__
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -90,4 +90,4 @@ void lwm2m_net_reg_stat_cb(uint32_t net_stat);
 int64_t lwm2m_coap_con_interval_get(void);
 void lwm2m_coap_con_interval_set(int64_t con_interval);
 
-#endif // LWM2M_VZW_MAIN_H__
+#endif // LWM2M_CARRIER_MAIN_H__
