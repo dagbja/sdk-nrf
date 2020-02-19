@@ -97,7 +97,7 @@ do
 		ninja lib$j.a || exit 1
 
 		mkdir -p $project_dir/$temp_dir/$j/lib/$cpu_variant/$i
-		cp $project_dir/build-$i/zephyr/modules/lwm2m/lib/${lib_paths[$j]}/lib$j.a $project_dir/$temp_dir/$j/lib/$cpu_variant/$i
+		cp $project_dir/build-$i/modules/lwm2m/lib/${lib_paths[$j]}/lib$j.a $project_dir/$temp_dir/$j/lib/$cpu_variant/$i
 	done
 done
 

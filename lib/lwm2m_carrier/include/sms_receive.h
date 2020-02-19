@@ -29,7 +29,7 @@ int32_t lwm2m_sms_receiver_disable(void);
  *
  * @param[in] notif NUll-terminated AT notification
  */
-int sms_receiver_notif_parse(char *notif);
+int sms_receiver_notif_parse(const char *notif);
 
 /**
  * @return The number of valid SMS decoded.

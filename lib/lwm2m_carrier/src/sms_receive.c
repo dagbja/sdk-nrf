@@ -52,7 +52,7 @@ int32_t lwm2m_sms_receiver_disable(void)
     return 0;
 }
 
-int sms_receiver_notif_parse(char *notif)
+int sms_receiver_notif_parse(const char *notif)
 {
     // Check if this is an SMS notification.
     int length = strlen(notif);

@@ -38,10 +38,10 @@ static volatile bool cid_ipv6_link_up = false;
  * @return 0 if the event has been consumed,
  *           or an error code if the event should be propagated to the other handlers.
  */
-typedef int (*at_notif_handler)(char* evt);
+typedef int (*at_notif_handler)(const char* evt);
 
-static int at_cgev_handler(char *notif);
-static int at_cereg_handler(char *notif);
+static int at_cgev_handler(const char *notif);
+static int at_cereg_handler(const char *notif);
 
 static const at_notif_handler at_handlers[] = {
     at_cgev_handler,          ///< Parse AT CGEV events for PDN/IPv6.
@@ -147,7 +147,7 @@ static int at_response_param_to_string(const char * p_at_command, int param_coun
     return retval;
 }
 
-static void at_response_handler(void *context, char *response)
+static void at_response_handler(void *context, const char *response)
 {
     ARG_UNUSED(context);
 
@@ -161,14 +161,14 @@ static void at_response_handler(void *context, char *response)
     }
 }
 
-static int at_cgev_handler(char *notif)
+static int at_cgev_handler(const char *notif)
 {
     // Check if this is a CGEV event.
     int length = strlen(notif);
     if (length >= 8 && strncmp(notif, "+CGEV: ", 7) == 0)
     {
         // Check type of CGEV event.
-        char * cgev_evt = &notif[7];
+        const char * cgev_evt = &notif[7];
 
         // IPv6 link is up for the default bearer.
         if (strncmp(cgev_evt, "IPV6 ", 5) == 0)
@@ -196,7 +196,7 @@ static int at_cgev_handler(char *notif)
     return -1;
 }
 
-static int at_cereg_handler(char *notif)
+static int at_cereg_handler(const char *notif)
 {
     int retval = 0;
     struct lwm2m_os_at_param_list cereg_params;
