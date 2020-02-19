@@ -213,7 +213,10 @@
 ^lwm2m_remote_register$
 ^lwm2m_remote_short_server_id_find$
 ^lwm2m_request_deregister$
+^lwm2m_respond_with_bs_discover_link$
 ^lwm2m_respond_with_code$
+^lwm2m_respond_with_instance_link$
+^lwm2m_respond_with_object_link$
 ^lwm2m_respond_with_payload$
 ^lwm2m_string_free$
 ^lwm2m_tlv_bytebuffer_to_int32$
@@ -230,6 +233,7 @@
 ^lwm2m_tlv_device_encode$
 ^lwm2m_tlv_firmware_decode$
 ^lwm2m_tlv_firmware_encode$
+^lwm2m_tlv_header_encode$
 ^lwm2m_tlv_list_encode$
 ^lwm2m_tlv_portfolio_decode$
 ^lwm2m_tlv_portfolio_encode$
