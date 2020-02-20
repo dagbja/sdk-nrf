@@ -2099,10 +2099,6 @@ void app_server_disable(uint16_t instance_id)
                   lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
                   instance_id);
     }
-    else
-    {
-        app_remove_observers_on_deregister(instance_id);
-    }
 }
 
 static void app_server_deregister(uint16_t instance_id)
