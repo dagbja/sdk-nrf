@@ -1101,6 +1101,15 @@ uint32_t lwm2m_list_integer_set(lwm2m_list_t * p_list, uint32_t idx, int32_t val
  */
 uint32_t lwm2m_list_integer_append(lwm2m_list_t * p_list, int32_t value);
 
+/**@brief Get a string from a lwm2m_list_t.
+ *
+ * @param[in] p_list List to fetch string from.
+ * @param[in] idx    Index of string in list.
+ *
+ * @return Pointer to lwm2m_string_t at the given index or NULL if invalid parameters.
+ */
+lwm2m_string_t * lwm2m_list_string_get(lwm2m_list_t * p_list, uint32_t idx);
+
 /**@brief Set a string in a lwm2m_list_t.
  *
  * @param[in] p_list    List to set string in.
@@ -1112,7 +1121,7 @@ uint32_t lwm2m_list_integer_append(lwm2m_list_t * p_list, int32_t value);
  * @retval  EINVAL    Illegal list definition.
  * @retval  EMSGSIZE  Index is out of bounds.
  */
-uint32_t lwm2m_list_string_set(lwm2m_list_t * p_list, uint32_t idx, uint8_t * p_value, uint16_t value_len);
+uint32_t lwm2m_list_string_set(lwm2m_list_t * p_list, uint32_t idx, const uint8_t * p_value, uint16_t value_len);
 
 /**@brief Append a string to a lwm2m_list_t.
  *

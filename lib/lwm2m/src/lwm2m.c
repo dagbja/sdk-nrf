@@ -1909,8 +1909,27 @@ uint32_t lwm2m_list_integer_append(lwm2m_list_t * p_list, int32_t value)
 }
 
 
-uint32_t lwm2m_list_string_set(lwm2m_list_t * p_list, uint32_t idx, uint8_t * p_value, uint16_t value_len)
+lwm2m_string_t * lwm2m_list_string_get(lwm2m_list_t * p_list, uint32_t idx)
 {
+    if (!p_list || !p_list->val.p_string || idx >= p_list->len)
+    {
+        return NULL;
+    }
+
+    switch (p_list->type)
+    {
+        case LWM2M_LIST_TYPE_STRING:
+            return &p_list->val.p_string[idx];
+        default:
+            return NULL;
+    }
+}
+
+
+uint32_t lwm2m_list_string_set(lwm2m_list_t * p_list, uint32_t idx, const uint8_t * p_value, uint16_t value_len)
+{
+    uint32_t err_code;
+
     if (!p_list || idx > p_list->len || idx >= p_list->max_len)
     {
         return EMSGSIZE;
@@ -1919,7 +1938,7 @@ uint32_t lwm2m_list_string_set(lwm2m_list_t * p_list, uint32_t idx, uint8_t * p_
     switch (p_list->type)
     {
         case LWM2M_LIST_TYPE_STRING:
-            lwm2m_bytebuffer_to_string(p_value, value_len, &p_list->val.p_string[idx]);
+            err_code = lwm2m_bytebuffer_to_string(p_value, value_len, &p_list->val.p_string[idx]);
             break;
 
         default:
@@ -1931,7 +1950,7 @@ uint32_t lwm2m_list_string_set(lwm2m_list_t * p_list, uint32_t idx, uint8_t * p_
         p_list->len = idx + 1;
     }
 
-    return 0;
+    return err_code;
 }
 
 

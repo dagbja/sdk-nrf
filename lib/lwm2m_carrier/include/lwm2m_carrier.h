@@ -99,6 +99,14 @@ typedef struct {
 #define LWM2M_CARRIER_BATTERY_STATUS_UNKNOWN         6
 
 /**
+ * @brief LWM2M portfolio identity types.
+ */
+#define LWM2M_CARRIER_IDENTITY_ID           0
+#define LWM2M_CARRIER_IDENTITY_MANUFACTURER 1
+#define LWM2M_CARRIER_IDENTITY_MODEL        2
+#define LWM2M_CARRIER_IDENTITY_SW_VERSION   3
+
+/**
  * @brief Structure holding LWM2M carrier library initialization parameters.
  */
 typedef struct {
@@ -444,5 +452,50 @@ int lwm2m_carrier_memory_total_set(uint32_t memory_total);
  */
 int lwm2m_carrier_memory_free_read(void);
 
+/**
+ * @brief	   Read the Identity field of a given Portfolio object instance.
+ *
+ * @note	   If the provided buffer is NULL, the function will perform a dry
+ * 			   run to determine the required buffer size (including the null
+ * 			   terminator).
+ *
+ * @param[in]     instance_id	 Portfolio object instance identifier.
+ * @param[in]     identity_type  Type of Identity field to be read.
+ * @param[inout]  buffer		 Buffer where the null-terminated response
+ * 								 will be stored.
+ * @param[inout]  buffer_len     Length of the provided buffer. Will return the
+ * 								 number of bytes of the full response.
+ *
+ * @retval        -ENOENT        If the instance does not exist.
+ * @retval		  -EINVAL        If the provided buffer length reference is NULL
+ * 								 or the identity type is invalid.
+ * @retval		  -ENOMEM 	     If the provided buffer is too small.
+ * @retval	      0			 	 If the operation was successful.
+ */
+int lwm2m_carrier_identity_read(uint16_t instance_id, uint16_t identity_type,
+					  char *buffer, uint16_t *buffer_len);
+
+/**
+ * @brief      Set the corresponding Identity field of a Portfolio object
+ * 			   instance to a given value.
+ *
+ * @param[in]  instance_id	  Portfolio object instance identifier.
+ * @param[in]  identity_type  Type of Identity field to be written.
+ * @param[in]  value	      Null terminated string to be written into the
+ * 							  Identity field.
+ *
+ * @retval     -EPERM         If the specified object instance ID corresponds
+ * 							  to the Primary Host identity.
+ * @retval     -EINVAL        If the input argument is a NULL pointer or
+ *                            an empty string, or the identity type is invalid.
+ * @retval     -ENOENT        If the instance does not exist.
+ * @retval     -E2BIG         If the input string is too long.
+ * @retval     -ENOMEM        If it was not possible to allocate memory
+ *                            storage to hold the string.
+ * @retval     0              If the Identity field has been updated
+ * 							  successfully.
+ */
+int lwm2m_carrier_identity_write(uint16_t instance_id, uint16_t identity_type,
+					  const char *value);
 
 #endif /* LWM2M_CARRIER_H__ */

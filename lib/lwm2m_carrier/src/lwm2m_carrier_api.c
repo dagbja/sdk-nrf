@@ -8,8 +8,10 @@
 #include <lwm2m_os.h>
 #include <lwm2m_api.h>
 #include <lwm2m_device.h>
+#include <lwm2m_portfolio.h>
 #include <lwm2m_carrier.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #define LWM2M_CARRIER_STRING_MAX_LEN 200
 
@@ -280,3 +282,89 @@ int __WEAK lwm2m_carrier_memory_free_read(void)
     return 0;
 }
 
+int lwm2m_carrier_identity_read(uint16_t instance_id, uint16_t identity_type, char *buffer, uint16_t *buffer_len)
+{
+    char buf[LWM2M_CARRIER_STRING_MAX_LEN];
+    bool dry_run = false;
+    uint16_t buf_len;
+    int retval = 0;
+    lwm2m_portfolio_t *portfolio_instance;
+    lwm2m_string_t *host_device_str;
+
+    if (!buffer_len || identity_type > LWM2M_CARRIER_IDENTITY_SW_VERSION)
+    {
+        return -EINVAL;
+    }
+
+    portfolio_instance = lwm2m_portfolio_get_instance(instance_id);
+
+    if (!portfolio_instance)
+    {
+        return -ENOENT;
+    }
+
+    host_device_str = lwm2m_list_string_get(&portfolio_instance->identity, identity_type);
+
+    if (!host_device_str || !host_device_str->p_val)
+    {
+        return -ENOENT;
+    }
+
+    if (!buffer)
+    {
+        dry_run = true;
+    }
+
+    memset(buf, 0, sizeof(buf));
+    buf_len = host_device_str->len;
+
+    // p_val field of lwm2m_string_t is not NULL terminated
+    char str[buf_len + 1];
+    memcpy(str, host_device_str->p_val, buf_len);
+    str[buf_len] = '\0';
+
+    buf_len = snprintf(buf, sizeof(buf), "%s", str);
+
+    if ((buf_len < *buffer_len) && !dry_run)
+    {
+        memcpy(buffer, buf, buf_len);
+        buffer[buf_len] = '\0';
+    }
+    else
+    {
+        retval = -ENOMEM;
+    }
+
+    *buffer_len = buf_len + 1;
+
+    return retval;
+}
+
+int lwm2m_carrier_identity_write(uint16_t instance_id, uint16_t identity_type, const char *value)
+{
+    lwm2m_portfolio_t *portfolio_instance;
+
+    if (instance_id == LWM2M_PRIMARY_HOST_DEVICE_PORTFOLIO)
+    {
+        return -EPERM;
+    }
+
+    if (!value || value[0] == '\0' || identity_type > LWM2M_CARRIER_IDENTITY_SW_VERSION)
+    {
+        return -EINVAL;
+    }
+
+    if (strlen(value) > LWM2M_CARRIER_STRING_MAX_LEN)
+    {
+        return -E2BIG;
+    }
+
+    portfolio_instance = lwm2m_portfolio_get_instance(instance_id);
+
+    if (!portfolio_instance)
+    {
+        return -ENOENT;
+    }
+
+    return -lwm2m_list_string_set(&portfolio_instance->identity, identity_type, value, strlen(value));
+}

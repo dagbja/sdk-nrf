@@ -18,6 +18,8 @@
 ^lwm2m_carrier_init$
 ^lwm2m_carrier_memory_free_read$
 ^lwm2m_carrier_memory_total_set$
+^lwm2m_carrier_identity_read$
+^lwm2m_carrier_identity_write$
 ^lwm2m_carrier_power_source_current_set$
 ^lwm2m_carrier_power_source_voltage_set$
 ^lwm2m_carrier_run$

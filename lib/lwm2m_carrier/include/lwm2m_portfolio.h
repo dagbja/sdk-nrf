@@ -11,7 +11,7 @@
 #include <lwm2m_tlv.h>
 #include <lwm2m_objects.h>
 
-// LWM2M core resources.
+#define LWM2M_PRIMARY_HOST_DEVICE_PORTFOLIO 0
 
 void lwm2m_portfolio_init(void);
 
