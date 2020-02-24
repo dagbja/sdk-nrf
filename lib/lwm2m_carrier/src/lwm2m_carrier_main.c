@@ -1320,7 +1320,7 @@ bool lwm2m_coap_error_handler(uint32_t error_code, coap_message_t * p_message)
               lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
 
     // Handle error when not able to send on socket.
-    if (error_code == EIO && lwm2m_os_errno() == EOPNOTSUPP) {
+    if (error_code == EIO && lwm2m_os_errno() == NRF_EOPNOTSUPP) {
         handled = lwm2m_request_remote_reconnect(p_message->remote);
     }
 
@@ -1758,7 +1758,7 @@ static void app_bootstrap_connect(void)
             lwm2m_state_set(LWM2M_STATE_BS_CONNECT_WAIT);
             m_lwm2m_transport[0] = local_port.transport;
         }
-        else if (err_code == EIO && (lwm2m_os_errno() == ENETDOWN)) {
+        else if (err_code == EIO && (lwm2m_os_errno() == NRF_ENETDOWN)) {
             LWM2M_INF("Connection failed (PDN down)");
 
             // Just return, so we come back setup PDN again
