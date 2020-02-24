@@ -384,6 +384,7 @@ void lwm2m_security_init(void)
     {
         lwm2m_instance_security_init(&m_instance_security[i]);
         m_instance_security[i].proto.instance_id = i;
+        m_instance_security[i].proto.callback = security_instance_callback;
     }
 }
 

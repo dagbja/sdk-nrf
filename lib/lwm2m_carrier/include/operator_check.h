@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 
+#define OPERATOR_ID_UNSET   UINT32_MAX
 #define OPERATOR_ID_CURRENT UINT32_MAX
 
 /**@brief Read operator id.

@@ -33,6 +33,8 @@
 /** @brief Operator id from last read. */
 static uint32_t m_operator_id;
 
+static bool operator_is_custom(bool allow_debug);
+
 void operator_id_read(void)
 {
     at_read_operator_id(&m_operator_id);
@@ -40,7 +42,18 @@ void operator_id_read(void)
 
 bool operator_is_supported(bool allow_debug)
 {
-    return (operator_is_vzw(allow_debug) || operator_is_att(allow_debug));
+    return (operator_is_vzw(allow_debug) || operator_is_att(allow_debug) || operator_is_custom(allow_debug));
+}
+
+static bool operator_is_custom(bool allow_debug)
+{
+    // Custom is only supported when carrier check is disabled
+
+    if (allow_debug && lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
+        return (lwm2m_debug_operator_id_get() == OPERATOR_ID_NOT_IDENTIFIED);
+    }
+
+    return false;
 }
 
 bool operator_is_vzw(bool allow_debug)

@@ -84,6 +84,12 @@ void lwm2m_set_carrier_acl(lwm2m_instance_t * p_instance)
         acl.access[0] = LWM2M_ACL_RWEDO_PERM;
         acl.server[0] = 1;
     }
+    else
+    {
+        // TODO: Remove when fixing ACL
+        acl.access[0] = LWM2M_ACL_RWEDO_PERM;
+        acl.server[0] = 1;
+    }
 
     lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
 }

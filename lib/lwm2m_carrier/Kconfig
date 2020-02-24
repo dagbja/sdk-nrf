@@ -15,6 +15,12 @@ if NRF_LWM2M_CARRIER
 config NRF_LWM2M_CARRIER_STANDALONE_LIBRARY
 	bool "Compile CARRIER LWM2M as a standalone library"
 
+config NRF_LWM2M_CARRIER_BOOTSTRAP_URI
+	string "Default bootstrap URI"
+
+config NRF_LWM2M_CARRIER_BOOTSTRAP_PSK
+	string "Default bootstrap PSK"
+
 config NRF_LWM2M_CARRIER_INCLUDE_DEBUG_INFORMATION
 	bool "Include debug information in the output library"
 	depends on NRF_LWM2M_CARRIER_STANDALONE_LIBRARY

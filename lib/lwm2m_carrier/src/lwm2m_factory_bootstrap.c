@@ -22,12 +22,6 @@
 #include <app_debug.h>
 #include <operator_check.h>
 
-#if USE_CONTABO
-#define BOOTSTRAP_URI_CONTABO          "coaps://vmi36865.contabo.host:5784"                  /**< Server URI to the bootstrap server when using security (DTLS). */
-#define BOOTSTRAP_SEC_PSK_CONTABO      { 'n', 'o', 'r', 'd', 'i', 'c', 's', 'e', 'c', 'r', 'e', 't' }  /**< Pre-shared key used for bootstrap server in hex format. */
-static char m_bootstrap_psk_contabo[] = BOOTSTRAP_SEC_PSK_CONTABO;
-#endif
-
 #define BOOTSTRAP_URI_VZW              "coaps://boot.lwm2m.vzwdm.com:5684"                   /**< Server URI to the bootstrap server when using security (DTLS). */
 #define DIAGNOSTICS_URI_VZW            "coaps://diag.lwm2m.vzwdm.com:5684"                   /**< Server URI to the diagnostics server when using security (DTLS). */
 
@@ -49,6 +43,43 @@ static char m_bootstrap_psk_contabo[] = BOOTSTRAP_SEC_PSK_CONTABO;
 
 static char m_bootstrap_psk_vzw[] = BOOTSTRAP_SEC_PSK_VZW;
 static char m_bootstrap_psk_att[] = BOOTSTRAP_SEC_PSK_ATT;
+
+static bool factory_bootstrap_init_default(uint16_t instance_id, uint16_t *default_access, lwm2m_instance_acl_t * p_acl)
+{
+    bool initialized = true;
+
+    switch (instance_id)
+    {
+        case LWM2M_BOOTSTRAP_INSTANCE_ID:
+        {
+            lwm2m_security_short_server_id_set(instance_id, LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
+            lwm2m_security_is_bootstrap_server_set(instance_id, true);
+
+            lwm2m_server_short_server_id_set(instance_id, LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
+
+            // TODO: Remove this ACL when doing NCSDK-4447
+            // This is a placeholder for a working Contabo setup.
+            p_acl->access[0] = LWM2M_ACL_RWEDO_PERM;
+            p_acl->server[0] = 1;
+            break;
+        }
+
+        case 1:
+            // TODO: Remove server instance 1 when doing NCSDK-4447
+            // This is a placeholder for a working Contabo setup.
+            lwm2m_security_short_server_id_set(instance_id, 1);
+            lwm2m_server_short_server_id_set(instance_id, 1);
+            lwm2m_server_lifetime_set(instance_id, 60);
+
+            break;
+
+        default:
+            initialized = false;
+            break;
+    }
+
+    return initialized;
+}
 
 static bool factory_bootstrap_init_vzw(uint16_t instance_id, uint16_t *default_access, lwm2m_instance_acl_t * p_acl)
 {
@@ -192,6 +223,10 @@ void lwm2m_factory_bootstrap_init(uint16_t instance_id)
     {
         initialized = factory_bootstrap_init_att(instance_id, &default_access, &acl);
     }
+    else
+    {
+        initialized = factory_bootstrap_init_default(instance_id, &default_access, &acl);
+    }
 
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
     lwm2m_set_instance_acl(p_instance, default_access, &acl);
@@ -201,11 +236,17 @@ void lwm2m_factory_bootstrap_init(uint16_t instance_id)
         lwm2m_instance_storage_security_store(instance_id);
         lwm2m_instance_storage_server_store(instance_id);
 
-        lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_security_get_instance(instance_id));
-        lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_security_get_instance(instance_id));
+        if (lwm2m_security_short_server_id_get(instance_id) != 0)
+        {
+            lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_security_get_instance(instance_id));
+            lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_security_get_instance(instance_id));
+        }
 
-        lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_server_get_instance(instance_id));
-        lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_server_get_instance(instance_id));
+        if (lwm2m_server_short_server_id_get(instance_id) != 0)
+        {
+            lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_server_get_instance(instance_id));
+            lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_server_get_instance(instance_id));
+        }
     }
 }
 
@@ -245,18 +286,19 @@ bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config)
         p_carrier_config->psk = m_bootstrap_psk_att;
         p_carrier_config->psk_length = sizeof(m_bootstrap_psk_att);
     }
-#if USE_CONTABO
     else
     {
-        bootstrap_uri = BOOTSTRAP_URI_CONTABO;
-        p_carrier_config->psk = m_bootstrap_psk_contabo;
-        p_carrier_config->psk_length = sizeof(m_bootstrap_psk_contabo);
+        bootstrap_uri = CONFIG_NRF_LWM2M_CARRIER_BOOTSTRAP_URI;
+        p_carrier_config->psk = CONFIG_NRF_LWM2M_CARRIER_BOOTSTRAP_PSK;
+        p_carrier_config->psk_length = sizeof(CONFIG_NRF_LWM2M_CARRIER_BOOTSTRAP_PSK) - 1;
     }
-#endif
 
     uint8_t p_len = 0;
     char * p = lwm2m_security_server_uri_get(LWM2M_BOOTSTRAP_INSTANCE_ID, &p_len);
-    if (bootstrap_uri && (p_len == 0 || strncmp(p, bootstrap_uri, p_len) != 0)) {
+    if ((bootstrap_uri) &&
+        (strlen(bootstrap_uri) > 0) &&
+        (p_len == 0 || strncmp(p, bootstrap_uri, p_len) != 0))
+    {
         // Initial startup (no server URI) or server URI has changed (carrier changed).
         // Clear all bootstrap settings and load factory settings.
         lwm2m_factory_bootstrap_init(LWM2M_BOOTSTRAP_INSTANCE_ID);

@@ -43,15 +43,8 @@
 
 #define APP_USE_SOCKET_POLL             0 // Use socket poll() to check status
 #define APP_ACL_DM_SERVER_HACK          1
-#define APP_USE_CONTABO                 0
 
-#if APP_USE_CONTABO
-#define COAP_LOCAL_LISTENER_PORT              5683                                            /**< Local port to listen on any traffic, client or server. Not bound to any specific LWM2M functionality.*/
-#define LWM2M_LOCAL_LISTENER_PORT             9997                                            /**< Local port to listen on any traffic. Bound to specific LWM2M functionality. */
-#define LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT     5784                                            /**< Local port to connect to the LWM2M bootstrap server. */
-#else
 #define LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT     9998                                            /**< Local port to connect to the LWM2M bootstrap server. */
-#endif
 #define LWM2M_LOCAL_CLIENT_PORT_OFFSET        9999                                            /**< Local port to connect to the LWM2M server. */
 
 #define APP_SEC_TAG_OFFSET              25
@@ -138,11 +131,7 @@ static bool m_use_client_holdoff_timer;
 static bool m_registration_ready;
 
 /* Resolved server addresses */
-#if APP_USE_CONTABO
-static nrf_sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { NRF_AF_INET, NRF_AF_INET, NRF_AF_INET, NRF_AF_INET };     /**< Current IP versions, start using IPv6. */
-#else
 static nrf_sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { NRF_AF_INET6, NRF_AF_INET6, NRF_AF_INET6, NRF_AF_INET6 };  /**< Current IP versions, start using IPv6. */
-#endif
 static struct nrf_sockaddr_in6 m_bs_remote_server;                                                    /**< Remote bootstrap server address to connect to. */
 
 static struct nrf_sockaddr_in6 m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
@@ -710,11 +699,19 @@ static int app_generate_client_id(void)
         return ret;
     }
 
-    uint32_t last_used_operator_id = 0;
+    uint32_t last_used_operator_id = OPERATOR_ID_UNSET;
     int32_t len = lwm2m_last_used_operator_id_get(&last_used_operator_id);
 
     if (last_used_operator_id != operator_id(true)) {
-        LWM2M_INF("Carrier change detected: %u -> %u", last_used_operator_id, operator_id(true));
+        const char *p_operator_id = operator_id_string(operator_id(true));
+        if (last_used_operator_id == OPERATOR_ID_UNSET) {
+            LWM2M_INF("Carrier detected: %s",
+                      lwm2m_os_log_strdup(p_operator_id));
+        } else {
+            LWM2M_INF("Carrier change detected: %s -> %s",
+                      lwm2m_os_log_strdup(operator_id_string(last_used_operator_id)),
+                      lwm2m_os_log_strdup(p_operator_id));
+        }
         if (lwm2m_factory_bootstrap_update(&m_app_config)) {
             clear_bootstrap = true;
         }
@@ -1441,10 +1438,11 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 
     LWM2M_INF("Store bootstrap settings");
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-        if (lwm2m_security_is_bootstrap_server_get(i) ||
-            lwm2m_server_short_server_id_get(i) != 0)
-        {
+        if (lwm2m_security_short_server_id_get(i) != 0) {
             lwm2m_instance_storage_security_store(i);
+        }
+
+        if (lwm2m_server_short_server_id_get(i) != 0) {
             lwm2m_instance_storage_server_store(i);
         }
     }
@@ -1505,7 +1503,7 @@ void lwm2m_factory_reset(void)
 
     // Provision bootstrap PSK and diagnostic PSK at next startup
     lwm2m_last_used_msisdn_set("", 0);
-    lwm2m_last_used_operator_id_set(0);
+    lwm2m_last_used_operator_id_set(OPERATOR_ID_UNSET);
 
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
@@ -1543,10 +1541,13 @@ static void app_load_flash_objects(void)
         lwm2m_instance_storage_security_load(i);
         lwm2m_instance_storage_server_load(i);
 
-        if (lwm2m_security_is_bootstrap_server_get(i) ||
-            lwm2m_server_short_server_id_get(i) != 0)
+        if (lwm2m_security_short_server_id_get(i) != 0)
         {
             lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_security_get_instance(i));
+        }
+
+        if (lwm2m_server_short_server_id_get(i) != 0)
+        {
             lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_server_get_instance(i));
         }
     }
@@ -1650,10 +1651,6 @@ static void app_connect(void)
             lwm2m_state_set(LWM2M_STATE_IDLE);
             app_init_connection_update();
         } else {
-#if APP_USE_CONTABO
-            // On contabo we don't use hold off timer
-            lwm2m_state_set(LWM2M_STATE_BS_CONNECT);
-#else
             int32_t hold_off_time = lwm2m_security_hold_off_timer_get(LWM2M_BOOTSTRAP_INSTANCE_ID);
             if (hold_off_time > 0) {
                 if (lwm2m_state_set(LWM2M_STATE_BS_HOLD_OFF)) {
@@ -1664,7 +1661,6 @@ static void app_connect(void)
                 // No hold off timer
                 lwm2m_state_set(LWM2M_STATE_BS_CONNECT);
             }
-#endif
         }
     } else {
         LWM2M_INF("Waiting for home network");
@@ -1690,6 +1686,16 @@ static void app_bootstrap_connect(void)
     // Save the remote address of the bootstrap server.
     uint8_t uri_len = 0;
     char * p_server_uri = lwm2m_security_server_uri_get(LWM2M_BOOTSTRAP_INSTANCE_ID, &uri_len);
+
+    if (uri_len == 0 || !p_server_uri) {
+        LWM2M_ERR("No Bootstrap URI found");
+        m_app_state = LWM2M_STATE_DISCONNECTED;
+        lwm2m_retry_delay_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
+
+        app_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, 0);
+        return;
+    }
+
     err_code = app_lwm2m_parse_uri_and_save_remote(LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
                                                    p_server_uri,
                                                    uri_len,
@@ -2317,10 +2323,6 @@ static void app_check_server_update(void)
                     m_server_instance = i;
                     m_connection_update[i].requested = LWM2M_REQUEST_NONE;
 
-#if APP_USE_CONTABO
-                    // On contabo we don't use client hold off timer
-                    lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT);
-#else
                     int32_t client_hold_off_time = lwm2m_server_client_hold_off_timer_get(i);
                     if (m_use_client_holdoff_timer && client_hold_off_time > 0) {
                         if (lwm2m_state_set(LWM2M_STATE_CLIENT_HOLD_OFF)) {
@@ -2331,7 +2333,6 @@ static void app_check_server_update(void)
                         // No client hold off timer
                         lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT);
                     }
-#endif
                 }
             } else if (lwm2m_server_registered_get(i)) {
                 if (m_connection_update[i].requested == LWM2M_REQUEST_DEREGISTER) {
@@ -2474,40 +2475,7 @@ static uint32_t app_coap_init(void)
 {
     uint32_t err_code;
 
-#if APP_USE_CONTABO
-    struct nrf_sockaddr_in6 local_addr;
-    struct nrf_sockaddr_in6 non_sec_local_addr;
-    app_init_sockaddr_in((struct nrf_sockaddr *)&local_addr, NRF_AF_INET, COAP_LOCAL_LISTENER_PORT);
-    app_init_sockaddr_in((struct nrf_sockaddr *)&non_sec_local_addr, m_family_type[1], LWM2M_LOCAL_LISTENER_PORT);
-#endif
-
-    // If bootstrap server and server is using different port we can
-    // register the ports individually.
-    coap_local_t local_port_list[] =
-    {
-#if APP_USE_CONTABO
-        {
-            .addr = (struct nrf_sockaddr *)&local_addr
-        },
-        {
-            .addr = (struct nrf_sockaddr *)&non_sec_local_addr,
-            .protocol = NRF_IPPROTO_UDP,
-            .setting = NULL,
-        }
-#endif
-    };
-
-    // Verify that the port count defined in sdk_config.h is matching the one configured for coap_init.
-    BUILD_ASSERT_MSG(ARRAY_SIZE(local_port_list) == COAP_PORT_COUNT,
-                     "Invalid COAP_PORT_COUNT setting");
-
-    coap_transport_init_t port_list = {
-#if APP_USE_CONTABO
-        .port_table = &local_port_list[0]
-#endif
-    };
-
-    err_code = coap_init(lwm2m_os_rand_get(), &port_list,
+    err_code = coap_init(lwm2m_os_rand_get(), NULL,
                          lwm2m_os_malloc, lwm2m_os_free);
 
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
@@ -2676,9 +2644,6 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     int err;
     enum lwm2m_firmware_update_state mdfu;
 
-#if APP_USE_CONTABO
-    // No support for setting custom bootstrap_uri.
-#else
     if ((config != NULL) && (config->bootstrap_uri != NULL)) {
         m_app_config.bootstrap_uri = config->bootstrap_uri;
     }
@@ -2687,7 +2652,6 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
         m_app_config.psk        = config->psk;
         m_app_config.psk_length = config->psk_length;
     }
-#endif
 
     // Initialize OS abstraction layer.
     // This will initialize the NVS subsystem as well.
