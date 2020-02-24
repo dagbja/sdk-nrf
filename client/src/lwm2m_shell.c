@@ -19,6 +19,7 @@
 #include <lwm2m_device.h>
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_conn_ext.h>
+#include <lwm2m_portfolio.h>
 #include <lwm2m_apn_conn_prof.h>
 #include <lwm2m_retry_delay.h>
 #include <lwm2m_instance_storage.h>
@@ -1634,6 +1635,121 @@ static int cmd_attribute_print(const struct shell *shell, size_t argc, char **ar
 }
 
 
+static int cmd_portfolio_print(const struct shell *shell, size_t argc, char **argv)
+{
+    lwm2m_list_t *p_list;
+
+    for (int i = 0; i < LWM2M_PORTFOLIO_MAX_INSTANCES; i++)
+    {
+        lwm2m_portfolio_t *p_instance = lwm2m_portfolio_get_instance(i);
+        if (!p_instance)
+        {
+            continue;
+        }
+
+        p_list = &p_instance->identity;
+
+        shell_print(shell, "Portfolio Instance /16/%d", i);
+        shell_print(shell, "  Host Device ID                %s", lwm2m_string_get(lwm2m_list_string_get(p_list, 0)));
+        shell_print(shell, "  Host Device Manufacturer      %s", lwm2m_string_get(lwm2m_list_string_get(p_list, 1)));
+        shell_print(shell, "  Host Device Model             %s", lwm2m_string_get(lwm2m_list_string_get(p_list, 2)));
+        shell_print(shell, "  Host Device Software Version  %s", lwm2m_string_get(lwm2m_list_string_get(p_list, 3)));
+    }
+
+    return 0;
+}
+
+
+static int cmd_portfolio_read(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 3)
+    {
+        shell_print(shell, "%s <object instance> <resource instance>", argv[0]);
+        return 0;
+    }
+
+    int ret;
+    uint16_t instance_id;
+    uint16_t identity_type;
+    char buffer[200];
+    uint16_t len = sizeof(buffer);
+
+    instance_id = (uint16_t)atoi(argv[1]);
+    identity_type = (uint16_t)atoi(argv[2]);
+
+    ret = lwm2m_carrier_identity_read(instance_id, identity_type, buffer, &len);
+
+    switch (ret)
+    {
+    case 0:
+        shell_print(shell, "%s", buffer);
+        break;
+    case -ENOMEM:
+        shell_print(shell, "Insufficient memory");
+        break;
+    case -ENOENT:
+        shell_print(shell, "Object instance %d does not exist", instance_id);
+        break;
+    case -EINVAL:
+        shell_print(shell, "Invalid Identity type %d", identity_type);
+        break;
+    default:
+        shell_print(shell, "Unknown error %d", ret);
+        break;
+    }
+
+    return 0;
+}
+
+
+static int cmd_portfolio_write(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 4)
+    {
+        shell_print(shell, "%s <object instance> <resource instance> <value>", argv[0]);
+        return 0;
+    }
+
+    int ret;
+    uint16_t instance_id;
+    uint16_t identity_type;
+    const char *val;
+
+    instance_id = (int)atoi(argv[1]);
+    identity_type = (int)atoi(argv[2]);
+    val = argv[3];
+
+    ret = lwm2m_carrier_identity_write(instance_id, identity_type, val);
+
+    switch (ret)
+    {
+    case 0:
+        shell_print(shell, "Wrote /16/%d/0/%d", instance_id, identity_type);
+        break;
+    case -ENOENT:
+        shell_print(shell, "Object instance %d does not exist", instance_id);
+        break;
+    case -ENOMEM:
+        shell_print(shell, "Insufficient memory");
+        break;
+    case -EINVAL:
+        shell_print(shell, "String is NULL or empty, or invalid Identity type %d", identity_type);
+        break;
+    case -E2BIG:
+        shell_print(shell, "String is too long");
+        break;
+    case -EPERM:
+        shell_print(shell, "Cannot write to instance %d", instance_id);
+        break;
+    default:
+        shell_print(shell, "Unknown error %d", ret);
+        break;
+    }
+
+    return 0;
+}
+
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_security,
     SHELL_CMD(print, NULL, "Print security objects", cmd_security_print),
     SHELL_CMD(uri, NULL, "Set URI", cmd_security_uri),
@@ -1645,6 +1761,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_server,
     SHELL_CMD(print, NULL, "Print server objects", cmd_server_print),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );
+
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_apn,
     SHELL_CMD(activate, NULL, "Activate APN", cmd_apn_activate),
@@ -1660,6 +1777,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_attribute,
     SHELL_CMD(print, NULL, "Print notification attributes", cmd_attribute_print),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );
+
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(carrier, NULL, "Set debug carrier", cmd_debug_operator_id),
@@ -1714,6 +1832,14 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_device,
 );
 
 
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_portfolio,
+    SHELL_CMD(print, NULL, "Print portfolio object instances", cmd_portfolio_print),
+    SHELL_CMD(read, NULL, "Read the Identity resource of a Portfolio object instance", cmd_portfolio_read),
+    SHELL_CMD(write, NULL, "Write into an instance of the Identity resource", cmd_portfolio_write),
+    SHELL_SUBCMD_SET_END
+);
+
+
 SHELL_CMD_REGISTER(apn, &sub_apn, "APN Table", NULL);
 SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
 SHELL_CMD_REGISTER(attribute, &sub_attribute, "Notification attributes operations", NULL);
@@ -1722,6 +1848,7 @@ SHELL_CMD_REGISTER(device, &sub_device, "Update or retrieve device information",
 SHELL_CMD_REGISTER(flash, &sub_flash, "Flash operations", NULL);
 SHELL_CMD_REGISTER(lwm2m, &sub_lwm2m, "LwM2M operations", NULL);
 SHELL_CMD_REGISTER(nslookup, NULL, "Query Internet name servers", cmd_nslookup);
+SHELL_CMD_REGISTER(portfolio, &sub_portfolio, "Portfolio object operations", NULL);
 SHELL_CMD_REGISTER(reboot, NULL, "Reboot", cmd_reboot);
 SHELL_CMD_REGISTER(security, &sub_security, "Security information", NULL);
 SHELL_CMD_REGISTER(server, &sub_server, "Server information", NULL);

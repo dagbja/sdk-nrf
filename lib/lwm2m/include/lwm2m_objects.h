@@ -219,6 +219,8 @@ extern "C" {
 #define LWM2M_PORTFOLIO_HOST_DEVICE_SW_VERSION   3
 #define LWM2M_PORTFOLIO_IDENTITY_INSTANCES       4
 
+#define LWM2M_PORTFOLIO_MAX_INSTANCES            3
+
 /* AT&T Connectivity extension */
 #define LWM2M_CONN_EXT_ICCID                     1
 #define LWM2M_CONN_EXT_IMSI                      2
