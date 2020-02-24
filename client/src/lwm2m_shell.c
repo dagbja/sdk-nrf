@@ -40,26 +40,15 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
 }
 
 
-static int cmd_config_clear(const struct shell *shell, size_t argc, char **argv)
-{
-    lwm2m_bootstrap_clear();
-    shell_print(shell, "Cleared bootstrapped");
-
-    return 0;
-}
-
-
-static int cmd_config_print(const struct shell *shell, size_t argc, char **argv)
+static int cmd_security_print(const struct shell *shell, size_t argc, char **argv)
 {
     uint8_t uri_len = 0;
     // Buffer for the URI with null terminator
     char terminated_uri[128];
 
     for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++) {
-        if (lwm2m_security_is_bootstrap_server_get(i) ||
-            lwm2m_server_short_server_id_get(i))
-        {
-            lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(i);
+        if (lwm2m_security_short_server_id_get(i) != 0) {
+            lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_security_get_instance(i);
             char * server_uri = lwm2m_security_server_uri_get(i, &uri_len);
             if (uri_len > 127) {
                 uri_len = 127;
@@ -67,10 +56,17 @@ static int cmd_config_print(const struct shell *shell, size_t argc, char **argv)
             memcpy(terminated_uri, server_uri, uri_len);
             terminated_uri[uri_len] = '\0';
 
-            shell_print(shell, "Instance %d", i);
-            shell_print(shell, "  Short Server ID  %d", lwm2m_server_short_server_id_get(i));
+            shell_print(shell, "Security Instance /0/%d", i);
+            shell_print(shell, "  Short Server ID  %d", lwm2m_security_short_server_id_get(i));
             shell_print(shell, "  Server URI       %s", terminated_uri);
-            shell_print(shell, "  Lifetime         %ld", lwm2m_server_lifetime_get(i));
+            shell_print(shell, "  Bootstrap Server %s", lwm2m_security_is_bootstrap_server_get(i) ? "Yes" : "No");
+            shell_print(shell, "  Client Holdoff   %ld", lwm2m_server_client_hold_off_timer_get(i));
+
+            if (operator_is_vzw(true)) {
+                shell_print(shell, "  Holdoff          %ld", lwm2m_security_hold_off_timer_get(i));
+                shell_print(shell, "  Is Bootstrapped  %s", lwm2m_security_bootstrapped_get(i) ? "Yes" : "No");
+            }
+
             shell_print(shell, "  Owner            %d", p_instance->acl.owner);
         }
     }
@@ -79,7 +75,7 @@ static int cmd_config_print(const struct shell *shell, size_t argc, char **argv)
 }
 
 
-static int cmd_config_uri(const struct shell *shell, size_t argc, char **argv)
+static int cmd_security_uri(const struct shell *shell, size_t argc, char **argv)
 {
     if (argc != 3) {
         shell_print(shell, "%s <instance> <URI>", argv[0]);
@@ -105,7 +101,44 @@ static int cmd_config_uri(const struct shell *shell, size_t argc, char **argv)
 }
 
 
-static int cmd_config_lifetime(const struct shell *shell, size_t argc, char **argv)
+static int cmd_server_print(const struct shell *shell, size_t argc, char **argv)
+{
+    uint8_t binding_len = 0;
+    char binding[4];
+
+    for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++) {
+        if (lwm2m_server_short_server_id_get(i) != 0) {
+            lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(i);
+            char * p_binding = lwm2m_server_binding_get(i, &binding_len);
+            if (binding_len > sizeof(binding) - 1) {
+                binding_len = sizeof(binding) - 1;
+            }
+            memcpy(binding, p_binding, binding_len);
+            binding[binding_len] = '\0';
+
+            shell_print(shell, "Server Instance /1/%d", i);
+            shell_print(shell, "  Short Server ID  %d", lwm2m_server_short_server_id_get(i));
+            shell_print(shell, "  Lifetime         %ld", lwm2m_server_lifetime_get(i));
+            shell_print(shell, "  Min Period       %ld", lwm2m_server_min_period_get(i));
+            shell_print(shell, "  Max Period       %ld", lwm2m_server_max_period_get(i));
+            shell_print(shell, "  Disable Timeout  %ld", lwm2m_server_disable_timeout_get(i));
+            shell_print(shell, "  Notif Storing    %s", lwm2m_server_notif_storing_get(i) ? "Yes" : "No");
+            shell_print(shell, "  Binding          %s", binding);
+
+            if (operator_is_vzw(true)) {
+                shell_print(shell, "  Is Registered    %s", lwm2m_server_registered_get(i) ? "Yes" : "No");
+                shell_print(shell, "  Client Holdoff   %ld", lwm2m_server_client_hold_off_timer_get(i));
+            }
+
+            shell_print(shell, "  Owner            %d", p_instance->acl.owner);
+        }
+    }
+
+    return 0;
+}
+
+
+static int cmd_server_lifetime(const struct shell *shell, size_t argc, char **argv)
 {
     if (argc != 3) {
         shell_print(shell, "%s <instance> <seconds>", argv[0]);
@@ -586,15 +619,6 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
 }
 
 
-static int cmd_factory_reset(const struct shell *shell, size_t argc, char **argv)
-{
-    lwm2m_factory_reset();
-    lwm2m_request_reset();
-
-    return 0;
-}
-
-
 static int cmd_reboot(const struct shell *shell, size_t argc, char **argv)
 {
     lwm2m_system_reset(true);
@@ -1018,12 +1042,14 @@ static int cmd_device_print(const struct shell *shell, size_t argc, char **argv)
     char buf[128];
     int offset = 0;
 
+    shell_print(shell, "Device Instance /3/0");
+
     for (int i = 0; i < device_obj_instance->avail_power_sources.len; i++)
     {
         offset += snprintf(&buf[offset], sizeof(buf) - offset, " %d       ",
                            device_obj_instance->avail_power_sources.val.p_uint8[i]);
     }
-    shell_print(shell, "Power sources    %s", buf);
+    shell_print(shell, "  Power sources    %s", buf);
 
     offset = 0;
     for (int i = 0; i < device_obj_instance->power_source_voltage.len; i++)
@@ -1031,7 +1057,7 @@ static int cmd_device_print(const struct shell *shell, size_t argc, char **argv)
         offset += snprintf(&buf[offset], sizeof(buf) - offset, "%4d mV  ",
                            device_obj_instance->power_source_voltage.val.p_int32[i]);
     }
-    shell_print(shell, "  Voltage         %s", buf);
+    shell_print(shell, "    Voltage         %s", buf);
 
     offset = 0;
     for (int i = 0; i < device_obj_instance->power_source_current.len; i++)
@@ -1039,19 +1065,19 @@ static int cmd_device_print(const struct shell *shell, size_t argc, char **argv)
         offset += snprintf(&buf[offset], sizeof(buf) - offset, "%4d mA  ",
                            device_obj_instance->power_source_current.val.p_int32[i]);
     }
-    shell_print(shell, "  Current         %s", buf);
+    shell_print(shell, "    Current         %s", buf);
 
-    shell_print(shell, "Battery level     %d%%", device_obj_instance->battery_level);
-    shell_print(shell, "Battery status    %d", device_obj_instance->battery_status);
-    shell_print(shell, "Manufacturer      %s", lwm2m_string_get(&device_obj_instance->manufacturer));
-    shell_print(shell, "Model number      %s", lwm2m_string_get(&device_obj_instance->model_number));
-    shell_print(shell, "Serial number     %s", lwm2m_string_get(&device_obj_instance->serial_number));
-    shell_print(shell, "Firmware version  %s", lwm2m_string_get(&device_obj_instance->firmware_version));
-    shell_print(shell, "Device type       %s", lwm2m_string_get(&device_obj_instance->device_type));
-    shell_print(shell, "Hardware version  %s", lwm2m_string_get(&device_obj_instance->hardware_version));
-    shell_print(shell, "Software version  %s", lwm2m_string_get(&device_obj_instance->software_version));
-    shell_print(shell, "Total memory      %d kB", device_obj_instance->memory_total);
-    shell_print(shell, "Memory free       %d kB", lwm2m_device_memory_free_read());
+    shell_print(shell, "  Battery level     %d%%", device_obj_instance->battery_level);
+    shell_print(shell, "  Battery status    %d", device_obj_instance->battery_status);
+    shell_print(shell, "  Manufacturer      %s", lwm2m_string_get(&device_obj_instance->manufacturer));
+    shell_print(shell, "  Model number      %s", lwm2m_string_get(&device_obj_instance->model_number));
+    shell_print(shell, "  Serial number     %s", lwm2m_string_get(&device_obj_instance->serial_number));
+    shell_print(shell, "  Firmware version  %s", lwm2m_string_get(&device_obj_instance->firmware_version));
+    shell_print(shell, "  Device type       %s", lwm2m_string_get(&device_obj_instance->device_type));
+    shell_print(shell, "  Hardware version  %s", lwm2m_string_get(&device_obj_instance->hardware_version));
+    shell_print(shell, "  Software version  %s", lwm2m_string_get(&device_obj_instance->software_version));
+    shell_print(shell, "  Total memory      %d kB", device_obj_instance->memory_total);
+    shell_print(shell, "  Memory free       %d kB", lwm2m_device_memory_free_read());
 
     offset = 0;
     for (int i = 0; i < device_obj_instance->error_code.len; i++)
@@ -1059,10 +1085,29 @@ static int cmd_device_print(const struct shell *shell, size_t argc, char **argv)
         offset += snprintf(&buf[offset], sizeof(buf) - offset, "%d ",
                            device_obj_instance->error_code.val.p_int32[i]);
     }
-    shell_print(shell, "Error codes       %s", buf);
+    shell_print(shell, "  Error codes       %s", buf);
 
     return 0;
 }
+
+
+static int cmd_device_bootstrap_clear(const struct shell *shell, size_t argc, char **argv)
+{
+    lwm2m_bootstrap_clear();
+    shell_print(shell, "Cleared bootstrapped");
+
+    return 0;
+}
+
+
+static int cmd_device_factory_reset(const struct shell *shell, size_t argc, char **argv)
+{
+    lwm2m_factory_reset();
+    lwm2m_request_reset();
+
+    return 0;
+}
+
 
 static int cmd_apn_set(const struct shell *shell, size_t argc, char **argv)
 {
@@ -1117,12 +1162,15 @@ static int cmd_apn_get(const struct shell *shell, size_t argc, char **argv)
     return 0;
 }
 
-SHELL_STATIC_SUBCMD_SET_CREATE(sub_config,
-    SHELL_CMD(print, NULL, "Print configuration", cmd_config_print),
-    SHELL_CMD(clear, NULL, "Clear bootstrapped values", cmd_config_clear),
-    SHELL_CMD(uri, NULL, "Set URI", cmd_config_uri),
-    SHELL_CMD(lifetime, NULL, "Set lifetime", cmd_config_lifetime),
-    SHELL_CMD(factory_reset, NULL, "Factory reset", cmd_factory_reset),
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_security,
+    SHELL_CMD(print, NULL, "Print security objects", cmd_security_print),
+    SHELL_CMD(uri, NULL, "Set URI", cmd_security_uri),
+    SHELL_SUBCMD_SET_END /* Array terminated. */
+);
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_server,
+    SHELL_CMD(lifetime, NULL, "Set lifetime", cmd_server_lifetime),
+    SHELL_CMD(print, NULL, "Print server objects", cmd_server_print),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );
 
@@ -1133,27 +1181,27 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_apn,
 );
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
+    SHELL_CMD(carrier, NULL, "Set debug carrier", cmd_debug_operator_id),
+    SHELL_CMD(carrier_check, NULL, "Set carrier check", cmd_debug_carrier_check),
+    SHELL_CMD(con_interval, NULL, "Set CoAP CON timer", cmd_debug_con_interval),
+    SHELL_CMD(fallback, NULL, "Set IP Fallback", cmd_debug_fallback_disabled),
+    SHELL_CMD(ipv6_enable, NULL, "Set IPv6 enabled", cmd_debug_ipv6_enabled),
+    SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
+    SHELL_CMD(net_reg_stat, NULL, "Set network registration status", cmd_debug_set_net_reg_stat),
     SHELL_CMD(print, NULL, "Print configuration", cmd_debug_print),
     SHELL_CMD(reset, NULL, "Reset configuration", cmd_debug_reset),
-    SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
     SHELL_CMD(roam_as_home, NULL, "Set Roam as Home", cmd_debug_roam_as_home),
-    SHELL_CMD(carrier_check, NULL, "Set carrier check", cmd_debug_carrier_check),
-    SHELL_CMD(carrier, NULL, "Set debug carrier", cmd_debug_operator_id),
-    SHELL_CMD(ipv6_enable, NULL, "Set IPv6 enabled", cmd_debug_ipv6_enabled),
-    SHELL_CMD(fallback, NULL, "Set IP Fallback", cmd_debug_fallback_disabled),
-    SHELL_CMD(con_interval, NULL, "Set CoAP CON timer", cmd_debug_con_interval),
-    SHELL_CMD(net_reg_stat, NULL, "Set network registration status", cmd_debug_set_net_reg_stat),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );
 
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_lwm2m,
-    SHELL_CMD(status, NULL, "Application status", cmd_lwm2m_status),
     SHELL_CMD(bootstrap, NULL, "Bootstrap", cmd_lwm2m_bootstrap),
-    SHELL_CMD(register, NULL, "Register server", cmd_lwm2m_register),
-    SHELL_CMD(update, NULL, "Update server", cmd_lwm2m_update),
     SHELL_CMD(deregister, NULL, "Deregister server", cmd_lwm2m_deregister),
     SHELL_CMD(disconnect, NULL, "Disconnect server", cmd_lwm2m_disconnect),
+    SHELL_CMD(register, NULL, "Register server", cmd_lwm2m_register),
+    SHELL_CMD(status, NULL, "Connection status", cmd_lwm2m_status),
+    SHELL_CMD(update, NULL, "Update server", cmd_lwm2m_update),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );
 
@@ -1161,10 +1209,12 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_lwm2m,
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_device,
     SHELL_CMD(battery_level, NULL, "Set battery level", cmd_device_battery_level_set),
     SHELL_CMD(battery_status, NULL, "Set battery status", cmd_device_battery_status_set),
+    SHELL_CMD(clear, NULL, "Clear bootstrapped values", cmd_device_bootstrap_clear),
     SHELL_CMD(current, NULL, "Set current measurement on a power source", cmd_device_current_set),
     SHELL_CMD(device_type, NULL, "Set device type", cmd_device_type_set),
     SHELL_CMD(error_code_add, NULL, "Add individual error code", cmd_device_error_code_add),
     SHELL_CMD(error_code_remove, NULL, "Remove individual error code", cmd_device_error_code_remove),
+    SHELL_CMD(factory_reset, NULL, "Factory reset", cmd_device_factory_reset),
     SHELL_CMD(hardware_version, NULL, "Set hardware version", cmd_device_hardware_version_set),
     SHELL_CMD(memory_free, NULL, "Set available amount of storage space", cmd_device_memory_free_write),
     SHELL_CMD(memory_total, NULL, "Set total amount of storage space", cmd_device_memory_total_set),
@@ -1178,11 +1228,12 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_device,
 
 SHELL_CMD_REGISTER(apn, &sub_apn, "APN Table", NULL);
 SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
-SHELL_CMD_REGISTER(config, &sub_config, "Instance configuration", NULL);
 SHELL_CMD_REGISTER(debug, &sub_debug, "Debug configuration", NULL);
 SHELL_CMD_REGISTER(device, &sub_device, "Update or retrieve device information", NULL);
 SHELL_CMD_REGISTER(lwm2m, &sub_lwm2m, "LwM2M operations", NULL);
 SHELL_CMD_REGISTER(reboot, NULL, "Reboot", cmd_reboot);
+SHELL_CMD_REGISTER(security, &sub_security, "Security information", NULL);
+SHELL_CMD_REGISTER(server, &sub_server, "Server information", NULL);
 SHELL_CMD_REGISTER(shutdown, NULL, "Shutdown", cmd_shutdown);
 
 
