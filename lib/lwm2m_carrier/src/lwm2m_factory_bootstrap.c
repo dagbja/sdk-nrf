@@ -31,7 +31,7 @@ static char m_bootstrap_psk_contabo[] = BOOTSTRAP_SEC_PSK_CONTABO;
 #define BOOTSTRAP_URI_VZW              "coaps://boot.lwm2m.vzwdm.com:5684"                   /**< Server URI to the bootstrap server when using security (DTLS). */
 #define DIAGNOSTICS_URI_VZW            "coaps://diag.lwm2m.vzwdm.com:5684"                   /**< Server URI to the diagnostics server when using security (DTLS). */
 
-#define BOOTSTRAP_URI_VZW_TEST         "coaps://xvzwcdpii.xdev.motive.com:5684"              /**< Server URI to the bootstrap server when using security (DTLS). */
+#define BOOTSTRAP_URI_VZW_TEST         "coaps://ddocdpboot.do.motive.com:5684"               /**< Server URI to the bootstrap server when using security (DTLS). */
 #define DIAGNOSTICS_URI_VZW_TEST       ""                                                    /**< Server URI to the diagnostics server when using security (DTLS). */
 
 #define BOOTSTRAP_URI_ATT              "coaps://InteropBootstrap.dm.iot.att.com:5694"        /**< Server URI to the bootstrap server when using security (DTLS). */
