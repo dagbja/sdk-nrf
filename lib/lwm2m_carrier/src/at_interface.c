@@ -1023,3 +1023,89 @@ int at_stop_connstat(void)
 {
     return lwm2m_os_at_cmd_write("AT%XCONNSTAT=0", NULL, 0);
 }
+
+int at_read_radio_signal_to_noise_ratio(int32_t * p_sinr)
+{
+    int retval = 0;
+    struct lwm2m_os_at_param_list xsnrsq_params;
+
+    if (p_sinr == NULL) {
+        return -EINVAL;
+    }
+
+    // Read network registration status
+    const char *at_xsnrsq = "AT%XSNRSQ?";
+
+    *p_sinr = 0;
+
+    retval = lwm2m_os_at_params_list_init(&xsnrsq_params, 2);
+    if (retval == 0)
+    {
+        if (at_send_command_and_parse_params(at_xsnrsq, &xsnrsq_params) == 0)
+        {
+            uint32_t sinr;
+            if (lwm2m_os_at_params_int_get(&xsnrsq_params, 1, &sinr) == 0)
+            {
+                if (sinr <= 50)
+                {
+                    /*
+                     * 3GPP TS 138.133: SS-SINR measurement report mapping
+                     *  Reported value   Measured quantity value   Unit
+                     *   SS-SINR_0            SS-SINR < -23         dB
+                     *   SS-SINR_1       -23 <= SS-SINR < -22.5     dB
+                     *   SS-SINR_2       -22.5 <= SS-SINR < -22     dB
+                     *   ...
+                     *   ...
+                     *   ...
+                     *   SS-SINR_125      39 <= SS-SINR < 39.5      dB
+                     *   SS-SINR_126      39.5 <= SS-SINR < 40      dB
+                     *   SS-SINR_127         40 <= SS-SINR          dB
+                     *
+                     *   Since lwm2m supports only integer value for SINR,
+                     *   we store the reported value without mapping it.
+                     */
+                    *p_sinr = (int32_t)sinr;
+                }
+                else
+                {
+                    retval = -EINVAL;
+                }
+            }
+            else
+            {
+                LWM2M_ERR("signal to noise ratio parse failed");
+                retval = -EINVAL;
+            }
+        }
+        else
+        {
+            LWM2M_ERR("reading xsnrsq failed");
+            retval = -EIO;
+        }
+
+        lwm2m_os_at_params_list_free(&xsnrsq_params);
+    }
+    else
+    {
+        LWM2M_ERR("xsnrsq_params init failed");
+        retval = EINVAL;
+    }
+
+    return retval;
+}
+
+int at_read_imsi(lwm2m_string_t *p_imsi)
+{
+    int retval = 0;
+
+    if (p_imsi == NULL) {
+        return -EINVAL;
+    }
+
+    // Read model number
+    const char *at_cimi = "AT+CIMI";
+
+    retval = at_response_param_to_lwm2m_string(at_cimi, p_imsi);
+
+    return retval;
+}

@@ -25,6 +25,9 @@
 static lwm2m_object_t                 m_object_conn_ext;        /**< AT&T Connectivity Extension base object. */
 static lwm2m_connectivity_extension_t m_instance_conn_ext;      /**< AT&T Connectivity Extension object instance. */
 
+// Forward declare
+static void lwm2m_conn_ext_update_resource(uint16_t resource_id);
+
 char * lwm2m_conn_ext_msisdn_get(uint8_t * p_len)
 {
     *p_len = m_instance_conn_ext.msisdn.len;
@@ -116,6 +119,7 @@ uint32_t conn_ext_instance_callback(lwm2m_instance_t * p_instance,
 
     if (op_code == LWM2M_OPERATION_CODE_READ)
     {
+        lwm2m_conn_ext_update_resource(resource_id);
 
         err_code = lwm2m_tlv_connectivity_extension_encode(buffer,
                                                            &buffer_size,
@@ -211,6 +215,7 @@ uint32_t lwm2m_conn_ext_object_callback(lwm2m_object_t * p_object,
         uint32_t buffer_len = 255;
         uint8_t  buffer[buffer_len];
 
+        lwm2m_conn_ext_update_resource(LWM2M_NAMED_OBJECT);
         err_code = lwm2m_tlv_connectivity_extension_encode(buffer + 3, &buffer_len,
                                                            LWM2M_NAMED_OBJECT,
                                                            &m_instance_conn_ext);
@@ -240,33 +245,97 @@ void lwm2m_conn_ext_init_acl(void)
     lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_conn_ext);
 }
 
+static int lwm2m_conn_ext_iccid_update(void)
+{
+    int ret;
+    char iccid[20];
+    uint32_t iccid_len = sizeof(iccid);
+
+    ret = at_read_sim_iccid(iccid, &iccid_len);
+
+    if (ret != 0)
+    {
+        LWM2M_WRN("Failed to read the SIM ICCID");
+        return ret;
+    }
+
+    return lwm2m_bytebuffer_to_string(iccid, iccid_len, &m_instance_conn_ext.iccid);
+}
+
+static int lwm2m_conn_ext_imsi_update(void)
+{
+    int ret;
+
+    ret = at_read_imsi(&m_instance_conn_ext.imsi);
+
+    if (ret != 0)
+    {
+        LWM2M_WRN("Failed to read the IMSI");
+    }
+
+    return ret;
+}
+
+static int lwm2m_conn_ext_sinr_update(void)
+{
+    int ret;
+
+    ret = at_read_radio_signal_to_noise_ratio(&m_instance_conn_ext.sinr);
+
+    if (ret != 0)
+    {
+        LWM2M_WRN("Failed to read the SINR");
+    }
+
+    return ret;
+}
+
+/* Fetch latest resource value */
+static void lwm2m_conn_ext_update_resource(uint16_t resource_id)
+{
+    switch (resource_id) {
+    case LWM2M_CONN_EXT_ICCID:
+        lwm2m_conn_ext_iccid_update();
+        break;
+    case LWM2M_CONN_EXT_IMSI:
+        lwm2m_conn_ext_imsi_update();
+        break;
+    case LWM2M_CONN_EXT_SINR:
+        lwm2m_conn_ext_sinr_update();
+        break;
+    case LWM2M_NAMED_OBJECT:
+        lwm2m_conn_ext_iccid_update();
+        lwm2m_conn_ext_imsi_update();
+        lwm2m_conn_ext_sinr_update();
+        break;
+    default:
+        break;
+    }
+}
+
 void lwm2m_conn_ext_init(void)
 {
-    //
-    // AT&T Connectivity Extension instance.
-    //
     lwm2m_instance_connectivity_extension_init(&m_instance_conn_ext);
 
     m_object_conn_ext.object_id = LWM2M_OBJ_CONN_EXT;
-
-    m_instance_conn_ext.iccid.p_val = NULL;
-    m_instance_conn_ext.iccid.len = 0;
-    m_instance_conn_ext.imsi.p_val = NULL;
-    m_instance_conn_ext.imsi.len = 0;
+    m_object_conn_ext.callback = lwm2m_conn_ext_object_callback;
+    m_instance_conn_ext.proto.callback = conn_ext_instance_callback;
 
     char last_used_msisdn[16];
     int32_t len = lwm2m_last_used_msisdn_get(last_used_msisdn, sizeof(last_used_msisdn));
     lwm2m_bytebuffer_to_string(last_used_msisdn, len, &m_instance_conn_ext.msisdn);
 
+    lwm2m_conn_ext_iccid_update();
+    lwm2m_conn_ext_imsi_update();
     m_instance_conn_ext.apn_retries.val.p_uint8[0] = DEFAULT_APN_RETRIES;
     m_instance_conn_ext.apn_retries.len = 1;
     m_instance_conn_ext.apn_retry_period.val.p_int32[0] = DEFAULT_APN_RETRY_PERIOD;
     m_instance_conn_ext.apn_retry_period.len = 1;
     m_instance_conn_ext.apn_retry_back_off_period.val.p_int32[0] = DEFAULT_APN_RETRY_BACK_OFF_PERIOD;
     m_instance_conn_ext.apn_retry_back_off_period.len = 1;
-
-    m_object_conn_ext.callback = lwm2m_conn_ext_object_callback;
-    m_instance_conn_ext.proto.callback = conn_ext_instance_callback;
+    lwm2m_conn_ext_sinr_update();
+    m_instance_conn_ext.srxlev = 0;
+    lwm2m_bytebuffer_to_string("Mode A", strlen("Mode A"), &m_instance_conn_ext.ce_mode);
 
     // Set bootstrap server as owner.
     (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_conn_ext,

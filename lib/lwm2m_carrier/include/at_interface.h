@@ -217,4 +217,22 @@ int at_read_connstat(lwm2m_connectivity_statistics_t * p_conn_stat);
 int at_start_connstat(void);
 int at_stop_connstat(void);
 
+/**
+ * @brief Read radio signal to noise ratio.
+ *
+ * @param[out] p_sinr Pointer to store signal to noise ratio.
+ *
+ * @return An error code if the read failed.
+ */
+int at_read_radio_signal_to_noise_ratio(int32_t * p_sinr);
+
+/**
+ * @brief Read IMSI.
+ *
+ * @param[out] p_sinr Pointer to store IMSI.
+ *
+ * @return An error code if the read failed.
+ */
+int at_read_imsi(lwm2m_string_t *p_imsi);
+
 #endif // AT_INTERFACE_H__
