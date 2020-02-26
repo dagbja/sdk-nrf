@@ -588,7 +588,7 @@ void lwm2m_firmware_init_acl(void)
     {
         // TODO: Remove when fixing ACL
         acl.access[0] = LWM2M_ACL_RWEDO_PERM;
-        acl.server[0] = 1;
+        acl.server[0] = 123;
     }
 
     lwm2m_set_instance_acl((lwm2m_instance_t *)&m_instance_firmware, LWM2M_PERMISSION_READ, &acl);

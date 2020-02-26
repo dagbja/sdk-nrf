@@ -131,6 +131,9 @@ static nrf_sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { NRF_AF_INET6, NRF_
 static struct nrf_sockaddr_in6 m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
 static volatile uint32_t tick_count = 0;
 
+/* Map table for Security instance and Server instance. */
+static uint16_t m_server_inst[1+LWM2M_MAX_SERVERS];
+
 static void app_server_disconnect(uint16_t instance_id);
 static int app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
 static int app_provision_secret_keys(void);
@@ -227,7 +230,7 @@ static bool lwm2m_is_registration_ready(void)
 static bool lwm2m_is_deregistration_done(void)
 {
     for (int i = 1; i < 1 + LWM2M_MAX_SERVERS; i++) {
-        if (lwm2m_server_registered_get(i)) {
+        if (lwm2m_server_registered_get(m_server_inst[i])) {
             // Still having registered servers
             return false;
         }
@@ -253,7 +256,7 @@ static uint16_t lwm2m_instance_id_from_remote(struct nrf_sockaddr *p_remote, uin
     {
         // Find the server instance for the short server ID.
         for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-            if (lwm2m_server_short_server_id_get(i) == *short_server_id) {
+            if (lwm2m_security_short_server_id_get(i) == *short_server_id) {
                 instance_id = i;
                 break;
             }
@@ -330,7 +333,7 @@ void lwm2m_request_server_update(uint16_t instance_id, bool reconnect)
 void lwm2m_request_deregister(void)
 {
     for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
-        if (lwm2m_server_registered_get(i) && m_lwm2m_transport[i] != -1) {
+        if (lwm2m_server_registered_get(m_server_inst[i]) && m_lwm2m_transport[i] != -1) {
             m_connection_update[i].requested = LWM2M_REQUEST_DEREGISTER;
         }
     }
@@ -773,6 +776,33 @@ static int app_generate_client_id(void)
     return ret;
 }
 
+/**@brief Delete all Security and Server instances.
+ *
+ * @param[in]  delete_bootstrap  Set if deleting bootstrap instances.
+ */
+static void delete_security_and_server_instances(bool delete_bootstrap)
+{
+    uint16_t bootstrap_ssid = lwm2m_security_short_server_id_get(LWM2M_BOOTSTRAP_INSTANCE_ID);
+
+    // Delete all instances except Bootstrap server
+    for (uint32_t i = 0; i < 1 + LWM2M_MAX_SERVERS; i++)
+    {
+        if (delete_bootstrap ||
+            (i != LWM2M_BOOTSTRAP_INSTANCE_ID))
+        {
+            lwm2m_instance_storage_security_delete(i);
+            (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_security_get_instance(i));
+        }
+
+        if (delete_bootstrap ||
+            (lwm2m_server_short_server_id_get(i) != bootstrap_ssid))
+        {
+            lwm2m_instance_storage_server_delete(i);
+            (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_server_get_instance(i));
+        }
+    }
+}
+
 /**@brief Application implementation of the root handler interface.
  *
  * @details This function is not bound to any object or instance. It will be called from
@@ -781,12 +811,7 @@ static int app_generate_client_id(void)
  */
 uint32_t lwm2m_coap_handler_root(uint8_t op_code, coap_message_t * p_request)
 {
-    // Delete all instances except Bootstrap server
-    for (uint32_t i = 1; i < 1 + LWM2M_MAX_SERVERS; i++)
-    {
-        (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_security_get_instance(i));
-        (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_server_get_instance(i));
-    }
+    delete_security_and_server_instances(false);
 
     (void)lwm2m_respond_with_code(COAP_CODE_202_DELETED, p_request);
 
@@ -1212,7 +1237,7 @@ static void app_set_bootstrap_if_last_retry_delay(int instance_id)
 
 static void app_restart_lifetime_timer(uint8_t instance_id)
 {
-    lwm2m_time_t lifetime = lwm2m_server_lifetime_get(instance_id);
+    lwm2m_time_t lifetime = lwm2m_server_lifetime_get(m_server_inst[instance_id]);
 
     if (lifetime > SECONDS_TO_UPDATE_EARLY) {
         // Set timeout before lifetime expires to ensure we Update within the timeout
@@ -1296,7 +1321,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         {
             LWM2M_INF("Registered (server %u)", instance_id);
             lwm2m_retry_delay_reset(instance_id);
-            lwm2m_server_registered_set(instance_id, true);
+            lwm2m_server_registered_set(m_server_inst[instance_id], true);
 
             // Reset connection update in case this has been requested while connecting
             m_connection_update[instance_id].requested = LWM2M_REQUEST_NONE;
@@ -1304,7 +1329,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             lwm2m_state_set(LWM2M_STATE_IDLE);
 
             // Refresh stored server object, to also include is_connected status and registration ID.
-            lwm2m_instance_storage_server_store(instance_id);
+            lwm2m_instance_storage_server_store(m_server_inst[instance_id]);
 
             lwm2m_notif_attr_storage_restore(short_server_id);
 
@@ -1354,8 +1379,8 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         {
             // If not found, ignore.
             (void)lwm2m_remote_location_delete(short_server_id);
-            lwm2m_server_registered_set(instance_id, false);
-            lwm2m_instance_storage_server_store(instance_id);
+            lwm2m_server_registered_set(m_server_inst[instance_id], false);
+            lwm2m_instance_storage_server_store(m_server_inst[instance_id]);
 
             // Reset state to get back to registration.
             lwm2m_state_set(LWM2M_STATE_SERVER_CONNECTED);
@@ -1400,10 +1425,10 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
     else if (type == LWM2M_NOTIFCATION_TYPE_DEREGISTER)
     {
         // We have successfully deregistered.
-        lwm2m_server_registered_set(instance_id, false);
+        lwm2m_server_registered_set(m_server_inst[instance_id], false);
 
         // Store server object to know that its not registered, and location should be cleared.
-        lwm2m_instance_storage_server_store(instance_id);
+        lwm2m_instance_storage_server_store(m_server_inst[instance_id]);
 
         if (m_app_state == LWM2M_STATE_SERVER_DEREGISTERING)
         {
@@ -1416,7 +1441,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         }
         else
         {
-            int32_t delay = (int32_t) lwm2m_server_disable_timeout_get(instance_id);
+            int32_t delay = (int32_t) lwm2m_server_disable_timeout_get(m_server_inst[instance_id]);
             LWM2M_INF("Disable [%ld seconds] (server %d)", delay, instance_id);
             app_server_disconnect(instance_id);
 
@@ -1531,6 +1556,32 @@ static void app_misc_data_set_bootstrapped(bool bootstrapped)
     lwm2m_instance_storage_misc_data_store(&misc_data);
 }
 
+static void app_update_server_instance_map(void)
+{
+    uint16_t short_server_id;
+
+    for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+        short_server_id = lwm2m_security_short_server_id_get(i);
+        m_server_inst[i] = UINT16_MAX; // Initialize to UINT16_MAX to detect illegal m_server_inst[] use.
+
+        if (short_server_id == 0) {
+            continue;
+        }
+
+        for (int j = 0; j < 1+LWM2M_MAX_SERVERS; j++) {
+            if (short_server_id == lwm2m_server_short_server_id_get(j)) {
+                lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(j);
+                LWM2M_INF("  </0/%u>,</1/%u>,</2/%u>;ssid=%u", i, j, p_instance->acl.id, short_server_id);
+                m_server_inst[i] = j;
+            }
+        }
+
+        if (m_server_inst[i] == UINT16_MAX) {
+            LWM2M_INF("  </0/%u>;ssid=%u", i, short_server_id);
+        }
+    }
+}
+
 /**@brief Callback function for the named bootstrap complete object. */
 uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
                                    uint16_t         instance_id,
@@ -1569,6 +1620,8 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
         }
     }
 
+    app_update_server_instance_map();
+
     (void)app_event_notify(LWM2M_CARRIER_EVENT_BOOTSTRAPPED, NULL);
 
     return 0;
@@ -1594,14 +1647,8 @@ void lwm2m_bootstrap_reset(void)
     }
 
     app_misc_data_set_bootstrapped(false);
-
-    // Delete existing servers and init factory defaults
-    for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
-        lwm2m_instance_storage_security_delete(i);
-        lwm2m_instance_storage_server_delete(i);
-
-        lwm2m_factory_bootstrap_init(i);
-    }
+    delete_security_and_server_instances(false);
+    lwm2m_factory_bootstrap_init();
 
     lwm2m_device_init_acl();
     lwm2m_conn_mon_init_acl();
@@ -1633,11 +1680,8 @@ void lwm2m_factory_reset(void)
     // Delete the notification attributes from the storage
     lwm2m_notif_attr_storage_delete_all();
 
-    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
-    {
-        lwm2m_instance_storage_security_delete(i);
-        lwm2m_instance_storage_server_delete(i);
-    }
+    // Delete all Security and Server instances
+    delete_security_and_server_instances(true);
 }
 
 /**@brief Initialize server ACLs in a specific order. */
@@ -1664,6 +1708,7 @@ static void app_server_acl_init(void)
 
 static void app_load_flash_objects(void)
 {
+    LWM2M_INF("Load bootstrap settings");
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
         lwm2m_instance_storage_security_load(i);
@@ -1679,6 +1724,8 @@ static void app_load_flash_objects(void)
             lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_server_get_instance(i));
         }
     }
+
+    app_update_server_instance_map();
 
     lwm2m_instance_storage_misc_data_t misc_data;
     int32_t result = lwm2m_instance_storage_misc_data_load(&misc_data);
@@ -1967,7 +2014,7 @@ static void app_server_connect(uint16_t instance_id)
 
     // Initialize server configuration structure.
     memset(&m_server_conf[instance_id], 0, sizeof(lwm2m_server_config_t));
-    m_server_conf[instance_id].lifetime = lwm2m_server_lifetime_get(instance_id);
+    m_server_conf[instance_id].lifetime = lwm2m_server_lifetime_get(m_server_inst[instance_id]);
 
     if (operator_is_supported(false))
     {
@@ -1981,7 +2028,7 @@ static void app_server_connect(uint16_t instance_id)
     }
 
     // Set the short server id of the server in the config.
-    m_server_conf[instance_id].short_server_id = lwm2m_server_short_server_id_get(instance_id);
+    m_server_conf[instance_id].short_server_id = lwm2m_security_short_server_id_get(instance_id);
 
     // Deregister the short_server_id in case it has been registered with a different address
     (void) lwm2m_remote_deregister(m_server_conf[instance_id].short_server_id);
@@ -2104,7 +2151,7 @@ static void app_server_register(uint16_t instance_id)
     uint32_t link_format_string_len = 0;
     uint8_t * p_link_format_string = NULL;
 
-    uint16_t short_server_id = lwm2m_server_short_server_id_get(instance_id);
+    uint16_t short_server_id = lwm2m_security_short_server_id_get(instance_id);
 
     // Dry run the link format generation, to check how much memory that is needed.
     err_code = lwm2m_coap_handler_gen_link_format(LWM2M_INVALID_INSTANCE, short_server_id, NULL, (uint16_t *)&link_format_string_len);
@@ -2162,7 +2209,7 @@ void app_server_update(uint16_t instance_id, bool connect_update)
     {
         uint32_t err_code;
 
-        m_server_conf[instance_id].lifetime = lwm2m_server_lifetime_get(instance_id);
+        m_server_conf[instance_id].lifetime = lwm2m_server_lifetime_get(m_server_inst[instance_id]);
 
         err_code = lwm2m_update((struct nrf_sockaddr *)&m_remote_server[instance_id],
                                 &m_server_conf[instance_id],
@@ -2469,7 +2516,7 @@ static void app_check_server_update(void)
                     m_server_instance = i;
                     m_connection_update[i].requested = LWM2M_REQUEST_NONE;
 
-                    int32_t client_hold_off_time = lwm2m_server_client_hold_off_timer_get(i);
+                    int32_t client_hold_off_time = lwm2m_server_client_hold_off_timer_get(m_server_inst[i]);
                     if (m_use_client_holdoff_timer && client_hold_off_time > 0) {
                         if (lwm2m_state_set(LWM2M_STATE_CLIENT_HOLD_OFF)) {
                             LWM2M_INF("Client hold off timer [%ld seconds] (server %u)", client_hold_off_time, i);
@@ -2480,7 +2527,7 @@ static void app_check_server_update(void)
                         lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT);
                     }
                 }
-            } else if (lwm2m_server_registered_get(i)) {
+            } else if (lwm2m_server_registered_get(m_server_inst[i])) {
                 if (m_connection_update[i].requested == LWM2M_REQUEST_DEREGISTER) {
                     m_server_instance = i;
                     m_connection_update[i].requested = LWM2M_REQUEST_NONE;
@@ -2555,15 +2602,15 @@ static int app_lwm2m_process(void)
             bool do_register = true;
 
             /* If already registered and having a remote location then do update. */
-            if (lwm2m_server_registered_get(m_server_instance)) {
+            if (lwm2m_server_registered_get(m_server_inst[m_server_instance])) {
 
-                uint16_t short_server_id = lwm2m_server_short_server_id_get(m_server_instance);
+                uint16_t short_server_id = lwm2m_security_short_server_id_get(m_server_instance);
 
                 // Register the remote.
                 lwm2m_remote_register(short_server_id, (struct nrf_sockaddr *)&m_remote_server[m_server_instance]);
 
                 // Load flash again, to retrieve the location.
-                lwm2m_instance_storage_server_load(m_server_instance);
+                lwm2m_instance_storage_server_load(m_server_inst[m_server_instance]);
 
                 char   * p_location;
                 uint16_t location_len = 0;
@@ -2696,12 +2743,12 @@ static int app_provision_secret_keys(void)
                 if (err == 0) {
                     LWM2M_TRC("Provisioning key for %s, short server id: %u",
                               lwm2m_os_log_strdup(p_server_uri_val),
-                              lwm2m_server_short_server_id_get(i));
+                              lwm2m_security_short_server_id_get(i));
                 } else {
                     ret = err;
                     LWM2M_ERR("Provisioning key failed (%d) for %s, short server id: %u (%d)", ret,
                               lwm2m_os_log_strdup(p_server_uri_val),
-                              lwm2m_server_short_server_id_get(i));
+                              lwm2m_security_short_server_id_get(i));
                 }
             }
 

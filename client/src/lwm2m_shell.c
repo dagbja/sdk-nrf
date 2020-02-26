@@ -49,7 +49,6 @@ static int cmd_security_print(const struct shell *shell, size_t argc, char **arg
 
     for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++) {
         if (lwm2m_security_short_server_id_get(i) != 0) {
-            lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_security_get_instance(i);
             char * server_uri = lwm2m_security_server_uri_get(i, &uri_len);
             if (uri_len > 127) {
                 uri_len = 127;
@@ -63,12 +62,10 @@ static int cmd_security_print(const struct shell *shell, size_t argc, char **arg
             shell_print(shell, "  Bootstrap Server %s", lwm2m_security_is_bootstrap_server_get(i) ? "Yes" : "No");
             shell_print(shell, "  Client Holdoff   %ld", lwm2m_server_client_hold_off_timer_get(i));
 
-            if (operator_is_vzw(true)) {
+            if (operator_is_vzw(true) && lwm2m_security_is_bootstrap_server_get(i)) {
                 shell_print(shell, "  Holdoff          %ld", lwm2m_security_hold_off_timer_get(i));
                 shell_print(shell, "  Is Bootstrapped  %s", lwm2m_security_bootstrapped_get(i) ? "Yes" : "No");
             }
-
-            shell_print(shell, "  Owner            %d", p_instance->acl.owner);
         }
     }
 
@@ -107,6 +104,8 @@ static int cmd_server_print(const struct shell *shell, size_t argc, char **argv)
     uint8_t binding_len = 0;
     char binding[4];
 
+    uint16_t bootstrap_ssid = lwm2m_security_short_server_id_get(0);
+
     for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++) {
         if (lwm2m_server_short_server_id_get(i) != 0) {
             lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(i);
@@ -126,7 +125,7 @@ static int cmd_server_print(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "  Notif Storing    %s", lwm2m_server_notif_storing_get(i) ? "Yes" : "No");
             shell_print(shell, "  Binding          %s", binding);
 
-            if (operator_is_vzw(true)) {
+            if (operator_is_vzw(true) && lwm2m_server_short_server_id_get(i) != bootstrap_ssid) {
                 shell_print(shell, "  Is Registered    %s", lwm2m_server_registered_get(i) ? "Yes" : "No");
                 shell_print(shell, "  Client Holdoff   %ld", lwm2m_server_client_hold_off_timer_get(i));
             }
