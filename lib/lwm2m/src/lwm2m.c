@@ -146,7 +146,7 @@ static uint16_t internal_get_allowed_operations(lwm2m_instance_t * p_instance,
     if ((acl_access &  LWM2M_PERMISSION_READ) > 0)
     {
         // Observe and discover is allowed if READ is allowed.
-        acl_access = (acl_access | LWM2M_OPERATION_CODE_DISCOVER | LWM2M_OPERATION_CODE_OBSERVE);
+        acl_access = (acl_access | LWM2M_OPERATION_CODE_DISCOVER | LWM2M_OPERATION_CODE_OBSERVE | LWM2M_OPERATION_CODE_WRITE_ATTR);
     }
 
 
@@ -986,7 +986,14 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
         case COAP_CODE_PUT:
         {
-            operation = LWM2M_OPERATION_CODE_WRITE;
+            if (content_type == COAP_CT_MASK_NONE)
+            {
+                operation = LWM2M_OPERATION_CODE_WRITE_ATTR;
+            }
+            else
+            {
+                operation = LWM2M_OPERATION_CODE_WRITE;
+            }
             break;
         }
 

@@ -39,6 +39,14 @@ static int32_t        m_apn_retry_back_off_period[LWM2M_CONN_EXT_MAX_APN_COUNT];
     instance->proto.resource_ids_offset = offsetof(type, resource_ids);
 // lint -restore
 
+/* Only in this file, use shorter versions of these defines for readability */
+#define NONE     LWM2M_OPERATION_CODE_NONE
+#define WRITE    LWM2M_OPERATION_CODE_WRITE
+#define READ     LWM2M_OPERATION_CODE_READ
+#define EXEC     LWM2M_OPERATION_CODE_EXECUTE
+#define OBSV     LWM2M_OPERATION_CODE_OBSERVE
+#define DISC     LWM2M_OPERATION_CODE_DISCOVER
+#define WRATT    LWM2M_OPERATION_CODE_WRITE_ATTR
 
 uint32_t lwm2m_bytebuffer_to_string(const char * p_payload, uint16_t payload_len, lwm2m_string_t * p_string)
 {
@@ -126,18 +134,18 @@ void lwm2m_instance_security_init(lwm2m_security_t * p_instance)
     memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
-    p_instance->operations[0]  = LWM2M_OPERATION_CODE_NONE;
-    p_instance->operations[1]  = LWM2M_OPERATION_CODE_NONE;
-    p_instance->operations[2]  = LWM2M_OPERATION_CODE_NONE;
-    p_instance->operations[3]  = LWM2M_OPERATION_CODE_NONE;
-    p_instance->operations[4]  = LWM2M_OPERATION_CODE_NONE;
-    p_instance->operations[5]  = LWM2M_OPERATION_CODE_NONE;
-    p_instance->operations[6]  = LWM2M_OPERATION_CODE_NONE;
-    p_instance->operations[7]  = LWM2M_OPERATION_CODE_NONE;
-    p_instance->operations[8]  = LWM2M_OPERATION_CODE_NONE;
-    p_instance->operations[9]  = LWM2M_OPERATION_CODE_NONE;
-    p_instance->operations[10] = LWM2M_OPERATION_CODE_NONE;
-    p_instance->operations[11] = LWM2M_OPERATION_CODE_NONE;
+    p_instance->operations[0]  = NONE;
+    p_instance->operations[1]  = NONE;
+    p_instance->operations[2]  = NONE;
+    p_instance->operations[3]  = NONE;
+    p_instance->operations[4]  = NONE;
+    p_instance->operations[5]  = NONE;
+    p_instance->operations[6]  = NONE;
+    p_instance->operations[7]  = NONE;
+    p_instance->operations[8]  = NONE;
+    p_instance->operations[9]  = NONE;
+    p_instance->operations[10] = NONE;
+    p_instance->operations[11] = NONE;
 
     // Set resource IDs.
     p_instance->resource_ids[0]  = LWM2M_SECURITY_SERVER_URI;
@@ -168,16 +176,16 @@ void lwm2m_instance_server_init(lwm2m_server_t * p_instance)
     memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
-    p_instance->operations[0] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[1] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[2] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[3] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[4] = LWM2M_OPERATION_CODE_EXECUTE;
-    p_instance->operations[5] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[6] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[7] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[8] = LWM2M_OPERATION_CODE_EXECUTE;
-    p_instance->operations[9] = LWM2M_OPERATION_CODE_EXECUTE;
+    p_instance->operations[0] = READ | WRATT;
+    p_instance->operations[1] = READ | WRATT | WRITE;
+    p_instance->operations[2] = READ | WRATT | WRITE;
+    p_instance->operations[3] = READ | WRATT | WRITE;
+    p_instance->operations[4] = EXEC;
+    p_instance->operations[5] = READ | WRATT | WRITE;
+    p_instance->operations[6] = READ | WRATT | WRITE;
+    p_instance->operations[7] = READ | WRATT | WRITE;
+    p_instance->operations[8] = EXEC;
+    p_instance->operations[9] = EXEC;
 
     // Set resource IDs.
     p_instance->resource_ids[0] = LWM2M_SERVER_SHORT_SERVER_ID;
@@ -206,16 +214,16 @@ void lwm2m_instance_firmware_init(lwm2m_firmware_t * p_instance)
     memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
-    p_instance->operations[0] = LWM2M_OPERATION_CODE_WRITE;
-    p_instance->operations[1] = LWM2M_OPERATION_CODE_WRITE;
-    p_instance->operations[2] = LWM2M_OPERATION_CODE_EXECUTE;
-    p_instance->operations[3] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[4] = 0; // "Update Supported Objects" is not available anymore, but reserved.
-    p_instance->operations[5] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[6] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[7] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[8] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[9] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[0] = WRITE;
+    p_instance->operations[1] = WRITE;
+    p_instance->operations[2] = EXEC;
+    p_instance->operations[3] = READ | WRATT;
+    p_instance->operations[4] = NONE; // "Update Supported Objects" is not available anymore, but reserved.
+    p_instance->operations[5] = READ | WRATT;
+    p_instance->operations[6] = READ | WRATT;
+    p_instance->operations[7] = READ | WRATT;
+    p_instance->operations[8] = READ | WRATT;
+    p_instance->operations[9] = READ | WRATT;
 
     // Set resource IDs.
     p_instance->resource_ids[0] = LWM2M_FIRMWARE_PACKAGE;
@@ -249,17 +257,17 @@ void lwm2m_instance_connectivity_monitoring_init(lwm2m_connectivity_monitoring_t
     memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
-    p_instance->operations[0]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[1]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[2]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[3]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[4]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[5]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[6]  = LWM2M_OPERATION_CODE_NONE; // "Link Utilization" is currently unused.
-    p_instance->operations[7]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[8]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[9]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[10] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[0]  = READ | WRATT;
+    p_instance->operations[1]  = READ | WRATT;
+    p_instance->operations[2]  = READ | WRATT;
+    p_instance->operations[3]  = READ | WRATT;
+    p_instance->operations[4]  = READ | WRATT;
+    p_instance->operations[5]  = READ | WRATT;
+    p_instance->operations[6]  = NONE; // "Link Utilization" is currently unused.
+    p_instance->operations[7]  = READ | WRATT;
+    p_instance->operations[8]  = READ | WRATT;
+    p_instance->operations[9]  = READ | WRATT;
+    p_instance->operations[10] = READ | WRATT;
 
     // Set resource IDs.
     p_instance->resource_ids[0]  = LWM2M_CONN_MON_NETWORK_BEARER;
@@ -310,15 +318,15 @@ void lwm2m_instance_connectivity_statistics_init(lwm2m_connectivity_statistics_t
     memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
-    p_instance->operations[0] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[1] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[2] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[3] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[4] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[5] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[6] = LWM2M_OPERATION_CODE_EXECUTE;
-    p_instance->operations[7] = LWM2M_OPERATION_CODE_EXECUTE;
-    p_instance->operations[8] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
+    p_instance->operations[0] = READ | WRATT;
+    p_instance->operations[1] = READ | WRATT;
+    p_instance->operations[2] = READ | WRATT;
+    p_instance->operations[3] = READ | WRATT;
+    p_instance->operations[4] = READ | WRATT;
+    p_instance->operations[5] = READ | WRATT;
+    p_instance->operations[6] = EXEC;
+    p_instance->operations[7] = EXEC;
+    p_instance->operations[8] = READ | WRATT | WRITE;
 
     // Set resource IDs.
     p_instance->resource_ids[0] = LWM2M_CONN_STAT_SMS_TX_COUNTER;
@@ -346,28 +354,28 @@ void lwm2m_instance_device_init(lwm2m_device_t * p_instance)
     memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
-    p_instance->operations[0]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[1]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[2]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[3]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[4]  = LWM2M_OPERATION_CODE_EXECUTE;
-    p_instance->operations[5]  = LWM2M_OPERATION_CODE_EXECUTE;
-    p_instance->operations[6]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[7]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[8]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[9]  = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[10] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[11] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[12] = LWM2M_OPERATION_CODE_EXECUTE;
-    p_instance->operations[13] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[14] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[15] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[16] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[17] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[18] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[19] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[20] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[21] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[0]  = READ | WRATT | DISC;
+    p_instance->operations[1]  = READ | WRATT | DISC;
+    p_instance->operations[2]  = READ | WRATT | DISC;
+    p_instance->operations[3]  = READ | WRATT | DISC;
+    p_instance->operations[4]  = EXEC;
+    p_instance->operations[5]  = EXEC;
+    p_instance->operations[6]  = READ | WRATT | DISC | OBSV;
+    p_instance->operations[7]  = READ | WRATT | DISC | OBSV;
+    p_instance->operations[8]  = READ | WRATT | DISC | OBSV;
+    p_instance->operations[9]  = READ | WRATT | DISC | OBSV;
+    p_instance->operations[10] = READ | WRATT | DISC;
+    p_instance->operations[11] = READ | WRATT | DISC | OBSV;
+    p_instance->operations[12] = EXEC;
+    p_instance->operations[13] = READ | WRATT | WRITE | DISC;
+    p_instance->operations[14] = READ | WRATT | WRITE | DISC;
+    p_instance->operations[15] = READ | WRATT | WRITE | DISC;
+    p_instance->operations[16] = READ | WRATT | DISC;
+    p_instance->operations[17] = READ | WRATT | DISC | OBSV;
+    p_instance->operations[18] = READ | WRATT | DISC | OBSV;
+    p_instance->operations[19] = READ | WRATT | DISC | OBSV;
+    p_instance->operations[20] = READ | WRATT | DISC | OBSV;
+    p_instance->operations[21] = READ | WRATT | DISC | OBSV;
 
     // Set resource IDs.
     p_instance->resource_ids[0]  = LWM2M_DEVICE_MANUFACTURER;
@@ -429,12 +437,12 @@ void lwm2m_instance_location_init(lwm2m_location_t * p_instance)
     memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
-    p_instance->operations[0] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[1] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[2] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[3] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[4] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[5] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[0] = READ | WRATT;
+    p_instance->operations[1] = READ | WRATT;
+    p_instance->operations[2] = READ | WRATT;
+    p_instance->operations[3] = READ | WRATT;
+    p_instance->operations[4] = READ | WRATT;
+    p_instance->operations[5] = READ | WRATT;
 
     // Set resource IDs.
     p_instance->resource_ids[0] = LWM2M_LOCATION_ALTITUDE;
@@ -459,15 +467,15 @@ void lwm2m_instance_software_update_init(lwm2m_software_update_t * p_instance)
     memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
-    p_instance->operations[0] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[1] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[2] = LWM2M_OPERATION_CODE_WRITE;
-    p_instance->operations[3] = LWM2M_OPERATION_CODE_WRITE;
-    p_instance->operations[4] = LWM2M_OPERATION_CODE_EXECUTE;
-    p_instance->operations[5] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[6] = LWM2M_OPERATION_CODE_EXECUTE;
-    p_instance->operations[7] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[8] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
+    p_instance->operations[0] = READ | WRATT;
+    p_instance->operations[1] = READ | WRATT;
+    p_instance->operations[2] = WRITE;
+    p_instance->operations[3] = WRITE;
+    p_instance->operations[4] = EXEC;
+    p_instance->operations[5] = READ | WRATT;
+    p_instance->operations[6] = EXEC;
+    p_instance->operations[7] = READ | WRATT;
+    p_instance->operations[8] = READ | WRATT | WRITE;
 
     // Set resource IDs.
     p_instance->resource_ids[0] = LWM2M_SW_UPDATE_PKG_NAME;
@@ -494,14 +502,14 @@ void lwm2m_instance_apn_connection_profile_init(lwm2m_apn_conn_prof_t * p_instan
     memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
-    p_instance->operations[0] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[1] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[2] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[3] = LWM2M_OPERATION_CODE_NONE;
-    p_instance->operations[4] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[5] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[6] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[7] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[0] = READ | WRATT | WRITE;
+    p_instance->operations[1] = READ | WRATT | WRITE;
+    p_instance->operations[2] = READ | WRATT | WRITE;
+    p_instance->operations[3] = NONE;
+    p_instance->operations[4] = READ | WRATT;
+    p_instance->operations[5] = READ | WRATT;
+    p_instance->operations[6] = READ | WRATT;
+    p_instance->operations[7] = READ | WRATT;
 
     // Set resource IDs.
     p_instance->resource_ids[0] = LWM2M_APN_CONN_PROF_PROFILE_NAME;
@@ -552,7 +560,7 @@ void lwm2m_instance_portfolio_init(lwm2m_portfolio_t * p_instance)
     memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
-    p_instance->operations[0] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
+    p_instance->operations[0] = READ | WRATT | WRITE;
 
     // Set resource IDs.
     p_instance->resource_ids[0] = LWM2M_PORTFOLIO_IDENTITY;
@@ -577,15 +585,15 @@ void lwm2m_instance_connectivity_extension_init(lwm2m_connectivity_extension_t *
     memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
-    p_instance->operations[0] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[1] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[2] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[3] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[4] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[5] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
-    p_instance->operations[6] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[7] = LWM2M_OPERATION_CODE_READ;
-    p_instance->operations[8] = LWM2M_OPERATION_CODE_READ;
+    p_instance->operations[0] = READ | WRATT;
+    p_instance->operations[1] = READ | WRATT;
+    p_instance->operations[2] = READ | WRATT | WRITE;
+    p_instance->operations[3] = READ | WRATT | WRITE;
+    p_instance->operations[4] = READ | WRATT | WRITE;
+    p_instance->operations[5] = READ | WRATT | WRITE;
+    p_instance->operations[6] = READ | WRATT;
+    p_instance->operations[7] = READ | WRATT;
+    p_instance->operations[8] = READ | WRATT;
 
     // Set resource IDs.
     p_instance->resource_ids[0] = LWM2M_CONN_EXT_ICCID;

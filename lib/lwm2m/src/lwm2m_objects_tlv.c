@@ -932,17 +932,23 @@ uint32_t lwm2m_tlv_device_decode(lwm2m_device_t     * p_device,
 
             default:
             {
-                if (resource_callback)
-                {
-                    err_code = resource_callback(((lwm2m_instance_t *)p_device)->instance_id, &tlv);
-                }
+                err_code = 0;
                 break;
             }
         }
 
         if (err_code != 0)
         {
-            return EINVAL;
+            return err_code;
+        }
+
+        if (resource_callback)
+        {
+            err_code = resource_callback(p_device->proto.instance_id, &tlv);
+            if (err_code != 0)
+            {
+                return err_code;
+            }
         }
     }
 
@@ -1145,7 +1151,7 @@ uint32_t lwm2m_tlv_device_encode(uint8_t        * p_buffer,
 
         default:
         {
-            err_code = ENOENT;
+            err_code = ENOTSUP;
             break;
         }
     }

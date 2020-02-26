@@ -407,23 +407,6 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                                                       p_request->payload,
                                                       p_request->payload_len);
         }
-        else if (mask == 0)
-        {
-            uint16_t path[] = { p_instance->object_id, p_instance->instance_id, resource_id };
-            uint16_t path_len = (resource_id == LWM2M_INVALID_RESOURCE) ? ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
-
-            err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
-            if (err_code != 0)
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-            }
-            else
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-            }
-
-            return 0;
-        }
         else
         {
             (void)lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_request);
@@ -449,6 +432,22 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
         else if (err_code == ENOTSUP)
         {
             (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+        }
+        else
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+        }
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_WRITE_ATTR)
+    {
+        uint16_t path[] = { p_instance->object_id, p_instance->instance_id, resource_id };
+        uint16_t path_len = (resource_id == LWM2M_INVALID_RESOURCE) ? ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
+
+        err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
+
+        if (err_code == 0)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
         }
         else
         {
@@ -599,19 +598,21 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
 
             (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
         }
-        else if (mask == 0)
+        else
         {
-            uint16_t path[] = { p_object->object_id };
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+        }
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_WRITE_ATTR)
+    {
+        uint16_t path[] = { p_object->object_id };
+        uint16_t path_len = ARRAY_SIZE(path);
 
-            err_code = lwm2m_write_attribute_handler(path, ARRAY_SIZE(path), p_request);
-            if (err_code != 0)
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-            }
-            else
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-            }
+        err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
+
+        if (err_code == 0)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
         }
         else
         {

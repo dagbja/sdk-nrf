@@ -444,13 +444,6 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                                                                 p_request->payload_len,
                                                                 tlv_conn_mon_resource_decode);
         }
-        else if (mask == 0)
-        {
-            uint16_t path[] = { p_instance->object_id, p_instance->instance_id, resource_id };
-            uint16_t path_len = (resource_id == LWM2M_INVALID_RESOURCE) ? ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
-
-            err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
-        }
         else
         {
             (void)lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_request);
@@ -464,6 +457,22 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
         else if (err_code == ENOTSUP)
         {
             (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+        }
+        else
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+        }
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_WRITE_ATTR)
+    {
+        uint16_t path[] = { p_instance->object_id, p_instance->instance_id, resource_id };
+        uint16_t path_len = (resource_id == LWM2M_INVALID_RESOURCE) ? ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
+
+        err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
+
+        if (err_code == 0)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
         }
         else
         {
@@ -517,37 +526,16 @@ uint32_t lwm2m_conn_mon_object_callback(lwm2m_object_t * p_object,
     {
         err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
     }
-    else if (op_code == LWM2M_OPERATION_CODE_WRITE)
+    else if (op_code == LWM2M_OPERATION_CODE_WRITE_ATTR)
     {
-        if (instance_id != LWM2M_INVALID_INSTANCE)
+        uint16_t path[] = { p_object->object_id };
+        uint16_t path_len = ARRAY_SIZE(path);
+
+        err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
+
+        if (err_code == 0)
         {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-            return 0;
-        }
-
-        uint32_t mask = 0;
-        err_code = coap_message_ct_mask_get(p_request, &mask);
-
-        if (err_code != 0)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-            return 0;
-        }
-
-        // A Write-Attribute request do not contain a Content-Format option.
-        if (mask == 0)
-        {
-            uint16_t path[] = { p_object->object_id };
-
-            err_code = lwm2m_write_attribute_handler(path, ARRAY_SIZE(path), p_request);
-            if (err_code != 0)
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-            }
-            else
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-            }
+            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
         }
         else
         {

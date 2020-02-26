@@ -42,11 +42,18 @@ static lwm2m_string_t m_verizon_resources[2];
 
 static int64_t m_con_time_start[sizeof(((lwm2m_device_t *)0)->resource_ids)];
 
-
-static uint32_t tlv_device_verizon_encode(uint16_t instance_id, uint8_t * p_buffer, uint32_t * p_buffer_len)
+static bool operation_is_allowed(uint16_t res, uint16_t op)
 {
-    ARG_UNUSED(instance_id);
+    if (res < ARRAY_SIZE(m_instance_device.operations)) {
+        return m_instance_device.operations[res] & op;
+    }
 
+    /* Allow by default, it could be a carrier-specific resource */
+    return true;
+}
+
+static uint32_t tlv_device_verizon_encode(uint8_t * p_buffer, uint32_t * p_buffer_len)
+{
     lwm2m_list_t list =
     {
         .type         = LWM2M_LIST_TYPE_STRING,
@@ -56,11 +63,6 @@ static uint32_t tlv_device_verizon_encode(uint16_t instance_id, uint8_t * p_buff
     };
 
     return lwm2m_tlv_list_encode(p_buffer, p_buffer_len, VERIZON_RESOURCE, &list);
-}
-
-static uint32_t tlv_device_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
-{
-    return 0;
 }
 
 static void lwm2m_device_time_resources_update(void)
@@ -222,7 +224,6 @@ static int lwm2m_device_utc_offset_write(lwm2m_device_t * p_device)
     return 0;
 }
 
-
 int lwm2m_device_set_sim_iccid(char *p_iccid, uint32_t iccid_len)
 {
     if (p_iccid == NULL) {
@@ -231,7 +232,6 @@ int lwm2m_device_set_sim_iccid(char *p_iccid, uint32_t iccid_len)
 
     return lwm2m_bytebuffer_to_string(p_iccid, iccid_len, &m_verizon_resources[0]);
 }
-
 
 char * lwm2m_device_get_sim_iccid(uint32_t * iccid_len)
 {
@@ -258,347 +258,424 @@ int32_t lwm2m_device_battery_status_get(void)
     return LWM2M_CARRIER_BATTERY_STATUS_NOT_INSTALLED;
 }
 
-/**@brief Callback function for device instances. */
-uint32_t device_instance_callback(lwm2m_instance_t * p_instance,
-                                  uint16_t           resource_id,
-                                  uint8_t            op_code,
-                                  coap_message_t   * p_request)
+static void on_read(uint16_t res, coap_message_t *p_req)
 {
-    LWM2M_TRC("device_instance_callback");
+    uint32_t err;
+    uint8_t buf[256];
+    size_t len;
 
-    uint16_t access = 0;
-    uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                       p_instance,
-                                                       p_request->remote);
-    if (err_code != 0)
-    {
+    len = sizeof(buf);
+
+    if (res == LWM2M_NAMED_OBJECT) {
+        LWM2M_INF("Read /3/0");
+    } else {
+        LWM2M_INF("Read /3/0/%d", res);
+    }
+
+    if (res == VERIZON_RESOURCE && operator_is_vzw(true)) {
+        err = tlv_device_verizon_encode(buf, &len);
+        if (err) {
+            goto reply_error;
+        }
+
+        lwm2m_respond_with_payload(buf, len, COAP_CT_APP_LWM2M_TLV, p_req);
+        return;
+    }
+
+    /* Update requested resource */
+    switch (res) {
+    case LWM2M_DEVICE_CURRENT_TIME:
+        lwm2m_device_current_time_update();
+        break;
+    case LWM2M_DEVICE_UTC_OFFSET:
+        lwm2m_device_utc_offset_update();
+        break;
+    case LWM2M_DEVICE_TIMEZONE:
+        lwm2m_device_timezone_update();
+        break;
+    case LWM2M_NAMED_OBJECT:
+        lwm2m_device_time_resources_update();
+        break;
+    }
+
+    err = lwm2m_tlv_device_encode(buf, &len, res, &m_instance_device);
+    if (err) {
+        goto reply_error;
+    }
+
+    /* Append VzW resource */
+    if (res == LWM2M_NAMED_OBJECT && operator_is_vzw(true)) {
+        size_t plen = sizeof(buf) - len;
+        err = tlv_device_verizon_encode(buf + len, &plen);
+        if (err) {
+           goto reply_error;
+        }
+        len += plen;
+    }
+
+    lwm2m_respond_with_payload(buf, len, COAP_CT_APP_LWM2M_TLV, p_req);
+    return;
+
+reply_error: {
+        const coap_msg_code_t code =
+                (err == ENOTSUP) ? COAP_CODE_404_NOT_FOUND :
+                                   COAP_CODE_500_INTERNAL_SERVER_ERROR;
+
+        lwm2m_respond_with_code(code, p_req);
+    }
+}
+
+static void on_observe_start(uint16_t res, coap_message_t *p_req)
+{
+    uint32_t err;
+    uint8_t buf[256];
+    size_t len;
+
+    const uint16_t path[] = { LWM2M_OBJ_DEVICE, 0, res };
+
+    LWM2M_INF("Observe register /3/0/%d", res);
+
+    err = lwm2m_tlv_device_encode(buf, &len, res, &m_instance_device);
+    if (err) {
+        const coap_msg_code_t code =
+            (err == ENOTSUP) ? COAP_CODE_404_NOT_FOUND :
+                               COAP_CODE_400_BAD_REQUEST;
+        lwm2m_respond_with_code(code, p_req);
+        return;
+    }
+
+    err = lwm2m_observe_register(
+            buf, len, m_instance_device.proto.expire_time, p_req,
+            COAP_CT_APP_LWM2M_TLV, res, &m_instance_device.proto);
+
+    if (err) {
+        LWM2M_WRN("Failed to register observer, err %d", err);
+        return;
+    }
+
+    m_con_time_start[res] = lwm2m_os_uptime_get();
+    err = lwm2m_observable_metadata_init(p_req->remote, path, ARRAY_SIZE(path));
+    if (err) {
+        /* Already logged */
+    }
+
+    return;
+}
+
+static void on_observe_stop(uint16_t res, coap_message_t *p_req)
+{
+    uint32_t err;
+    const uint16_t path[] = { LWM2M_OBJ_DEVICE, 0, res };
+
+    LWM2M_INF("Observe deregister /3/0/%d", res);
+
+    err = lwm2m_observe_unregister(p_req->remote,
+                                   &m_instance_device.resource_ids[res]);
+
+    if (err) {
+        /* TODO */
+    }
+
+    lwm2m_notif_attr_storage_update(path, ARRAY_SIZE(path), p_req->remote);
+
+    /* Process as a read */
+    on_read(res, p_req);
+}
+
+static void on_observe(uint16_t res, coap_message_t *p_req)
+{
+    uint32_t err = 1;
+    uint32_t opt;
+
+    for (uint8_t i = 0; i < p_req->options_count; i++) {
+        if (p_req->options[i].number == COAP_OPT_OBSERVE) {
+            err = coap_opt_uint_decode(&opt,
+                           p_req->options[i].length,
+                           p_req->options[i].data);
+            break;
+        }
+    }
+
+    if (err) {
+        lwm2m_respond_with_code(COAP_CODE_402_BAD_OPTION, p_req);
+        return;
+    }
+
+    switch (opt) {
+    case 0: /* observe start */
+        on_observe_start(res, p_req);
+        break;
+    case 1: /* observe stop */
+        on_observe_stop(res, p_req);
+        break;
+    default:
+        /* Unexpected opt value */
+        lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_req);
+        break;
+    }
+}
+
+static void on_write_attribute(uint16_t res, coap_message_t *p_req)
+{
+    int err;
+    const uint16_t path[] = { LWM2M_OBJ_DEVICE, 0, res };
+
+    const uint16_t len =
+        (res == LWM2M_NAMED_OBJECT) ? ARRAY_SIZE(path) - 1 :
+                                      ARRAY_SIZE(path);
+
+    err = lwm2m_write_attribute_handler(path, len, p_req);
+    if (err) {
+        const coap_msg_code_t code =
+            (err == -EINVAL) ? COAP_CODE_400_BAD_REQUEST :
+                               COAP_CODE_500_INTERNAL_SERVER_ERROR;
+        lwm2m_respond_with_code(code, p_req);
+        return;
+    }
+
+    lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_req);
+}
+
+static void on_write(uint16_t res, coap_message_t *p_req)
+{
+    uint32_t err;
+    uint32_t mask;
+
+    if (res == LWM2M_NAMED_OBJECT) {
+        LWM2M_INF("Write /3/0");
+    } else {
+        LWM2M_INF("Write /3/0/%d", res);
+    }
+
+    err = coap_message_ct_mask_get(p_req, &mask);
+    if (err) {
+        lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_req);
+        return;
+    }
+
+    if (mask & COAP_CT_MASK_APP_LWM2M_TLV) {
+        /* Decode TLV payload */
+        err = lwm2m_tlv_device_decode(&m_instance_device,
+                                      p_req->payload,
+                                      p_req->payload_len,
+                                      NULL);
+
+    } else if ((mask & COAP_CT_MASK_PLAIN_TEXT) ||
+               (mask & COAP_CT_MASK_APP_OCTET_STREAM)) {
+        /* Decode plaintext / octect stream payload */
+        err = lwm2m_plain_text_device_decode(&m_instance_device,
+                                             res, p_req->payload,
+                                             p_req->payload_len);
+    } else {
+        lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_req);
+        return;
+    }
+
+    if (err) {
+        /* Failed to decode or to process the payload.
+         * We attempted to decode a resource and failed because
+         * - memory contraints or
+         * - the payload contained unexpected data
+         */
+        const coap_msg_code_t code =
+            (err == ENOTSUP) ? COAP_CODE_404_NOT_FOUND :
+                               COAP_CODE_400_BAD_REQUEST;
+        lwm2m_respond_with_code(code, p_req);
+        return;
+    }
+
+    /* Trigger after decoding */
+    switch (res) {
+    case LWM2M_DEVICE_CURRENT_TIME:
+        err = lwm2m_carrier_utc_time_write(m_instance_device.current_time);
+        break;
+    case LWM2M_DEVICE_UTC_OFFSET:
+        err = lwm2m_device_utc_offset_write(&m_instance_device);
+        break;
+    case LWM2M_DEVICE_TIMEZONE:
+        lwm2m_device_timezone_write(&m_instance_device);
+        break;
+    case LWM2M_NAMED_OBJECT:
+        err = lwm2m_carrier_utc_time_write(m_instance_device.current_time);
+        if (err) {
+            break;
+        }
+        err = lwm2m_device_utc_offset_write(&m_instance_device);
+        if (err) {
+            break;
+        }
+        lwm2m_device_timezone_write(&m_instance_device);
+        break;
+    }
+
+    const coap_msg_code_t code =
+        (err) ? COAP_CODE_400_BAD_REQUEST:
+                COAP_CODE_204_CHANGED;
+
+    lwm2m_respond_with_code(code, p_req);
+}
+
+static void on_exec(uint16_t res, coap_message_t *p_req)
+{
+    int err;
+
+    LWM2M_INF("Execute /3/0/%d", res);
+
+    switch (res) {
+    case LWM2M_DEVICE_FACTORY_RESET:
+        lwm2m_factory_reset();
+        /* FALLTHROUGH */
+
+    case LWM2M_DEVICE_REBOOT:
+        err = lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_req);
+        if (err) {
+            break;
+        }
+
+        /* FIXME:
+         * This sleep is needed to ensure the response
+         * is sent before closing the socket.
+         */
+        lwm2m_os_sleep(K_SECONDS(1));
+
+        lwm2m_request_reset();
+        break;
+
+    case LWM2M_DEVICE_RESET_ERROR_CODE:
+        m_instance_device.error_code.len = 1;
+        m_instance_device.error_code.val.p_int32[0] = 0;
+
+        (void) lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_req);
+        break;
+    }
+}
+
+static void on_discover(uint16_t res, coap_message_t *p_req)
+{
+    uint32_t err;
+
+    err = lwm2m_respond_with_instance_link(&m_instance_device.proto, res, p_req);
+    if (err) {
+        LWM2M_WRN("Failed to respond to discover on /3/0/%d, err %d", res, err);
+    }
+}
+
+uint32_t device_instance_callback(lwm2m_instance_t *p_instance,
+                                  uint16_t resource_id, uint8_t op_code,
+                                  coap_message_t *p_request)
+{
+    uint16_t access;
+    uint32_t err_code;
+
+    err_code = lwm2m_access_remote_get(&access, p_instance, p_request->remote);
+    if (err_code != 0) {
         return err_code;
     }
 
-    // Set op_code to 0 if access not allowed for that op_code.
-    // op_code has the same bit pattern as ACL operates with.
+    /* Check server access */
     op_code = (access & op_code);
-
-    if (op_code == 0)
-    {
-        (void)lwm2m_respond_with_code(COAP_CODE_401_UNAUTHORIZED, p_request);
+    if (op_code == 0) {
+        lwm2m_respond_with_code(COAP_CODE_401_UNAUTHORIZED, p_request);
         return 0;
     }
 
-    uint16_t instance_id = p_instance->instance_id;
-
-    if (instance_id != 0)
-    {
-        (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
+    /* Check resource permissions */
+    if (!operation_is_allowed(resource_id, op_code)) {
+        LWM2M_WRN("Operation 0x%x on resource 3/0/%d, not allowed",
+                  op_code, resource_id);
+        lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
         return 0;
     }
 
-    uint8_t  buffer[300];
-    uint32_t buffer_size = sizeof(buffer);
-
-    if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
-    {
-        uint32_t observe_option = 0;
-        for (uint8_t index = 0; index < p_request->options_count; index++)
-        {
-            if (p_request->options[index].number == COAP_OPT_OBSERVE)
-            {
-                err_code = coap_opt_uint_decode(&observe_option,
-                                                p_request->options[index].length,
-                                                p_request->options[index].data);
-                break;
-            }
-        }
-
-        if (err_code == 0)
-        {
-            uint16_t path[] = {LWM2M_OBJ_DEVICE, 0, resource_id};
-
-            if (observe_option == 0) // Observe start
-            {
-                // Whitelist the resources that support observe.
-                switch (resource_id)
-                {
-                    // case LWM2M_DEVICE_MANUFACTURER:
-                    // case LWM2M_DEVICE_MODEL_NUMBER:
-                    // case LWM2M_DEVICE_SERIAL_NUMBER:
-                    // case LWM2M_DEVICE_FIRMWARE_VERSION:
-                    case LWM2M_DEVICE_AVAILABLE_POWER_SOURCES:
-                    case LWM2M_DEVICE_POWER_SOURCE_VOLTAGE:
-                    case LWM2M_DEVICE_POWER_SOURCE_CURRENT:
-                    case LWM2M_DEVICE_BATTERY_LEVEL:
-                    // case LWM2M_DEVICE_MEMORY_FREE:
-                    case LWM2M_DEVICE_ERROR_CODE:
-                    // case LWM2M_DEVICE_CURRENT_TIME:
-                    // case LWM2M_DEVICE_UTC_OFFSET:
-                    // case LWM2M_DEVICE_TIMEZONE:
-                    // case LWM2M_DEVICE_SUPPORTED_BINDINGS:
-                    case LWM2M_DEVICE_DEVICE_TYPE:
-                    case LWM2M_DEVICE_HARDWARE_VERSION:
-                    case LWM2M_DEVICE_SOFTWARE_VERSION:
-                    case LWM2M_DEVICE_BATTERY_STATUS:
-                    case LWM2M_DEVICE_MEMORY_TOTAL:
-                    {
-                        LWM2M_INF("Observe requested on resource /3/%i/%i", p_instance->instance_id, resource_id);
-                        err_code = lwm2m_tlv_device_encode(buffer,
-                                                        &buffer_size,
-                                                        resource_id,
-                                                        &m_instance_device);
-
-                        err_code = lwm2m_observe_register(buffer,
-                                                        buffer_size,
-                                                        m_instance_device.proto.expire_time,
-                                                        p_request,
-                                                        COAP_CT_APP_LWM2M_TLV,
-                                                        resource_id,
-                                                        p_instance);
-
-                        lwm2m_observable_metadata_init(p_request->remote, path, ARRAY_SIZE(path));
-                        m_con_time_start[resource_id] = lwm2m_os_uptime_get();
-                        break;
-                    }
-
-                    case LWM2M_INVALID_RESOURCE: // By design LWM2M_INVALID_RESOURCE indicates that this is on instance level.
-                    {
-                        // Process the GET request as usual.
-                        LWM2M_INF("Observe requested on instance /3/%i, no slots", p_instance->instance_id);
-                        op_code = LWM2M_OPERATION_CODE_READ;
-                        break;
-                    }
-
-                    default:
-                    {
-                        // Process the GET request as usual.
-                        LWM2M_INF("Observe requested on resource /3/%i/%i, no slots", p_instance->instance_id, resource_id);
-                        op_code = LWM2M_OPERATION_CODE_READ;
-                        break;
-                    }
-                }
-            }
-            else if (observe_option == 1) // Observe stop
-            {
-                if (resource_id == LWM2M_INVALID_RESOURCE) {
-                    LWM2M_INF("Observe cancel on instance /3/%i, no  match", p_instance->instance_id);
-                } else {
-                    LWM2M_INF("Observe cancel on resource /3/%i/%i", p_instance->instance_id, resource_id);
-                    lwm2m_observe_unregister(p_request->remote, (void *)&m_instance_device.resource_ids[resource_id]);
-                    lwm2m_notif_attr_storage_update(path, ARRAY_SIZE(path), p_request->remote);
-                }
-
-                // Process the GET request as usual.
-                op_code = LWM2M_OPERATION_CODE_READ;
-            }
-            else
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-                return 0;
-            }
-        }
+    if (p_instance->instance_id != 0) {
+        lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
+        return 0;
     }
 
-
-    if (op_code == LWM2M_OPERATION_CODE_READ)
-    {
-        if (resource_id == VERIZON_RESOURCE && operator_is_vzw(true))
-        {
-            err_code = tlv_device_verizon_encode(instance_id, buffer, &buffer_size);
-        }
-        else
-        {
-            // Update requested resource
-            switch (resource_id)
-            {
-                case LWM2M_DEVICE_CURRENT_TIME:
-                    lwm2m_device_current_time_update();
-                    break;
-                case LWM2M_DEVICE_UTC_OFFSET:
-                    lwm2m_device_utc_offset_update();
-                    break;
-                case LWM2M_DEVICE_TIMEZONE:
-                    lwm2m_device_timezone_update();
-                    break;
-                case LWM2M_NAMED_OBJECT:
-                    lwm2m_device_time_resources_update();
-                    break;
-                default:
-                    break;
-            }
-
-            err_code = lwm2m_tlv_device_encode(buffer,
-                                               &buffer_size,
-                                               resource_id,
-                                               &m_instance_device);
-
-            if (err_code == ENOENT)
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
-                return 0;
-            }
-
-            if (resource_id == LWM2M_NAMED_OBJECT)
-            {
-                if (operator_is_vzw(true)) {
-                    uint32_t added_size = sizeof(buffer) - buffer_size;
-                    err_code = tlv_device_verizon_encode(instance_id, buffer + buffer_size, &added_size);
-                    buffer_size += added_size;
-                }
-            }
-        }
-
-        if (err_code != 0)
-        {
-            return err_code;
-        }
-
-        (void)lwm2m_respond_with_payload(buffer, buffer_size, COAP_CT_APP_LWM2M_TLV, p_request);
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_WRITE)
-    {
-        uint32_t mask = 0;
-
-        err_code = coap_message_ct_mask_get(p_request, &mask);
-
-        if (err_code != 0)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-            return 0;
-        }
-
-        if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
-        {
-            err_code = lwm2m_tlv_device_decode(&m_instance_device,
-                                               p_request->payload,
-                                               p_request->payload_len,
-                                               tlv_device_resource_decode);
-        }
-        else if ((mask & COAP_CT_MASK_PLAIN_TEXT) || (mask & COAP_CT_MASK_APP_OCTET_STREAM))
-        {
-            err_code = lwm2m_plain_text_device_decode(&m_instance_device,
-                                                      resource_id,
-                                                      p_request->payload,
-                                                      p_request->payload_len);
-        }
-        else if (mask == 0)
-        {
-            uint16_t path[] = { p_instance->object_id, p_instance->instance_id, resource_id };
-            uint16_t path_len = (resource_id == LWM2M_INVALID_RESOURCE) ? ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
-
-            err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
-            if (err_code != 0)
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-            }
-            else
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-            }
-
-            return 0;
-        }
-        else
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_request);
-            return 0;
-        }
-
-        if (err_code == 0)
-        {
-            int err;
-
-            switch (resource_id)
-            {
-                case LWM2M_DEVICE_CURRENT_TIME:
-                    lwm2m_carrier_utc_time_write(m_instance_device.current_time);
-                    break;
-                case LWM2M_DEVICE_UTC_OFFSET:
-                    err = lwm2m_device_utc_offset_write(&m_instance_device);
-                    if (err != 0)
-                    {
-                        (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-                        return 0;
-                    }
-                    break;
-                case LWM2M_DEVICE_TIMEZONE:
-                    lwm2m_device_timezone_write(&m_instance_device);
-                    break;
-                case LWM2M_NAMED_OBJECT:
-                {
-                    lwm2m_carrier_utc_time_write(m_instance_device.current_time);
-                    err = lwm2m_device_utc_offset_write(&m_instance_device);
-                    if (err != 0)
-                    {
-                        (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-                        return 0;
-                    }
-                    lwm2m_device_timezone_write(&m_instance_device);
-                    break;
-                }
-                default:
-                    (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
-                    return 0;
-            }
-            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-        }
-        else if (err_code == ENOTSUP)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
-        }
-        else
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-        }
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_EXECUTE)
-    {
-        switch (resource_id)
-        {
-            case LWM2M_DEVICE_FACTORY_RESET:
-            {
-                lwm2m_factory_reset();
-            }
-            /* FALLTHROUGH */
-
-            case LWM2M_DEVICE_REBOOT:
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-
-                // FIXME: This sleep is needed to ensure the response is sent before closing the socket.
-                lwm2m_os_sleep(1000);
-
-                lwm2m_request_reset();
-                break;
-            }
-
-            case LWM2M_DEVICE_RESET_ERROR_CODE:
-            {
-                m_instance_device.error_code.len = 1;
-                m_instance_device.error_code.val.p_int32[0] = 0;
-
-                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-                break;
-            }
-
-            default:
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
-                return 0;
-            }
-        }
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
-    {
-        err_code = lwm2m_respond_with_instance_link(p_instance, resource_id, p_request);
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
-    {
-        // Already handled
-    }
-    else
-    {
-        (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+    switch (op_code) {
+    case LWM2M_OPERATION_CODE_READ:
+        on_read(resource_id, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_WRITE:
+        on_write(resource_id, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_EXECUTE:
+        on_exec(resource_id, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_OBSERVE:
+        on_observe(resource_id, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_DISCOVER:
+        on_discover(resource_id, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_WRITE_ATTR:
+        on_write_attribute(resource_id, p_request);
+        break;
+    default:
+        lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+        break;
     }
 
-    return err_code;
+    return 0;
+}
+
+static void on_object_read(coap_message_t *p_req)
+{
+    uint32_t err;
+    uint8_t buf[256];
+    size_t len;
+
+    len = sizeof(buf);
+
+    err = lwm2m_tlv_device_encode(buf + 3, &len, LWM2M_NAMED_OBJECT,
+                                  &m_instance_device);
+
+    if (err) {
+        /* TODO */
+        return;
+    }
+
+    lwm2m_tlv_t tlv = {
+        .id_type = TLV_TYPE_OBJECT,
+        .length = len
+    };
+
+    err = lwm2m_tlv_header_encode(buf, &len, &tlv);
+    if (err) {
+        /* TODO */
+        return;
+    }
+
+    len += tlv.length;
+
+    lwm2m_respond_with_payload(buf, len, COAP_CT_APP_LWM2M_TLV, p_req);
+}
+
+static void on_object_write_attribute(uint16_t instance, coap_message_t *p_req)
+{
+    int err;
+    uint16_t path[] = { LWM2M_OBJ_DEVICE };
+
+    err = lwm2m_write_attribute_handler(path, ARRAY_SIZE(path), p_req);
+    if (err) {
+        const coap_msg_code_t code =
+            (err == -EINVAL) ? COAP_CODE_400_BAD_REQUEST :
+                               COAP_CODE_500_INTERNAL_SERVER_ERROR;
+        lwm2m_respond_with_code(code, p_req);
+        return;
+    }
+
+    lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_req);
+}
+
+static void on_object_discover(coap_message_t * p_req)
+{
+    int err;
+
+    err = lwm2m_respond_with_object_link(LWM2M_OBJ_DEVICE, p_req);
+    if (err) {
+        LWM2M_WRN("Failed to discover device object, err %d", err);
+    }
 }
 
 /**@brief Callback function for LWM2M device objects. */
@@ -607,74 +684,22 @@ uint32_t lwm2m_device_object_callback(lwm2m_object_t * p_object,
                                       uint8_t          op_code,
                                       coap_message_t * p_request)
 {
-    LWM2M_TRC("device_object_callback");
-
-    uint32_t err_code = 0;
-
-    if (op_code == LWM2M_OPERATION_CODE_READ)
-    {
-        uint32_t buffer_len = 255;
-        uint8_t  buffer[buffer_len];
-
-        err_code = lwm2m_tlv_device_encode(buffer + 3, &buffer_len,
-                                           LWM2M_NAMED_OBJECT,
-                                           &m_instance_device);
-        lwm2m_tlv_t tlv = {
-            .id_type = TLV_TYPE_OBJECT,
-            .length = buffer_len
-        };
-        err_code = lwm2m_tlv_header_encode(buffer, &buffer_len, &tlv);
-        buffer_len += tlv.length;
-
-        err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LWM2M_TLV, p_request);
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
-    {
-        err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_WRITE)
-    {
-        if (instance_id != LWM2M_INVALID_INSTANCE)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-            return 0;
-        }
-
-        uint32_t mask = 0;
-        err_code = coap_message_ct_mask_get(p_request, &mask);
-
-        if (err_code != 0)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-            return 0;
-        }
-
-        // A Write-Attribute request do not contain a Content-Format option.
-        if (mask == 0)
-        {
-            uint16_t path[] = { p_object->object_id };
-
-            err_code = lwm2m_write_attribute_handler(path, ARRAY_SIZE(path), p_request);
-            if (err_code != 0)
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-            }
-            else
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-            }
-        }
-        else
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-        }
-    }
-    else
-    {
-        (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+    switch (op_code) {
+    case LWM2M_OPERATION_CODE_READ:
+        on_object_read(p_request);
+        break;
+    case LWM2M_OPERATION_CODE_WRITE_ATTR:
+        on_object_write_attribute(instance_id, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_DISCOVER:
+        on_object_discover(p_request);
+        break;
+    default:
+        lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+        break;
     }
 
-    return err_code;
+    return 0;
 }
 
 lwm2m_device_t * lwm2m_device_get_instance(uint16_t instance_id)

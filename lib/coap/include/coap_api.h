@@ -66,6 +66,8 @@ extern "C" {
 /**@defgroup COAP_CONTENT_TYPE_MASK Resource content type bitmask values
  * @{
  */
+#define COAP_CT_MASK_NONE 0x00
+
 /** Content type Plain text supported in the endpoint resource. */
 #define COAP_CT_MASK_PLAIN_TEXT 0x01
 

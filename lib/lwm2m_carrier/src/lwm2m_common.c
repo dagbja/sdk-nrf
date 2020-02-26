@@ -36,7 +36,7 @@ uint32_t lwm2m_access_remote_get(uint16_t            * p_access,
     if ((*p_access & LWM2M_PERMISSION_READ) > 0)
     {
         // Observe and discover is allowed if READ is allowed.
-        *p_access = (*p_access | LWM2M_OPERATION_CODE_DISCOVER | LWM2M_OPERATION_CODE_OBSERVE);
+        *p_access = (*p_access | LWM2M_OPERATION_CODE_DISCOVER | LWM2M_OPERATION_CODE_OBSERVE | LWM2M_OPERATION_CODE_WRITE_ATTR);
     }
 
     return err_code;

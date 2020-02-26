@@ -149,14 +149,15 @@ typedef struct
 #define LWM2M_PERMISSION_CREATE       0x10  /**< Bit mask for LWM2M create permission. */
 #define LWM2M_PERMISSION_OBSERVE      0x40  /**< Bit mask for LWM2M observe permission. */
 
-#define LWM2M_OPERATION_CODE_NONE     0x00                     /**< Bit mask for LWM2M no operation. */
-#define LWM2M_OPERATION_CODE_READ     LWM2M_PERMISSION_READ    /**< Bit mask for LWM2M read operation. */
-#define LWM2M_OPERATION_CODE_WRITE    LWM2M_PERMISSION_WRITE   /**< Bit mask for LWM2M write operation. */
-#define LWM2M_OPERATION_CODE_EXECUTE  LWM2M_PERMISSION_EXECUTE /**< Bit mask for LWM2M execute operation. */
-#define LWM2M_OPERATION_CODE_DELETE   LWM2M_PERMISSION_DELETE  /**< Bit mask for LWM2M delete operation. */
-#define LWM2M_OPERATION_CODE_CREATE   LWM2M_PERMISSION_CREATE  /**< Bit mask for LWM2M create operation. */
-#define LWM2M_OPERATION_CODE_DISCOVER 0x20                     /**< Bit mask for LWM2M discover operation. */
-#define LWM2M_OPERATION_CODE_OBSERVE  LWM2M_PERMISSION_OBSERVE /**< Bit mask for LWM2M observe operation. */
+#define LWM2M_OPERATION_CODE_NONE       0x00                        /**< Bit mask for LWM2M no operation. */
+#define LWM2M_OPERATION_CODE_READ       LWM2M_PERMISSION_READ       /**< Bit mask for LWM2M read operation. */
+#define LWM2M_OPERATION_CODE_WRITE      LWM2M_PERMISSION_WRITE      /**< Bit mask for LWM2M write operation. */
+#define LWM2M_OPERATION_CODE_EXECUTE    LWM2M_PERMISSION_EXECUTE    /**< Bit mask for LWM2M execute operation. */
+#define LWM2M_OPERATION_CODE_DELETE     LWM2M_PERMISSION_DELETE     /**< Bit mask for LWM2M delete operation. */
+#define LWM2M_OPERATION_CODE_CREATE     LWM2M_PERMISSION_CREATE     /**< Bit mask for LWM2M create operation. */
+#define LWM2M_OPERATION_CODE_DISCOVER   0x20                        /**< Bit mask for LWM2M discover operation. */
+#define LWM2M_OPERATION_CODE_OBSERVE    LWM2M_PERMISSION_OBSERVE    /**< Bit mask for LWM2M observe operation. */
+#define LWM2M_OPERATION_CODE_WRITE_ATTR 0x80                        /**< Bit mask for LWM2M write-attribute operation. */
 
 #define LWM2M_ATTRIBUTE_TYPE_MIN_PERIOD        0 /**< p_min notification attribute type. */
 #define LWM2M_ATTRIBUTE_TYPE_MAX_PERIOD        1 /**< p_max notification attribute type. */

@@ -421,7 +421,7 @@ typedef struct
 
 } lwm2m_apn_conn_prof_t;
 
-typedef struct 
+typedef struct
 {
     lwm2m_instance_t           proto;
     uint8_t                    operations[1];
