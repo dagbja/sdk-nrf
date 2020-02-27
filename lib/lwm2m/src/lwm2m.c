@@ -792,7 +792,7 @@ uint32_t lwm2m_coap_handler_gen_object_link(uint16_t   object_id,
     uint32_t err_code = 0;
     uint32_t buffer_index    = 0;
     uint32_t buffer_max_size = *p_buffer_len;
-    uint32_t buffer_len;
+    uint32_t buffer_len, added_len;
     uint8_t  dry_run_buffer[16]; // Maximum: ",</65535/65535>"
 
     buffer_len = snprintf((char *)dry_run_buffer,
@@ -809,6 +809,16 @@ uint32_t lwm2m_coap_handler_gen_object_link(uint16_t   object_id,
     {
         return ENOMEM;
     }
+
+    added_len = buffer_max_size - buffer_index;
+    err_code = lwm2m_coap_handler_gen_attr_link(&object_id, 1, short_server_id, &p_buffer[buffer_index], &added_len);
+
+    if (err_code != 0)
+    {
+        return err_code;
+    }
+
+    buffer_index += added_len;
 
     for (int i = 0; i < m_num_instances; ++i)
     {
@@ -831,12 +841,14 @@ uint32_t lwm2m_coap_handler_gen_object_link(uint16_t   object_id,
                 return ENOMEM;
             }
 
-            uint32_t added_len = buffer_max_size - buffer_index;
-            err_code = lwm2m_coap_handler_gen_instance_link(m_instances[i], &p_buffer[buffer_index], &added_len);
+            added_len = buffer_max_size - buffer_index;
+            err_code = lwm2m_coap_handler_gen_instance_link(m_instances[i], short_server_id, &p_buffer[buffer_index], &added_len);
+
             if (err_code != 0)
             {
                 return err_code;
             }
+
             buffer_index += added_len;
         }
     }
@@ -848,6 +860,7 @@ uint32_t lwm2m_coap_handler_gen_object_link(uint16_t   object_id,
 
 
 uint32_t lwm2m_coap_handler_gen_instance_link(lwm2m_instance_t * p_instance,
+                                              uint16_t           short_server_id,
                                               uint8_t          * p_buffer,
                                               uint32_t         * p_buffer_len)
 {
@@ -855,6 +868,8 @@ uint32_t lwm2m_coap_handler_gen_instance_link(lwm2m_instance_t * p_instance,
     uint32_t buffer_index    = 0;
     uint32_t buffer_max_size = *p_buffer_len;
     uint32_t buffer_len;
+    uint32_t added_len;
+    uint16_t path[] = { p_instance->object_id, p_instance->instance_id, 0};
     uint8_t  dry_run_buffer[22]; // Maximum: ",</65535/65535/65535>"
 
     buffer_len = snprintf((char *)dry_run_buffer,
@@ -872,6 +887,16 @@ uint32_t lwm2m_coap_handler_gen_instance_link(lwm2m_instance_t * p_instance,
     {
         return ENOMEM;
     }
+
+    added_len = buffer_max_size - buffer_index;
+    err_code = lwm2m_coap_handler_gen_attr_link(path, 2, short_server_id, &p_buffer[buffer_index], &added_len);
+
+    if (err_code != 0)
+    {
+        return err_code;
+    }
+
+    buffer_index += added_len;
 
     uint16_t * p_resource_ids = (uint16_t *)((uint8_t *)p_instance + p_instance->resource_ids_offset);
 
@@ -904,6 +929,17 @@ uint32_t lwm2m_coap_handler_gen_instance_link(lwm2m_instance_t * p_instance,
             {
                 return ENOMEM;
             }
+
+            path[2] = p_resource_ids[i];
+            added_len = buffer_max_size - buffer_index;
+            err_code = lwm2m_coap_handler_gen_attr_link(path, 3, short_server_id, &p_buffer[buffer_index], &added_len);
+
+            if (err_code != 0)
+            {
+                return err_code;
+            }
+
+            buffer_index += added_len;
         }
     }
 

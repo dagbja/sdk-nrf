@@ -664,7 +664,7 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint16_t   object_id,
  * @param[inout] p_buffer_len    As input used to indicate length of the buffer. It will return the
  *                               used amout of buffer length.
  *
- * retval NRF_SUCCESS If generation of link format string was successful.
+ * @retval NRF_SUCCESS If generation of link format string was successful.
  */
 uint32_t lwm2m_coap_handler_gen_object_link(uint16_t   object_id,
                                             uint16_t   short_server_id,
@@ -678,11 +678,28 @@ uint32_t lwm2m_coap_handler_gen_object_link(uint16_t   object_id,
  * @param[inout] p_buffer_len As input used to indicate length of the buffer. It will return the
  *                            used amout of buffer length.
  *
- * retval NRF_SUCCESS If generation of link format string was successful.
+ * @retval NRF_SUCCESS If generation of link format string was successful.
  */
 uint32_t lwm2m_coap_handler_gen_instance_link(lwm2m_instance_t * p_instance,
+                                              uint16_t           short_server_id,
                                               uint8_t          * p_buffer,
                                               uint32_t         * p_buffer_len);
+
+/**@brief Generate link format string based on Notification Attributes.
+ *
+ * @param[in]    p_path           URI path that identifies the observable item.
+ * @param[in]    path_len         Length of the URI path that identifies the observable item.
+ * @param[in]    short_server_id  Short server id of the requesting server.
+ * @param[inout] p_buffer_len     As input used to indicate length of the buffer. It will return the
+ *                                used amout of buffer length.
+ *
+ * @retval NRF_SUCCESS If generation of link format string was successful.
+ */
+uint32_t lwm2m_coap_handler_gen_attr_link(uint16_t const * p_path,
+                                          uint16_t         path_len,
+                                          uint16_t         short_server_id,
+                                          uint8_t        * p_buffer,
+                                          uint32_t       * p_buffer_len);
 
 /**@brief Send CoAP 2.05 Content response with the payload provided.
  *

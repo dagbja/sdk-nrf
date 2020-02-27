@@ -513,11 +513,21 @@ uint32_t lwm2m_respond_with_instance_link(lwm2m_instance_t * p_instance,
 {
     uint8_t  buffer[512];
     uint32_t buffer_len = sizeof(buffer);
+    uint32_t added_len, err_code;
+    uint16_t short_server_id = 0;
+    uint16_t path[] = { p_instance->object_id, p_instance->instance_id, resource_id };
+
+    err_code = lwm2m_remote_short_server_id_find(&short_server_id, p_request->remote);
+    if (err_code != 0)
+    {
+        (void)lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
+        return err_code;
+    }
 
     if (resource_id == LWM2M_NAMED_OBJECT)
     {
         // Object Instance
-        uint32_t err_code = lwm2m_coap_handler_gen_instance_link(p_instance, buffer, &buffer_len);
+        err_code = lwm2m_coap_handler_gen_instance_link(p_instance, short_server_id, buffer, &buffer_len);
 
         if (err_code != 0)
         {
@@ -532,6 +542,15 @@ uint32_t lwm2m_respond_with_instance_link(lwm2m_instance_t * p_instance,
                               p_instance->object_id,
                               p_instance->instance_id,
                               resource_id);
+
+        added_len = sizeof(buffer) - buffer_len;
+        err_code = lwm2m_coap_handler_gen_attr_link(path, 3, short_server_id, &buffer[buffer_len], &added_len);
+
+        if (err_code != 0)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
+            return err_code;
+        }
     }
 
     return lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LINK_FORMAT, p_request);

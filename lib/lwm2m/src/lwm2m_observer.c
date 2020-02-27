@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include <lwm2m.h>
 #include <lwm2m_api.h>
@@ -1049,4 +1050,72 @@ const lwm2m_observable_metadata_t * const * lwm2m_observables_get(uint16_t *p_le
 {
     *p_len = LWM2M_MAX_OBSERVABLES_WITH_ATTRIBUTES;
     return (const lwm2m_observable_metadata_t * const * )m_observables;
+}
+
+uint32_t lwm2m_coap_handler_gen_attr_link(uint16_t const *p_path, uint16_t path_len, uint16_t short_server_id,
+                uint8_t *p_buffer, uint32_t *p_buffer_len)
+{
+    int index;
+    uint32_t buffer_index = 0;
+    uint8_t  dry_run_buffer[128];
+    uint32_t len = 0;
+    uint8_t  type;
+    const void *observable;
+
+    if (!p_path || !p_buffer)
+    {
+        *p_buffer_len = 0;
+        return EINVAL;
+    }
+
+    if (!observable_reference_get_cb)
+    {
+        *p_buffer_len = 0;
+        return 0;
+    }
+
+    observable = observable_reference_get_cb(p_path, path_len, &type);
+    if (!observable)
+    {
+        *p_buffer_len = 0;
+        return 0;
+    }
+
+    index = observable_index_find(observable, short_server_id);
+    if (index < 0)
+    {
+        *p_buffer_len = 0;
+        return 0;
+    }
+
+    for (int i = 0; i < LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE; i++)
+    {
+        if (m_observables[index]->attributes[i].assignment_level >= path_len)
+        {
+            if (buffer_index >= sizeof(dry_run_buffer))
+            {
+                // Should never happen
+                return ENOMEM;
+            }
+
+            len += snprintf((char *)&dry_run_buffer[buffer_index],
+                            sizeof(dry_run_buffer) - len,
+                            ";%s=%d", lwm2m_notif_attribute_name[i],
+                            m_observables[index]->attributes[i].value.i);
+            buffer_index = len;
+        }
+    }
+
+    if (len <= *p_buffer_len)
+    {
+        memcpy(p_buffer, dry_run_buffer, len);
+        *p_buffer_len = len;
+    }
+    else
+    {
+        *p_buffer_len = 0;
+        return ENOMEM;
+    }
+
+    return 0;
 }
