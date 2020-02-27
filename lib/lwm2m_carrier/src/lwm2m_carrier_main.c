@@ -132,8 +132,6 @@ static bool m_registration_ready;
 
 /* Resolved server addresses */
 static nrf_sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { NRF_AF_INET6, NRF_AF_INET6, NRF_AF_INET6, NRF_AF_INET6 };  /**< Current IP versions, start using IPv6. */
-static struct nrf_sockaddr_in6 m_bs_remote_server;                                                    /**< Remote bootstrap server address to connect to. */
-
 static struct nrf_sockaddr_in6 m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
 static volatile uint32_t tick_count = 0;
 
@@ -1009,7 +1007,7 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t              short_
     uint32_t err_code;
 
     // Use DNS to lookup the IP
-    err_code = app_resolve_server_uri(server_uri, uri_len, p_remote, secure, m_family_type[0], m_admin_pdn_handle);
+    err_code = app_resolve_server_uri(server_uri, uri_len, p_remote, secure, m_family_type[LWM2M_BOOTSTRAP_INSTANCE_ID], m_admin_pdn_handle);
 
     if (err_code == 0)
     {
@@ -1702,7 +1700,7 @@ static void app_bootstrap_connect(void)
                                                    p_server_uri,
                                                    uri_len,
                                                    &secure,
-                                                   (struct nrf_sockaddr *)&m_bs_remote_server);
+                                                   (struct nrf_sockaddr *)&m_remote_server[LWM2M_BOOTSTRAP_INSTANCE_ID]);
     if (err_code != 0) {
         if (err_code == ENETDOWN) {
             // PDN disconnected, just return to come back activating it immediately
@@ -1724,7 +1722,7 @@ static void app_bootstrap_connect(void)
         LWM2M_TRC("SECURE session (bootstrap)");
 
         struct nrf_sockaddr_in6 local_addr;
-        app_init_sockaddr_in((struct nrf_sockaddr *)&local_addr, m_bs_remote_server.sin6_family, LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT);
+        app_init_sockaddr_in((struct nrf_sockaddr *)&local_addr, m_remote_server[LWM2M_BOOTSTRAP_INSTANCE_ID].sin6_family, LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT);
 
         #define SEC_TAG_COUNT 1
 
@@ -1744,7 +1742,7 @@ static void app_bootstrap_connect(void)
             .protocol     = NRF_SPROTO_DTLS1v2
         };
 
-        if (m_use_admin_pdn[0] && m_admin_pdn_handle != -1)
+        if (m_use_admin_pdn[LWM2M_BOOTSTRAP_INSTANCE_ID] && m_admin_pdn_handle != -1)
         {
             admin_apn_get(m_apn_name_buf, sizeof(m_apn_name_buf));
             local_port.interface = m_apn_name_buf;
@@ -1753,18 +1751,18 @@ static void app_bootstrap_connect(void)
         LWM2M_INF("Setup secure DTLS session (server 0) (APN %s)",
                   (local_port.interface) ? lwm2m_os_log_strdup(m_apn_name_buf) : "default");
 
-        err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_bs_remote_server);
+        err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_remote_server[LWM2M_BOOTSTRAP_INSTANCE_ID]);
 
         if (err_code == 0)
         {
             LWM2M_INF("Connected");
             lwm2m_state_set(LWM2M_STATE_BS_CONNECTED);
-            m_lwm2m_transport[0] = local_port.transport;
+            m_lwm2m_transport[LWM2M_BOOTSTRAP_INSTANCE_ID] = local_port.transport;
         }
         else if (err_code == EINPROGRESS)
         {
             lwm2m_state_set(LWM2M_STATE_BS_CONNECT_WAIT);
-            m_lwm2m_transport[0] = local_port.transport;
+            m_lwm2m_transport[LWM2M_BOOTSTRAP_INSTANCE_ID] = local_port.transport;
         }
         else if (err_code == EIO && (lwm2m_os_errno() == NRF_ENETDOWN)) {
             LWM2M_INF("Connection failed (PDN down)");
@@ -1803,9 +1801,9 @@ static void app_bootstrap(void)
 
     m_use_client_holdoff_timer = true;
 
-    uint32_t err_code = lwm2m_bootstrap((struct nrf_sockaddr *)&m_bs_remote_server,
+    uint32_t err_code = lwm2m_bootstrap((struct nrf_sockaddr *)&m_remote_server[LWM2M_BOOTSTRAP_INSTANCE_ID],
                                         &m_client_id,
-                                        m_lwm2m_transport[0]);
+                                        m_lwm2m_transport[LWM2M_BOOTSTRAP_INSTANCE_ID]);
     if (err_code == 0)
     {
         lwm2m_state_set(LWM2M_STATE_BOOTSTRAP_REQUESTED);
