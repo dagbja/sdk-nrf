@@ -23,11 +23,6 @@
                                               LWM2M_PERMISSION_EXECUTE | \
                                               LWM2M_PERMISSION_DELETE  | \
                                               LWM2M_PERMISSION_CREATE)
-#define LWM2M_ACL_RWEDO_PERM                 (LWM2M_PERMISSION_READ    | \
-                                              LWM2M_PERMISSION_WRITE   | \
-                                              LWM2M_PERMISSION_EXECUTE | \
-                                              LWM2M_PERMISSION_DELETE  | \
-                                              LWM2M_PERMISSION_OBSERVE)
 #define LWM2M_ACL_DEFAULT_SHORT_SERVER_ID    0
 #define LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID  65535
 #define LWM2M_ACL_LIST_TLV_SIZE              (LWM2M_MAX_SERVERS * 5) /* Bytes required to serialize an ACL list to TLV. */

@@ -570,24 +570,27 @@ uint32_t lwm2m_firmware_object_callback(lwm2m_object_t * p_object,
 
 void lwm2m_firmware_init_acl(void)
 {
+    uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
+                            LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE);
+
     lwm2m_instance_acl_t acl = {
         .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID
     };
 
     if (operator_is_vzw(true))
     {
-        acl.access[0] = LWM2M_ACL_RWEDO_PERM;
+        acl.access[0] = rwde_access;
         acl.server[0] = 102;
     }
     else if (operator_is_att(true))
     {
-        acl.access[0] = LWM2M_ACL_RWEDO_PERM;
+        acl.access[0] = rwde_access;
         acl.server[0] = 1;
     }
     else
     {
         // TODO: Remove when fixing ACL
-        acl.access[0] = LWM2M_ACL_RWEDO_PERM;
+        acl.access[0] = rwde_access;
         acl.server[0] = 123;
     }
 
