@@ -703,14 +703,13 @@ static int app_generate_client_id(void)
     int32_t len = lwm2m_last_used_operator_id_get(&last_used_operator_id);
 
     if (last_used_operator_id != operator_id(true)) {
-        const char *p_operator_id = operator_id_string(operator_id(true));
         if (last_used_operator_id == OPERATOR_ID_UNSET) {
             LWM2M_INF("Carrier detected: %s",
-                      lwm2m_os_log_strdup(p_operator_id));
+                      lwm2m_os_log_strdup(operator_id_string(operator_id(true))));
         } else {
             LWM2M_INF("Carrier change detected: %s -> %s",
                       lwm2m_os_log_strdup(operator_id_string(last_used_operator_id)),
-                      lwm2m_os_log_strdup(p_operator_id));
+                      lwm2m_os_log_strdup(operator_id_string(operator_id(true))));
         }
         if (lwm2m_factory_bootstrap_update(&m_app_config)) {
             clear_bootstrap = true;
