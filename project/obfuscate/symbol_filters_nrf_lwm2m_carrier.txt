@@ -125,7 +125,7 @@
 ^lwm2m_security_server_uri_get$
 ^lwm2m_security_server_uri_set$
 ^lwm2m_server_get_instance$
-^lwm2m_server_instance$
+^lwm2m_security_instance$
 ^lwm2m_server_lifetime_get$
 ^lwm2m_server_lifetime_set$
 ^lwm2m_server_registered_get$

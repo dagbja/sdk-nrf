@@ -68,7 +68,7 @@ void lwm2m_request_deregister(void);
 void lwm2m_request_disconnect(void);
 void lwm2m_request_reset(void);
 bool lwm2m_did_bootstrap(void);
-uint16_t lwm2m_server_instance(void);
+uint16_t lwm2m_security_instance(void);
 nrf_sa_family_t lwm2m_family_type_get(uint16_t instance_id);
 int32_t lwm2m_state_update_delay(void);
 

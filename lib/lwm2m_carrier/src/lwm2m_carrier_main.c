@@ -88,8 +88,13 @@ static int   m_admin_pdn_handle = -1;                                           
 static bool  m_use_admin_pdn[1+LWM2M_MAX_SERVERS] = { true, true, true, false };              /**< Use VZWADMIN PDN for connection. */
 
 static volatile lwm2m_state_t m_app_state = LWM2M_STATE_BOOTING;                              /**< Application state. Should be one of @ref lwm2m_state_t. */
-static volatile uint16_t    m_server_instance;                                                /**< Server instance handled. */
 static volatile bool        m_did_bootstrap;
+
+/**< Security instance currently handled. */
+static volatile uint16_t    m_security_instance;
+
+/* Map table for Security instance and Server instance. */
+static uint16_t m_server_instance_map[1+LWM2M_MAX_SERVERS];
 
 /** @brief 15 digits IMEI stored as a NULL-terminated String. */
 static char m_imei[16];
@@ -117,7 +122,7 @@ typedef enum
 
 struct connection_update_t {
     void *timer;
-    uint16_t instance_id;
+    uint16_t security_instance;
     lwm2m_update_request_t requested;
     bool reconnect;
 };
@@ -131,10 +136,7 @@ static nrf_sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { NRF_AF_INET6, NRF_
 static struct nrf_sockaddr_in6 m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
 static volatile uint32_t tick_count = 0;
 
-/* Map table for Security instance and Server instance. */
-static uint16_t m_server_inst[1+LWM2M_MAX_SERVERS];
-
-static void app_server_disconnect(uint16_t instance_id);
+static void app_server_disconnect(uint16_t security_instance);
 static int app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
 static int app_provision_secret_keys(void);
 static void app_disconnect(void);
@@ -213,10 +215,54 @@ static int app_offline(void)
     return err;
 }
 
+/** @brief Get the server instance which corresponds to the security instance. */
+static uint16_t server_instance_get(uint16_t security_instance)
+{
+    if (security_instance >= 1+LWM2M_MAX_SERVERS)
+    {
+        LWM2M_ERR("Illegal security instance: %u", security_instance);
+        return 0;
+    }
+
+    if (m_server_instance_map[security_instance] == UINT16_MAX)
+    {
+        LWM2M_ERR("Missing server instance for security instance: %u", security_instance);
+        return 0;
+    }
+
+    return m_server_instance_map[security_instance];
+}
+
+static void server_instance_update_map(void)
+{
+    uint16_t short_server_id;
+
+    for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+        short_server_id = lwm2m_security_short_server_id_get(i);
+        m_server_instance_map[i] = UINT16_MAX;
+
+        if (short_server_id == 0) {
+            continue;
+        }
+
+        for (int j = 0; j < 1+LWM2M_MAX_SERVERS; j++) {
+            if (short_server_id == lwm2m_server_short_server_id_get(j)) {
+                lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(j);
+                LWM2M_INF("  </0/%u>,</1/%u>,</2/%u>;ssid=%u", i, j, p_instance->acl.id, short_server_id);
+                m_server_instance_map[i] = j;
+            }
+        }
+
+        if (m_server_instance_map[i] == UINT16_MAX) {
+            LWM2M_INF("  </0/%u>;ssid=%u", i, short_server_id);
+        }
+    }
+}
+
 static bool lwm2m_is_registration_ready(void)
 {
     for (int i = 1; i < 1 + LWM2M_MAX_SERVERS; i++) {
-        if ((m_connection_update[i].instance_id != 0) &&
+        if ((m_connection_update[i].security_instance != 0) &&
             (m_connection_update[i].requested == LWM2M_REQUEST_UPDATE))
         {
             /* More registrations to come, not ready yet. */
@@ -229,8 +275,8 @@ static bool lwm2m_is_registration_ready(void)
 
 static bool lwm2m_is_deregistration_done(void)
 {
-    for (int i = 1; i < 1 + LWM2M_MAX_SERVERS; i++) {
-        if (lwm2m_server_registered_get(m_server_inst[i])) {
+    for (int i = 0; i < 1 + LWM2M_MAX_SERVERS; i++) {
+        if (lwm2m_server_registered_get(i)) {
             // Still having registered servers
             return false;
         }
@@ -239,9 +285,9 @@ static bool lwm2m_is_deregistration_done(void)
     return true;
 }
 
-static uint16_t lwm2m_instance_id_from_remote(struct nrf_sockaddr *p_remote, uint16_t *short_server_id)
+static uint16_t lwm2m_security_instance_from_remote(struct nrf_sockaddr *p_remote, uint16_t *short_server_id)
 {
-    uint16_t instance_id = UINT16_MAX;
+    uint16_t security_instance = UINT16_MAX;
 
     if (p_remote == NULL)
     {
@@ -257,19 +303,19 @@ static uint16_t lwm2m_instance_id_from_remote(struct nrf_sockaddr *p_remote, uin
         // Find the server instance for the short server ID.
         for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
             if (lwm2m_security_short_server_id_get(i) == *short_server_id) {
-                instance_id = i;
+                security_instance = i;
                 break;
             }
         }
     }
 
-    if ((instance_id == UINT16_MAX) &&
+    if ((security_instance == UINT16_MAX) &&
         (*short_server_id != 0))
     {
         LWM2M_WRN("Server instance for short server ID not found: %d", *short_server_id);
     }
 
-    return instance_id;
+    return security_instance;
 }
 
 /** Functions available from shell access */
@@ -323,17 +369,17 @@ void lwm2m_request_connect(void)
     }
 }
 
-void lwm2m_request_server_update(uint16_t instance_id, bool reconnect)
+void lwm2m_request_server_update(uint16_t security_instance, bool reconnect)
 {
-    if (m_lwm2m_transport[instance_id] != -1 || reconnect) {
-        m_connection_update[instance_id].requested = LWM2M_REQUEST_UPDATE;
+    if (m_lwm2m_transport[security_instance] != -1 || reconnect) {
+        m_connection_update[security_instance].requested = LWM2M_REQUEST_UPDATE;
     }
 }
 
 void lwm2m_request_deregister(void)
 {
-    for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
-        if (lwm2m_server_registered_get(m_server_inst[i]) && m_lwm2m_transport[i] != -1) {
+    for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
+        if (lwm2m_server_registered_get(i) && m_lwm2m_transport[i] != -1) {
             m_connection_update[i].requested = LWM2M_REQUEST_DEREGISTER;
         }
     }
@@ -405,9 +451,9 @@ bool lwm2m_is_admin_pdn_ready()
     return (m_admin_pdn_handle != -1);
 }
 
-uint16_t lwm2m_server_instance(void)
+uint16_t lwm2m_security_instance(void)
 {
-    return m_server_instance;
+    return m_security_instance;
 }
 
 int64_t lwm2m_coap_con_interval_get(void)
@@ -420,9 +466,9 @@ void lwm2m_coap_con_interval_set(int64_t con_interval)
     m_coap_con_interval = con_interval;
 }
 
-nrf_sa_family_t lwm2m_family_type_get(uint16_t instance_id)
+nrf_sa_family_t lwm2m_family_type_get(uint16_t security_instance)
 {
-    return m_family_type[instance_id];
+    return m_family_type[security_instance];
 }
 
 int32_t lwm2m_state_update_delay(void)
@@ -496,12 +542,12 @@ static void lwm2m_pdn_activate_delay_reset(void)
 }
 
 /**@brief Setup ADMIN PDN connection, if necessary */
-int lwm2m_admin_pdn_activate(uint16_t instance_id)
+int lwm2m_admin_pdn_activate(uint16_t security_instance)
 {
     int rc;
 
     if (!operator_is_vzw(false) ||
-        !m_use_admin_pdn[instance_id]) {
+        !m_use_admin_pdn[security_instance]) {
         /* Nothing to do */
         lwm2m_pdn_activate_delay_reset();
         return 0;
@@ -559,18 +605,18 @@ bool lwm2m_request_remote_reconnect(struct nrf_sockaddr *p_remote)
     bool requested = false;
 
     uint16_t short_server_id = 0;
-    uint16_t instance_id = lwm2m_instance_id_from_remote(p_remote, &short_server_id);;
+    uint16_t security_instance = lwm2m_security_instance_from_remote(p_remote, &short_server_id);;
 
     // Reconnect if not already in the connect/register phase for this server.
     if ((m_app_state == LWM2M_STATE_IDLE) ||
-        (instance_id != m_server_instance))
+        (security_instance != m_security_instance))
     {
         // Only reconnect if remote is found and already connected.
-        if ((instance_id != UINT16_MAX) &&
-            (m_lwm2m_transport[instance_id] != -1))
+        if ((security_instance != UINT16_MAX) &&
+            (m_lwm2m_transport[security_instance] != -1))
         {
-            app_server_disconnect(instance_id);
-            lwm2m_request_server_update(instance_id, true);
+            app_server_disconnect(security_instance);
+            lwm2m_request_server_update(security_instance, true);
             lwm2m_remote_reconnecting_set(short_server_id);
 
             requested = true;
@@ -1169,16 +1215,16 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t              short_
 }
 
 /**@brief Helper function to handle a connect retry. */
-static void app_handle_connect_retry(int instance_id, bool fallback)
+static void app_handle_connect_retry(uint16_t security_instance, bool fallback)
 {
     bool start_retry_delay = true;
 
     if (fallback && !lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6) && !lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_FALLBACK))
     {
         // Fallback to the other IP version
-        m_family_type[instance_id] = (m_family_type[instance_id] == NRF_AF_INET6) ? NRF_AF_INET : NRF_AF_INET6;
+        m_family_type[security_instance] = (m_family_type[security_instance] == NRF_AF_INET6) ? NRF_AF_INET : NRF_AF_INET6;
 
-        if (m_family_type[instance_id] == NRF_AF_INET)
+        if (m_family_type[security_instance] == NRF_AF_INET)
         {
             // No retry delay when IPv6 to IPv4 fallback
             LWM2M_INF("IPv6 to IPv4 fallback");
@@ -1189,12 +1235,12 @@ static void app_handle_connect_retry(int instance_id, bool fallback)
     if (start_retry_delay)
     {
         bool is_last = false;
-        int32_t retry_delay = lwm2m_retry_delay_get(instance_id, true, &is_last);
+        int32_t retry_delay = lwm2m_retry_delay_get(security_instance, true, &is_last);
 
         if (retry_delay == -1) {
             LWM2M_ERR("Bootstrap procedure failed");
             m_app_state = LWM2M_STATE_DISCONNECTED;
-            lwm2m_retry_delay_reset(instance_id);
+            lwm2m_retry_delay_reset(security_instance);
 
             app_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, 0);
             return;
@@ -1204,27 +1250,27 @@ static void app_handle_connect_retry(int instance_id, bool fallback)
             if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT) {
                 // This is the last retry delay after no response from server.
                 // Disconnect the session and retry on timeout.
-                app_server_disconnect(instance_id);
+                app_server_disconnect(security_instance);
             }
 
             app_event_notify(LWM2M_CARRIER_EVENT_DEFERRED, NULL);
         }
 
-        LWM2M_INF("Retry delay for %ld minutes (server %u)", retry_delay / 60, instance_id);
+        LWM2M_INF("Retry delay for %ld minutes (server %u)", retry_delay / 60, security_instance);
         lwm2m_os_timer_start(state_update_timer, retry_delay * 1000);
     } else {
         lwm2m_os_timer_start(state_update_timer, 0);
     }
 }
 
-static void app_set_bootstrap_if_last_retry_delay(int instance_id)
+static void app_set_bootstrap_if_last_retry_delay(uint16_t security_instance)
 {
-    if (instance_id == VZW_MANAGEMENT_INSTANCE_ID ||
-        instance_id == VZW_REPOSITORY_INSTANCE_ID)
+    if (security_instance == VZW_MANAGEMENT_INSTANCE_ID ||
+        security_instance == VZW_REPOSITORY_INSTANCE_ID)
     {
         // Check if this is the last retry delay after an inability to establish a DTLS session.
         bool is_last = false;
-        (void) lwm2m_retry_delay_get(instance_id, false, &is_last);
+        (void) lwm2m_retry_delay_get(security_instance, false, &is_last);
 
         if (is_last) {
             // Repeat the bootstrap flow on timeout or reboot.
@@ -1235,9 +1281,10 @@ static void app_set_bootstrap_if_last_retry_delay(int instance_id)
     }
 }
 
-static void app_restart_lifetime_timer(uint8_t instance_id)
+static void app_restart_lifetime_timer(uint16_t security_instance)
 {
-    lwm2m_time_t lifetime = lwm2m_server_lifetime_get(m_server_inst[instance_id]);
+    uint16_t server_instance = server_instance_get(security_instance);
+    lwm2m_time_t lifetime = lwm2m_server_lifetime_get(server_instance);
 
     if (lifetime > SECONDS_TO_UPDATE_EARLY) {
         // Set timeout before lifetime expires to ensure we Update within the timeout
@@ -1250,13 +1297,13 @@ static void app_restart_lifetime_timer(uint8_t instance_id)
         timeout = INT32_MAX;
     }
 
-    m_connection_update[instance_id].reconnect = false;
-    lwm2m_os_timer_start(m_connection_update[instance_id].timer, timeout);
+    m_connection_update[security_instance].reconnect = false;
+    lwm2m_os_timer_start(m_connection_update[security_instance].timer, timeout);
 }
 
-static void app_cancel_lifetime_timer(uint8_t instance_id)
+static void app_cancel_lifetime_timer(uint16_t security_instance)
 {
-    lwm2m_os_timer_cancel(m_connection_update[instance_id].timer);
+    lwm2m_os_timer_cancel(m_connection_update[security_instance].timer);
 }
 
 /**@brief LWM2M notification handler. */
@@ -1305,9 +1352,10 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
     }
 
     uint16_t short_server_id = 0;
-    uint16_t instance_id = lwm2m_instance_id_from_remote(p_remote, &short_server_id);
+    uint16_t security_instance = lwm2m_security_instance_from_remote(p_remote, &short_server_id);
+    uint16_t server_instance = server_instance_get(security_instance);
 
-    if (instance_id == UINT16_MAX)
+    if (security_instance == UINT16_MAX)
     {
         // Not found
         return;
@@ -1315,21 +1363,22 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
 
     if (type == LWM2M_NOTIFCATION_TYPE_REGISTER)
     {
-        app_restart_lifetime_timer(instance_id);
+        app_restart_lifetime_timer(security_instance);
 
         if (coap_code == COAP_CODE_201_CREATED || coap_code == COAP_CODE_204_CHANGED)
         {
-            LWM2M_INF("Registered (server %u)", instance_id);
-            lwm2m_retry_delay_reset(instance_id);
-            lwm2m_server_registered_set(m_server_inst[instance_id], true);
+            LWM2M_INF("Registered (server %u)", security_instance);
+
+            lwm2m_retry_delay_reset(security_instance);
+            lwm2m_server_registered_set(server_instance, true);
 
             // Reset connection update in case this has been requested while connecting
-            m_connection_update[instance_id].requested = LWM2M_REQUEST_NONE;
+            m_connection_update[security_instance].requested = LWM2M_REQUEST_NONE;
 
             lwm2m_state_set(LWM2M_STATE_IDLE);
 
             // Refresh stored server object, to also include is_connected status and registration ID.
-            lwm2m_instance_storage_server_store(m_server_inst[instance_id]);
+            lwm2m_instance_storage_server_store(server_instance);
 
             lwm2m_notif_attr_storage_restore(short_server_id);
 
@@ -1343,20 +1392,20 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         {
             // No response or received a 4.0x error.
             if (lwm2m_state_set(LWM2M_STATE_SERVER_REGISTER_WAIT)) {
-                if (instance_id == VZW_MANAGEMENT_INSTANCE_ID && coap_code == COAP_CODE_400_BAD_REQUEST) {
+                if (security_instance == VZW_MANAGEMENT_INSTANCE_ID && coap_code == COAP_CODE_400_BAD_REQUEST) {
                     // Received 4.00 error from DM server, use last defined retry delay.
-                    int32_t retry_delay = lwm2m_retry_delay_get(instance_id, false, NULL);
+                    int32_t retry_delay = lwm2m_retry_delay_get(security_instance, false, NULL);
 
                     // VZW HACK: Loop until the current delay is 8 minutes. This will give the
                     // last retry delay (24 hours) in the next call to lwm2m_retry_delay_get()
                     // in app_handle_connect_retry().
                     while (retry_delay != (8*60)) {
                         // If not second to last then fetch next.
-                        retry_delay = lwm2m_retry_delay_get(instance_id, true, NULL);
+                        retry_delay = lwm2m_retry_delay_get(security_instance, true, NULL);
                     }
                 }
 
-                app_handle_connect_retry(instance_id, false);
+                app_handle_connect_retry(security_instance, false);
             }
         }
     }
@@ -1364,9 +1413,9 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
     {
         if (coap_code == 0) {
             // No response from update request
-            LWM2M_INF("Update timeout, reconnect (server %d)", instance_id);
-            app_server_disconnect(instance_id);
-            lwm2m_request_server_update(instance_id, true);
+            LWM2M_INF("Update timeout, reconnect (server %d)", security_instance);
+            app_server_disconnect(security_instance);
+            lwm2m_request_server_update(security_instance, true);
 
             if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT) {
                 // Timeout sending update after a server connect, reconnect from idle state.
@@ -1379,8 +1428,8 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         {
             // If not found, ignore.
             (void)lwm2m_remote_location_delete(short_server_id);
-            lwm2m_server_registered_set(m_server_inst[instance_id], false);
-            lwm2m_instance_storage_server_store(m_server_inst[instance_id]);
+            lwm2m_server_registered_set(server_instance, false);
+            lwm2m_instance_storage_server_store(server_instance);
 
             // Reset state to get back to registration.
             lwm2m_state_set(LWM2M_STATE_SERVER_CONNECTED);
@@ -1388,16 +1437,16 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         else if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT)
         {
             // Update instead of register during connect
-            LWM2M_INF("Updated after connect (server %d)", instance_id);
-            lwm2m_retry_delay_reset(instance_id);
+            LWM2M_INF("Updated after connect (server %d)", security_instance);
+            lwm2m_retry_delay_reset(security_instance);
 
             if (!m_registration_ready) {
-                lwm2m_observer_storage_restore(short_server_id, m_lwm2m_transport[instance_id]);
+                lwm2m_observer_storage_restore(short_server_id, m_lwm2m_transport[security_instance]);
                 lwm2m_notif_attr_storage_restore(short_server_id);
             }
 
             // Reset connection update in case this has been requested while connecting
-            m_connection_update[instance_id].requested = LWM2M_REQUEST_NONE;
+            m_connection_update[security_instance].requested = LWM2M_REQUEST_NONE;
 
             lwm2m_state_set(LWM2M_STATE_IDLE);
 
@@ -1415,7 +1464,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
                 {
                     if (memcmp(p_observer->remote, p_remote, sizeof(struct nrf_sockaddr)) == 0)
                     {
-                        p_observer->transport = m_lwm2m_transport[instance_id];
+                        p_observer->transport = m_lwm2m_transport[security_instance];
                     }
                 }
                 lwm2m_observer_process(true);
@@ -1425,15 +1474,15 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
     else if (type == LWM2M_NOTIFCATION_TYPE_DEREGISTER)
     {
         // We have successfully deregistered.
-        lwm2m_server_registered_set(m_server_inst[instance_id], false);
+        lwm2m_server_registered_set(server_instance, false);
 
         // Store server object to know that its not registered, and location should be cleared.
-        lwm2m_instance_storage_server_store(m_server_inst[instance_id]);
+        lwm2m_instance_storage_server_store(server_instance);
 
         if (m_app_state == LWM2M_STATE_SERVER_DEREGISTERING)
         {
-            LWM2M_INF("Deregistered (server %d)", instance_id);
-            app_server_disconnect(instance_id);
+            LWM2M_INF("Deregistered (server %d)", security_instance);
+            app_server_disconnect(security_instance);
 
             if (lwm2m_is_deregistration_done()) {
                 m_app_state = LWM2M_STATE_DISCONNECTED;
@@ -1441,12 +1490,12 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         }
         else
         {
-            int32_t delay = (int32_t) lwm2m_server_disable_timeout_get(m_server_inst[instance_id]);
-            LWM2M_INF("Disable [%ld seconds] (server %d)", delay, instance_id);
-            app_server_disconnect(instance_id);
+            int32_t delay = (int32_t) lwm2m_server_disable_timeout_get(server_instance);
+            LWM2M_INF("Disable [%ld seconds] (server %d)", delay, security_instance);
+            app_server_disconnect(security_instance);
 
-            m_connection_update[instance_id].reconnect = true;
-            lwm2m_os_timer_start(m_connection_update[instance_id].timer, delay * 1000);
+            m_connection_update[security_instance].reconnect = true;
+            lwm2m_os_timer_start(m_connection_update[security_instance].timer, delay * 1000);
         }
     }
 }
@@ -1521,7 +1570,7 @@ static void app_connection_update(void *timer)
         return;
     }
 
-    lwm2m_request_server_update(connection_update_p->instance_id, connection_update_p->reconnect);
+    lwm2m_request_server_update(connection_update_p->security_instance, connection_update_p->reconnect);
 }
 
 static void app_init_connection_update(void)
@@ -1536,13 +1585,13 @@ static void app_init_connection_update(void)
             if (m_connection_update[i].timer == NULL) {
                 m_connection_update[i].timer = lwm2m_os_timer_get(app_connection_update);
             }
-            m_connection_update[i].instance_id = i;
+            m_connection_update[i].security_instance = i;
         } else {
             if (m_connection_update[i].timer != NULL) {
                 lwm2m_os_timer_release(m_connection_update[i].timer);
                 m_connection_update[i].timer = NULL;
             }
-            m_connection_update[i].instance_id = 0;
+            m_connection_update[i].security_instance = 0;
         }
         m_connection_update[i].reconnect = false;
     }
@@ -1554,32 +1603,6 @@ static void app_misc_data_set_bootstrapped(bool bootstrapped)
     lwm2m_instance_storage_misc_data_load(&misc_data);
     misc_data.bootstrapped = bootstrapped ? 1 : 0;
     lwm2m_instance_storage_misc_data_store(&misc_data);
-}
-
-static void app_update_server_instance_map(void)
-{
-    uint16_t short_server_id;
-
-    for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-        short_server_id = lwm2m_security_short_server_id_get(i);
-        m_server_inst[i] = UINT16_MAX; // Initialize to UINT16_MAX to detect illegal m_server_inst[] use.
-
-        if (short_server_id == 0) {
-            continue;
-        }
-
-        for (int j = 0; j < 1+LWM2M_MAX_SERVERS; j++) {
-            if (short_server_id == lwm2m_server_short_server_id_get(j)) {
-                lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(j);
-                LWM2M_INF("  </0/%u>,</1/%u>,</2/%u>;ssid=%u", i, j, p_instance->acl.id, short_server_id);
-                m_server_inst[i] = j;
-            }
-        }
-
-        if (m_server_inst[i] == UINT16_MAX) {
-            LWM2M_INF("  </0/%u>;ssid=%u", i, short_server_id);
-        }
-    }
 }
 
 /**@brief Callback function for the named bootstrap complete object. */
@@ -1620,7 +1643,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
         }
     }
 
-    app_update_server_instance_map();
+    server_instance_update_map();
 
     (void)app_event_notify(LWM2M_CARRIER_EVENT_BOOTSTRAPPED, NULL);
 
@@ -1725,7 +1748,7 @@ static void app_load_flash_objects(void)
         }
     }
 
-    app_update_server_instance_map();
+    server_instance_update_map();
 
     lwm2m_instance_storage_misc_data_t misc_data;
     int32_t result = lwm2m_instance_storage_misc_data_load(&misc_data);
@@ -1997,51 +2020,53 @@ static void app_bootstrap(void)
     }
 }
 
-static void app_server_connect(uint16_t instance_id)
+static void app_server_connect(uint16_t security_instance)
 {
     uint32_t err_code;
     bool secure;
 
-    int32_t pdn_retry_delay = lwm2m_admin_pdn_activate(instance_id);
+    int32_t pdn_retry_delay = lwm2m_admin_pdn_activate(security_instance);
     if (pdn_retry_delay > 0) {
         // Setup ADMIN PDN connection failed, try again
         if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
-            LWM2M_INF("PDN retry delay for %ld seconds (server %u)", pdn_retry_delay/1000, instance_id);
+            LWM2M_INF("PDN retry delay for %ld seconds (server %u)", pdn_retry_delay/1000, security_instance);
             lwm2m_os_timer_start(state_update_timer, pdn_retry_delay);
         }
         return;
     }
 
+    uint16_t server_instance = server_instance_get(security_instance);
+
     // Initialize server configuration structure.
-    memset(&m_server_conf[instance_id], 0, sizeof(lwm2m_server_config_t));
-    m_server_conf[instance_id].lifetime = lwm2m_server_lifetime_get(m_server_inst[instance_id]);
+    memset(&m_server_conf[security_instance], 0, sizeof(lwm2m_server_config_t));
+    m_server_conf[security_instance].lifetime = lwm2m_server_lifetime_get(server_instance);
 
     if (operator_is_supported(false))
     {
-        m_server_conf[instance_id].binding.p_val = "UQS";
-        m_server_conf[instance_id].binding.len = 3;
+        m_server_conf[security_instance].binding.p_val = "UQS";
+        m_server_conf[security_instance].binding.len = 3;
 
-        if (instance_id) {
-            m_server_conf[instance_id].msisdn.p_val = lwm2m_msisdn_get();
-            m_server_conf[instance_id].msisdn.len = strlen(lwm2m_msisdn_get());
+        if (security_instance) {
+            m_server_conf[security_instance].msisdn.p_val = lwm2m_msisdn_get();
+            m_server_conf[security_instance].msisdn.len = strlen(lwm2m_msisdn_get());
         }
     }
 
     // Set the short server id of the server in the config.
-    m_server_conf[instance_id].short_server_id = lwm2m_security_short_server_id_get(instance_id);
+    m_server_conf[security_instance].short_server_id = lwm2m_security_short_server_id_get(security_instance);
 
     // Deregister the short_server_id in case it has been registered with a different address
-    (void) lwm2m_remote_deregister(m_server_conf[instance_id].short_server_id);
+    (void) lwm2m_remote_deregister(m_server_conf[security_instance].short_server_id);
 
     uint8_t uri_len = 0;
-    char * p_server_uri = lwm2m_security_server_uri_get(instance_id, &uri_len);
+    char * p_server_uri = lwm2m_security_server_uri_get(security_instance, &uri_len);
 
     err_code = app_resolve_server_uri(p_server_uri,
                                       uri_len,
-                                      (struct nrf_sockaddr *)&m_remote_server[instance_id],
+                                      (struct nrf_sockaddr *)&m_remote_server[security_instance],
                                       &secure,
-                                      m_family_type[instance_id],
-                                      m_use_admin_pdn[instance_id] ? m_admin_pdn_handle : -1);
+                                      m_family_type[security_instance],
+                                      m_use_admin_pdn[security_instance] ? m_admin_pdn_handle : -1);
     if (err_code != 0)
     {
         if (err_code == ENETDOWN) {
@@ -2051,9 +2076,9 @@ static void app_server_connect(uint16_t instance_id)
 
         if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
             if (err_code == EINVAL) {
-                app_handle_connect_retry(instance_id, true);
+                app_handle_connect_retry(security_instance, true);
             } else {
-                app_handle_connect_retry(instance_id, false);
+                app_handle_connect_retry(security_instance, false);
             }
         }
         return;
@@ -2065,11 +2090,11 @@ static void app_server_connect(uint16_t instance_id)
 
         // TODO: Check if this has to be static.
         struct nrf_sockaddr_in6 local_addr;
-        app_init_sockaddr_in((struct nrf_sockaddr *)&local_addr, m_remote_server[instance_id].sin6_family, LWM2M_LOCAL_CLIENT_PORT_OFFSET + instance_id);
+        app_init_sockaddr_in((struct nrf_sockaddr *)&local_addr, m_remote_server[security_instance].sin6_family, LWM2M_LOCAL_CLIENT_PORT_OFFSET + security_instance);
 
         #define SEC_TAG_COUNT 1
 
-        nrf_sec_tag_t sec_tag_list[SEC_TAG_COUNT] = { APP_SEC_TAG_OFFSET + instance_id };
+        nrf_sec_tag_t sec_tag_list[SEC_TAG_COUNT] = { APP_SEC_TAG_OFFSET + security_instance };
 
         coap_sec_config_t setting =
         {
@@ -2085,29 +2110,29 @@ static void app_server_connect(uint16_t instance_id)
             .protocol     = NRF_SPROTO_DTLS1v2
         };
 
-        if (m_use_admin_pdn[instance_id] && m_admin_pdn_handle != -1)
+        if (m_use_admin_pdn[security_instance] && m_admin_pdn_handle != -1)
         {
             admin_apn_get(m_apn_name_buf, sizeof(m_apn_name_buf));
             local_port.interface = m_apn_name_buf;
         }
 
         LWM2M_INF("Setup secure DTLS session (server %u) (APN %s)",
-                  instance_id,
+                  security_instance,
                   (local_port.interface) ? lwm2m_os_log_strdup(m_apn_name_buf) : "default");
 
-        err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_remote_server[instance_id]);
+        err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_remote_server[security_instance]);
 
         if (err_code == 0)
         {
             LWM2M_INF("Connected");
             // Reset state to get back to registration.
             lwm2m_state_set(LWM2M_STATE_SERVER_CONNECTED);
-            m_lwm2m_transport[instance_id] = local_port.transport;
+            m_lwm2m_transport[security_instance] = local_port.transport;
         }
         else if (err_code == EINPROGRESS)
         {
             lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_WAIT);
-            m_lwm2m_transport[instance_id] = local_port.transport;
+            m_lwm2m_transport[security_instance] = local_port.transport;
         }
         else if (err_code == EIO && (lwm2m_os_errno() == NRF_ENETDOWN))
         {
@@ -2127,13 +2152,13 @@ static void app_server_connect(uint16_t instance_id)
                 if (err_code == EIO && (lwm2m_os_errno() == NRF_EINVAL ||
                                         lwm2m_os_errno() == NRF_EOPNOTSUPP ||
                                         lwm2m_os_errno() == NRF_ENETUNREACH)) {
-                    app_handle_connect_retry(instance_id, true);
+                    app_handle_connect_retry(security_instance, true);
                 } else {
-                    app_handle_connect_retry(instance_id, false);
+                    app_handle_connect_retry(security_instance, false);
                 }
 
                 if (lwm2m_os_errno() != NRF_ENETUNREACH) {
-                    app_set_bootstrap_if_last_retry_delay(instance_id);
+                    app_set_bootstrap_if_last_retry_delay(security_instance);
                 }
             }
         }
@@ -2145,13 +2170,13 @@ static void app_server_connect(uint16_t instance_id)
     }
 }
 
-static void app_server_register(uint16_t instance_id)
+static void app_server_register(uint16_t security_instance)
 {
     uint32_t err_code;
     uint32_t link_format_string_len = 0;
     uint8_t * p_link_format_string = NULL;
 
-    uint16_t short_server_id = lwm2m_security_short_server_id_get(instance_id);
+    uint16_t short_server_id = lwm2m_security_short_server_id_get(security_instance);
 
     // Dry run the link format generation, to check how much memory that is needed.
     err_code = lwm2m_coap_handler_gen_link_format(LWM2M_INVALID_INSTANCE, short_server_id, NULL, (uint16_t *)&link_format_string_len);
@@ -2171,10 +2196,10 @@ static void app_server_register(uint16_t instance_id)
     }
 
     if (err_code == 0) {
-        err_code = lwm2m_register((struct nrf_sockaddr *)&m_remote_server[instance_id],
+        err_code = lwm2m_register((struct nrf_sockaddr *)&m_remote_server[security_instance],
                                   &m_client_id,
-                                  &m_server_conf[instance_id],
-                                  m_lwm2m_transport[instance_id],
+                                  &m_server_conf[security_instance],
+                                  m_lwm2m_transport[security_instance],
                                   p_link_format_string,
                                   (uint16_t)link_format_string_len);
     }
@@ -2189,39 +2214,40 @@ static void app_server_register(uint16_t instance_id)
         LWM2M_INF("Register failed: %s (%d), %s (%d), reconnect (server %d)",
                     lwm2m_os_log_strdup(strerror(err_code)), err_code,
                     lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
-                    instance_id);
+                    security_instance);
 
-        app_server_disconnect(instance_id);
+        app_server_disconnect(security_instance);
 
         if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
-            app_handle_connect_retry(instance_id, false);
+            app_handle_connect_retry(security_instance, false);
         }
     }
 }
 
-void app_server_update(uint16_t instance_id, bool connect_update)
+void app_server_update(uint16_t security_instance, bool connect_update)
 {
     bool restart_lifetime_timer = true;
 
     if ((m_app_state == LWM2M_STATE_IDLE) ||
         (connect_update) ||
-        (instance_id != m_server_instance))
+        (security_instance != m_security_instance))
     {
         uint32_t err_code;
+        uint16_t server_instance = server_instance_get(security_instance);
 
-        m_server_conf[instance_id].lifetime = lwm2m_server_lifetime_get(m_server_inst[instance_id]);
+        m_server_conf[security_instance].lifetime = lwm2m_server_lifetime_get(server_instance);
 
-        err_code = lwm2m_update((struct nrf_sockaddr *)&m_remote_server[instance_id],
-                                &m_server_conf[instance_id],
-                                m_lwm2m_transport[instance_id]);
+        err_code = lwm2m_update((struct nrf_sockaddr *)&m_remote_server[security_instance],
+                                &m_server_conf[security_instance],
+                                m_lwm2m_transport[security_instance]);
         if (err_code != 0) {
             LWM2M_INF("Update failed: %s (%d), %s (%d), reconnect (server %d)",
                       lwm2m_os_log_strdup(strerror(err_code)), err_code,
                       lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
-                      instance_id);
+                      security_instance);
 
-            app_server_disconnect(instance_id);
-            lwm2m_request_server_update(instance_id, true);
+            app_server_disconnect(security_instance);
+            lwm2m_request_server_update(security_instance, true);
 
             if (connect_update) {
                 // Failed sending update after a server connect, reconnect from idle state.
@@ -2240,23 +2266,23 @@ void app_server_update(uint16_t instance_id, bool connect_update)
     }
     else
     {
-        LWM2M_WRN("Unable to do server update (server %u)", instance_id);
+        LWM2M_WRN("Unable to do server update (server %u)", security_instance);
     }
 
     if (restart_lifetime_timer) {
-        app_restart_lifetime_timer(instance_id);
+        app_restart_lifetime_timer(security_instance);
     }
 }
 
 
-static void app_remove_observers_on_deregister(uint16_t instance_id)
+static void app_remove_observers_on_deregister(uint16_t security_instance)
 {
     uint32_t err_code;
     coap_observer_t *p_observer = NULL;
 
     while (coap_observe_server_next_get(&p_observer, p_observer, NULL) == 0)
     {
-        if (memcmp(p_observer->remote, (struct nrf_sockaddr *)&m_remote_server[instance_id], sizeof(struct nrf_sockaddr)) == 0)
+        if (memcmp(p_observer->remote, (struct nrf_sockaddr *)&m_remote_server[security_instance], sizeof(struct nrf_sockaddr)) == 0)
         {
             err_code = lwm2m_observe_unregister(p_observer->remote, p_observer->resource_of_interest);
 
@@ -2265,7 +2291,7 @@ static void app_remove_observers_on_deregister(uint16_t instance_id)
                 LWM2M_ERR("Removing observer after deregister failed: %s (%d), %s (%d) (server %d)",
                           lwm2m_os_log_strdup(strerror(err_code)), err_code,
                           lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
-                          instance_id);
+                          security_instance);
             }
 
             err_code = lwm2m_observer_storage_delete(p_observer);
@@ -2275,60 +2301,60 @@ static void app_remove_observers_on_deregister(uint16_t instance_id)
                 LWM2M_ERR("Removing observer from flash failed: %s (%d), %s (%d) (server %d)",
                           lwm2m_os_log_strdup(strerror(err_code)), err_code,
                           lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
-                          instance_id);
+                          security_instance);
             }
         }
     }
 }
 
-void app_server_disable(uint16_t instance_id)
+void app_server_disable(uint16_t security_instance)
 {
     uint32_t err_code;
 
-    app_cancel_lifetime_timer(instance_id);
+    app_cancel_lifetime_timer(security_instance);
 
-    err_code = lwm2m_deregister((struct nrf_sockaddr *)&m_remote_server[instance_id],
-                                m_lwm2m_transport[instance_id]);
+    err_code = lwm2m_deregister((struct nrf_sockaddr *)&m_remote_server[security_instance],
+                                m_lwm2m_transport[security_instance]);
 
     if (err_code != 0) {
         LWM2M_ERR("Disable failed: %s (%d), %s (%d) (server %d)",
                   lwm2m_os_log_strdup(strerror(err_code)), err_code,
                   lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
-                  instance_id);
+                  security_instance);
     }
 }
 
-static void app_server_deregister(uint16_t instance_id)
+static void app_server_deregister(uint16_t security_instance)
 {
     uint32_t err_code;
 
-    app_cancel_lifetime_timer(instance_id);
+    app_cancel_lifetime_timer(security_instance);
 
-    err_code = lwm2m_deregister((struct nrf_sockaddr *)&m_remote_server[instance_id],
-                                m_lwm2m_transport[instance_id]);
+    err_code = lwm2m_deregister((struct nrf_sockaddr *)&m_remote_server[security_instance],
+                                m_lwm2m_transport[security_instance]);
 
     if (err_code != 0) {
         LWM2M_ERR("Deregister failed: %s (%d), %s (%d) (server %d)",
                   lwm2m_os_log_strdup(strerror(err_code)), err_code,
                   lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
-                  instance_id);
+                  security_instance);
 
        return;
     }
     else
     {
-        app_remove_observers_on_deregister(instance_id);
+        app_remove_observers_on_deregister(security_instance);
     }
 
     lwm2m_state_set(LWM2M_STATE_SERVER_DEREGISTERING);
 }
 
-static void app_server_disconnect(uint16_t instance_id)
+static void app_server_disconnect(uint16_t security_instance)
 {
-    if (m_lwm2m_transport[instance_id] != -1) {
-        app_cancel_lifetime_timer(instance_id);
-        coap_security_destroy(m_lwm2m_transport[instance_id]);
-        m_lwm2m_transport[instance_id] = -1;
+    if (m_lwm2m_transport[security_instance] != -1) {
+        app_cancel_lifetime_timer(security_instance);
+        coap_security_destroy(m_lwm2m_transport[security_instance]);
+        m_lwm2m_transport[security_instance] = -1;
     }
 }
 
@@ -2403,7 +2429,7 @@ static bool app_coap_socket_poll(void)
             fds[nfds].requested = NRF_POLLIN;
 
             // Only check NRF_POLLOUT (writing possible) when waiting for connect()
-            if ((i == m_server_instance) &&
+            if ((i == m_security_instance) &&
                 ((m_app_state == LWM2M_STATE_BS_CONNECT_WAIT) ||
                  (m_app_state == LWM2M_STATE_SERVER_CONNECT_WAIT))) {
                 fds[nfds].events |= NRF_POLLOUT;
@@ -2469,7 +2495,7 @@ static bool app_coap_socket_poll(void)
             ARG_UNUSED(coap_err_code);
 
             // NOTE: This works because we are only connecting to one server at a time.
-            m_lwm2m_transport[m_server_instance] = -1;
+            m_lwm2m_transport[m_security_instance] = -1;
 
             LWM2M_INF("Connection failed: %s (%d)", lwm2m_os_log_strdup(strerror(error)), errno);
 
@@ -2480,13 +2506,13 @@ static bool app_coap_socket_poll(void)
             if (lwm2m_state_set(next_state)) {
                 // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
                 if (error == NRF_EINVAL || error == NRF_EOPNOTSUPP || error == NRF_ENETUNREACH) {
-                    app_handle_connect_retry(m_server_instance, true);
+                    app_handle_connect_retry(m_security_instance, true);
                 } else {
-                    app_handle_connect_retry(m_server_instance, false);
+                    app_handle_connect_retry(m_security_instance, false);
                 }
 
                 if (error != NRF_ENETUNREACH) {
-                    app_set_bootstrap_if_last_retry_delay(instance_id);
+                    app_set_bootstrap_if_last_retry_delay(security_instance);
                 }
             }
         }
@@ -2511,12 +2537,13 @@ static void app_check_server_update(void)
 
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
         if (m_connection_update[i].requested != LWM2M_REQUEST_NONE) {
+            uint16_t server_instance = server_instance_get(i);
             if (m_lwm2m_transport[i] == -1) {
                 if (m_app_state == LWM2M_STATE_IDLE) {
-                    m_server_instance = i;
+                    m_security_instance = i;
                     m_connection_update[i].requested = LWM2M_REQUEST_NONE;
 
-                    int32_t client_hold_off_time = lwm2m_server_client_hold_off_timer_get(m_server_inst[i]);
+                    int32_t client_hold_off_time = lwm2m_server_client_hold_off_timer_get(server_instance);
                     if (m_use_client_holdoff_timer && client_hold_off_time > 0) {
                         if (lwm2m_state_set(LWM2M_STATE_CLIENT_HOLD_OFF)) {
                             LWM2M_INF("Client hold off timer [%ld seconds] (server %u)", client_hold_off_time, i);
@@ -2527,9 +2554,9 @@ static void app_check_server_update(void)
                         lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT);
                     }
                 }
-            } else if (lwm2m_server_registered_get(m_server_inst[i])) {
+            } else if (lwm2m_server_registered_get(server_instance)) {
                 if (m_connection_update[i].requested == LWM2M_REQUEST_DEREGISTER) {
-                    m_server_instance = i;
+                    m_security_instance = i;
                     m_connection_update[i].requested = LWM2M_REQUEST_NONE;
                     lwm2m_state_set(LWM2M_STATE_SERVER_DEREGISTER);
                     break; // Break the loop to process the deregister
@@ -2593,24 +2620,25 @@ static int app_lwm2m_process(void)
         }
         case LWM2M_STATE_SERVER_CONNECT:
         {
-            LWM2M_INF("Server connect (server %u)", m_server_instance);
-            app_server_connect(m_server_instance);
+            LWM2M_INF("Server connect (server %u)", m_security_instance);
+            app_server_connect(m_security_instance);
             break;
         }
         case LWM2M_STATE_SERVER_CONNECTED:
         {
             bool do_register = true;
+            uint16_t server_instance = server_instance_get(m_security_instance);
 
             /* If already registered and having a remote location then do update. */
-            if (lwm2m_server_registered_get(m_server_inst[m_server_instance])) {
+            if (lwm2m_server_registered_get(server_instance)) {
 
-                uint16_t short_server_id = lwm2m_security_short_server_id_get(m_server_instance);
+                uint16_t short_server_id = lwm2m_security_short_server_id_get(m_security_instance);
 
                 // Register the remote.
-                lwm2m_remote_register(short_server_id, (struct nrf_sockaddr *)&m_remote_server[m_server_instance]);
+                lwm2m_remote_register(short_server_id, (struct nrf_sockaddr *)&m_remote_server[m_security_instance]);
 
                 // Load flash again, to retrieve the location.
-                lwm2m_instance_storage_server_load(m_server_inst[m_server_instance]);
+                lwm2m_instance_storage_server_load(server_instance);
 
                 char   * p_location;
                 uint16_t location_len = 0;
@@ -2623,19 +2651,19 @@ static int app_lwm2m_process(void)
             }
 
             if (do_register) {
-                LWM2M_INF("Server register (server %u)", m_server_instance);
-                app_server_register(m_server_instance);
+                LWM2M_INF("Server register (server %u)", m_security_instance);
+                app_server_register(m_security_instance);
             } else {
-                LWM2M_INF("Server update after connect (server %u)", m_server_instance);
-                app_server_update(m_server_instance, true);
+                LWM2M_INF("Server update after connect (server %u)", m_security_instance);
+                app_server_update(m_security_instance, true);
             }
 
             break;
         }
         case LWM2M_STATE_SERVER_DEREGISTER:
         {
-            LWM2M_INF("Server deregister (server %u)", m_server_instance);
-            app_server_deregister(m_server_instance);
+            LWM2M_INF("Server deregister (server %u)", m_security_instance);
+            app_server_deregister(m_security_instance);
             break;
         }
         case LWM2M_STATE_REQUEST_DISCONNECT:

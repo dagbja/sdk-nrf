@@ -499,7 +499,7 @@ static int cmd_lwm2m_disconnect(const struct shell *shell, size_t argc, char **a
 static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
 {
     char ip_version[] = "IPvX";
-    ip_version[3] = (lwm2m_family_type_get(lwm2m_server_instance()) == NRF_AF_INET6) ? '6' : '4';
+    ip_version[3] = (lwm2m_family_type_get(lwm2m_security_instance()) == NRF_AF_INET6) ? '6' : '4';
     int32_t retry_delay;
 
     if (lwm2m_did_bootstrap()) {
@@ -564,42 +564,42 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
             shell_print(shell, "Bootstrapping [%s]", ip_version);
             break;
         case LWM2M_STATE_CLIENT_HOLD_OFF:
-            shell_print(shell, "Client hold off (server %d)", lwm2m_server_instance());
+            shell_print(shell, "Client hold off (server %d)", lwm2m_security_instance());
             break;
         case LWM2M_STATE_SERVER_CONNECT:
-            shell_print(shell, "Server %d connecting [%s]", lwm2m_server_instance(), ip_version);
+            shell_print(shell, "Server %d connecting [%s]", lwm2m_security_instance(), ip_version);
             break;
         case LWM2M_STATE_SERVER_CONNECT_WAIT:
-            shell_print(shell, "Server %d connect wait [%s]", lwm2m_server_instance(), ip_version);
+            shell_print(shell, "Server %d connect wait [%s]", lwm2m_security_instance(), ip_version);
             break;
         case LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT:
-            retry_delay = lwm2m_retry_delay_get(lwm2m_server_instance(), false, NULL);
+            retry_delay = lwm2m_retry_delay_get(lwm2m_security_instance(), false, NULL);
             if (retry_delay != -1) {
                 int32_t delay = lwm2m_state_update_delay() / 1000;
                 shell_print(shell, "Server %d connect delay: %d minutes (%d seconds left) [%s]",
-                            lwm2m_server_instance(), retry_delay / 60, delay, ip_version);
+                            lwm2m_security_instance(), retry_delay / 60, delay, ip_version);
             } else {
-                shell_print(shell, "Server %d connect timed wait [%s]", lwm2m_server_instance(), ip_version);
+                shell_print(shell, "Server %d connect timed wait [%s]", lwm2m_security_instance(), ip_version);
             }
             break;
         case LWM2M_STATE_SERVER_CONNECTED:
-            shell_print(shell, "Server %d connected [%s]", lwm2m_server_instance(), ip_version);
+            shell_print(shell, "Server %d connected [%s]", lwm2m_security_instance(), ip_version);
             break;
         case LWM2M_STATE_SERVER_REGISTER_WAIT:
-            retry_delay = lwm2m_retry_delay_get(lwm2m_server_instance(), false, NULL);
+            retry_delay = lwm2m_retry_delay_get(lwm2m_security_instance(), false, NULL);
             if (retry_delay != -1) {
                 int32_t delay = lwm2m_state_update_delay() / 1000;
                 shell_print(shell, "Server %d register delay: %d minutes (%d seconds left) [%s]",
-                            lwm2m_server_instance(), retry_delay / 60, delay, ip_version);
+                            lwm2m_security_instance(), retry_delay / 60, delay, ip_version);
             } else {
-                shell_print(shell, "Server %d register wait [%s]", lwm2m_server_instance(), ip_version);
+                shell_print(shell, "Server %d register wait [%s]", lwm2m_security_instance(), ip_version);
             }
             break;
         case LWM2M_STATE_SERVER_DEREGISTER:
-            shell_print(shell, "Server %d deregister", lwm2m_server_instance());
+            shell_print(shell, "Server %d deregister", lwm2m_security_instance());
             break;
         case LWM2M_STATE_SERVER_DEREGISTERING:
-            shell_print(shell, "Server %d deregistering", lwm2m_server_instance());
+            shell_print(shell, "Server %d deregistering", lwm2m_security_instance());
             break;
         case LWM2M_STATE_REQUEST_DISCONNECT:
             shell_print(shell, "Request disconnect");
