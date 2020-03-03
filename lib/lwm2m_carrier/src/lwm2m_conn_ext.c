@@ -24,6 +24,33 @@
 static lwm2m_object_t                 m_object_conn_ext;        /**< AT&T Connectivity Extension base object. */
 static lwm2m_connectivity_extension_t m_instance_conn_ext;      /**< AT&T Connectivity Extension object instance. */
 
+uint8_t lwm2m_conn_ext_apn_retries_get(uint16_t instance_id, uint16_t apn_instance)
+{
+    if (apn_instance >= m_instance_conn_ext.apn_retries.max_len) {
+        return 0;
+    }
+
+    return m_instance_conn_ext.apn_retries.val.p_uint8[apn_instance];
+}
+
+int32_t lwm2m_conn_ext_apn_retry_period_get(uint16_t instance_id, uint16_t apn_instance)
+{
+    if (apn_instance >= m_instance_conn_ext.apn_retry_period.max_len) {
+        return 0;
+    }
+
+    return m_instance_conn_ext.apn_retry_period.val.p_int32[apn_instance];
+}
+
+int32_t lwm2m_conn_ext_apn_retry_back_off_period_get(uint16_t instance_id, uint16_t apn_instance)
+{
+    if (apn_instance >= m_instance_conn_ext.apn_retry_back_off_period.max_len) {
+        return 0;
+    }
+
+    return m_instance_conn_ext.apn_retry_back_off_period.val.p_int32[apn_instance];
+}
+
 lwm2m_connectivity_extension_t * lwm2m_conn_ext_get_instance(uint16_t instance_id)
 {
     return &m_instance_conn_ext;

@@ -15,6 +15,12 @@
 
 void lwm2m_conn_ext_init(void);
 
+uint8_t lwm2m_conn_ext_apn_retries_get(uint16_t instance_id, uint16_t apn_instance);
+
+int32_t lwm2m_conn_ext_apn_retry_period_get(uint16_t instance_id, uint16_t apn_instance);
+
+int32_t lwm2m_conn_ext_apn_retry_back_off_period_get(uint16_t instance_id, uint16_t apn_instance);
+
 lwm2m_connectivity_extension_t * lwm2m_conn_ext_get_instance(uint16_t instance_id);
 
 lwm2m_object_t * lwm2m_conn_ext_get_object(void);

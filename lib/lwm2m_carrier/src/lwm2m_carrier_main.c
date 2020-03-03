@@ -68,9 +68,6 @@
 
 static char m_apn_name_buf[APP_APN_NAME_BUF_LENGTH];                                        /**< Buffer to store APN name. */
 
-static int32_t m_pdn_retry_delay[] = { K_SECONDS(2), K_SECONDS(60), K_SECONDS(1800) };      /**< PDN activation deleays. */
-static int32_t m_pdn_retry_count;                                                           /**< PDN activation count. */
-
 /* Initialize config with default values. */
 static lwm2m_carrier_config_t              m_app_config;
 
@@ -525,22 +522,6 @@ static int admin_apn_get(char *buf, size_t len)
     return read;
 }
 
-static int lwm2m_pdn_activate_delay_get(void)
-{
-    int retry_delay = m_pdn_retry_delay[m_pdn_retry_count];
-
-    if (m_pdn_retry_count < (ARRAY_SIZE(m_pdn_retry_delay) - 1)) {
-        m_pdn_retry_count++;
-    }
-
-    return retry_delay;
-}
-
-static void lwm2m_pdn_activate_delay_reset(void)
-{
-    m_pdn_retry_count = 0;
-}
-
 /**@brief Setup ADMIN PDN connection, if necessary */
 int lwm2m_admin_pdn_activate(uint16_t security_instance)
 {
@@ -549,7 +530,7 @@ int lwm2m_admin_pdn_activate(uint16_t security_instance)
     if (!operator_is_vzw(false) ||
         !m_use_admin_pdn[security_instance]) {
         /* Nothing to do */
-        lwm2m_pdn_activate_delay_reset();
+        lwm2m_retry_delay_pdn_reset();
         return 0;
     }
 
@@ -563,13 +544,13 @@ int lwm2m_admin_pdn_activate(uint16_t security_instance)
     if (rc < 0) {
         at_apn_unregister_from_packet_events();
 
-        return lwm2m_pdn_activate_delay_get();
+        return lwm2m_retry_delay_pdn_get();
     }
 
     /* PDN was active */
     if (rc == 0) {
         at_apn_unregister_from_packet_events();
-        lwm2m_pdn_activate_delay_reset();
+        lwm2m_retry_delay_pdn_reset();
         return 0;
     }
 
@@ -582,10 +563,10 @@ int lwm2m_admin_pdn_activate(uint16_t security_instance)
     at_apn_unregister_from_packet_events();
 
     if (rc) {
-        return lwm2m_pdn_activate_delay_get();
+        return lwm2m_retry_delay_pdn_get();
     }
 
-    lwm2m_pdn_activate_delay_reset();
+    lwm2m_retry_delay_pdn_reset();
 
     return 0;
 }
@@ -787,7 +768,7 @@ static int app_generate_client_id(void)
 
     if (clear_bootstrap) {
         lwm2m_bootstrap_clear();
-        lwm2m_retry_delay_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
+        lwm2m_retry_delay_connect_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
         provision_bs_psk = true;
     }
 
@@ -1235,12 +1216,12 @@ static void app_handle_connect_retry(uint16_t security_instance, bool fallback)
     if (start_retry_delay)
     {
         bool is_last = false;
-        int32_t retry_delay = lwm2m_retry_delay_get(security_instance, true, &is_last);
+        int32_t retry_delay = lwm2m_retry_delay_connect_get(security_instance, true, &is_last);
 
         if (retry_delay == -1) {
             LWM2M_ERR("Bootstrap procedure failed");
             m_app_state = LWM2M_STATE_DISCONNECTED;
-            lwm2m_retry_delay_reset(security_instance);
+            lwm2m_retry_delay_connect_reset(security_instance);
 
             app_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, 0);
             return;
@@ -1265,12 +1246,13 @@ static void app_handle_connect_retry(uint16_t security_instance, bool fallback)
 
 static void app_set_bootstrap_if_last_retry_delay(uint16_t security_instance)
 {
-    if (security_instance == VZW_MANAGEMENT_INSTANCE_ID ||
-        security_instance == VZW_REPOSITORY_INSTANCE_ID)
+    if (operator_is_vzw(true) &&
+        ((security_instance == VZW_MANAGEMENT_INSTANCE_ID) ||
+         (security_instance == VZW_REPOSITORY_INSTANCE_ID)))
     {
         // Check if this is the last retry delay after an inability to establish a DTLS session.
         bool is_last = false;
-        (void) lwm2m_retry_delay_get(security_instance, false, &is_last);
+        (void) lwm2m_retry_delay_connect_get(security_instance, false, &is_last);
 
         if (is_last) {
             // Repeat the bootstrap flow on timeout or reboot.
@@ -1344,7 +1326,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             LWM2M_ERR("Bootstrap procedure failed (%d.%02d)", coap_code >> 5, coap_code & 0x1f);
             m_app_state = LWM2M_STATE_DISCONNECTED;
             app_server_disconnect(LWM2M_BOOTSTRAP_INSTANCE_ID);
-            lwm2m_retry_delay_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
+            lwm2m_retry_delay_connect_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
 
             app_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, 0);
         }
@@ -1369,7 +1351,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         {
             LWM2M_INF("Registered (server %u)", security_instance);
 
-            lwm2m_retry_delay_reset(security_instance);
+            lwm2m_retry_delay_connect_reset(security_instance);
             lwm2m_server_registered_set(server_instance, true);
 
             // Reset connection update in case this has been requested while connecting
@@ -1392,16 +1374,19 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         {
             // No response or received a 4.0x error.
             if (lwm2m_state_set(LWM2M_STATE_SERVER_REGISTER_WAIT)) {
-                if (security_instance == VZW_MANAGEMENT_INSTANCE_ID && coap_code == COAP_CODE_400_BAD_REQUEST) {
-                    // Received 4.00 error from DM server, use last defined retry delay.
-                    int32_t retry_delay = lwm2m_retry_delay_get(security_instance, false, NULL);
+                if (operator_is_vzw(true) &&
+                    (security_instance == VZW_MANAGEMENT_INSTANCE_ID) &&
+                    (coap_code == COAP_CODE_400_BAD_REQUEST))
+                {
+                    // Received 4.00 error from VzW DM server, use last defined retry delay.
+                    int32_t retry_delay = lwm2m_retry_delay_connect_get(security_instance, false, NULL);
 
                     // VZW HACK: Loop until the current delay is 8 minutes. This will give the
-                    // last retry delay (24 hours) in the next call to lwm2m_retry_delay_get()
+                    // last retry delay (24 hours) in the next call to lwm2m_retry_delay_connect_get()
                     // in app_handle_connect_retry().
                     while (retry_delay != (8*60)) {
                         // If not second to last then fetch next.
-                        retry_delay = lwm2m_retry_delay_get(security_instance, true, NULL);
+                        retry_delay = lwm2m_retry_delay_connect_get(security_instance, true, NULL);
                     }
                 }
 
@@ -1438,7 +1423,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         {
             // Update instead of register during connect
             LWM2M_INF("Updated after connect (server %d)", security_instance);
-            lwm2m_retry_delay_reset(security_instance);
+            lwm2m_retry_delay_connect_reset(security_instance);
 
             if (!m_registration_ready) {
                 lwm2m_observer_storage_restore(short_server_id, m_lwm2m_transport[security_instance]);
@@ -1619,7 +1604,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 
     // Close connection to bootstrap server.
     app_server_disconnect(LWM2M_BOOTSTRAP_INSTANCE_ID);
-    lwm2m_retry_delay_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
+    lwm2m_retry_delay_connect_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
 
     if (app_provision_secret_keys() != 0) {
         lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
@@ -1900,7 +1885,7 @@ static void app_bootstrap_connect(void)
     if (uri_len == 0 || !p_server_uri) {
         LWM2M_ERR("No Bootstrap URI found");
         m_app_state = LWM2M_STATE_DISCONNECTED;
-        lwm2m_retry_delay_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
+        lwm2m_retry_delay_connect_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
 
         app_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, 0);
         return;
