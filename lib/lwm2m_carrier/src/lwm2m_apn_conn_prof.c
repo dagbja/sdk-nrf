@@ -95,7 +95,7 @@ uint32_t apn_conn_prof_instance_callback(lwm2m_instance_t * p_instance,
     }
     else if (op_code == LWM2M_OPERATION_CODE_WRITE)
     {
-        u32_t mask = 0;
+        uint32_t mask = 0;
         err_code = coap_message_ct_mask_get(p_request, &mask);
 
         if (err_code != 0)
