@@ -9,7 +9,7 @@
 
 /**@brief Get PDN retry delay.
  *
- * @return Retry delay in seconds.
+ * @return Retry delay in milliseconds.
  */
 int32_t lwm2m_retry_delay_pdn_get(void);
 
@@ -23,7 +23,7 @@ void lwm2m_retry_delay_pdn_reset(void);
  * @param[in]  next_delay   Fetch next delay
  * @param[out] p_is_last    Set to true if this is the last retry delay
  *
- * @return Retry delay in seconds. -1 if no more retries.
+ * @return Retry delay in milliseconds. -1 if no more retries.
  */
 int32_t lwm2m_retry_delay_connect_get(int instance_id, bool next_delay, bool * p_is_last);
 
