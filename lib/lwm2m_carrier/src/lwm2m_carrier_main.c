@@ -2028,8 +2028,9 @@ static void app_server_connect(uint16_t security_instance)
 
     if (operator_is_supported(false))
     {
-        m_server_conf[security_instance].binding.p_val = "UQS";
-        m_server_conf[security_instance].binding.len = 3;
+        uint8_t binding_len = 0;
+        char *p_binding = lwm2m_server_binding_get(server_instance, &binding_len);
+        lwm2m_bytebuffer_to_string(p_binding, binding_len, &m_server_conf[security_instance].binding);
 
         if (security_instance) {
             m_server_conf[security_instance].msisdn.p_val = lwm2m_msisdn_get();
