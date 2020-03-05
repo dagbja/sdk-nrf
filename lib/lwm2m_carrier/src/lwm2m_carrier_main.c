@@ -914,21 +914,25 @@ uint32_t lwm2m_coap_handler_root(uint8_t op_code, coap_message_t * p_request)
     return 0;
 }
 
-const void * lwm2m_observable_reference_get(const uint16_t *p_path, uint8_t path_len, uint8_t *p_type)
+const void * observable_reference_get(const uint16_t *p_path, uint8_t path_len, uint8_t *p_type)
 {
     const void * value = NULL;
     lwm2m_object_t *object;
     lwm2m_instance_t *instance;
     int ret;
 
-    if (p_path == NULL || path_len <= 0 || p_type == NULL)
+    if (!p_path || path_len <= 0)
     {
-        return value;
+        return NULL;
+    }
+
+    if (p_type)
+    {
+        *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
     }
 
     if (path_len == 1)
     {
-        *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
         ret = lwm2m_lookup_object(&object, p_path[0]);
         if (ret != 0)
         {
@@ -942,7 +946,6 @@ const void * lwm2m_observable_reference_get(const uint16_t *p_path, uint8_t path
 
     if (path_len == 2)
     {
-        *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
         ret = lwm2m_lookup_instance(&instance, p_path[0], p_path[1]);
         if (ret != 0)
         {
@@ -972,12 +975,8 @@ const void * lwm2m_observable_reference_get(const uint16_t *p_path, uint8_t path
     case LWM2M_OBJ_ACL:
     case LWM2M_OBJ_LOCATION:
     case LWM2M_OBJ_CONN_STAT:
-        // Unsupported observables.
-        *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
-        break;
     default:
         // Unsupported observables.
-        *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
         break;
     }
 
@@ -1889,7 +1888,7 @@ static void app_lwm2m_setup(void)
     lwm2m_notif_attr_default_cb_set(lwm2m_notif_attribute_default_value_set);
 
     // Add callback to get pointers to observables.
-    lwm2m_observable_reference_get_cb_set(lwm2m_observable_reference_get);
+    lwm2m_observable_reference_get_cb_set(observable_reference_get);
 
     // Add callback to get the uptime in milliseconds and initialize the timer.
     lwm2m_observable_uptime_cb_initialize(lwm2m_os_uptime_get);

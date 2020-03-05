@@ -295,6 +295,8 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
 
     uint8_t  buffer[200];
     uint32_t buffer_size = sizeof(buffer);
+    uint16_t path[] = { p_instance->object_id, p_instance->instance_id, resource_id };
+    uint8_t  path_len = (resource_id == LWM2M_INVALID_RESOURCE) ? ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
 
     if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
     {
@@ -312,8 +314,6 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
 
         if (err_code == 0)
         {
-            uint16_t path[] = { LWM2M_OBJ_CONN_MON, 0, resource_id };
-
             if (observe_option == 0) // Observe start
             {
                 // Whitelist the resources that support observe.
@@ -331,21 +331,38 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                     // case LWM2M_CONN_MON_SMNC:
                     // case LWM2M_CONN_MON_SMCC:
                     {
+                        coap_message_t *p_message;
+
                         LWM2M_INF("Observe requested on resource /4/%i/%i", p_instance->instance_id, resource_id);
                         err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
                                                                             &buffer_size,
                                                                             resource_id,
                                                                             &m_instance_conn_mon);
+                        if (err_code != 0)
+                        {
+                            LWM2M_INF("Failed to perform the TLV encoding");
+                            lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
+                            return err_code;
+                        }
 
-                        err_code = lwm2m_observe_register(buffer,
-                                                        buffer_size,
-                                                        m_instance_conn_mon.proto.expire_time,
-                                                        p_request,
-                                                        COAP_CT_APP_LWM2M_TLV,
-                                                        resource_id,
-                                                        p_instance);
+                        err_code = lwm2m_observe_register(path, path_len, p_request, &p_message);
+                        if (err_code != 0)
+                        {
+                            LWM2M_INF("Failed to register the observer");
+                            lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
+                            return err_code;
+                        }
 
-                        lwm2m_observable_metadata_init(p_request->remote, path, ARRAY_SIZE(path));
+                        err_code = lwm2m_coap_message_send_to_remote(p_message, p_request->remote, buffer, buffer_size);
+                        if (err_code != 0)
+                        {
+                            LWM2M_INF("Failed to respond to Observe request");
+                            lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
+                            return err_code;
+                        }
+
+                        lwm2m_observable_metadata_init(p_request->remote, path, path_len);
+
                         break;
                     }
 
@@ -372,8 +389,9 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                     LWM2M_INF("Observe cancel on instance /4/%i, no match", p_instance->instance_id);
                 } else {
                     LWM2M_INF("Observe cancel on resource /4/%i/%i", p_instance->instance_id, resource_id);
-                    lwm2m_observe_unregister(p_request->remote, (void *)&m_instance_conn_mon.resource_ids[resource_id]);
-                    lwm2m_notif_attr_storage_update(path, ARRAY_SIZE(path), p_request->remote);
+                    const void * p_observable = lwm2m_observable_reference_get(path, path_len);
+                    lwm2m_observe_unregister(p_request->remote, p_observable);
+                    lwm2m_notif_attr_storage_update(path, path_len, p_request->remote);
                 }
 
                 // Process the GET request as usual.
@@ -463,9 +481,6 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
     }
     else if (op_code == LWM2M_OPERATION_CODE_WRITE_ATTR)
     {
-        uint16_t path[] = { p_instance->object_id, p_instance->instance_id, resource_id };
-        uint16_t path_len = (resource_id == LWM2M_INVALID_RESOURCE) ? ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
-
         err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
 
         if (err_code == 0)
@@ -527,7 +542,7 @@ uint32_t lwm2m_conn_mon_object_callback(lwm2m_object_t * p_object,
     else if (op_code == LWM2M_OPERATION_CODE_WRITE_ATTR)
     {
         uint16_t path[] = { p_object->object_id };
-        uint16_t path_len = ARRAY_SIZE(path);
+        uint8_t path_len = ARRAY_SIZE(path);
 
         err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
 
@@ -630,7 +645,7 @@ void lwm2m_conn_mon_notify_resource(struct nrf_sockaddr * p_remote_server, int16
 {
     uint16_t short_server_id;
     coap_observer_t *p_observer = NULL;
-    const void * p_observable = NULL;
+    const void * p_observable = lwm2m_conn_mon_resource_reference_get(resource_id, NULL);
 
     while (coap_observe_server_next_get(&p_observer, p_observer,
                (void*)&m_instance_conn_mon.resource_ids[resource_id]) == 0)
@@ -665,7 +680,6 @@ void lwm2m_conn_mon_notify_resource(struct nrf_sockaddr * p_remote_server, int16
             continue;
         }
 
-        p_observable = lwm2m_conn_mon_resource_reference_get(resource_id, NULL);
         coap_msg_type_t type = (lwm2m_observer_notification_is_con(p_observable, short_server_id)) ? COAP_TYPE_CON : COAP_TYPE_NON;
 
         LWM2M_INF("Notify /4/0/%d", resource_id);

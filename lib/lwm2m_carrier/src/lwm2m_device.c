@@ -328,8 +328,11 @@ static void on_observe_start(uint16_t res, coap_message_t *p_req)
     uint32_t err;
     uint8_t buf[256];
     size_t len;
+    coap_message_t *p_message;
 
     const uint16_t path[] = { LWM2M_OBJ_DEVICE, 0, res };
+    uint8_t path_len = (res == LWM2M_INVALID_RESOURCE) ?
+                ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
 
     len = sizeof(buf);
 
@@ -344,16 +347,21 @@ static void on_observe_start(uint16_t res, coap_message_t *p_req)
         return;
     }
 
-    err = lwm2m_observe_register(
-            buf, len, m_instance_device.proto.expire_time, p_req,
-            COAP_CT_APP_LWM2M_TLV, res, &m_instance_device.proto);
-
+    err = lwm2m_observe_register(path, path_len, p_req, &p_message);
     if (err) {
         LWM2M_WRN("Failed to register observer, err %d", err);
+        lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_req);
         return;
     }
 
-    err = lwm2m_observable_metadata_init(p_req->remote, path, ARRAY_SIZE(path));
+    err = lwm2m_coap_message_send_to_remote(p_message, p_req->remote, buf, len);
+    if (err) {
+        LWM2M_WRN("Failed to respond to Observe request");
+        lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_req);
+        return;
+    }
+
+    err = lwm2m_observable_metadata_init(p_req->remote, path, path_len);
     if (err) {
         /* Already logged */
     }
@@ -365,17 +373,19 @@ static void on_observe_stop(uint16_t res, coap_message_t *p_req)
 {
     uint32_t err;
     const uint16_t path[] = { LWM2M_OBJ_DEVICE, 0, res };
+    uint8_t path_len = (res == LWM2M_INVALID_RESOURCE) ?
+                ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
+    const void * p_observable = lwm2m_observable_reference_get(path, path_len);
 
     LWM2M_INF("Observe deregister /3/0/%d", res);
 
-    err = lwm2m_observe_unregister(p_req->remote,
-                                   &m_instance_device.resource_ids[res]);
+    err = lwm2m_observe_unregister(p_req->remote, p_observable);
 
     if (err) {
         /* TODO */
     }
 
-    lwm2m_notif_attr_storage_update(path, ARRAY_SIZE(path), p_req->remote);
+    lwm2m_notif_attr_storage_update(path, path_len, p_req->remote);
 
     /* Process as a read */
     on_read(res, p_req);
@@ -418,12 +428,10 @@ static void on_write_attribute(uint16_t res, coap_message_t *p_req)
 {
     int err;
     const uint16_t path[] = { LWM2M_OBJ_DEVICE, 0, res };
+    uint8_t path_len = (res == LWM2M_INVALID_RESOURCE) ?
+                ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
 
-    const uint16_t len =
-        (res == LWM2M_NAMED_OBJECT) ? ARRAY_SIZE(path) - 1 :
-                                      ARRAY_SIZE(path);
-
-    err = lwm2m_write_attribute_handler(path, len, p_req);
+    err = lwm2m_write_attribute_handler(path, path_len, p_req);
     if (err) {
         const coap_msg_code_t code =
             (err == -EINVAL) ? COAP_CODE_400_BAD_REQUEST :
@@ -653,9 +661,10 @@ static void on_object_read(coap_message_t *p_req)
 static void on_object_write_attribute(uint16_t instance, coap_message_t *p_req)
 {
     int err;
-    uint16_t path[] = { LWM2M_OBJ_DEVICE };
+    const uint16_t path[] = { LWM2M_OBJ_DEVICE };
+    uint8_t path_len = ARRAY_SIZE(path);
 
-    err = lwm2m_write_attribute_handler(path, ARRAY_SIZE(path), p_req);
+    err = lwm2m_write_attribute_handler(path, path_len, p_req);
     if (err) {
         const coap_msg_code_t code =
             (err == -EINVAL) ? COAP_CODE_400_BAD_REQUEST :
@@ -867,7 +876,7 @@ void lwm2m_device_notify_resource(struct nrf_sockaddr * p_remote_server, uint16_
     coap_observer_t * p_observer = NULL;
     const void * p_observable = lwm2m_device_resource_reference_get(resource_id, NULL);
 
-    while (coap_observe_server_next_get(&p_observer, p_observer, (void *)&m_instance_device.resource_ids[resource_id]) == 0)
+    while (coap_observe_server_next_get(&p_observer, p_observer, (void *)p_observable) == 0)
     {
         lwm2m_remote_short_server_id_find(&short_server_id, p_observer->remote);
         if (lwm2m_remote_reconnecting_get(short_server_id)) {

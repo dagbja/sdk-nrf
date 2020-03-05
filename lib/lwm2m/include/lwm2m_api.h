@@ -757,37 +757,35 @@ uint32_t lwm2m_respond_with_instance_link(lwm2m_instance_t * p_instance,
                                           uint16_t           resource_id,
                                           coap_message_t   * p_request);
 
-/**@brief Register observer with initial value notification
+/**@brief Register an observer on the item specified by the URI path.
  *
- * @param p_payload     Payload of reply message to observer request.
- * @param payload_len   Length of payload buffer.
- * @param max_age       Max time between notifications.
- * @param p_request     Original coap message requesting to observe the resource.
- * @param content_type  Type of the content being observed.
- * @param resource      Resource number that identifies the resource to be observed or similar.
- * @param p_instance    Pointer to instance of object being observed.
+ * @param[in]    p_path      URI path that identifies the item to be observed.
+ * @param[in]    path_len    Length of the URI path that identifies the item
+ *                           to be observed.
+ * @param[in]    p_request   Original CoAP request. Must not be NULL.
+ * @param[inout] pp_response CoAP message that will be populated with the
+ *                           required parameters to acknowledge the observation
+ *                           request. Must not be NULL.
  *
- * @retval 0            If the observable resource was registered successfully.
+ * @return 0  If the observer has been registered successfully or error code on
+ *            failure.
  */
-uint32_t lwm2m_observe_register(uint8_t             * p_payload,
-                                uint16_t              payload_len,
-                                uint16_t              max_age,
-                                coap_message_t      * p_request,
-                                coap_content_type_t   content_type,
-                                uint16_t              resource,
-                                lwm2m_instance_t    * p_instance);
+uint32_t lwm2m_observe_register(const uint16_t   * p_path,
+                                uint8_t            path_len,
+                                coap_message_t   * p_request,
+                                coap_message_t  ** pp_response);
 
 /**@brief Unregister observer if found.
  *
  * @param p_remote           Remote address of the observing server.
- * @param p_resource   Pointer to the resource of interest registered.
+ * @param p_observable       Pointer to the item of interest registered.
  *
- * @retval 0      If the observable resource was unregistered successfully.
- * @retval ENOMEM If the observable resource could not be found in the list.
+ * @retval 0      If the observer has been unregistered successfully.
+ * @retval ENOMEM If the observer could not be found in the list.
  * @retval EINVAL If one of the parameters is a NULL pointer.
  */
-uint32_t lwm2m_observe_unregister(struct nrf_sockaddr  * p_remote,
-                                  void                 * p_resource);
+uint32_t lwm2m_observe_unregister(struct nrf_sockaddr * p_remote,
+                                  const void          * p_observable);
 
 uint32_t lwm2m_notify(uint8_t         * p_payload,
                       uint16_t          payload_len,
@@ -797,13 +795,18 @@ uint32_t lwm2m_notify(uint8_t         * p_payload,
 /**@brief Store information about the observer so it can be restored later.
  *
  * @param p_observer Pointer to an observer object to store.
- * @param p_instance Pointer to the instance being observed by the observer.
+ * @param p_path     URI path that identifies the item of interest of the
+ *                   observer to be stored.
+ * @param path_len   Length of the URI path of the item of interest of the
+ *                   observer to be stored.
  *
  * @retval 0      If observer information has been stored successfully.
  * @retval ENOMEM If not able to find a free slot to store the observer data.
  * @retval EIO    If storage interface returned error on deletion operation.
  */
-uint32_t lwm2m_observer_storage_store(coap_observer_t  * p_observer);
+uint32_t lwm2m_observer_storage_store(coap_observer_t * p_observer,
+                                      const uint16_t  * p_path,
+                                      uint8_t           path_len);
 
 /**@brief Store notification attributes of a given observable so that they
  *        can be restored after a power cycle.
@@ -858,7 +861,7 @@ uint32_t lwm2m_notif_attr_storage_restore(uint16_t short_server_id);
  * @retval EIO    If storage interface returned error on deletion operation.
  *
  */
-uint32_t lwm2m_observer_storage_delete(coap_observer_t  * p_observer);
+uint32_t lwm2m_observer_storage_delete(coap_observer_t * p_observer);
 
 /**@brief Delete all the observers from storage.
  *
@@ -990,17 +993,41 @@ void lwm2m_observable_uptime_cb_initialize(lwm2m_uptime_get_cb_t callback);
  * @return 0  If the notification attributes have been updated successfully or an error code on
  *            failure.
  */
-int lwm2m_write_attribute_handler(const uint16_t *p_path, uint16_t path_len, const coap_message_t *p_request);
+int lwm2m_write_attribute_handler(const uint16_t *p_path, uint8_t path_len, const coap_message_t *p_request);
 
 /**@brief Determine whether the given LWM2M resource is being observed by the given server.
  *
  * @param[in] short_server_id  Short server ID of the potential observer.
- * @param[in] p_instance       Instance of the object that owns the resource.
- * @param[in] resource_id      ID of the observable resource.
+ * @param[in] p_observable     Observable item.
  *
  * @return  true if the resource has a registered observer, false otherwise.
  */
-bool lwm2m_is_observed(uint16_t short_server_id, const lwm2m_instance_t * p_instance, uint16_t resource_id);
+bool lwm2m_is_observed(uint16_t short_server_id, const void *p_observable);
+
+/**@brief Send a CoAP message to a given remote.
+ *
+ * @param[in] coap_message_t   Message to be sent.
+ * @param[in] p_remote         Remote server to which the message will be sent.
+ * @param[in] p_payload        Message payload to be included. Can be NULL if an
+ *                             empty message is to be sent.
+ * @param[in] payload_len      Length of the message payload.
+ *
+ * @return 0  If the message has been sent successfully or an error code on failure.
+ */
+uint32_t lwm2m_coap_message_send_to_remote(coap_message_t      * p_message,
+                                           struct nrf_sockaddr * p_remote,
+                                           uint8_t             * p_payload,
+                                           uint16_t              payload_len);
+
+/**@brief Retrieve a pointer to an observable LwM2M item identified by its URI path.
+ *
+ * @param[in] p_path      URI path that identifies the observable item.
+ * @param[in] path_len    Length of the URI path that identifies the observable item.
+ *
+ * @return  A valid pointer to the observable item if found, or NULL if the item has
+ *          not been found or is not observable.
+ */
+const void * lwm2m_observable_reference_get(const uint16_t *p_path, uint8_t path_len);
 
 /**@brief Retrieve the configured value of the time interval for sending confirmable notifications.
  *

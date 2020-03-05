@@ -80,6 +80,8 @@ uint32_t conn_stat_instance_callback(lwm2m_instance_t * p_instance,
 
     uint8_t  buffer[200];
     uint32_t buffer_size = sizeof(buffer);
+    uint16_t path[] = { p_instance->object_id, p_instance->instance_id, resource_id };
+    uint8_t  path_len = (resource_id == LWM2M_INVALID_RESOURCE) ? ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
 
     if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
     {
@@ -151,7 +153,8 @@ uint32_t conn_stat_instance_callback(lwm2m_instance_t * p_instance,
                     LWM2M_INF("Observe cancel on instance /7/%i, no match", p_instance->instance_id);
                 } else {
                     LWM2M_INF("Observe cancel on resource /7/%i/%i", p_instance->instance_id, resource_id);
-                    lwm2m_observe_unregister(p_request->remote, (void *)&m_instance_conn_stat.resource_ids[resource_id]);
+                    const void * p_observable = lwm2m_observable_reference_get(path, path_len);
+                    lwm2m_observe_unregister(p_request->remote, p_observable);
                 }
 
                 // Process the GET request as usual.

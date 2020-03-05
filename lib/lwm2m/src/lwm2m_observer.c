@@ -768,15 +768,15 @@ static bool lwm2m_observable_is_init(int index)
     // Assert index >= 0 && !m_observables[index]
     if (m_observables[index]->path_len == 3)
     {
-        const lwm2m_instance_t *p_instance;
+        const void *p_observable;
         uint16_t short_server_id, resource_id;
         uint8_t type;
 
         short_server_id = m_observables[index]->ssid;
         resource_id = m_observables[index]->path[2];
-        p_instance = observable_reference_get_cb(m_observables[index]->path, LWM2M_ATTR_OBJECT_INSTANCE_LEVEL, &type);
+        p_observable = observable_reference_get_cb(m_observables[index]->path, m_observables[index]->path_len, &type);
 
-        if (lwm2m_is_observed(short_server_id, p_instance, resource_id))
+        if (lwm2m_is_observed(short_server_id, p_observable))
         {
             return true;
         }
@@ -923,7 +923,7 @@ static bool is_query(const coap_message_t *p_request)
     return false;
 }
 
-int lwm2m_write_attribute_handler(const uint16_t *p_path, uint16_t path_len, const coap_message_t *p_request)
+int lwm2m_write_attribute_handler(const uint16_t *p_path, uint8_t path_len, const coap_message_t *p_request)
 {
     NULL_PARAM_CHECK(p_path);
     NULL_PARAM_CHECK(p_request);
@@ -1119,4 +1119,14 @@ uint32_t lwm2m_coap_handler_gen_attr_link(uint16_t const *p_path, uint16_t path_
     }
 
     return 0;
+}
+
+const void * lwm2m_observable_reference_get(const uint16_t *p_path, uint8_t path_len)
+{
+    if (!p_path)
+    {
+        return NULL;
+    }
+
+    return observable_reference_get_cb(p_path, path_len, NULL);
 }

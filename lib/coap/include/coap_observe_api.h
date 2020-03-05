@@ -44,13 +44,10 @@ typedef struct {
 	coap_content_type_t ct;
 
 	/** Pointer to the resource of interest. */
-	coap_resource_t *resource_of_interest;
+	const coap_resource_t *resource_of_interest;
 
 	/** Pointer to use when sending notifictions. */
 	coap_transport_handle_t transport;
-
-	/** Pointer to user defined data */
-	void * p_userdata;
 } coap_observer_t;
 
 /**@brief Struct for CoAP Client for holding an instance of a remote observable
@@ -117,7 +114,7 @@ uint32_t coap_observe_server_unregister(uint32_t handle);
  * @retval ENOENT If observer was not found.
  */
 uint32_t coap_observe_server_search(uint32_t *handle, struct nrf_sockaddr *observer_addr,
-				 coap_resource_t *resource);
+				 const coap_resource_t *resource);
 
 /**@brief Iterate through observers, with support for filter on specific resource
  *

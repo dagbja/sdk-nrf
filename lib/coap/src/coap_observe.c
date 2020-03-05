@@ -116,7 +116,7 @@ uint32_t internal_coap_observe_server_unregister(uint32_t handle)
 
 uint32_t internal_coap_observe_server_search(uint32_t *handle,
 					  struct nrf_sockaddr *observer_addr,
-					  coap_resource_t *resource)
+					  const coap_resource_t *resource)
 {
 	NULL_PARAM_CHECK(handle);
 	NULL_PARAM_CHECK(observer_addr);
@@ -655,7 +655,7 @@ uint32_t coap_observe_server_unregister(uint32_t handle)
 }
 
 uint32_t coap_observe_server_search(uint32_t *handle, struct nrf_sockaddr *observer_addr,
-				 coap_resource_t *resource)
+				 const coap_resource_t *resource)
 {
 	COAP_MUTEX_UNLOCK();
 

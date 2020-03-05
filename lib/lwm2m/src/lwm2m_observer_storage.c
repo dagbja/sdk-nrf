@@ -20,9 +20,8 @@
 typedef struct __attribute__((__packed__))
 {
     uint16_t            short_server_id;
-    uint16_t            object_id;
-    uint16_t            instance_id;
-    uint16_t            resource_id;
+    uint16_t            path[LWM2M_URI_PATH_MAX_LEN];
+    uint8_t             path_len;
     coap_content_type_t content_type;
     uint8_t             token_len;
     uint8_t             session_token[COAP_MESSAGE_TOKEN_MAX_LEN];
@@ -46,8 +45,10 @@ static lwm2m_del_notif_attr_cb_t   notif_attr_delete_cb;
 
 static int lwm2m_observer_storage_lookup_storage_id(void * cur_entry)
 {
-    NULL_PARAM_CHECK(cur_entry);
-    NULL_PARAM_CHECK(observer_load_cb);
+    if (!cur_entry || !observer_load_cb)
+    {
+        return -EINVAL;
+    }
 
     uint8_t entry[OBSERVER_ENTRY_SIZE];
 
@@ -67,8 +68,10 @@ static int lwm2m_observer_storage_lookup_storage_id(void * cur_entry)
 
 static int lwm2m_notif_attr_storage_lookup_storage_id(const void * cur_entry)
 {
-    NULL_PARAM_CHECK(cur_entry);
-    NULL_PARAM_CHECK(notif_attr_load_cb);
+    if (!cur_entry || !notif_attr_load_cb)
+    {
+        return -EINVAL;
+    }
 
     uint8_t entry[NOTIF_ATTR_ENTRY_SIZE];
 
@@ -120,15 +123,40 @@ static int lwm2m_notif_attr_storage_get_new_storage_id(void)
     return -ENOMEM;
 }
 
+static uint32_t lwm2m_observer_storage_entry_get(const coap_observer_t          * p_observer,
+                                                 lwm2m_observer_storage_entry_t * p_entry)
+{
+    NULL_PARAM_CHECK(p_observer);
+    NULL_PARAM_CHECK(p_entry);
+
+    lwm2m_observer_storage_entry_t entry;
+    const void * p_observable;
+
+    for (size_t i = 0; i < CONFIG_NRF_COAP_OBSERVE_MAX_NUM_OBSERVERS; i++)
+    {
+        if (observer_load_cb(i, (void *)&entry, OBSERVER_ENTRY_SIZE) == 0)
+        {
+            p_observable = lwm2m_observable_reference_get(entry.path, entry.path_len);
+            if (p_observable == p_observer->resource_of_interest)
+            {
+                *p_entry = entry;
+                return 0;
+            }
+        }
+    }
+
+    return ENOENT;
+}
+
 static int lwm2m_observer_storage_create_entry(coap_observer_t                * p_observer,
+                                               const uint16_t                 * p_path,
+                                               uint8_t                          path_len,
                                                lwm2m_observer_storage_entry_t * p_entry)
 {
     NULL_PARAM_CHECK(p_observer);
-    NULL_PARAM_CHECK(p_observer->p_userdata);
-    NULL_PARAM_CHECK(p_observer->resource_of_interest);
+    NULL_PARAM_CHECK(p_observer->remote);
+    NULL_PARAM_CHECK(p_path);
     NULL_PARAM_CHECK(p_entry);
-
-    lwm2m_instance_t * p_instance = (lwm2m_instance_t *)p_observer->p_userdata;
 
     int err_code = lwm2m_remote_short_server_id_find(&p_entry->short_server_id, p_observer->remote);
     if (err_code != 0)
@@ -136,18 +164,17 @@ static int lwm2m_observer_storage_create_entry(coap_observer_t                * 
         return err_code;
     }
 
-    /* We are only interested in the 16-bit value that this pointer is pointing to
-     * not the coap_resource_t object.
-     */
-    p_entry->resource_id  = *((uint16_t *)p_observer->resource_of_interest);
+    memset(p_entry->path, 0, sizeof(p_entry->path));
+    p_entry->path_len = path_len;
+    for (int i = 0; i < path_len; i++)
+    {
+        p_entry->path[i] = p_path[i];
+    }
     p_entry->content_type = p_observer->ct;
-    p_entry->token_len    = p_observer->token_len;
-    p_entry->instance_id  = p_instance->instance_id;
-    p_entry->object_id    = p_instance->object_id;
-
+    p_entry->token_len = p_observer->token_len;
     memcpy(p_entry->session_token, p_observer->token, p_entry->token_len);
 
-   return 0;
+    return 0;
 }
 
 static int lwm2m_notif_attr_storage_create_entry(const lwm2m_observable_metadata_t      * p_metadata,
@@ -162,7 +189,7 @@ static int lwm2m_notif_attr_storage_create_entry(const lwm2m_observable_metadata
     p_entry->path_len = p_metadata->path_len;
     p_entry->short_server_id = p_metadata->ssid;
 
-   return 0;
+    return 0;
 }
 
 uint32_t lwm2m_observer_storage_set_callbacks(lwm2m_store_observer_cb_t store_cb,
@@ -197,29 +224,24 @@ uint32_t lwm2m_notif_attr_storage_set_callbacks(lwm2m_store_notif_attr_cb_t stor
     return EINVAL;
 }
 
-uint32_t lwm2m_observer_storage_store(coap_observer_t  * p_observer)
+uint32_t lwm2m_observer_storage_store(coap_observer_t * p_observer, const uint16_t * p_path, uint8_t path_len)
 {
     NULL_PARAM_CHECK(p_observer);
-    NULL_PARAM_CHECK(p_observer->p_userdata);
     NULL_PARAM_CHECK(p_observer->remote);
-    NULL_PARAM_CHECK(p_observer->resource_of_interest);
+    NULL_PARAM_CHECK(p_path);
     NULL_PARAM_CHECK(observer_store_cb);
 
-    int                             sid;
-    lwm2m_observer_storage_entry_t  entry;
-    lwm2m_instance_t              * p_instance = (lwm2m_instance_t *)p_observer->p_userdata;
-    uint16_t                        short_server_id;
+    int sid, err_code;
+    lwm2m_observer_storage_entry_t entry;
+    uint16_t short_server_id;
 
-    /* Silence warnings */
-    (void) p_instance;
-
-    int err_code = lwm2m_remote_short_server_id_find(&short_server_id, p_observer->remote);
+    err_code = lwm2m_remote_short_server_id_find(&short_server_id, p_observer->remote);
     if (err_code != 0)
     {
         return err_code;
     }
 
-    err_code = lwm2m_observer_storage_create_entry(p_observer, &entry);
+    err_code = lwm2m_observer_storage_create_entry(p_observer, p_path, path_len, &entry);
     if (err_code != 0)
     {
         return err_code;
@@ -237,22 +259,12 @@ uint32_t lwm2m_observer_storage_store(coap_observer_t  * p_observer)
     }
     else
     {
-        LWM2M_INF("Observer /%d/%d/%d for server %d already exist in storage, updating entry",
-                   p_instance->object_id,
-                   p_instance->instance_id,
-                   *((uint16_t *)p_observer->resource_of_interest),
-                   short_server_id);
+        LWM2M_INF("Observer already exists in flash storage, updating entry");
     }
 
     if (observer_store_cb(sid, (void *)&entry, OBSERVER_ENTRY_SIZE) != 0)
     {
-
-        LWM2M_ERR("Failed to store observer /%d/%d/%d for server %d to storage",
-                  p_instance->object_id,
-                  p_instance->instance_id,
-                  *((uint16_t *)p_observer->resource_of_interest),
-                  short_server_id);
-
+        LWM2M_ERR("Failed to store observer in flash storage");
         return EIO;
     }
 
@@ -266,7 +278,7 @@ uint32_t lwm2m_notif_attr_storage_store(const lwm2m_observable_metadata_t * p_me
     NULL_PARAM_CHECK(p_metadata->observable);
     NULL_PARAM_CHECK(notif_attr_store_cb);
 
-    lwm2m_notif_attr_storage_entry_t  entry;
+    lwm2m_notif_attr_storage_entry_t entry;
     int err_code, sid;
 
     err_code = lwm2m_notif_attr_storage_create_entry(p_metadata, &entry);
@@ -297,52 +309,38 @@ uint32_t lwm2m_notif_attr_storage_store(const lwm2m_observable_metadata_t * p_me
     return 0;
 }
 
-uint32_t lwm2m_observer_storage_delete(coap_observer_t  * p_observer)
+uint32_t lwm2m_observer_storage_delete(coap_observer_t * p_observer)
 {
     NULL_PARAM_CHECK(p_observer);
-    NULL_PARAM_CHECK(p_observer->p_userdata);
-    NULL_PARAM_CHECK(p_observer->resource_of_interest);
     NULL_PARAM_CHECK(p_observer->remote);
     NULL_PARAM_CHECK(observer_delete_cb);
 
     lwm2m_observer_storage_entry_t entry;
-    lwm2m_instance_t * p_instance = (lwm2m_instance_t *)p_observer->p_userdata;
-    uint16_t short_server_id;
+    uint32_t err_code;
+    int sid;
 
-    /* Silence warnings */
-    (void) p_instance;
+    err_code = lwm2m_observer_storage_entry_get(p_observer, &entry);
 
-    int err_code = lwm2m_remote_short_server_id_find(&short_server_id, p_observer->remote);
-    if (err_code != 0)
+    if (err_code == 0)
     {
-        return err_code;
+        sid = lwm2m_observer_storage_lookup_storage_id(&entry);
+        if (sid < 0)
+        {
+            err_code = -sid;
+        }
     }
 
-    err_code = lwm2m_observer_storage_create_entry(p_observer, &entry);
-    if (err_code != 0)
+    if (err_code == 0)
     {
-        return err_code;
+        err_code = observer_delete_cb(sid);
     }
 
-    int sid = lwm2m_observer_storage_lookup_storage_id((void *)&entry);
-    if (sid < 0)
+    if (err_code != 0) 
     {
-        return -sid;
+        LWM2M_ERR("Failed to delete observer from flash storage");
     }
 
-    err_code = observer_delete_cb(sid);
-    if (err_code != 0) {
-        LWM2M_ERR("Failed to delete observer /%d/%d/%d for server %d from storage failed:"
-                  "%s (%ld), %s (%d)",
-                  p_instance->object_id, p_instance->instance_id, *((uint16_t *)p_observer->resource_of_interest),
-                  short_server_id, lwm2m_os_log_strdup(strerror(err_code)),
-                  err_code, lwm2m_os_log_strdup(strerror(errno)), errno);
-
-
-        return EIO;
-    }
-
-    return 0;
+    return err_code;
 }
 
 uint32_t lwm2m_notif_attr_storage_delete(const lwm2m_observable_metadata_t * p_metadata)
@@ -407,10 +405,12 @@ uint32_t lwm2m_observer_storage_restore(uint16_t                short_server_id,
     NULL_PARAM_CHECK(observer_load_cb);
 
     lwm2m_observer_storage_entry_t entry;
-    uint32_t                       handle;
-    uint32_t                       observer_count = 0;
-    uint32_t                       rc             = 0;
-    coap_observer_t                observer;
+    uint32_t handle;
+    uint32_t observer_count = 0;
+    uint32_t rc = 0;
+    coap_observer_t observer;
+    const void * p_observable;
+    struct nrf_sockaddr * p_remote;
 
     for (uint32_t sid = 0; sid < CONFIG_NRF_COAP_OBSERVE_MAX_NUM_OBSERVERS; sid++)
     {
@@ -421,59 +421,38 @@ uint32_t lwm2m_observer_storage_restore(uint16_t                short_server_id,
 
         if (short_server_id == entry.short_server_id)
         {
-            lwm2m_instance_t    * p_instance;
-            struct nrf_sockaddr * p_remote;
-
-            rc = lwm2m_lookup_instance(&p_instance, entry.object_id, entry.instance_id);
+            rc = lwm2m_short_server_id_remote_find(&p_remote, entry.short_server_id);
             if (rc != 0)
             {
-                LWM2M_ERR("Locating observer /%d/%d failed: %s (%ld), %s (%d)",
-                           entry.object_id, entry.instance_id,
-                           lwm2m_os_log_strdup(strerror(rc)), rc,
-                           lwm2m_os_log_strdup(strerror(errno)), errno);
-
                 continue;
             }
 
-            uint16_t * p_resource_ids = (uint16_t *)((uint8_t *)p_instance + p_instance->resource_ids_offset);
-
-            int err_code = lwm2m_short_server_id_remote_find(&p_remote, entry.short_server_id);
-            if (err_code != 0)
+            p_observable = lwm2m_observable_reference_get(entry.path, entry.path_len);
+            if (!p_observable)
             {
-                LWM2M_ERR("Finding remote for short server id: %d (observer: /%d/%d/%d) failed: %s (%ld), %s (%d)",
-                           entry.short_server_id, entry.object_id, entry.instance_id, entry.resource_id,
-                           lwm2m_os_log_strdup(strerror(rc)), rc,
-                           lwm2m_os_log_strdup(strerror(errno)), errno);
+                continue;
             }
 
             observer.remote               = p_remote;
             observer.transport            = transport;
             observer.ct                   = entry.content_type;
-            observer.p_userdata           = (void *)p_instance;
-            observer.resource_of_interest = (coap_resource_t *)&p_resource_ids[entry.resource_id];
+            observer.resource_of_interest = p_observable;
             observer.token_len            = entry.token_len;
             memcpy(observer.token, entry.session_token, entry.token_len);
 
             rc = coap_observe_server_register(&handle, &observer);
-
             if (rc != 0)
             {
-                LWM2M_ERR("Loading observer with server ID: %d observing: /%d/%d/%d failed: %s (%ld), %s (%d)",
-                           entry.short_server_id, entry.object_id, entry.instance_id, entry.resource_id,
+                LWM2M_ERR("Loading observer failed: %s (%ld), %s (%d)",
                            lwm2m_os_log_strdup(strerror(rc)), rc,
                            lwm2m_os_log_strdup(strerror(errno)), errno);
 
                 continue;
             }
 
-            LWM2M_INF("Observer /%d/%d/%d restored, server: %d", entry.object_id,
-                                                                 entry.instance_id,
-                                                                 entry.resource_id,
-                                                                 entry.short_server_id);
+            LWM2M_INF("Observer restored");
 
-            uint16_t path[] = { entry.object_id, entry.instance_id, entry.resource_id };
-
-            lwm2m_observable_metadata_init(p_remote, path, ARRAY_SIZE(path));
+            lwm2m_observable_metadata_init(p_remote, entry.path, entry.path_len);
 
             observer_count++;
         }
@@ -484,11 +463,9 @@ uint32_t lwm2m_observer_storage_restore(uint16_t                short_server_id,
 
 void lwm2m_observer_storage_delete_all(void)
 {
-    coap_observer_t * p_observer = NULL;
-
-    while (coap_observe_server_next_get(&p_observer, p_observer, NULL) == 0)
+    for (int i = 0; i < CONFIG_NRF_COAP_OBSERVE_MAX_NUM_OBSERVERS; i++)
     {
-        lwm2m_observer_storage_delete(p_observer);
+        observer_delete_cb(i);
     }
 }
 
