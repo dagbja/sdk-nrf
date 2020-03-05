@@ -70,6 +70,7 @@ extern "C" {
 #define LWM2M_SERVER_NOTIFY_WHEN_DISABLED        6
 #define LWM2M_SERVER_BINDING                     7
 #define LWM2M_SERVER_REGISTRATION_UPDATE_TRIGGER 8
+#define LWM2M_SERVER_BOOTSTRAP_REQUEST_TRIGGER   9
 
 
 /* LWM2M Firmware update Resources Appendix E.6 */
@@ -259,9 +260,9 @@ typedef struct
 
 typedef struct
 {
-    lwm2m_instance_t           proto;           /* Internal. MUST be first. */
-    uint8_t                    operations[9];   /* Internal. MUST be second. */
-    uint16_t                   resource_ids[9]; /* Internal. MUST be third. */
+    lwm2m_instance_t           proto;            /* Internal. MUST be first. */
+    uint8_t                    operations[10];   /* Internal. MUST be second. */
+    uint16_t                   resource_ids[10]; /* Internal. MUST be third. */
 
     /* Public members. */
     uint16_t                   short_server_id;              // 1-65535
@@ -273,6 +274,7 @@ typedef struct
     bool                       notification_storing_on_disabled;
     lwm2m_string_t             binding;
     void *                     registration_update_trigger;  // Function pointer.
+    void *                     bootstrap_request_trigger;    // Function pointer.
 
 } lwm2m_server_t;
 

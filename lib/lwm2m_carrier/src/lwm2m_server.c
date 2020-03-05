@@ -480,6 +480,14 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                 break;
             }
 
+            case LWM2M_SERVER_BOOTSTRAP_REQUEST_TRIGGER:
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+
+                lwm2m_request_bootstrap();
+                break;
+            }
+
             default:
             {
                 (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);

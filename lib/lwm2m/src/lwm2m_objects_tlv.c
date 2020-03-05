@@ -501,6 +501,12 @@ uint32_t lwm2m_tlv_server_decode(lwm2m_server_t     * p_server,
                 break;
             }
 
+            case LWM2M_SERVER_BOOTSTRAP_REQUEST_TRIGGER:
+            {
+                // Execute do nothing
+                break;
+            }
+
             default:
             {
                 if (resource_callback)

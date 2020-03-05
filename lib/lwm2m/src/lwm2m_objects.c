@@ -177,6 +177,7 @@ void lwm2m_instance_server_init(lwm2m_server_t * p_instance)
     p_instance->operations[6] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
     p_instance->operations[7] = (LWM2M_OPERATION_CODE_READ | LWM2M_OPERATION_CODE_WRITE);
     p_instance->operations[8] = LWM2M_OPERATION_CODE_EXECUTE;
+    p_instance->operations[9] = LWM2M_OPERATION_CODE_EXECUTE;
 
     // Set resource IDs.
     p_instance->resource_ids[0] = LWM2M_SERVER_SHORT_SERVER_ID;
@@ -188,6 +189,7 @@ void lwm2m_instance_server_init(lwm2m_server_t * p_instance)
     p_instance->resource_ids[6] = LWM2M_SERVER_NOTIFY_WHEN_DISABLED;
     p_instance->resource_ids[7] = LWM2M_SERVER_BINDING;
     p_instance->resource_ids[8] = LWM2M_SERVER_REGISTRATION_UPDATE_TRIGGER;
+    p_instance->resource_ids[9] = LWM2M_SERVER_BOOTSTRAP_REQUEST_TRIGGER;
 }
 
 
