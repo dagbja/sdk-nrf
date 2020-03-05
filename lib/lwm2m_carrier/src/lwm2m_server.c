@@ -24,7 +24,6 @@
 
 
 extern void app_server_disable(uint16_t instance_id);
-extern void app_server_update(uint16_t instance_id, bool connect_update);
 
 #define VERIZON_RESOURCE 30000
 
@@ -66,12 +65,7 @@ lwm2m_time_t lwm2m_server_lifetime_get(uint16_t instance_id)
 
 void lwm2m_server_lifetime_set(uint16_t instance_id, lwm2m_time_t value)
 {
-    lwm2m_time_t previous = m_instance_server[instance_id].lifetime = value;
     m_instance_server[instance_id].lifetime = value;
-    if (value != previous)
-    {
-        app_server_update(instance_id, false);
-    }
 }
 
 lwm2m_time_t lwm2m_server_min_period_get(uint16_t instance_id)
@@ -397,6 +391,8 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
             return 0;
         }
 
+        lwm2m_time_t previous_lifetime = lwm2m_server_lifetime_get(instance_id);
+
         if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
         {
             err_code = lwm2m_tlv_server_decode(lwm2m_server_get_instance(instance_id),
@@ -432,6 +428,11 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
         {
             (void)lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_request);
             return 0;
+        }
+
+        if (lwm2m_server_lifetime_get(instance_id) != previous_lifetime)
+        {
+            lwm2m_request_server_update(instance_id, false);
         }
 
         if (err_code == 0)
@@ -475,7 +476,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                     instance_id = 1;
                 }
 #endif
-                app_server_update(instance_id, false);
+                lwm2m_request_server_update(instance_id, false);
                 break;
             }
 
@@ -576,9 +577,9 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
         if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
         {
             (void)lwm2m_tlv_server_decode(&m_instance_server[instance_id],
-                                        p_request->payload,
-                                        p_request->payload_len,
-                                        tlv_server_resource_decode);
+                                          p_request->payload,
+                                          p_request->payload_len,
+                                          tlv_server_resource_decode);
 
             m_instance_server[instance_id].proto.instance_id = instance_id;
             m_instance_server[instance_id].proto.object_id   = p_object->object_id;
