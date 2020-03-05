@@ -195,7 +195,7 @@ static void factory_server_att(void)
     lwm2m_instance_acl_t acl = {
         .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
         .access = { rwde_access },
-        .server = { 123 }
+        .server = { 1 }
     };
 
     lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
@@ -210,7 +210,7 @@ static void factory_server_test_att(void)
     lwm2m_instance_acl_t acl = {
         .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
         .access = { rwde_access },
-        .server = { 123 }
+        .server = { 1 }
     };
 
     lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
