@@ -15,6 +15,10 @@
 
 void lwm2m_conn_ext_init(void);
 
+char * lwm2m_conn_ext_msisdn_get(uint8_t * p_len);
+
+void lwm2m_conn_ext_msisdn_set(char * p_value, uint8_t len);
+
 uint8_t lwm2m_conn_ext_apn_retries_get(uint16_t instance_id, uint16_t apn_instance);
 
 int32_t lwm2m_conn_ext_apn_retry_period_get(uint16_t instance_id, uint16_t apn_instance);

@@ -17,6 +17,7 @@
 #include <lwm2m_server.h>
 #include <lwm2m_device.h>
 #include <lwm2m_conn_mon.h>
+#include <lwm2m_conn_ext.h>
 #include <lwm2m_retry_delay.h>
 #include <lwm2m_instance_storage.h>
 #include <at_interface.h>
@@ -169,10 +170,6 @@ static int cmd_server_lifetime(const struct shell *shell, size_t argc, char **ar
 
 static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
 {
-    shell_print(shell, "Debug configuration");
-    shell_print(shell, "  IMEI           %s", lwm2m_imei_get());
-    shell_print(shell, "  MSISDN         %s", lwm2m_msisdn_get());
-
     uint32_t iccid_len;
     char * p_iccid = lwm2m_device_get_sim_iccid(&iccid_len);
     char iccid[21];
@@ -183,7 +180,15 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
         iccid[0] = 0;
     }
 
+    char last_used_msisdn[16];
+    int32_t len = lwm2m_last_used_msisdn_get(last_used_msisdn, sizeof(last_used_msisdn));
+    last_used_msisdn[len > 0 ? len : 0] = 0;
+
+    shell_print(shell, "Debug configuration");
+    shell_print(shell, "  IMEI           %s", lwm2m_imei_get());
+    shell_print(shell, "  SIM MSISDN     %s", lwm2m_msisdn_get());
     shell_print(shell, "  SIM ICCID      %s", iccid);
+    shell_print(shell, "  Stored MSISDN  %s", last_used_msisdn);
     shell_print(shell, "  Logging        %s", modem_logging_get());
     shell_print(shell, "  Real carrier   %s", operator_id_string(OPERATOR_ID_CURRENT));
     shell_print(shell, "  Carrier check  %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK) ? "No" : "Yes");
@@ -235,6 +240,37 @@ static int cmd_debug_logging(const struct shell *shell, size_t argc, char **argv
 
     shell_print(shell, "Set logging value: %s", logging);
     shell_print(shell, "Remember to do 'reboot' to store this value permanent!");
+
+    return 0;
+}
+
+static int cmd_debug_msisdn(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s MSISDN", argv[0]);
+        return 0;
+    }
+
+    char *p_msisdn = argv[1];
+    size_t msisdn_len = strlen(p_msisdn);
+
+    if (msisdn_len > 15) {
+        shell_print(shell, "length of MSISDN must be less than 15");
+        return 0;
+    }
+
+    lwm2m_last_used_msisdn_set(p_msisdn, msisdn_len);
+    lwm2m_conn_ext_msisdn_set(p_msisdn, msisdn_len);
+
+    for (uint32_t i = 1; i < 1 + LWM2M_MAX_SERVERS; i++) {
+        lwm2m_request_server_update(i, false);
+    }
+
+    if (msisdn_len) {
+        shell_print(shell, "Set MSISDN: %s", p_msisdn);
+    } else {
+        shell_print(shell, "Removed MSISDN");
+    }
 
     return 0;
 }
@@ -1300,6 +1336,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
     SHELL_CMD(fallback, NULL, "Set IP Fallback", cmd_debug_fallback_disabled),
     SHELL_CMD(ipv6_enable, NULL, "Set IPv6 enabled", cmd_debug_ipv6_enabled),
     SHELL_CMD(logging, NULL, "Set logging value", cmd_debug_logging),
+    SHELL_CMD(msisdn, NULL, "Set MSISDN", cmd_debug_msisdn),
     SHELL_CMD(net_reg_stat, NULL, "Set network registration status", cmd_debug_set_net_reg_stat),
     SHELL_CMD(print, NULL, "Print configuration", cmd_debug_print),
     SHELL_CMD(reset, NULL, "Reset configuration", cmd_debug_reset),

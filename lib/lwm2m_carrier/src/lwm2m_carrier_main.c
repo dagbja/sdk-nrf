@@ -643,24 +643,18 @@ static int app_read_sim_values(void)
 
     if (ret != 0)
     {
-        if (operator_is_supported(false))
+        if (operator_is_vzw(false))
         {
-            // MSISDN is mandatory on VZW and AT&T network. Cannot continue.
+            // MSISDN is mandatory on VZW network. Cannot continue.
             LWM2M_ERR("No MSISDN available, cannot generate client ID");
             return EACCES;
         }
-        else if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK))
+        else if (operator_is_vzw(true))
         {
             // If no MSISDN is available, use part of IMEI to generate a unique Client ID.
             // This is not allowed on VZW network. Use for testing purposes only.
             memcpy(m_msisdn, &m_imei[5], 10);
             m_msisdn[10] = '\0';
-        }
-        else
-        {
-            // No MSISDN available to generate a unique Client ID.
-            LWM2M_ERR("No MSISDN available");
-            return EACCES;
         }
     }
 
@@ -701,7 +695,7 @@ static bool app_bootstrap_keys_exists(void)
 static int app_generate_client_id(void)
 {
     char client_id[APP_CLIENT_ID_LENGTH];
-    char last_used_msisdn[128];
+    char last_used_msisdn[16];
     bool clear_bootstrap = false;
     bool provision_bs_psk = false;
 
@@ -725,6 +719,7 @@ static int app_generate_client_id(void)
                       lwm2m_os_log_strdup(operator_id_string(operator_id(true))));
         }
         if (lwm2m_factory_bootstrap_update(&m_app_config)) {
+            lwm2m_last_used_msisdn_set("", 0);
             clear_bootstrap = true;
         }
 
@@ -744,11 +739,11 @@ static int app_generate_client_id(void)
             if (strlen(p_msisdn) > 0 && strcmp(p_msisdn, last_used_msisdn) != 0) {
                 // MSISDN has changed, factory reset and initiate bootstrap.
                 LWM2M_INF("New MSISDN detected: %s -> %s", lwm2m_os_log_strdup(last_used_msisdn), lwm2m_os_log_strdup(p_msisdn));
-                lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
+                lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn));
                 clear_bootstrap = true;
             }
         } else {
-            lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn) + 1);
+            lwm2m_last_used_msisdn_set(p_msisdn, strlen(p_msisdn));
             provision_bs_psk = true;
         }
 
@@ -2008,6 +2003,22 @@ static void app_bootstrap(void)
     }
 }
 
+static void update_server_conf(uint16_t security_instance)
+{
+    uint16_t server_instance = server_instance_get(security_instance);
+
+    m_server_conf[security_instance].lifetime = lwm2m_server_lifetime_get(server_instance);
+
+    if (operator_is_att(false) &&
+        (security_instance != LWM2M_BOOTSTRAP_INSTANCE_ID))
+    {
+        // For AT&T MSISDN is fetched from the connectivity extension object.
+        uint8_t msisdn_len = 0;
+        m_server_conf[security_instance].msisdn.p_val = lwm2m_conn_ext_msisdn_get(&msisdn_len);
+        m_server_conf[security_instance].msisdn.len = msisdn_len;
+    }
+}
+
 static void app_server_connect(uint16_t security_instance)
 {
     uint32_t err_code;
@@ -2023,23 +2034,22 @@ static void app_server_connect(uint16_t security_instance)
         return;
     }
 
-    uint16_t server_instance = server_instance_get(security_instance);
-
     // Initialize server configuration structure.
     memset(&m_server_conf[security_instance], 0, sizeof(lwm2m_server_config_t));
-    m_server_conf[security_instance].lifetime = lwm2m_server_lifetime_get(server_instance);
 
     if (operator_is_supported(false))
     {
-        uint8_t binding_len = 0;
-        char *p_binding = lwm2m_server_binding_get(server_instance, &binding_len);
-        lwm2m_bytebuffer_to_string(p_binding, binding_len, &m_server_conf[security_instance].binding);
+        m_server_conf[security_instance].binding.p_val = "UQS";
+        m_server_conf[security_instance].binding.len = 3;
 
-        if (security_instance) {
+        if (security_instance != LWM2M_BOOTSTRAP_INSTANCE_ID)
+        {
             m_server_conf[security_instance].msisdn.p_val = lwm2m_msisdn_get();
             m_server_conf[security_instance].msisdn.len = strlen(lwm2m_msisdn_get());
         }
     }
+
+    update_server_conf(security_instance);
 
     // Set the short server id of the server in the config.
     m_server_conf[security_instance].short_server_id = lwm2m_security_short_server_id_get(security_instance);
@@ -2222,9 +2232,8 @@ void app_server_update(uint16_t security_instance, bool connect_update)
         (security_instance != m_security_instance))
     {
         uint32_t err_code;
-        uint16_t server_instance = server_instance_get(security_instance);
 
-        m_server_conf[security_instance].lifetime = lwm2m_server_lifetime_get(server_instance);
+        update_server_conf(security_instance);
 
         err_code = lwm2m_update((struct nrf_sockaddr *)&m_remote_server[security_instance],
                                 &m_server_conf[security_instance],

@@ -15,6 +15,7 @@
 #include <coap_message.h>
 #include <lwm2m_common.h>
 #include <lwm2m_carrier_main.h>
+#include <lwm2m_instance_storage.h>
 #include <at_interface.h>
 
 #define DEFAULT_APN_RETRIES               2
@@ -23,6 +24,20 @@
 
 static lwm2m_object_t                 m_object_conn_ext;        /**< AT&T Connectivity Extension base object. */
 static lwm2m_connectivity_extension_t m_instance_conn_ext;      /**< AT&T Connectivity Extension object instance. */
+
+char * lwm2m_conn_ext_msisdn_get(uint8_t * p_len)
+{
+    *p_len = m_instance_conn_ext.msisdn.len;
+    return m_instance_conn_ext.msisdn.p_val;
+}
+
+void lwm2m_conn_ext_msisdn_set(char * p_value, uint8_t len)
+{
+    if (lwm2m_bytebuffer_to_string(p_value, len, &m_instance_conn_ext.msisdn) != 0)
+    {
+        LWM2M_ERR("Could not set MSISDN");
+    }
+}
 
 uint8_t lwm2m_conn_ext_apn_retries_get(uint16_t instance_id, uint16_t apn_instance)
 {
@@ -130,6 +145,9 @@ uint32_t conn_ext_instance_callback(lwm2m_instance_t * p_instance,
             return 0;
         }
 
+        char previous_msisdn[16];
+        memcpy(previous_msisdn, m_instance_conn_ext.msisdn.p_val, m_instance_conn_ext.msisdn.len);
+
         if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
         {
             err_code = lwm2m_tlv_connectivity_extension_decode(&m_instance_conn_ext,
@@ -141,6 +159,16 @@ uint32_t conn_ext_instance_callback(lwm2m_instance_t * p_instance,
         {
             (void)lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_request);
             return 0;
+        }
+
+        if (memcmp(previous_msisdn, m_instance_conn_ext.msisdn.p_val, m_instance_conn_ext.msisdn.len) != 0)
+        {
+            lwm2m_last_used_msisdn_set(m_instance_conn_ext.msisdn.p_val, m_instance_conn_ext.msisdn.len);
+
+            for (uint32_t i = 1; i < 1 + LWM2M_MAX_SERVERS; i++)
+            {
+                lwm2m_request_server_update(i, false);
+            }
         }
 
         if (err_code == 0)
@@ -225,8 +253,11 @@ void lwm2m_conn_ext_init(void)
     m_instance_conn_ext.iccid.len = 0;
     m_instance_conn_ext.imsi.p_val = NULL;
     m_instance_conn_ext.imsi.len = 0;
-    m_instance_conn_ext.msisdn.p_val = NULL;
-    m_instance_conn_ext.msisdn.len = 0;
+
+    char last_used_msisdn[16];
+    int32_t len = lwm2m_last_used_msisdn_get(last_used_msisdn, sizeof(last_used_msisdn));
+    lwm2m_bytebuffer_to_string(last_used_msisdn, len, &m_instance_conn_ext.msisdn);
+
     m_instance_conn_ext.apn_retries.val.p_uint8[0] = DEFAULT_APN_RETRIES;
     m_instance_conn_ext.apn_retries.len = 1;
     m_instance_conn_ext.apn_retry_period.val.p_int32[0] = DEFAULT_APN_RETRY_PERIOD;
