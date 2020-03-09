@@ -1750,6 +1750,9 @@ static void app_load_flash_objects(void)
 
 static void app_lwm2m_create_objects(void)
 {
+    // Init functions will check operator ID.
+    operator_id_read();
+
     lwm2m_security_init();
     lwm2m_server_init();
     app_server_acl_init();
