@@ -1661,7 +1661,7 @@ void lwm2m_bootstrap_reset(void)
     lwm2m_portfolio_init_acl();
     lwm2m_conn_ext_init_acl();
 
-    lwm2m_device_update_software_version();
+    lwm2m_device_update_carrier_specific_settings();
 
     for (uint32_t i = 0; i < CONFIG_NRF_COAP_OBSERVE_MAX_NUM_OBSERVERS; i++)
     {

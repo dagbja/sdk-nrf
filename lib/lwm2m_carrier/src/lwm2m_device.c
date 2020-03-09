@@ -687,17 +687,19 @@ lwm2m_object_t * lwm2m_device_get_object(void)
     return &m_object_device;
 }
 
-void lwm2m_device_update_software_version(void)
+void lwm2m_device_update_carrier_specific_settings(void)
 {
     if (operator_is_att(true))
     {
         char svn[3];
-
         at_read_svn(svn, sizeof(svn));
+
+        (void)lwm2m_carrier_device_type_set("Module - LGA");
         (void)lwm2m_carrier_software_version_set(svn);
     }
     else
     {
+        (void)lwm2m_carrier_device_type_set("Smart Device");
         (void)lwm2m_carrier_software_version_set("LwM2M 0.9");
     }
 }
@@ -749,8 +751,7 @@ void lwm2m_device_init(void)
     m_instance_device.memory_free = 0;
     (void)lwm2m_carrier_error_code_add(LWM2M_CARRIER_ERROR_CODE_NO_ERROR);
     (void)lwm2m_bytebuffer_to_string("UQS", 3, &m_instance_device.supported_bindings);
-    (void)lwm2m_carrier_device_type_set("Smart Device");
-    lwm2m_device_update_software_version();
+    lwm2m_device_update_carrier_specific_settings();
     (void)lwm2m_carrier_hardware_version_set("1.0");
     (void)lwm2m_carrier_battery_status_set(LWM2M_CARRIER_BATTERY_STATUS_NOT_INSTALLED);
 
