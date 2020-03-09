@@ -25,22 +25,6 @@
 #define LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL  -1 /**< Notification attribute uninitialized assignment level. */
 #define LWM2M_ATTR_DEFAULT_ASSIGNMENT_LEVEL  0 /**< Notification attribute default assignment level. */
 
-/**@brief Retrieve the current notification attributes of an observable item.
- *
- * @note The provided array of notification attributes MUST be of size >= LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE.
- *
- * @param[inout] p_attributes      Array of notification attributes where the corresponding attributes will be stored.
- * @param[in]    p_path            URI path that identifies the observable item.
- * @param[in]    path_len          Length of the URI path that identifies the observable item.
- * @param[in]    ssid              Short server ID of the observer.
- *
- * @retval  0       If the attributes have been retrieved successfully.
- * @retval -EINVAL  If the provided array or path is NULL.
- * @retval -EIO     If a callback function to reference the observable item has not been set yet.
- * @retval -ENOENT  If the observable or its corresponding metadata structure has not been found.
- */
-int lwm2m_observable_notif_attributes_get(lwm2m_notif_attribute_t *p_attributes, const uint16_t *p_path, uint8_t path_len, uint16_t ssid);
-
 /**@brief Restore the notification attributes of an observable item.
  *
  * @param[in] p_attributes  Array of notification attributes to be reassigned to the given observable.

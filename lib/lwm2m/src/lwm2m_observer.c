@@ -15,8 +15,8 @@
 #include <nrf_socket.h>
 
 static lwm2m_observable_metadata_t       * m_observables[LWM2M_MAX_OBSERVABLES_WITH_ATTRIBUTES];
-static lwm2m_notif_attribute_default_cb_t  notif_attr_default_set_cb;
-static lwm2m_observers_notify_path_cb_t    observers_notify_path_cb;
+static lwm2m_notif_attr_default_cb_t       notif_attr_default_set_cb;
+static lwm2m_observer_notify_path_cb_t     observer_notify_path_cb;
 static lwm2m_observable_reference_get_cb_t observable_reference_get_cb;
 static lwm2m_uptime_get_cb_t               uptime_get_cb;
 static int64_t                             m_time_base;
@@ -76,14 +76,14 @@ static void lwm2m_observer_update_after_notification(int index)
     m_observables[index]->flags = 0;
 }
 
-void lwm2m_notif_attribute_default_cb_set(lwm2m_notif_attribute_default_cb_t callback)
+void lwm2m_notif_attr_default_cb_set(lwm2m_notif_attr_default_cb_t callback)
 {
     notif_attr_default_set_cb = callback;
 }
 
-void lwm2m_observers_notify_path_cb_set(lwm2m_observers_notify_path_cb_t callback)
+void lwm2m_observer_notify_path_cb_set(lwm2m_observer_notify_path_cb_t callback)
 {
-    observers_notify_path_cb = callback;
+    observer_notify_path_cb = callback;
 }
 
 void lwm2m_observable_reference_get_cb_set(lwm2m_observable_reference_get_cb_t callback)
@@ -543,7 +543,7 @@ void lwm2m_observer_process(bool reconnect)
         return;
     }
 
-    if (!observers_notify_path_cb)
+    if (!observer_notify_path_cb)
     {
         LWM2M_WRN("No callback set to notify the observers");
         return;
@@ -563,44 +563,10 @@ void lwm2m_observer_process(bool reconnect)
         {
             // Finding remote should not fail at this stage.
             lwm2m_short_server_id_remote_find(&remote, m_observables[i]->ssid);
-            observers_notify_path_cb(m_observables[i]->path, m_observables[i]->path_len, remote);
+            observer_notify_path_cb(m_observables[i]->path, m_observables[i]->path_len, remote);
             lwm2m_observer_update_after_notification(i);
         }
     }
-}
-
-int lwm2m_observable_notif_attributes_get(lwm2m_notif_attribute_t *p_attributes, const uint16_t *p_path, uint8_t path_len, uint16_t ssid)
-{
-    const void *observable;
-    uint8_t observable_type;
-    int index;
-
-    if (!p_attributes|| !p_path)
-    {
-        return -EINVAL;
-    }
-
-    if (!observable_reference_get_cb)
-    {
-        LWM2M_WRN("Failed to retrieve notification attributes: no callback set to reference the observable");
-        return -EIO;
-    }
-
-    observable = observable_reference_get_cb(p_path, path_len, &observable_type);
-    if (!observable)
-    {
-        return -ENOENT;
-    }
-
-    index = observable_index_find(observable, ssid);
-    if (index < 0)
-    {
-        return -ENOENT;
-    }
-
-    memcpy(p_attributes, m_observables[index]->attributes, LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE * sizeof(lwm2m_notif_attribute_t));
-
-    return 0;
 }
 
 int lwm2m_observable_notif_attributes_restore(const lwm2m_notif_attribute_t *p_attributes, const uint16_t *p_path, uint8_t path_len, uint16_t ssid)

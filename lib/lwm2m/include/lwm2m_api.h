@@ -320,7 +320,7 @@ typedef int (*lwm2m_del_notif_attr_cb_t)(uint32_t sid);
  * @param[in]    p_remote_server Structure containing address information and port number to the remote server
  *                               that made the OBSERVE request.
  */
-typedef void (*lwm2m_notif_attribute_default_cb_t)(uint8_t type, void *p_value, struct nrf_sockaddr *p_remote_server);
+typedef void (*lwm2m_notif_attr_default_cb_t)(uint8_t type, void *p_value, struct nrf_sockaddr *p_remote_server);
 
 /**@brief Callback function to notify the observers of the item identified by its URI path.
  *
@@ -328,7 +328,7 @@ typedef void (*lwm2m_notif_attribute_default_cb_t)(uint8_t type, void *p_value, 
  * @param[in] path_len         Length of the URI path that identifies the observable item.
  * @param[in] p_remote_server  Structure containing address information and port number to the remote observer.
  */
-typedef void (*lwm2m_observers_notify_path_cb_t)(const uint16_t *p_path, uint8_t path_len, struct nrf_sockaddr *p_remote_server);
+typedef void (*lwm2m_observer_notify_path_cb_t)(const uint16_t *p_path, uint8_t path_len, struct nrf_sockaddr *p_remote_server);
 
 /**@brief Callback function to retrieve a pointer to the value of the observable item.
  *
@@ -959,13 +959,13 @@ void lwm2m_observer_process(bool reconnect);
  *
  * @param[in] callback  Callback function to be registered.
  */
-void lwm2m_observers_notify_path_cb_set(lwm2m_observers_notify_path_cb_t callback);
+void lwm2m_observer_notify_path_cb_set(lwm2m_observer_notify_path_cb_t callback);
 
 /**@brief Set the callback function to set the default notification attribute values.
  *
  * @param[in] callback  Callback function to be registered.
  */
-void lwm2m_notif_attribute_default_cb_set(lwm2m_notif_attribute_default_cb_t callback);
+void lwm2m_notif_attr_default_cb_set(lwm2m_notif_attr_default_cb_t callback);
 
 /**@brief Set the callback function to retrieve a pointer to the value of the observable item.
  *

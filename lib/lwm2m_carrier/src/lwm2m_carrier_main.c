@@ -1804,10 +1804,10 @@ static void app_lwm2m_setup(void)
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_conn_ext_get_object());
 
     // Add observer notification support.
-    lwm2m_observers_notify_path_cb_set(lwm2m_observer_notify_path);
+    lwm2m_observer_notify_path_cb_set(lwm2m_observer_notify_path);
 
     // Add callback to set default notification attribute values.
-    lwm2m_notif_attribute_default_cb_set(lwm2m_notif_attribute_default_value_set);
+    lwm2m_notif_attr_default_cb_set(lwm2m_notif_attribute_default_value_set);
 
     // Add callback to get pointers to observables.
     lwm2m_observable_reference_get_cb_set(lwm2m_observable_reference_get);

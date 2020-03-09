@@ -105,6 +105,12 @@
 ^lwm2m_family_type_get$
 ^lwm2m_imei_get$
 ^lwm2m_instance_storage_init$
+^lwm2m_observable_metadata_init$
+^lwm2m_observable_reference_get_cb_set$
+^lwm2m_observable_uptime_cb_initialize$
+^lwm2m_observer_notification_is_con$
+^lwm2m_observer_notify_path_cb_set$
+^lwm2m_observer_process$
 ^lwm2m_observer_storage_store$
 ^lwm2m_observer_storage_restore$
 ^lwm2m_observer_storage_delete$
@@ -113,8 +119,12 @@
 ^lwm2m_instance_storage_security_store$
 ^lwm2m_instance_storage_server_store$
 ^lwm2m_msisdn_get$
+^lwm2m_notif_attr_default_cb_set$
+^lwm2m_notif_attr_storage_delete$
+^lwm2m_notif_attr_storage_delete_all$
 ^lwm2m_notif_attr_storage_restore$
 ^lwm2m_notif_attr_storage_set_callbacks$
+^lwm2m_notif_attr_storage_update$
 ^lwm2m_plain_text_firmware_decode$
 ^lwm2m_remote_location_find$
 ^lwm2m_remote_reconnecting_clear$
@@ -140,6 +150,7 @@
 ^lwm2m_state_update_delay$
 ^lwm2m_system_reset$
 ^lwm2m_system_shutdown$
+^lwm2m_write_attribute_handler$
 
 # External symbols we should not modify
 
