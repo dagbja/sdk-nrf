@@ -105,8 +105,6 @@ static char m_msisdn[16];
 
 static uint32_t m_net_stat;
 
-static uint32_t m_coap_con_interval = CONFIG_NRF_LWM2M_CARRIER_COAP_CON_INTERVAL;
-
 /* Structures for timers */
 static void *state_update_timer;
 
@@ -457,16 +455,6 @@ bool lwm2m_is_admin_pdn_ready()
 uint16_t lwm2m_security_instance(void)
 {
     return m_security_instance;
-}
-
-int64_t lwm2m_coap_con_interval_get(void)
-{
-    return m_coap_con_interval;
-}
-
-void lwm2m_coap_con_interval_set(int64_t con_interval)
-{
-    m_coap_con_interval = con_interval;
 }
 
 nrf_sa_family_t lwm2m_family_type_get(uint16_t security_instance)

@@ -87,7 +87,4 @@ void lwm2m_system_reset(bool force_reset);
 uint32_t lwm2m_net_reg_stat_get(void);
 void lwm2m_net_reg_stat_cb(uint32_t net_stat);
 
-int64_t lwm2m_coap_con_interval_get(void);
-void lwm2m_coap_con_interval_set(int64_t con_interval);
-
 #endif // LWM2M_CARRIER_MAIN_H__

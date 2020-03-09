@@ -20,6 +20,7 @@ static lwm2m_observers_notify_path_cb_t    observers_notify_path_cb;
 static lwm2m_observable_reference_get_cb_t observable_reference_get_cb;
 static lwm2m_uptime_get_cb_t               uptime_get_cb;
 static int64_t                             m_time_base;
+static int64_t                             m_coap_con_interval = COAP_CON_NOTIFICATION_INTERVAL;
 // lwm2m_notif_attribute_name and lwm2m_notif_attribute_type need to match the attributes
 static const char * const lwm2m_notif_attribute_name[] = { "pmin", "pmax", "gt",
                                                         "lt", "st" };
@@ -94,6 +95,16 @@ void lwm2m_observable_uptime_cb_initialize(lwm2m_uptime_get_cb_t callback)
 {
     uptime_get_cb = callback;
     m_time_base = uptime_get_cb();
+}
+
+int64_t lwm2m_coap_con_interval_get(void)
+{
+    return m_coap_con_interval;
+}
+
+void lwm2m_coap_con_interval_set(int64_t con_interval)
+{
+    m_coap_con_interval = con_interval;
 }
 
 static int lwm2m_notif_attribute_set(int index, uint8_t type, const void *p_value, int8_t assignment_level)
@@ -236,8 +247,9 @@ int lwm2m_observable_metadata_init(struct nrf_sockaddr *p_remote, const uint16_t
     index = observable_index_find(observable, short_server_id);
     if (index >= 0)
     {
-        // Observable metadata structure already exists; reset the notification timer.
+        // Observable metadata structure already exists; reset the notification timers.
         lwm2m_observer_update_after_notification(index);
+        m_observables[index]->con_notification = 0;
         return index;
     }
 
@@ -270,6 +282,7 @@ int lwm2m_observable_metadata_init(struct nrf_sockaddr *p_remote, const uint16_t
         m_observables[index]->attributes[i].assignment_level = LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL;
     }
 
+    m_observables[index]->con_notification = uptime_get_cb();
     m_observables[index]->observable = observable;
     m_observables[index]->type = observable_type;
     m_observables[index]->ssid = short_server_id;
@@ -495,10 +508,34 @@ static bool notification_send_check(int index)
     return false;
 }
 
+bool lwm2m_observer_notification_is_con(const void *p_observable, uint16_t ssid)
+{
+    if (!p_observable)
+    {
+        return false;
+    }
+
+    int index = observable_index_find(p_observable, ssid);
+
+    if (index < 0)
+    {
+        return false;
+    }
+
+    if ((m_observables[index]->con_notification + K_SECONDS(m_coap_con_interval)) < m_time_base)
+    {
+        m_observables[index]->con_notification = m_time_base;
+        return true;
+    }
+
+    return false;
+}
+
 void lwm2m_observer_process(bool reconnect)
 {
     struct nrf_sockaddr *remote;
     lwm2m_time_t delta = lwm2m_observer_uptime_delta_get();
+    m_time_base = uptime_get_cb();
 
     if (delta < 0)
     {
@@ -530,8 +567,6 @@ void lwm2m_observer_process(bool reconnect)
             lwm2m_observer_update_after_notification(i);
         }
     }
-
-    m_time_base = uptime_get_cb();
 }
 
 int lwm2m_observable_notif_attributes_get(lwm2m_notif_attribute_t *p_attributes, const uint16_t *p_path, uint8_t path_len, uint16_t ssid)

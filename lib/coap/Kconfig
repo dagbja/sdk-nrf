@@ -144,4 +144,11 @@ config NRF_COAP_VERSION
 	help
 	  "The version of CoAP which all CoAP messages will be populated with."
 
+config NRF_COAP_CON_NOTIFICATION_INTERVAL
+	int "CoAP CON notification interval"
+	default 86400
+	help
+	  This interval defines how often a CoAP Non-Confirmable notification
+	  is sent as Confirmable, according to RFC 7641 section 4.5.
+
 endif # NRF_COAP

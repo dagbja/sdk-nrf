@@ -414,7 +414,8 @@ typedef struct
     uint8_t                  path_len;                                   /**< Length of the URI path of the observable structure. */
     lwm2m_notif_attribute_t  attributes[LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE]; /**< Notification attributes of this observable. */
     lwm2m_time_t             last_notification;                          /**< Time elapsed from the last notification sent. */
-    const void               *observable;                                 /**< Pointer to the observable structure. */
+    int64_t                  con_notification;                           /**< Last time the notification has been sent as a confirmable message. */
+    const void               *observable;                                /**< Pointer to the observable structure. */
     int32_t                  prev_value;                                 /**< The value of the observable structure that was reported in the last notification. */
     uint8_t                  type;                                       /**< Bitcode that identifies the data type of the observable. */
     uint8_t                  flags;                                      /**< Flags indicating whether the conditions defined by the attributes have been fulfilled. */
@@ -999,6 +1000,34 @@ int lwm2m_write_attribute_handler(const uint16_t *p_path, uint16_t path_len, con
  * @return  true if the resource has a registered observer, false otherwise.
  */
 bool lwm2m_is_observed(uint16_t short_server_id, const lwm2m_instance_t * p_instance, uint16_t resource_id);
+
+/**@brief Retrieve the configured value of the time interval for sending confirmable notifications.
+ *
+ * @return  Time interval in miliseconds.
+ */
+int64_t lwm2m_coap_con_interval_get(void);
+
+/**@brief Set the time interval for sending confirmable notifications.
+ *
+ * @note  If the interval is not set by the application, the value indicated by
+ *        CONFIG_NRF_COAP_CON_NOTIFICATION_INTERVAL will be used.
+ *
+ * @param[in] con_interval     Time interval in seconds.
+ */
+void lwm2m_coap_con_interval_set(int64_t con_interval);
+
+/**@brief Determine whether the next notification ought to be a confirmable message.
+ *
+ * @details The function will determine whether the next notification regarding the
+ *          given observable should be sent as a confirmable CoAP message, according
+ *          to the configured interval.
+ *
+ * @param[in] p_observable     Item of interest of the observer.
+ * @param[in] ssid             Short ID of the server that requested the observation.
+ *
+ * @return  true if the notification is to be sent as a CON message.
+ */
+bool lwm2m_observer_notification_is_con(const void *p_observable, uint16_t ssid);
 
 #ifdef __cplusplus
 }

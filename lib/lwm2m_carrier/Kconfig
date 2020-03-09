@@ -34,13 +34,6 @@ config NRF_LWM2M_CARRIER_ERASE_TIMEOUT_S
 	  after which the library will inform the application that
 	  the link will be turned off to continue.
 
-config NRF_LWM2M_CARRIER_COAP_CON_INTERVAL
-	int "CoAP CON interval"
-	default 86400
-	help
-	  This interval defines how often a CoAP Non-Confirmable notification
-	  is sent as Confirmable, according to RFC 7641 section 4.5.
-
 config NRF_LWM2M_CARRIER_SEC_TAG
 	int "TLS security tag for Firmware downloads"
 	default 11

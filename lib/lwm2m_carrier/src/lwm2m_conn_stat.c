@@ -23,8 +23,6 @@ static void *collection_period_timer;
 static lwm2m_object_t                  m_object_conn_stat;        /**< Connectivity Statistics base object. */
 static lwm2m_connectivity_statistics_t m_instance_conn_stat;      /**< Connectivity Statistics object instance. */
 
-// static int64_t m_con_time_start[sizeof(((m_instance_conn_stat *)0)->resource_ids)];
-
 // LWM2M core resources.
 
 lwm2m_connectivity_statistics_t * lwm2m_conn_stat_get_instance(uint16_t instance_id)
@@ -126,7 +124,6 @@ uint32_t conn_stat_instance_callback(lwm2m_instance_t * p_instance,
                                                         COAP_CT_APP_LWM2M_TLV,
                                                         (void *)&m_instance_conn_stat.resource_ids[resource_id]);
 
-                        m_con_time_start[resource_id] = lwm2m_os_uptime_get();
                         break;
                     }
                     */

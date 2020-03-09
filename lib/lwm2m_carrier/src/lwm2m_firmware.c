@@ -27,8 +27,6 @@
 static lwm2m_object_t   m_object_firmware;
 static lwm2m_firmware_t m_instance_firmware;
 
-static int64_t m_con_time_start[sizeof(((lwm2m_location_t *)0)->resource_ids)];
-
 char * lwm2m_firmware_package_uri_get(uint16_t instance_id, uint8_t * p_len)
 {
     *p_len = m_instance_firmware.package_uri.len;
@@ -189,7 +187,6 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
                                                           p_instance);
 
                         lwm2m_observable_metadata_init(p_request->remote, path, ARRAY_SIZE(path));
-                        m_con_time_start[resource_id] = lwm2m_os_uptime_get();
                         break;
                     }
 
@@ -423,25 +420,36 @@ uint32_t firmware_instance_callback(lwm2m_instance_t * p_instance,
 
 const void * lwm2m_firmware_resource_reference_get(uint16_t resource_id, uint8_t *p_type)
 {
-    // TODO: Assert type != NULL
+    const void *p_observable = NULL;
+    uint8_t type;
+
     switch (resource_id)
     {
         case LWM2M_FIRMWARE_STATE:
-            *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-            return &m_instance_firmware.state;
+            type = LWM2M_OBSERVABLE_TYPE_INT;
+            p_observable = &m_instance_firmware.state;
+            break;
         case LWM2M_FIRMWARE_UPDATE_RESULT:
-            *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-            return &m_instance_firmware.update_result;
+            type = LWM2M_OBSERVABLE_TYPE_INT;
+            p_observable = &m_instance_firmware.update_result;
+            break;
         default:
-            *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
-            return NULL;
+            type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
     }
+
+    if (p_type)
+    {
+        *p_type = type;
+    }
+
+    return p_observable;
 }
 
 void lwm2m_firmware_notify_resource(struct nrf_sockaddr * p_remote_server, uint16_t resource_id)
 {
     uint16_t short_server_id;
     coap_observer_t * p_observer = NULL;
+    const void *p_observable = NULL;
 
     while (coap_observe_server_next_get(&p_observer, p_observer,
                (void *)&m_instance_firmware.resource_ids[resource_id]) == 0)
@@ -475,15 +483,8 @@ void lwm2m_firmware_notify_resource(struct nrf_sockaddr * p_remote_server, uint1
                       resource_id, err_code);
         }
 
-        coap_msg_type_t type = COAP_TYPE_NON;
-        int64_t now = lwm2m_os_uptime_get();
-
-        // Send CON every configured interval
-        if ((m_con_time_start[resource_id] +
-            (lwm2m_coap_con_interval_get() * 1000)) < now) {
-            type = COAP_TYPE_CON;
-            m_con_time_start[resource_id] = now;
-        }
+        p_observable = lwm2m_firmware_resource_reference_get(resource_id, NULL);
+        coap_msg_type_t type = (lwm2m_observer_notification_is_con(p_observable, short_server_id)) ? COAP_TYPE_CON : COAP_TYPE_NON;
 
         LWM2M_INF("Notify /5/0/%d", resource_id);
         err_code =  lwm2m_notify(buffer,

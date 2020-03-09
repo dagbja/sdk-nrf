@@ -28,8 +28,6 @@ static lwm2m_object_t                  m_object_conn_mon;        /**< Connectivi
 static lwm2m_connectivity_monitoring_t m_instance_conn_mon;      /**< Connectivity Monitoring object instance. */
 static vzw_conn_mon_class_apn_t        m_vzw_conn_mon_class_apn; /**< Verizon specific APN names. */
 
-static int64_t m_con_time_start[sizeof(((lwm2m_connectivity_monitoring_t *)0)->resource_ids)];
-
 static char m_apn_class_scratch_buffer[64];
 // Forward declare.
 static void lwm2m_conn_mon_update_resource(uint16_t resource_id);
@@ -347,7 +345,6 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                                                         p_instance);
 
                         lwm2m_observable_metadata_init(p_request->remote, path, ARRAY_SIZE(path));
-                        m_con_time_start[resource_id] = lwm2m_os_uptime_get();
                         break;
                     }
 
@@ -588,31 +585,44 @@ static void lwm2m_conn_mon_update_resource(uint16_t resource_id)
 
 const void * lwm2m_conn_mon_resource_reference_get(uint16_t resource_id, uint8_t *p_type)
 {
-    // TODO: Assert type != NULL
+    const void *p_observable = NULL;
+    uint8_t type;
+
     switch (resource_id)
     {
         case LWM2M_CONN_MON_NETWORK_BEARER:
-            *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-            return &m_instance_conn_mon.network_bearer;
+            type = LWM2M_OBSERVABLE_TYPE_INT;
+            p_observable = &m_instance_conn_mon.network_bearer;
+            break;
         case LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH:
-            *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-            return &m_instance_conn_mon.radio_signal_strength;
+            type = LWM2M_OBSERVABLE_TYPE_INT;
+            p_observable = &m_instance_conn_mon.radio_signal_strength;
+            break;
         case LWM2M_CONN_MON_LINK_QUALITY:
-            *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-            return &m_instance_conn_mon.link_quality;
+            type = LWM2M_OBSERVABLE_TYPE_INT;
+            p_observable = &m_instance_conn_mon.link_quality;
+            break;
         case LWM2M_CONN_MON_CELL_ID:
-            *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-            return &m_instance_conn_mon.cell_id;
+            type = LWM2M_OBSERVABLE_TYPE_INT;
+            p_observable = &m_instance_conn_mon.cell_id;
+            break;
         default:
-            *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
-            return NULL;
+            type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
     }
+
+    if (p_type)
+    {
+        *p_type = type;
+    }
+
+    return p_observable;
 }
 
 void lwm2m_conn_mon_notify_resource(struct nrf_sockaddr * p_remote_server, int16_t resource_id)
 {
     uint16_t short_server_id;
     coap_observer_t *p_observer = NULL;
+    const void * p_observable = NULL;
 
     while (coap_observe_server_next_get(&p_observer, p_observer,
                (void*)&m_instance_conn_mon.resource_ids[resource_id]) == 0)
@@ -644,17 +654,11 @@ void lwm2m_conn_mon_notify_resource(struct nrf_sockaddr * p_remote_server, int16
         if (err_code) {
             LWM2M_ERR("Could not encode resource_id %u, error code: %lu",
                       resource_id, err_code);
+            continue;
         }
 
-        coap_msg_type_t type = COAP_TYPE_NON;
-        int64_t now = lwm2m_os_uptime_get();
-
-        // Send CON every configured interval
-        if ((m_con_time_start[resource_id] +
-             (lwm2m_coap_con_interval_get() * 1000)) < now) {
-            type = COAP_TYPE_CON;
-            m_con_time_start[resource_id] = now;
-        }
+        p_observable = lwm2m_conn_mon_resource_reference_get(resource_id, NULL);
+        coap_msg_type_t type = (lwm2m_observer_notification_is_con(p_observable, short_server_id)) ? COAP_TYPE_CON : COAP_TYPE_NON;
 
         LWM2M_INF("Notify /4/0/%d", resource_id);
         err_code = lwm2m_notify(buffer, buffer_size, p_observer, type);

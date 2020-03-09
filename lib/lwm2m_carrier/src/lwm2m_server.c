@@ -32,8 +32,6 @@ extern void app_server_disable(uint16_t instance_id);
 static lwm2m_server_t                      m_instance_server[1+LWM2M_MAX_SERVERS];            /**< Server object instance to be filled by the bootstrap server. */
 static lwm2m_object_t                      m_object_server;                                   /**< LWM2M server base object. */
 
-static int64_t m_con_time_start[sizeof(((lwm2m_server_t *)0)->resource_ids)];
-
 // Verizon specific resources.
 static vzw_server_settings_t vzw_server_settings[1+LWM2M_MAX_SERVERS];
 
@@ -301,7 +299,6 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                                                         p_instance);
 
                         lwm2m_observable_metadata_init(p_request->remote, path, ARRAY_SIZE(path));
-                        m_con_time_start[resource_id] = lwm2m_os_uptime_get();
                         break;
                     }
 
@@ -695,10 +692,50 @@ void lwm2m_server_reset(uint16_t instance_id)
     lwm2m_string_free(&p_instance->binding);
 }
 
+const void * lwm2m_server_resource_reference_get(uint16_t instance_id, uint16_t resource_id, uint8_t *p_type)
+{
+    const void *p_observable = NULL;
+    uint8_t type;
+
+    switch (resource_id)
+    {
+    case LWM2M_SERVER_SHORT_SERVER_ID:
+        type = LWM2M_OBSERVABLE_TYPE_INT;
+        p_observable = &m_instance_server[instance_id].short_server_id;
+        break;
+    case LWM2M_SERVER_LIFETIME:
+        type = LWM2M_OBSERVABLE_TYPE_INT;
+        p_observable = &m_instance_server[instance_id].lifetime;
+        break;
+    case LWM2M_SERVER_DEFAULT_MIN_PERIOD:
+        type = LWM2M_OBSERVABLE_TYPE_INT;
+        p_observable = &m_instance_server[instance_id].default_minimum_period;
+        break;
+    case LWM2M_SERVER_DEFAULT_MAX_PERIOD:
+        type = LWM2M_OBSERVABLE_TYPE_INT;
+        p_observable = &m_instance_server[instance_id].default_maximum_period;
+        break;
+    case LWM2M_SERVER_DISABLE_TIMEOUT:
+        type = LWM2M_OBSERVABLE_TYPE_INT;
+        p_observable = &m_instance_server[instance_id].disable_timeout;
+        break;
+    default:
+        type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
+    }
+
+    if (p_type)
+    {
+        *p_type = type;
+    }
+
+    return p_observable;
+}
+
 void lwm2m_server_notify_resource(struct nrf_sockaddr *p_remote_server, uint16_t instance_id, uint16_t resource_id)
 {
     uint16_t short_server_id;
     coap_observer_t * p_observer = NULL;
+    const void *p_observable = NULL;
 
     while (coap_observe_server_next_get(&p_observer, p_observer, (void *)&lwm2m_server_get_instance(instance_id)->resource_ids[resource_id]) == 0)
     {
@@ -728,14 +765,8 @@ void lwm2m_server_notify_resource(struct nrf_sockaddr *p_remote_server, uint16_t
             LWM2M_ERR("Could not encode resource_id %u, error code: %lu", resource_id, err_code);
         }
 
-        coap_msg_type_t type = COAP_TYPE_NON;
-        int64_t now = lwm2m_os_uptime_get();
-
-        // Send CON every configured interval
-        if ((m_con_time_start[resource_id] + (lwm2m_coap_con_interval_get() * 1000)) < now) {
-            type = COAP_TYPE_CON;
-            m_con_time_start[resource_id] = now;
-        }
+        p_observable = lwm2m_server_resource_reference_get(instance_id, resource_id, NULL);
+        coap_msg_type_t type = (lwm2m_observer_notification_is_con(p_observable, short_server_id)) ? COAP_TYPE_CON : COAP_TYPE_NON;
 
         LWM2M_INF("Notify /1/%d/%d", instance_id, resource_id);
         err_code =  lwm2m_notify(buffer,
@@ -750,31 +781,5 @@ void lwm2m_server_notify_resource(struct nrf_sockaddr *p_remote_server, uint16_t
 
             lwm2m_request_remote_reconnect(p_observer->remote);
         }
-    }
-}
-
-const void * lwm2m_server_resource_reference_get(uint16_t instance_id, uint16_t resource_id, uint8_t *p_type)
-{
-    // TODO: Assert type != NULL
-    switch (resource_id)
-    {
-    case LWM2M_SERVER_SHORT_SERVER_ID:
-        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-        return &m_instance_server[instance_id].short_server_id;
-    case LWM2M_SERVER_LIFETIME:
-        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-        return &m_instance_server[instance_id].lifetime;
-    case LWM2M_SERVER_DEFAULT_MIN_PERIOD:
-        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-        return &m_instance_server[instance_id].default_minimum_period;
-    case LWM2M_SERVER_DEFAULT_MAX_PERIOD:
-        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-        return &m_instance_server[instance_id].default_maximum_period;
-    case LWM2M_SERVER_DISABLE_TIMEOUT:
-        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-        return &m_instance_server[instance_id].disable_timeout;
-    default:
-        *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
-        return NULL;
     }
 }

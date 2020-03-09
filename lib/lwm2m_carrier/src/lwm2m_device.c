@@ -40,8 +40,6 @@ static lwm2m_object_t m_object_device;    /**< Device base object. */
 static lwm2m_device_t m_instance_device;  /**< Device object instance. */
 static lwm2m_string_t m_verizon_resources[2];
 
-static int64_t m_con_time_start[sizeof(((lwm2m_device_t *)0)->resource_ids)];
-
 static bool operation_is_allowed(uint16_t res, uint16_t op)
 {
     if (res < ARRAY_SIZE(m_instance_device.operations)) {
@@ -353,7 +351,6 @@ static void on_observe_start(uint16_t res, coap_message_t *p_req)
         return;
     }
 
-    m_con_time_start[res] = lwm2m_os_uptime_get();
     err = lwm2m_observable_metadata_init(p_req->remote, path, ARRAY_SIZE(path));
     if (err) {
         /* Already logged */
@@ -801,52 +798,72 @@ void lwm2m_device_init(void)
 
 const void * lwm2m_device_resource_reference_get(uint16_t resource_id, uint8_t *p_type)
 {
-    // TODO: Assert type != NULL
+    const void *p_observable = NULL;
+    uint8_t type;
+
     switch (resource_id)
     {
     case LWM2M_DEVICE_AVAILABLE_POWER_SOURCES:
-        *p_type = LWM2M_OBSERVABLE_TYPE_LIST;
-        return &m_instance_device.avail_power_sources;
+        type = LWM2M_OBSERVABLE_TYPE_LIST;
+        p_observable = &m_instance_device.avail_power_sources;
+        break;
     case LWM2M_DEVICE_POWER_SOURCE_VOLTAGE:
-        *p_type = LWM2M_OBSERVABLE_TYPE_LIST;
-        return &m_instance_device.power_source_voltage;
+        type = LWM2M_OBSERVABLE_TYPE_LIST;
+        p_observable = &m_instance_device.power_source_voltage;
+        break;
     case LWM2M_DEVICE_POWER_SOURCE_CURRENT:
-        *p_type = LWM2M_OBSERVABLE_TYPE_LIST;
-        return &m_instance_device.power_source_current;
+        type = LWM2M_OBSERVABLE_TYPE_LIST;
+        p_observable = &m_instance_device.power_source_current;
+        break;
     case LWM2M_DEVICE_ERROR_CODE:
-        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-        return &m_instance_device.error_code;
+        type = LWM2M_OBSERVABLE_TYPE_INT;
+        p_observable = &m_instance_device.error_code;
+        break;
     case LWM2M_DEVICE_DEVICE_TYPE:
-        *p_type = LWM2M_OBSERVABLE_TYPE_STR;
-        return &m_instance_device.device_type;
+        type = LWM2M_OBSERVABLE_TYPE_STR;
+        p_observable = &m_instance_device.device_type;
+        break;
     case LWM2M_DEVICE_HARDWARE_VERSION:
-        *p_type = LWM2M_OBSERVABLE_TYPE_STR;
-        return &m_instance_device.hardware_version;
+        type = LWM2M_OBSERVABLE_TYPE_STR;
+        p_observable = &m_instance_device.hardware_version;
+        break;
     case LWM2M_DEVICE_SOFTWARE_VERSION:
-        *p_type = LWM2M_OBSERVABLE_TYPE_STR;
-        return &m_instance_device.software_version;
+        type = LWM2M_OBSERVABLE_TYPE_STR;
+        p_observable = &m_instance_device.software_version;
+        break;
     case LWM2M_DEVICE_BATTERY_LEVEL:
-        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-        return &m_instance_device.battery_level;
+        type = LWM2M_OBSERVABLE_TYPE_INT;
+        p_observable = &m_instance_device.battery_level;
+        break;
     case LWM2M_DEVICE_SUPPORTED_BINDINGS:
-        *p_type = LWM2M_OBSERVABLE_TYPE_STR;
-        return &m_instance_device.supported_bindings;
+        type = LWM2M_OBSERVABLE_TYPE_STR;
+        p_observable = &m_instance_device.supported_bindings;
+        break;
     case LWM2M_DEVICE_BATTERY_STATUS:
-        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-        return &m_instance_device.battery_status;
+        type = LWM2M_OBSERVABLE_TYPE_INT;
+        p_observable = &m_instance_device.battery_status;
+        break;
     case LWM2M_DEVICE_MEMORY_TOTAL:
-        *p_type = LWM2M_OBSERVABLE_TYPE_INT;
-        return &m_instance_device.memory_total;
+        type = LWM2M_OBSERVABLE_TYPE_INT;
+        p_observable = &m_instance_device.memory_total;
+        break;
     default:
-        *p_type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
-        return NULL;
+        type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
     }
+
+    if (p_type)
+    {
+        *p_type = type;
+    }
+
+    return p_observable;
 }
 
 void lwm2m_device_notify_resource(struct nrf_sockaddr * p_remote_server, uint16_t resource_id)
 {
     uint16_t short_server_id;
     coap_observer_t * p_observer = NULL;
+    const void * p_observable = lwm2m_device_resource_reference_get(resource_id, NULL);
 
     while (coap_observe_server_next_get(&p_observer, p_observer, (void *)&m_instance_device.resource_ids[resource_id]) == 0)
     {
@@ -873,16 +890,10 @@ void lwm2m_device_notify_resource(struct nrf_sockaddr * p_remote_server, uint16_
         if (err_code)
         {
             LWM2M_ERR("Could not encode resource_id %u, error code: %lu", resource_id, err_code);
+            continue;
         }
 
-        coap_msg_type_t type = COAP_TYPE_NON;
-        int64_t now = lwm2m_os_uptime_get();
-
-        // Send CON every configured interval
-        if ((m_con_time_start[resource_id] + (lwm2m_coap_con_interval_get() * 1000)) < now) {
-            type = COAP_TYPE_CON;
-            m_con_time_start[resource_id] = now;
-        }
+        coap_msg_type_t type = (lwm2m_observer_notification_is_con(p_observable, short_server_id)) ? COAP_TYPE_CON : COAP_TYPE_NON;
 
         LWM2M_INF("Notify /3/0/%d", resource_id);
         err_code =  lwm2m_notify(buffer,
