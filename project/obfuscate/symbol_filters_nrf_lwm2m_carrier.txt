@@ -87,6 +87,7 @@
 
 # Other APIs that are needed for now
 ^lwm2m_bootstrap_clear$
+^lwm2m_client_id_get$
 ^lwm2m_coap_con_interval_get$
 ^lwm2m_coap_con_interval_set$
 ^lwm2m_conn_ext_msisdn_get$

@@ -44,6 +44,13 @@ typedef enum
 lwm2m_state_t lwm2m_state_get(void);
 
 /**
+ * @brief Get the device client id.
+ *
+ * @return Client ID
+ */
+char *lwm2m_client_id_get(uint16_t *p_len);
+
+/**
  * @brief Get device IMEI that we can use as a unique serial number.
  * @return IMEI has a NULL-terminated String.
  */

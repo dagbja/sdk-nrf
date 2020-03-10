@@ -400,6 +400,12 @@ lwm2m_state_t lwm2m_state_get(void)
     return m_app_state;
 }
 
+char *lwm2m_client_id_get(uint16_t *p_len)
+{
+    *p_len = m_client_id.len;
+    return (char *)&m_client_id.value;
+}
+
 char *lwm2m_imei_get(void)
 {
     return m_imei;

@@ -170,6 +170,13 @@ static int cmd_server_lifetime(const struct shell *shell, size_t argc, char **ar
 
 static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
 {
+    char client_id[LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN+1];
+    uint16_t client_id_len;
+    char *p_client_id = lwm2m_client_id_get(&client_id_len);
+    client_id_len = MIN(client_id_len, LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN);
+    memcpy(client_id, p_client_id, client_id_len);
+    client_id[client_id_len] = '\0';
+
     uint32_t iccid_len;
     char * p_iccid = lwm2m_device_get_sim_iccid(&iccid_len);
     char iccid[21];
@@ -182,9 +189,11 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
 
     char last_used_msisdn[16];
     int32_t len = lwm2m_last_used_msisdn_get(last_used_msisdn, sizeof(last_used_msisdn));
+    len = MIN(len, 15);
     last_used_msisdn[len > 0 ? len : 0] = 0;
 
     shell_print(shell, "Debug configuration");
+    shell_print(shell, "  Client ID      %s", client_id);
     shell_print(shell, "  IMEI           %s", lwm2m_imei_get());
     shell_print(shell, "  SIM MSISDN     %s", lwm2m_msisdn_get());
     shell_print(shell, "  SIM ICCID      %s", iccid);
