@@ -323,14 +323,6 @@ typedef int (*lwm2m_del_notif_attr_cb_t)(uint32_t sid);
  */
 typedef void (*lwm2m_notif_attr_default_cb_t)(uint8_t type, void *p_value, struct nrf_sockaddr *p_remote_server);
 
-/**@brief Callback function to notify the observers of the item identified by its URI path.
- *
- * @param[in] p_path           URI path that identifies the observable item.
- * @param[in] path_len         Length of the URI path that identifies the observable item.
- * @param[in] p_remote_server  Structure containing address information and port number to the remote observer.
- */
-typedef void (*lwm2m_observer_notify_path_cb_t)(const uint16_t *p_path, uint8_t path_len, struct nrf_sockaddr *p_remote_server);
-
 /**@brief Callback function to retrieve a pointer to the value of the observable item.
  *
  * @param[in]    p_path     URI path that identifies the observable item.
@@ -346,6 +338,14 @@ typedef const void * (*lwm2m_observable_reference_get_cb_t)(const uint16_t *p_pa
  * @return  Uptime in milliseconds (ms).
  */
 typedef int64_t (*lwm2m_uptime_get_cb_t)(void);
+
+/**@brief Callback function to request a remote server reconnection.
+ *
+ * @param[in]    p_remote Structure containing address information and port number to the remote server.
+ *
+ * @return  true if the request has been made, false otherwise.
+ */
+typedef bool (*lwm2m_request_remote_reconnect_cb_t)(struct nrf_sockaddr *p_remote);
 
 /**@brief LWM2M object prototype structure.
  *
@@ -958,13 +958,6 @@ int lwm2m_observable_metadata_init(struct nrf_sockaddr *p_remote,
  */
 void lwm2m_observer_process(bool reconnect);
 
-/**@brief Set the callback function to notify the observers of the item identified by
- *        its URI path.
- *
- * @param[in] callback  Callback function to be registered.
- */
-void lwm2m_observer_notify_path_cb_set(lwm2m_observer_notify_path_cb_t callback);
-
 /**@brief Set the callback function to set the default notification attribute values.
  *
  * @param[in] callback  Callback function to be registered.
@@ -983,6 +976,12 @@ void lwm2m_observable_reference_get_cb_set(lwm2m_observable_reference_get_cb_t c
  * @param[in] callback  Callback function to be registered.
  */
 void lwm2m_observable_uptime_cb_initialize(lwm2m_uptime_get_cb_t callback);
+
+/**@brief Set the callback function to request remote server reconnection.
+ *
+ * @param[in] callback  Callback function to be registered.
+ */
+void lwm2m_request_remote_reconnect_cb_set(lwm2m_request_remote_reconnect_cb_t callback);
 
 /**@brief Handler function for incoming write-attribute requests from the LWM2M server.
  *

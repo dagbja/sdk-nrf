@@ -67,6 +67,4 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
 
 uint32_t tlv_server_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv);
 
-void lwm2m_server_notify_resource(struct nrf_sockaddr *p_remote_server, uint16_t instance_id, uint16_t resource_id);
-
 const void * lwm2m_server_resource_reference_get(uint16_t instance_id, uint16_t resource_id, uint8_t *p_type);

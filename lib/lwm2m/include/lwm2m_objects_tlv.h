@@ -23,14 +23,29 @@
 extern "C" {
 #endif
 
-/**@brief Encode a LwM2M instance object to a TLV byte buffer.
+/**@brief Encode an LwM2M element to a TLV byte buffer.
+ *
+ * @param[out]   p_buffer     Pointer to a byte buffer to be used to fill the encoded TLVs.
+ * @param[inout] p_buffer_len Value by reference indicating the size of the buffer provided.
+ *                            Will return the number of used bytes on return.
+ * @param[in]    p_path       URI path of the element to be encoded.
+ * @param[in]    path_len     Length of the URI path of the element to be encoded.
+ *
+ * @retval NRF_SUCCESS If the encoding was successful.
+ */
+uint32_t lwm2m_tlv_element_encode(uint8_t        * p_buffer,
+                                  uint32_t       * p_buffer_len,
+                                  const uint16_t * p_path,
+                                  uint8_t          path_len);
+
+/**@brief Encode an LwM2M instance object to a TLV byte buffer.
  *
  * @param[out]   p_buffer     Pointer to a byte buffer to be used to fill the encoded TLVs.
  * @param[inout] p_buffer_len Value by reference indicating the size of the buffer provided.
  *                            Will return the number of used bytes on return.
  * @param[in]    p_instance   Pointer to the LwM2M instance object to be encoded into TLVs.
  *
- * @retval NRF_SUCCESS If the encoded was successful.
+ * @retval NRF_SUCCESS If the encoding was successful.
  */
 uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
                                    uint32_t         * p_buffer_len,

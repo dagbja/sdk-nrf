@@ -12,13 +12,14 @@
 #include <lwm2m_api.h>
 #include <lwm2m_remote.h>
 #include <lwm2m_observer.h>
+#include <lwm2m_objects_tlv.h>
 #include <nrf_socket.h>
 
 static lwm2m_observable_metadata_t       * m_observables[LWM2M_MAX_OBSERVABLES_WITH_ATTRIBUTES];
 static lwm2m_notif_attr_default_cb_t       notif_attr_default_set_cb;
-static lwm2m_observer_notify_path_cb_t     observer_notify_path_cb;
 static lwm2m_observable_reference_get_cb_t observable_reference_get_cb;
 static lwm2m_uptime_get_cb_t               uptime_get_cb;
+static lwm2m_request_remote_reconnect_cb_t request_remote_reconnect_cb;
 static int64_t                             m_time_base;
 static int64_t                             m_coap_con_interval = COAP_CON_NOTIFICATION_INTERVAL;
 // lwm2m_notif_attribute_name and lwm2m_notif_attribute_type need to match the attributes
@@ -81,11 +82,6 @@ void lwm2m_notif_attr_default_cb_set(lwm2m_notif_attr_default_cb_t callback)
     notif_attr_default_set_cb = callback;
 }
 
-void lwm2m_observer_notify_path_cb_set(lwm2m_observer_notify_path_cb_t callback)
-{
-    observer_notify_path_cb = callback;
-}
-
 void lwm2m_observable_reference_get_cb_set(lwm2m_observable_reference_get_cb_t callback)
 {
     observable_reference_get_cb = callback;
@@ -95,6 +91,11 @@ void lwm2m_observable_uptime_cb_initialize(lwm2m_uptime_get_cb_t callback)
 {
     uptime_get_cb = callback;
     m_time_base = uptime_get_cb();
+}
+
+void lwm2m_request_remote_reconnect_cb_set(lwm2m_request_remote_reconnect_cb_t callback)
+{
+    request_remote_reconnect_cb = callback;
 }
 
 int64_t lwm2m_coap_con_interval_get(void)
@@ -531,6 +532,72 @@ bool lwm2m_observer_notification_is_con(const void *p_observable, uint16_t ssid)
     return false;
 }
 
+static void observer_notify_path(const uint16_t *p_path, uint8_t path_len, struct nrf_sockaddr *p_remote_server)
+{
+    uint8_t  payload[512];
+    uint32_t payload_len = sizeof(payload);
+    uint16_t short_server_id;
+    uint32_t err_code;
+    coap_observer_t * p_observer = NULL;
+    const void * p_observable;
+
+    p_observable = lwm2m_observable_reference_get(p_path, path_len);
+
+    if (!p_observable)
+    {
+        LWM2M_WRN("Failed to notify the observer: could not find the observable");
+        return;
+    }
+
+    while (coap_observe_server_next_get(&p_observer, p_observer, (void *)p_observable) == 0)
+    {
+        lwm2m_remote_short_server_id_find(&short_server_id, p_observer->remote);
+
+        if (lwm2m_remote_reconnecting_get(short_server_id))
+        {
+            /* Wait for reconnection */
+            continue;
+        }
+
+        if (p_remote_server)
+        {
+            /* Only notify to given remote */
+            if (memcmp(p_observer->remote, p_remote_server,
+                       sizeof(struct nrf_sockaddr)) != 0) {
+                continue;
+            }
+        }
+
+        LWM2M_TRC("Observer found");
+        err_code = lwm2m_tlv_element_encode(payload, &payload_len, p_path, path_len);
+
+        if (err_code)
+        {
+            LWM2M_ERR("Failed to encode the observable: %lu", err_code);
+            continue;
+        }
+
+        coap_msg_type_t type = (lwm2m_observer_notification_is_con(p_observable, short_server_id)) ? COAP_TYPE_CON : COAP_TYPE_NON;
+
+        LWM2M_INF("Notification sent");
+        err_code = lwm2m_notify(payload,
+                                payload_len,
+                                p_observer,
+                                type);
+
+        if (err_code)
+        {
+            LWM2M_INF("Failed to send the notification: %s (%ld)",
+                      lwm2m_os_log_strdup(strerror(err_code)), err_code);
+
+            if (request_remote_reconnect_cb)
+            {
+                request_remote_reconnect_cb(p_observer->remote);
+            }
+        }
+    }
+}
+
 void lwm2m_observer_process(bool reconnect)
 {
     struct nrf_sockaddr *remote;
@@ -540,12 +607,6 @@ void lwm2m_observer_process(bool reconnect)
     if (delta < 0)
     {
         LWM2M_WRN("No callback set to retrieve the uptime");
-        return;
-    }
-
-    if (!observer_notify_path_cb)
-    {
-        LWM2M_WRN("No callback set to notify the observers");
         return;
     }
 
@@ -563,7 +624,7 @@ void lwm2m_observer_process(bool reconnect)
         {
             // Finding remote should not fail at this stage.
             lwm2m_short_server_id_remote_find(&remote, m_observables[i]->ssid);
-            observer_notify_path_cb(m_observables[i]->path, m_observables[i]->path_len, remote);
+            observer_notify_path(m_observables[i]->path, m_observables[i]->path_len, remote);
             lwm2m_observer_update_after_notification(i);
         }
     }

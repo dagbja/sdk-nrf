@@ -38,6 +38,7 @@
 #include <nrf_socket.h>
 #include <nrf_errno.h>
 #include <sms_receive.h>
+#include <coap_observe_api.h>
 
 #include <sha256.h>
 
@@ -983,42 +984,6 @@ const void * observable_reference_get(const uint16_t *p_path, uint8_t path_len, 
     return value;
 }
 
-void lwm2m_observer_notify_path(const uint16_t *p_path, uint8_t path_len, struct nrf_sockaddr *p_remote_server)
-{
-    // Currently, we only support observe on resource level.
-    if (path_len < 3)
-    {
-        return;
-    }
-    // TODO: Assert p_path is not NULL.
-    uint16_t object_id = p_path[0];
-    uint16_t instance_id = p_path[1];
-    uint16_t resource_id = p_path[2];
-    switch (object_id)
-    {
-    case LWM2M_OBJ_DEVICE:
-        lwm2m_device_notify_resource(p_remote_server, resource_id);
-        break;
-    case LWM2M_OBJ_CONN_MON:
-        lwm2m_conn_mon_notify_resource(p_remote_server, resource_id);
-        break;
-    case LWM2M_OBJ_FIRMWARE:
-        lwm2m_firmware_notify_resource(p_remote_server, resource_id);
-        break;
-    case LWM2M_OBJ_SERVER:
-        lwm2m_server_notify_resource(p_remote_server, instance_id, resource_id);
-        break;
-    case LWM2M_OBJ_SECURITY:
-    case LWM2M_OBJ_ACL:
-    case LWM2M_OBJ_LOCATION:
-    case LWM2M_OBJ_CONN_STAT:
-        // Unsupported observables.
-        break;
-    default:
-        break;
-    }
-}
-
 static void lwm2m_notif_attribute_default_value_set(uint8_t type, void * p_value, struct nrf_sockaddr *p_remote_server)
 {
     // TODO: Assert value != NULL && p_remote_server != NULL
@@ -1881,9 +1846,6 @@ static void app_lwm2m_setup(void)
     // Add connectivity extension support.
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_conn_ext_get_object());
 
-    // Add observer notification support.
-    lwm2m_observer_notify_path_cb_set(lwm2m_observer_notify_path);
-
     // Add callback to set default notification attribute values.
     lwm2m_notif_attr_default_cb_set(lwm2m_notif_attribute_default_value_set);
 
@@ -1892,6 +1854,9 @@ static void app_lwm2m_setup(void)
 
     // Add callback to get the uptime in milliseconds and initialize the timer.
     lwm2m_observable_uptime_cb_initialize(lwm2m_os_uptime_get);
+
+    // Add callback to request remote server reconnection.
+    lwm2m_request_remote_reconnect_cb_set(lwm2m_request_remote_reconnect);
 }
 
 static void app_connect(void)

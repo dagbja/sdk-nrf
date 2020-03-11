@@ -16,6 +16,109 @@ static void index_buffer_len_update(uint32_t * index, uint32_t * buffer_len, uin
 }
 
 
+static uint32_t lwm2m_tlv_resource_encode(uint8_t          * p_buffer,
+                                          uint32_t         * p_buffer_len,
+                                          lwm2m_instance_t * p_instance,
+                                          uint16_t           resource_id)
+{
+    NULL_PARAM_CHECK(p_buffer);
+    NULL_PARAM_CHECK(p_buffer_len);
+    NULL_PARAM_CHECK(p_instance);
+
+    uint32_t err_code = 0;
+
+    switch (p_instance->object_id)
+    {
+        case LWM2M_OBJ_SECURITY:
+        {
+            err_code = lwm2m_tlv_security_encode(p_buffer,
+                                                 p_buffer_len,
+                                                 resource_id,
+                                                 (lwm2m_security_t *)p_instance);
+            break;
+        }
+
+        case LWM2M_OBJ_SERVER:
+        {
+            err_code = lwm2m_tlv_server_encode(p_buffer,
+                                               p_buffer_len,
+                                               resource_id,
+                                               (lwm2m_server_t *)p_instance);
+            break;
+        }
+
+        case LWM2M_OBJ_DEVICE:
+        {
+            err_code = lwm2m_tlv_device_encode(p_buffer,
+                                               p_buffer_len,
+                                               resource_id,
+                                               (lwm2m_device_t *)p_instance);
+            break;
+        }
+
+        case LWM2M_OBJ_CONN_MON:
+        {
+            err_code = lwm2m_tlv_connectivity_monitoring_encode(p_buffer,
+                                                                p_buffer_len,
+                                                                resource_id,
+                                                                (lwm2m_connectivity_monitoring_t *)p_instance);
+            break;
+        }
+
+        case LWM2M_OBJ_FIRMWARE:
+            err_code = lwm2m_tlv_firmware_encode(p_buffer,
+                                                 p_buffer_len,
+                                                 resource_id,
+                                                 (lwm2m_firmware_t *)p_instance);
+            break;
+
+        case LWM2M_OBJ_CONN_STAT:
+        {
+            err_code = lwm2m_tlv_connectivity_statistics_encode(p_buffer,
+                                                                p_buffer_len,
+                                                                resource_id,
+                                                                (lwm2m_connectivity_statistics_t *)p_instance);
+            break;
+        }
+
+        case LWM2M_OBJ_APN_CONNECTION_PROFILE:
+        {
+            err_code = lwm2m_tlv_apn_connection_profile_encode(p_buffer,
+                                                              p_buffer_len,
+                                                              resource_id,
+                                                              (lwm2m_apn_conn_prof_t *)p_instance);
+            break;
+        }
+
+        case LWM2M_OBJ_PORTFOLIO:
+        {
+            err_code = lwm2m_tlv_portfolio_encode(p_buffer,
+                                                  p_buffer_len,
+                                                  resource_id,
+                                                  (lwm2m_portfolio_t *)p_instance);
+            break;
+        }
+
+        case LWM2M_OBJ_CONN_EXT:
+        {
+            err_code = lwm2m_tlv_connectivity_extension_encode(p_buffer,
+                                                               p_buffer_len,
+                                                               resource_id,
+                                                               (lwm2m_connectivity_extension_t *)p_instance);
+            break;
+        }
+
+        default:
+        {
+            err_code = ENOENT;
+            break;
+        }
+    }
+
+    return err_code;
+}
+
+
 uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
                                    uint32_t         * p_buffer_len,
                                    lwm2m_instance_t * p_instance)
@@ -38,93 +141,7 @@ uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
             continue;
         }
 
-        switch (p_instance->object_id)
-        {
-            case LWM2M_OBJ_SECURITY:
-            {
-                err_code = lwm2m_tlv_security_encode(p_buffer + index,
-                                                     p_buffer_len,
-                                                     p_resource_ids[i],
-                                                     (lwm2m_security_t *)p_instance);
-                break;
-            }
-
-            case LWM2M_OBJ_SERVER:
-            {
-                err_code = lwm2m_tlv_server_encode(p_buffer + index,
-                                                   p_buffer_len,
-                                                   p_resource_ids[i],
-                                                   (lwm2m_server_t *)p_instance);
-                break;
-            }
-
-            case LWM2M_OBJ_DEVICE:
-            {
-                err_code = lwm2m_tlv_device_encode(p_buffer + index,
-                                                   p_buffer_len,
-                                                   p_resource_ids[i],
-                                                   (lwm2m_device_t *)p_instance);
-                break;
-            }
-
-            case LWM2M_OBJ_CONN_MON:
-            {
-                err_code = lwm2m_tlv_connectivity_monitoring_encode(p_buffer + index,
-                                                                    p_buffer_len,
-                                                                    p_resource_ids[i],
-                                                                    (lwm2m_connectivity_monitoring_t *)p_instance);
-                break;
-            }
-
-            case LWM2M_OBJ_FIRMWARE:
-                err_code = lwm2m_tlv_firmware_encode(p_buffer + index,
-                                                     p_buffer_len,
-                                                     p_resource_ids[i],
-                                                     (lwm2m_firmware_t *)p_instance);
-                break;
-
-            case LWM2M_OBJ_CONN_STAT:
-            {
-                err_code = lwm2m_tlv_connectivity_statistics_encode(p_buffer + index,
-                                                                    p_buffer_len,
-                                                                    p_resource_ids[i],
-                                                                    (lwm2m_connectivity_statistics_t *)p_instance);
-                break;
-            }
-
-            case LWM2M_OBJ_APN_CONNECTION_PROFILE:
-            {
-                err_code = lwm2m_tlv_apn_connection_profile_encode(p_buffer + index,
-                                                                   p_buffer_len,
-                                                                   p_resource_ids[i],
-                                                                   (lwm2m_apn_conn_prof_t *)p_instance);
-                break;
-            }
-
-            case LWM2M_OBJ_PORTFOLIO:
-            {
-                err_code = lwm2m_tlv_portfolio_encode(p_buffer + index,
-                                                      p_buffer_len,
-                                                      p_resource_ids[i],
-                                                      (lwm2m_portfolio_t *)p_instance);
-                break;
-            }
-
-            case LWM2M_OBJ_CONN_EXT:
-            {
-                err_code = lwm2m_tlv_connectivity_extension_encode(p_buffer + index,
-                                                                   p_buffer_len,
-                                                                   p_resource_ids[i],
-                                                                   (lwm2m_connectivity_extension_t *)p_instance);
-                break;
-            }
-
-            default:
-            {
-                err_code = ENOENT;
-                break;
-            }
-        }
+        err_code = lwm2m_tlv_resource_encode(&p_buffer[index], p_buffer_len, p_instance, p_resource_ids[i]);
 
         if (err_code != 0)
         {
@@ -137,6 +154,136 @@ uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
     *p_buffer_len = index;
 
     return 0;
+}
+
+
+static uint32_t lwm2m_tlv_object_encode(uint8_t          * p_buffer,
+                                        uint32_t         * p_buffer_len,
+                                        lwm2m_object_t   * p_object)
+{
+    NULL_PARAM_CHECK(p_buffer);
+    NULL_PARAM_CHECK(p_buffer_len);
+    NULL_PARAM_CHECK(p_object);
+
+    uint32_t err_code            = 0;
+    uint32_t instance_buffer_len = 256;
+    uint8_t  instance_buffer[instance_buffer_len];
+    uint32_t current_len         = *p_buffer_len;
+    uint32_t max_buffer          = *p_buffer_len;
+    uint32_t index               = 0;
+    uint16_t object_id           = p_object->object_id;
+    lwm2m_instance_t *p_instance = NULL;
+
+    for (int i = 0; i < LWM2M_COAP_HANDLER_MAX_INSTANCES; i++)
+    {
+        err_code = lwm2m_lookup_instance(&p_instance, object_id, i);
+
+        if (err_code != 0)
+        {
+            err_code = 0;
+            continue;
+        }
+
+        instance_buffer_len = sizeof(instance_buffer);
+
+        err_code = lwm2m_tlv_instance_encode(instance_buffer, &instance_buffer_len, p_instance);
+
+        if (err_code != 0)
+        {
+            break;
+        }
+
+        lwm2m_tlv_t tlv = {
+            .id_type = TLV_TYPE_OBJECT,
+            .id = i,
+            .length = instance_buffer_len
+        };
+
+        err_code = lwm2m_tlv_header_encode(&p_buffer[index], &current_len, &tlv);
+
+        if (err_code != 0)
+        {
+            break;
+        }
+
+        index += current_len;
+
+        if ((index < max_buffer) && ((max_buffer - index) > instance_buffer_len))
+        {
+            memcpy(&p_buffer[index], instance_buffer, instance_buffer_len);
+            index += instance_buffer_len;
+            current_len = max_buffer - index;
+        }
+        else
+        {
+            err_code = ENOMEM;
+            break;
+        }
+    }
+
+    *p_buffer_len = index;
+
+    return err_code;
+}
+
+
+uint32_t lwm2m_tlv_element_encode(uint8_t        * p_buffer,
+                                  uint32_t       * p_buffer_len,
+                                  const uint16_t * p_path,
+                                  uint8_t          path_len)
+{
+    NULL_PARAM_CHECK(p_buffer);
+    NULL_PARAM_CHECK(p_buffer_len);
+    NULL_PARAM_CHECK(p_path);
+
+    uint32_t err_code;
+
+    if (path_len == 1)
+    {
+        lwm2m_object_t *p_object;
+
+        err_code = lwm2m_lookup_object(&p_object, p_path[0]);
+
+        if (err_code != 0)
+        {
+            return err_code;
+        }
+
+        err_code = lwm2m_tlv_object_encode(p_buffer, p_buffer_len, p_object);
+    }
+    else if (path_len == 2)
+    {
+        lwm2m_instance_t *p_instance;
+
+        err_code = lwm2m_lookup_instance(&p_instance, p_path[0], p_path[1]);
+
+        if (err_code != 0)
+        {
+            return err_code;
+        }
+
+        err_code = lwm2m_tlv_instance_encode(p_buffer, p_buffer_len, p_instance);
+    }
+    else if (path_len == 3)
+    {
+        lwm2m_instance_t *p_instance;
+
+        err_code = lwm2m_lookup_instance(&p_instance, p_path[0], p_path[1]);
+
+        if (err_code != 0)
+        {
+            return err_code;
+        }
+
+        err_code = lwm2m_tlv_resource_encode(p_buffer, p_buffer_len, p_instance, p_path[2]);
+    }
+    else
+    {
+        LWM2M_WRN("Unsupported URI path length %d", path_len);
+        err_code = EINVAL;
+    }
+
+    return err_code;
 }
 
 

@@ -99,7 +99,6 @@
 ^lwm2m_debug_set$
 ^lwm2m_device_get_instance$
 ^lwm2m_device_get_sim_iccid$
-^lwm2m_device_notify_resource$
 ^lwm2m_did_bootstrap$
 ^lwm2m_factory_reset$
 ^lwm2m_family_type_get$
@@ -109,7 +108,6 @@
 ^lwm2m_observable_reference_get_cb_set$
 ^lwm2m_observable_uptime_cb_initialize$
 ^lwm2m_observer_notification_is_con$
-^lwm2m_observer_notify_path_cb_set$
 ^lwm2m_observer_process$
 ^lwm2m_observer_storage_store$
 ^lwm2m_observer_storage_restore$
@@ -132,6 +130,7 @@
 ^lwm2m_remote_reconnecting_set$
 ^lwm2m_request_connect$
 ^lwm2m_request_disconnect$
+^lwm2m_request_remote_reconnect_cb_set$
 ^lwm2m_request_reset$
 ^lwm2m_request_server_update$
 ^lwm2m_retry_delay_connect_get$

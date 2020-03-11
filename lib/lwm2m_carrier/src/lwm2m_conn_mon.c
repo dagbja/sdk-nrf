@@ -641,60 +641,6 @@ const void * lwm2m_conn_mon_resource_reference_get(uint16_t resource_id, uint8_t
     return p_observable;
 }
 
-void lwm2m_conn_mon_notify_resource(struct nrf_sockaddr * p_remote_server, int16_t resource_id)
-{
-    uint16_t short_server_id;
-    coap_observer_t *p_observer = NULL;
-    const void * p_observable = lwm2m_conn_mon_resource_reference_get(resource_id, NULL);
-
-    while (coap_observe_server_next_get(&p_observer, p_observer,
-               (void*)&m_instance_conn_mon.resource_ids[resource_id]) == 0)
-    {
-        lwm2m_conn_mon_update_resource(resource_id);
-
-        lwm2m_remote_short_server_id_find(&short_server_id, p_observer->remote);
-        if (lwm2m_remote_reconnecting_get(short_server_id)) {
-            /* Wait for reconnection */
-            continue;
-        }
-
-        if (p_remote_server != NULL) {
-            /* Only notify to given remote */
-            if (memcmp(p_observer->remote, p_remote_server,
-                       sizeof(struct nrf_sockaddr)) != 0) {
-                continue;
-            }
-        }
-
-        uint32_t err_code;
-        uint8_t buffer[200];
-        uint32_t buffer_size = sizeof(buffer);
-
-        LWM2M_TRC("Observer found");
-        err_code = lwm2m_tlv_connectivity_monitoring_encode(
-            buffer, &buffer_size, resource_id, &m_instance_conn_mon);
-
-        if (err_code) {
-            LWM2M_ERR("Could not encode resource_id %u, error code: %lu",
-                      resource_id, err_code);
-            continue;
-        }
-
-        coap_msg_type_t type = (lwm2m_observer_notification_is_con(p_observable, short_server_id)) ? COAP_TYPE_CON : COAP_TYPE_NON;
-
-        LWM2M_INF("Notify /4/0/%d", resource_id);
-        err_code = lwm2m_notify(buffer, buffer_size, p_observer, type);
-
-        if (err_code) {
-            LWM2M_INF("Notify /4/0/%d failed: %s (%ld), %s (%d)", resource_id,
-                    lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                    lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
-
-            lwm2m_request_remote_reconnect(p_observer->remote);
-        }
-    }
-}
-
 void lwm2m_conn_mon_init_acl(void)
 {
     lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_conn_mon);
