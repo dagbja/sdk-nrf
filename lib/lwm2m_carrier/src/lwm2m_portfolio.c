@@ -164,16 +164,89 @@ uint32_t lwm2m_portfolio_object_callback(lwm2m_object_t * p_object,
     LWM2M_TRC("portfolio_object_callback");
 
     uint32_t err_code = 0;
+    uint8_t  buffer[300];
+    uint32_t buffer_len      = sizeof(buffer);
+    uint32_t buffer_max_size = buffer_len;
+    const uint16_t path[] = { LWM2M_OBJ_PORTFOLIO };
+    uint8_t  path_len = ARRAY_SIZE(path);
+
+    if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
+    {
+        uint32_t observe_option = 0;
+
+        if (instance_id != LWM2M_INVALID_INSTANCE)
+        {
+            lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
+            return 0;
+        }
+
+        for (uint8_t index = 0; index < p_request->options_count; index++)
+        {
+            if (p_request->options[index].number == COAP_OPT_OBSERVE)
+            {
+                err_code = coap_opt_uint_decode(&observe_option,
+                                                p_request->options[index].length,
+                                                p_request->options[index].data);
+                break;
+            }
+        }
+
+        if (err_code == 0)
+        {
+            if (observe_option == 0) // Observe start
+            {
+                coap_message_t *p_message;
+
+                LWM2M_INF("Observe requested on object /16");
+                err_code = lwm2m_tlv_element_encode(buffer, &buffer_len, path, path_len);
+                if (err_code != 0)
+                {
+                    LWM2M_INF("Failed to perform the TLV encoding, err %d", err_code);
+                    lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
+                    return err_code;
+                }
+
+                err_code = lwm2m_observe_register(path, path_len, p_request, &p_message);
+                if (err_code != 0)
+                {
+                    LWM2M_INF("Failed to register the observer");
+                    lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
+                    return err_code;
+                }
+
+                err_code = lwm2m_coap_message_send_to_remote(p_message, p_request->remote, buffer, buffer_len);
+                if (err_code != 0)
+                {
+                    LWM2M_INF("Failed to respond to Observe request");
+                    lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
+                    return err_code;
+                }
+
+                lwm2m_observable_metadata_init(p_request->remote, path, path_len);
+            }
+            else if (observe_option == 1) // Observe stop
+            {
+                LWM2M_INF("Observe cancel on object /16");
+                const void * p_observable = lwm2m_observable_reference_get(path, path_len);
+                lwm2m_observe_unregister(p_request->remote, p_observable);
+                lwm2m_notif_attr_storage_update(path, path_len, p_request->remote);
+
+                // Process the GET request as usual.
+                op_code = LWM2M_OPERATION_CODE_READ;
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+                return 0;
+            }
+        }
+    }
 
     if (op_code == LWM2M_OPERATION_CODE_READ)
     {
-        uint32_t           buffer_max_size = 1024;
-        uint32_t           buffer_len      = buffer_max_size;
-        uint8_t            buffer[buffer_max_size];
-        uint32_t           index           = 0;
-
-        uint32_t instance_buffer_len = 256;
-        uint8_t  instance_buffer[instance_buffer_len];
+        uint32_t index = 0;
+        uint8_t  instance_buffer[150];
+        uint32_t instance_buffer_len = sizeof(instance_buffer);
 
         for (int i = 0; i < ARRAY_SIZE(m_instance_portfolio); i++)
         {
@@ -187,7 +260,7 @@ uint32_t lwm2m_portfolio_object_callback(lwm2m_object_t * p_object,
                 continue;
             }
 
-            instance_buffer_len = 256;
+            instance_buffer_len = 150;
             err_code = lwm2m_tlv_portfolio_encode(instance_buffer,
                                                   &instance_buffer_len,
                                                   LWM2M_NAMED_OBJECT,
@@ -219,6 +292,22 @@ uint32_t lwm2m_portfolio_object_callback(lwm2m_object_t * p_object,
     else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
     {
         err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_WRITE_ATTR)
+    {
+        err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
+        if (err_code != 0)
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+        }
+        else
+        {
+            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+        }
+    }
+    else if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
+    {
+        // Already handled
     }
     else
     {
