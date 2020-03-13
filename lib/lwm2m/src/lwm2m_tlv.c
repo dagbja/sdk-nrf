@@ -108,34 +108,18 @@ static uint32_t lwm2m_tlv_bytebuffer_to_uint32(uint8_t * p_buffer, uint8_t val_l
 
 uint32_t lwm2m_tlv_bytebuffer_to_uint16(uint8_t * p_buffer, uint8_t val_len, uint16_t * p_result)
 {
-    uint16_t res;
+    uint32_t err;
+    uint32_t res;
 
-    switch (val_len)
-    {
-        case 0:
-        {
-            res = 0;
-            break;
-        }
-
-        case 1:
-        {
-            res = p_buffer[0];
-            break;
-        }
-
-        case 2:
-        {
-            res = ((uint16_t)p_buffer[0] << 8) | p_buffer[1];
-            break;
-        }
-
-        default:
-            return EMSGSIZE;
-    }
+    /* uint16_t types are encoded as int32_t types, since there is no
+     * unsigned type in LwM2M, we encode it as a 4 byte integer.
+     * Here, we decode it as such and then cast it to a uint16_t.
+     */
+    err = lwm2m_tlv_bytebuffer_to_uint32(p_buffer, val_len, &res);
 
     *p_result = res;
-    return 0;
+
+    return err;
 }
 
 
@@ -502,11 +486,11 @@ uint32_t lwm2m_tlv_decode(lwm2m_tlv_t * p_tlv,
     uint8_t id_len_size = id_len + 1;
 
     err_code = lwm2m_tlv_bytebuffer_to_uint16(&p_buffer[index], id_len_size, &p_tlv->id);
-
     if (err_code != 0)
     {
         return err_code;
     }
+
     index += id_len_size;
 
     // Extract the value length.
@@ -529,7 +513,7 @@ uint32_t lwm2m_tlv_decode(lwm2m_tlv_t * p_tlv,
 
     if (p_tlv->length > buffer_len)
     {
-        return EINVAL;
+        return ENOMEM;
     }
 
     p_tlv->value = &p_buffer[index];

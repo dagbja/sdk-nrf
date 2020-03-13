@@ -116,6 +116,22 @@ uint32_t lwm2m_acl_permissions_reset(lwm2m_instance_t * p_instance,
 uint32_t lwm2m_acl_serialize_tlv(uint8_t          * p_buffer,
                                  uint32_t         * p_buffer_len,
                                  lwm2m_instance_t * p_instance);
+
+/**
+ * @brief Deserialize an ACL from a TLV.
+ *
+ * @param[out] p_buffer     Buffer to deserialize the ACL from.
+ * @param[in]  buffer_len   Length of the buffer.
+ * @param[in]  p_instance   Instance that the ACL belongs to or NULL
+ *                          to deserialize automatically into the right instance.
+ *
+ * @retval NRF_SUCCESS      Deserialization succeeded.
+ * @retval NRF_ENOENT       Instance could not be found.
+ */
+uint32_t lwm2m_acl_deserialize_tlv(uint8_t          * p_buffer,
+                                   uint16_t           buffer_len,
+                                   lwm2m_instance_t * p_instance);
+
 #endif // LWM2M_ACL_H__
 
 /**@} */

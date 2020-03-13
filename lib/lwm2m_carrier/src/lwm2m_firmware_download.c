@@ -327,13 +327,6 @@ static void reboot_task(void *w)
 	if (lwm2m_device_battery_status_get() != LWM2M_CARRIER_BATTERY_STATUS_LOW_BATTERY) {
 		LWM2M_INF("Firmware update scheduled at boot");
 		lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_UPDATING);
-		/* Temporary fix:
-		 * deregister in order to register at boot instead of doing
-		 * a server update; this will trigger the observe request
-		 * on the firmware resources needed by the FOTA update test.
-		 */
-		lwm2m_server_registered_set(1, false);
-		lwm2m_instance_storage_server_store(1);
 		/* Reset to continue FOTA update */
 		lwm2m_request_reset();
 	} else {

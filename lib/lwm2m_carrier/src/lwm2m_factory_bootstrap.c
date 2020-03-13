@@ -55,8 +55,6 @@ static void factory_security_bootstrap_default(void)
     lwm2m_security_short_server_id_set(instance_id, LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
     lwm2m_security_is_bootstrap_server_set(instance_id, true);
 
-    lwm2m_instance_storage_security_store(instance_id);
-
     lwm2m_coap_handler_instance_delete(p_instance);
     lwm2m_coap_handler_instance_add(p_instance);
 }
@@ -73,7 +71,6 @@ static void factory_server_default(void)
     };
 
     lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
-    lwm2m_instance_storage_server_store(instance_id);
 }
 
 static void factory_security_bootstrap_vzw(void)
@@ -85,8 +82,6 @@ static void factory_security_bootstrap_vzw(void)
     lwm2m_security_is_bootstrap_server_set(instance_id, true);
     lwm2m_security_bootstrapped_set(instance_id, false);
     lwm2m_security_hold_off_timer_set(instance_id, 10);
-
-    lwm2m_instance_storage_security_store(instance_id);
 
     lwm2m_coap_handler_instance_delete(p_instance);
     lwm2m_coap_handler_instance_add(p_instance);
@@ -103,8 +98,6 @@ static void factory_security_diagnostics_vzw(void)
     } else {
         lwm2m_security_server_uri_set(instance_id, DIAGNOSTICS_URI_VZW, strlen(DIAGNOSTICS_URI_VZW));
     }
-
-    lwm2m_instance_storage_security_store(instance_id);
 
     lwm2m_coap_handler_instance_delete(p_instance);
     lwm2m_coap_handler_instance_add(p_instance);
@@ -125,7 +118,6 @@ static void factory_server_bootstrap_vzw(void)
     lwm2m_server_client_hold_off_timer_set(instance_id, 0);
 
     lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
-    lwm2m_instance_storage_server_store(instance_id);
 
     lwm2m_coap_handler_instance_delete(p_instance);
     lwm2m_coap_handler_instance_add(p_instance);
@@ -143,7 +135,6 @@ static void factory_server_management_vzw(void)
     };
 
     lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
-    lwm2m_instance_storage_server_store(instance_id);
 }
 
 static void factory_server_diagnostics_vzw(void)
@@ -166,7 +157,6 @@ static void factory_server_diagnostics_vzw(void)
     lwm2m_server_binding_set(instance_id, "UQS", 3);
 
     lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
-    lwm2m_instance_storage_server_store(instance_id);
 
     lwm2m_coap_handler_instance_delete(p_instance);
     lwm2m_coap_handler_instance_add(p_instance);
@@ -184,7 +174,6 @@ static void factory_server_repository_vzw(void)
     };
 
     lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
-    lwm2m_instance_storage_server_store(instance_id);
 }
 
 static void factory_server_att(void)
@@ -199,7 +188,6 @@ static void factory_server_att(void)
     };
 
     lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
-    lwm2m_instance_storage_server_store(instance_id);
 }
 
 static void factory_server_test_att(void)
@@ -214,7 +202,6 @@ static void factory_server_test_att(void)
     };
 
     lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
-    lwm2m_instance_storage_server_store(instance_id);
 }
 
 /**@brief Reset factory bootstrapped objects. */
@@ -269,6 +256,10 @@ void lwm2m_factory_bootstrap_init(void)
     {
         factory_server_default();
     }
+
+    lwm2m_storage_security_store();
+    lwm2m_storage_server_store();
+    lwm2m_storage_acl_store();
 }
 
 bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config)
@@ -325,8 +316,9 @@ bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config)
         factory_bootstrap_bootstrap();
 
         lwm2m_security_server_uri_set(LWM2M_BOOTSTRAP_INSTANCE_ID, bootstrap_uri, strlen(bootstrap_uri));
-        lwm2m_instance_storage_security_store(LWM2M_BOOTSTRAP_INSTANCE_ID);
-        lwm2m_instance_storage_server_store(LWM2M_BOOTSTRAP_INSTANCE_ID);
+
+        lwm2m_storage_server_store();
+        lwm2m_storage_security_store();
 
         settings_changed = true;
     }

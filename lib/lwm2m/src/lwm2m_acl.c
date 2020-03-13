@@ -269,3 +269,88 @@ uint32_t lwm2m_acl_serialize_tlv(uint8_t          * p_buffer,
 
     return 0;
 }
+
+uint32_t lwm2m_acl_deserialize_tlv(uint8_t          * buffer,
+                                   uint16_t           buffer_len,
+                                   lwm2m_instance_t * p_instance)
+{
+    uint32_t    err_code;
+    uint32_t    index = 0;
+    lwm2m_tlv_t tlv;
+    lwm2m_tlv_t acl_list = { 0 };
+    uint16_t    object_id = 0;
+    uint16_t    instance_id = 0;
+    uint16_t    control_owner = 0;
+
+    while (index < buffer_len)
+    {
+        err_code = lwm2m_tlv_decode(&tlv, &index, buffer, buffer_len);
+        if (err_code != 0)
+        {
+            break;
+        }
+
+        switch (tlv.id)
+        {
+        case LWM2M_ACL_OBJECT_ID:
+            lwm2m_tlv_bytebuffer_to_uint16(tlv.value, tlv.length, &object_id);
+            break;
+        case LWM2M_ACL_INSTANCE_ID:
+            lwm2m_tlv_bytebuffer_to_uint16(tlv.value, tlv.length, &instance_id);
+            break;
+        case LWM2M_ACL_ACL:
+            acl_list = tlv;
+            break;
+        case LWM2M_ACL_CONTROL_OWNER:
+            lwm2m_tlv_bytebuffer_to_uint16(tlv.value, tlv.length, &control_owner);
+            break;
+        default:
+            break;
+        }
+    }
+
+    // Find the instance if none is provided
+    if (p_instance == NULL)
+    {
+        err_code = lwm2m_lookup_instance(&p_instance, object_id, instance_id);
+        if (err_code)
+        {
+            return err_code;
+        }
+    }
+
+    if (object_id == p_instance->object_id &&
+        instance_id == p_instance->instance_id)
+    {
+        if (control_owner != 0)
+        {
+            // Change owner
+            p_instance->acl.owner = control_owner;
+        }
+
+        index = 0;
+        while (index < acl_list.length)
+        {
+            err_code = lwm2m_tlv_decode(&tlv, &index, acl_list.value, acl_list.length);
+            if (err_code != 0)
+            {
+                break;
+            }
+
+            // Add new permissions
+            (void)lwm2m_acl_permissions_remove(p_instance, tlv.id);
+
+            err_code = lwm2m_acl_permissions_add(p_instance, tlv.value[0], tlv.id);
+            if (err_code != 0)
+            {
+                break;
+            }
+        }
+    }
+    else
+    {
+        return ENOENT;
+    }
+
+    return 0;
+}

@@ -177,6 +177,23 @@ uint32_t lwm2m_lookup_instance(lwm2m_instance_t  ** pp_instance,
     return ENOENT;
 }
 
+bool lwm2m_instance_next(lwm2m_instance_t ** p_instance, size_t *prog)
+{
+    if (*p_instance == NULL) {
+        *prog = 0;
+    }
+
+    if (*prog == m_num_instances) {
+        return false;
+    }
+
+    __ASSERT(PART_OF_ARRAY(m_instances, m_instances + (*prog)),
+         "Out of bounds");
+
+    *p_instance = m_instances[(*prog)++];
+
+    return true;
+}
 
 uint32_t lwm2m_lookup_object(lwm2m_object_t  ** pp_object,
                              uint16_t           object_id)
@@ -286,96 +303,6 @@ static uint32_t internal_gen_acl_link(uint8_t * p_buffer, uint32_t * p_len, uint
 
     return 0;
 }
-
-
-static uint32_t internal_acl_save_from_tlv(uint8_t          * buffer,
-                                           uint16_t           buffer_len,
-                                           lwm2m_instance_t * p_instance)
-{
-    uint32_t    err_code;
-    uint32_t    index = 0;
-    lwm2m_tlv_t tlv;
-    lwm2m_tlv_t acl_list = { 0 };
-    uint16_t    object_id = p_instance->object_id;
-    uint16_t    instance_id = p_instance->instance_id;
-    uint16_t    control_owner = 0;
-
-    while (index < buffer_len)
-    {
-        err_code = lwm2m_tlv_decode(&tlv, &index, buffer, buffer_len);
-
-        if (err_code != 0)
-        {
-            break;
-        }
-
-        switch (tlv.id)
-        {
-            case LWM2M_ACL_OBJECT_ID:
-            {
-                object_id = tlv.value[0];
-                break;
-            }
-
-            case LWM2M_ACL_INSTANCE_ID:
-            {
-                instance_id = tlv.value[0];
-                break;
-            }
-
-            case LWM2M_ACL_ACL:
-            {
-                acl_list = tlv;
-                break;
-            }
-
-            case LWM2M_ACL_CONTROL_OWNER:
-            {
-                control_owner = tlv.value[0];
-                break;
-            }
-
-            default:
-                break;
-        }
-    }
-
-
-    if (object_id == p_instance->object_id && instance_id == p_instance->instance_id)
-    {
-        if (control_owner != 0)
-        {
-            // Change owner
-            p_instance->acl.owner = control_owner;
-        }
-
-        index = 0;
-        while (index < acl_list.length)
-        {
-            err_code = lwm2m_tlv_decode(&tlv, &index, acl_list.value, acl_list.length);
-
-            if (err_code != 0)
-            {
-                break;
-            }
-            // Add new permissions
-            (void)lwm2m_acl_permissions_remove(p_instance, tlv.id);
-            err_code = lwm2m_acl_permissions_add(p_instance, tlv.value[0], tlv.id);
-
-            if (err_code != 0)
-            {
-                break;
-            }
-        }
-    }
-    else
-    {
-        return EINVAL;
-    }
-
-    return err_code;
-}
-
 
 static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                                             uint16_t       * p_path,
@@ -558,7 +485,7 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
                 }
 
 
-                err_code = internal_acl_save_from_tlv(p_request->payload, p_request->payload_len, current_instance);
+                err_code = lwm2m_acl_deserialize_tlv(p_request->payload, p_request->payload_len, current_instance);
                 if (err_code != 0)
                 {
                     LWM2M_MUTEX_UNLOCK();

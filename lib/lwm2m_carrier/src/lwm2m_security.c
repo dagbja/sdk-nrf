@@ -16,6 +16,7 @@
 #include <lwm2m_remote.h>
 #include <lwm2m_security.h>
 #include <lwm2m_instance_storage.h>
+#include <operator_check.h>
 
 #include <coap_option.h>
 #include <coap_observe_api.h>
@@ -137,7 +138,39 @@ void lwm2m_security_short_server_id_set(uint16_t instance_id, uint16_t value)
     m_instance_security[instance_id].short_server_id = value;
 }
 
-static uint32_t tlv_security_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
+static uint32_t tlv_security_vzw_encode(uint16_t instance_id, uint8_t * p_buffer, uint32_t * p_buffer_len)
+{
+    int32_t list_values[2] =
+    {
+        vzw_boostrap_security_settings.is_bootstrapped,
+        vzw_boostrap_security_settings.hold_off_timer
+    };
+
+    lwm2m_list_t list =
+    {
+        .type        = LWM2M_LIST_TYPE_INT32,
+        .p_id        = NULL,
+        .val.p_int32 = list_values,
+        .len         = ARRAY_SIZE(list_values)
+    };
+
+    return lwm2m_tlv_list_encode(
+        p_buffer, p_buffer_len, VERIZON_RESOURCE, &list);
+}
+
+uint32_t tlv_security_carrier_encode(uint16_t instance_id, uint8_t * p_buffer,
+                                     uint32_t * p_buffer_len)
+{
+    if (!operator_is_vzw(true)) {
+        /* Nothing to encode */
+        *p_buffer_len = 0;
+        return 0;
+    }
+
+    return tlv_security_vzw_encode(instance_id, p_buffer, p_buffer_len);
+}
+
+static uint32_t tlv_security_vzw_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
 {
     uint32_t    index = 0;
     uint32_t    err_code = 0;
@@ -179,26 +212,16 @@ static uint32_t tlv_security_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * 
 }
 
 
-static uint32_t tlv_security_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
+uint32_t tlv_security_carrier_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
 {
-    uint32_t err_code = 0;
-
     switch (p_tlv->id)
     {
         case VERIZON_RESOURCE:
-            err_code = tlv_security_verizon_decode(instance_id, p_tlv);
-            break;
+            return tlv_security_vzw_decode(instance_id, p_tlv);
 
         default:
-#if 0
-            err_code = ENOENT;
-#else
-            LWM2M_ERR("Unhandled security resource: %i", p_tlv->id);
-#endif
-            break;
+            return 0;
     }
-
-    return err_code;
 }
 
 /**@brief Callback function for LWM2M security instances. */
@@ -259,7 +282,7 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
 
         if (err_code == 0)
         {
-            if (lwm2m_instance_storage_security_store(instance_id) == 0)
+            if (lwm2m_storage_security_store() == 0)
             {
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
             }
@@ -299,7 +322,7 @@ uint32_t security_object_callback(lwm2m_object_t  * p_object,
         uint32_t err_code = lwm2m_tlv_security_decode(&m_instance_security[instance_id],
                                                       p_request->payload,
                                                       p_request->payload_len,
-                                                      tlv_security_resource_decode);
+                                                      tlv_security_carrier_decode);
         if (err_code != 0)
         {
             return 0;

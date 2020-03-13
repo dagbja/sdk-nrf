@@ -903,14 +903,12 @@ static void delete_security_and_server_instances(bool delete_bootstrap)
         if (delete_bootstrap ||
             (i != LWM2M_BOOTSTRAP_INSTANCE_ID))
         {
-            lwm2m_instance_storage_security_delete(i);
             (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_security_get_instance(i));
         }
 
         if (delete_bootstrap ||
             (lwm2m_server_short_server_id_get(i) != bootstrap_ssid))
         {
-            lwm2m_instance_storage_server_delete(i);
             (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_server_get_instance(i));
         }
     }
@@ -1233,9 +1231,6 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t              short_
 
     if (err_code == 0)
     {
-        // Deregister the short_server_id in case it has been registered with a different address
-        (void) lwm2m_remote_deregister(short_server_id);
-
         // Register the short_server_id
         err_code = lwm2m_remote_register(short_server_id, (struct nrf_sockaddr *)p_remote);
     }
@@ -1408,7 +1403,8 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             lwm2m_state_set(LWM2M_STATE_IDLE);
 
             // Refresh stored server object, to also include is_connected status and registration ID.
-            lwm2m_instance_storage_server_store(server_instance);
+            lwm2m_storage_server_store();
+            lwm2m_storage_location_store();
 
             lwm2m_notif_attr_storage_restore(short_server_id);
 
@@ -1459,10 +1455,10 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
                  (coap_code == COAP_CODE_403_FORBIDDEN) ||    // AT&T reports this when different DTLS session
                  (coap_code == COAP_CODE_404_NOT_FOUND))
         {
-            // If not found, ignore.
-            (void)lwm2m_remote_location_delete(short_server_id);
+            // Remove the server (deregister) to trigger a Registration,
+            // instead an of Update the next time we connect to it.
+            lwm2m_remote_deregister(short_server_id);
             lwm2m_server_registered_set(server_instance, false);
-            lwm2m_instance_storage_server_store(server_instance);
 
             // Reset state to get back to registration.
             lwm2m_state_set(LWM2M_STATE_SERVER_CONNECTED);
@@ -1508,9 +1504,11 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
     {
         // We have successfully deregistered.
         lwm2m_server_registered_set(server_instance, false);
+        lwm2m_remote_deregister(short_server_id);
 
         // Store server object to know that its not registered, and location should be cleared.
-        lwm2m_instance_storage_server_store(server_instance);
+        lwm2m_storage_server_store();
+        lwm2m_storage_location_store();
 
         if (m_app_state == LWM2M_STATE_SERVER_DEREGISTERING)
         {
@@ -1632,10 +1630,10 @@ static void app_init_connection_update(void)
 
 static void app_misc_data_set_bootstrapped(bool bootstrapped)
 {
-    lwm2m_instance_storage_misc_data_t misc_data = { 0 };
-    lwm2m_instance_storage_misc_data_load(&misc_data);
+    lwm2m_storage_misc_data_t misc_data = { 0 };
+    lwm2m_storage_misc_data_load(&misc_data);
     misc_data.bootstrapped = bootstrapped ? 1 : 0;
-    lwm2m_instance_storage_misc_data_store(&misc_data);
+    lwm2m_storage_misc_data_store(&misc_data);
 }
 
 /**@brief Callback function for the named bootstrap complete object. */
@@ -1666,15 +1664,10 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     app_misc_data_set_bootstrapped(true);
 
     LWM2M_INF("Store bootstrap settings");
-    for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-        if (lwm2m_security_short_server_id_get(i) != 0) {
-            lwm2m_instance_storage_security_store(i);
-        }
 
-        if (lwm2m_server_short_server_id_get(i) != 0) {
-            lwm2m_instance_storage_server_store(i);
-        }
-    }
+    lwm2m_storage_server_store();
+    lwm2m_storage_security_store();
+    lwm2m_storage_acl_store();
 
     server_instance_update_map();
 
@@ -1693,13 +1686,12 @@ void lwm2m_bootstrap_reset(void)
 {
     if (lwm2m_security_short_server_id_get(LWM2M_BOOTSTRAP_INSTANCE_ID) == 0) {
         // Server object not loaded yet
-        lwm2m_instance_storage_security_load(LWM2M_BOOTSTRAP_INSTANCE_ID);
+        lwm2m_storage_security_load();
     }
 
     if (lwm2m_security_bootstrapped_get(LWM2M_BOOTSTRAP_INSTANCE_ID)) {
         // Security object exists and bootstrap is done
         lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
-        lwm2m_instance_storage_security_store(LWM2M_BOOTSTRAP_INSTANCE_ID);
     }
 
     app_misc_data_set_bootstrapped(false);
@@ -1738,6 +1730,9 @@ void lwm2m_factory_reset(void)
 
     // Delete all Security and Server instances
     delete_security_and_server_instances(true);
+
+    lwm2m_storage_security_store();
+    lwm2m_storage_server_store();
 }
 
 /**@brief Initialize server ACLs in a specific order. */
@@ -1765,26 +1760,32 @@ static void app_server_acl_init(void)
 static void app_load_flash_objects(void)
 {
     LWM2M_INF("Load bootstrap settings");
+
+    lwm2m_storage_security_load();
+    lwm2m_storage_server_load();
+
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {
-        lwm2m_instance_storage_security_load(i);
-        lwm2m_instance_storage_server_load(i);
-
         if (lwm2m_security_short_server_id_get(i) != 0)
         {
-            lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_security_get_instance(i));
+            lwm2m_coap_handler_instance_add(&lwm2m_security_get_instance(i)->proto);
         }
 
         if (lwm2m_server_short_server_id_get(i) != 0)
         {
-            lwm2m_coap_handler_instance_add((lwm2m_instance_t *)lwm2m_server_get_instance(i));
+            lwm2m_coap_handler_instance_add(&lwm2m_server_get_instance(i)->proto);
         }
     }
 
+    // Load ACLs after adding the Security and Server instances.
+    lwm2m_storage_acl_load();
+    // Load location
+    lwm2m_storage_location_load();
+
     server_instance_update_map();
 
-    lwm2m_instance_storage_misc_data_t misc_data;
-    int32_t result = lwm2m_instance_storage_misc_data_load(&misc_data);
+    lwm2m_storage_misc_data_t misc_data;
+    int32_t result = lwm2m_storage_misc_data_load(&misc_data);
     if (result == 0 && misc_data.bootstrapped)
     {
         lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, true);
@@ -1805,9 +1806,6 @@ static void app_lwm2m_create_objects(void)
     lwm2m_server_init();
     app_server_acl_init();
 
-    // Initialize security, server and acl from flash.
-    app_load_flash_objects();
-
     lwm2m_device_init();
     lwm2m_conn_mon_init();
     lwm2m_firmware_init();
@@ -1816,6 +1814,9 @@ static void app_lwm2m_create_objects(void)
     lwm2m_apn_conn_prof_init();
     lwm2m_portfolio_init();
     lwm2m_conn_ext_init();
+
+    // Initialize security, server and acl from flash.
+    app_load_flash_objects();
 }
 
 /**@brief LWM2M initialization.
@@ -2106,9 +2107,6 @@ static void app_server_connect(uint16_t security_instance)
 
     // Set the short server id of the server in the config.
     m_server_conf[security_instance].short_server_id = lwm2m_security_short_server_id_get(security_instance);
-
-    // Deregister the short_server_id in case it has been registered with a different address
-    (void) lwm2m_remote_deregister(m_server_conf[security_instance].short_server_id);
 
     uint8_t uri_len = 0;
     char * p_server_uri = lwm2m_security_server_uri_get(security_instance, &uri_len);
@@ -2667,34 +2665,18 @@ static int app_lwm2m_process(void)
         }
         case LWM2M_STATE_SERVER_CONNECTED:
         {
-            bool do_register = true;
-            uint16_t server_instance = server_instance_get(m_security_instance);
-
-            /* If already registered and having a remote location then do update. */
-            if (lwm2m_server_registered_get(server_instance)) {
-
-                uint16_t short_server_id = lwm2m_security_short_server_id_get(m_security_instance);
-
-                // Register the remote.
-                lwm2m_remote_register(short_server_id, (struct nrf_sockaddr *)&m_remote_server[m_security_instance]);
-
-                // Load flash again, to retrieve the location.
-                lwm2m_instance_storage_server_load(server_instance);
-
-                char   * p_location;
-                uint16_t location_len = 0;
-                uint32_t err_code = lwm2m_remote_location_find(&p_location,
-                                                               &location_len,
-                                                               short_server_id);
-                if (err_code == 0 && location_len > 0) {
-                    do_register = false;
-                }
-            }
+            uint16_t short_server_id = lwm2m_security_short_server_id_get(m_security_instance);
+            bool do_register = !lwm2m_remote_is_registered(short_server_id);
 
             if (do_register) {
+                // Remote is registered by the LwM2M core.
                 LWM2M_INF("Server register (server %u)", m_security_instance);
                 app_server_register(m_security_instance);
             } else {
+                // Register the remote manually in case of update.
+                lwm2m_remote_register(short_server_id,
+                        (struct nrf_sockaddr *)&m_remote_server[m_security_instance]);
+
                 LWM2M_INF("Server update after connect (server %u)", m_security_instance);
                 app_server_update(m_security_instance, true);
             }

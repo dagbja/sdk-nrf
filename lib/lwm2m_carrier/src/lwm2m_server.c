@@ -140,7 +140,7 @@ lwm2m_object_t * lwm2m_server_get_object(void)
     return &m_object_server;
 }
 
-static uint32_t tlv_server_verizon_encode(uint16_t instance_id, uint8_t * p_buffer, uint32_t * p_buffer_len)
+static uint32_t tlv_server_vzw_encode(uint16_t instance_id, uint8_t * p_buffer, uint32_t * p_buffer_len)
 {
     int32_t list_values[2] =
     {
@@ -153,14 +153,26 @@ static uint32_t tlv_server_verizon_encode(uint16_t instance_id, uint8_t * p_buff
         .type        = LWM2M_LIST_TYPE_INT32,
         .p_id        = NULL,
         .val.p_int32 = list_values,
-        .len         = 2
+        .len         = ARRAY_SIZE(list_values)
     };
 
-    return lwm2m_tlv_list_encode(p_buffer, p_buffer_len, VERIZON_RESOURCE, &list);
+    return lwm2m_tlv_list_encode(
+            p_buffer, p_buffer_len, VERIZON_RESOURCE, &list);
 }
 
+uint32_t tlv_server_carrier_encode(uint16_t instance_id, uint8_t * p_buffer,
+                                   uint32_t * p_buffer_len)
+{
+    if (!operator_is_vzw(true)) {
+        /* Nothing to encode */
+        *p_buffer_len = 0;
+        return 0;
+    }
 
-static uint32_t tlv_server_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
+    return tlv_server_vzw_encode(instance_id, p_buffer, p_buffer_len);
+}
+
+uint32_t tlv_server_vzw_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
 {
     uint32_t    index = 0;
     uint32_t    err_code = 0;
@@ -199,26 +211,16 @@ static uint32_t tlv_server_verizon_decode(uint16_t instance_id, lwm2m_tlv_t * p_
     return err_code;
 }
 
-uint32_t tlv_server_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
+uint32_t tlv_server_carrier_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
 {
-    uint32_t err_code = 0;
-
     switch (p_tlv->id)
     {
         case VERIZON_RESOURCE:
-            err_code = tlv_server_verizon_decode(instance_id, p_tlv);
-            break;
+            return tlv_server_vzw_decode(instance_id, p_tlv);
 
         default:
-#if 0
-            err_code = ENOENT;
-#else
-            LWM2M_ERR("Unhandled server resource: %i", p_tlv->id);
-#endif
-            break;
+            return 0;
     }
-
-    return err_code;
 }
 
 /**@brief Callback function for LWM2M server instances. */
@@ -355,7 +357,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
     {
         if (resource_id == VERIZON_RESOURCE && operator_is_vzw(true))
         {
-            err_code = tlv_server_verizon_encode(instance_id, buffer, &buffer_size);
+            err_code = tlv_server_vzw_encode(instance_id, buffer, &buffer_size);
         }
         else
         {
@@ -374,7 +376,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
             {
                 if (operator_is_vzw(true)) {
                     uint32_t added_size = sizeof(buffer) - buffer_size;
-                    err_code = tlv_server_verizon_encode(instance_id, buffer + buffer_size, &added_size);
+                    err_code = tlv_server_vzw_encode(instance_id, buffer + buffer_size, &added_size);
                     buffer_size += added_size;
                 }
             }
@@ -406,7 +408,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
             err_code = lwm2m_tlv_server_decode(lwm2m_server_get_instance(instance_id),
                                                p_request->payload,
                                                p_request->payload_len,
-                                               tlv_server_resource_decode);
+                                               tlv_server_carrier_decode);
         }
         else if ((mask & COAP_CT_MASK_PLAIN_TEXT) || (mask & COAP_CT_MASK_APP_OCTET_STREAM))
         {
@@ -428,7 +430,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
 
         if (err_code == 0)
         {
-            if (lwm2m_instance_storage_server_store(instance_id) == 0)
+            if (lwm2m_storage_server_store() == 0)
             {
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
             }
@@ -591,7 +593,7 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
             (void)lwm2m_tlv_server_decode(&m_instance_server[instance_id],
                                           p_request->payload,
                                           p_request->payload_len,
-                                          tlv_server_resource_decode);
+                                          tlv_server_carrier_decode);
 
             m_instance_server[instance_id].proto.instance_id = instance_id;
             m_instance_server[instance_id].proto.object_id   = p_object->object_id;

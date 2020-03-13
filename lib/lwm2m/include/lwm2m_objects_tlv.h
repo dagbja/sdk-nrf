@@ -44,12 +44,16 @@ uint32_t lwm2m_tlv_element_encode(uint8_t        * p_buffer,
  * @param[inout] p_buffer_len Value by reference indicating the size of the buffer provided.
  *                            Will return the number of used bytes on return.
  * @param[in]    p_instance   Pointer to the LwM2M instance object to be encoded into TLVs.
+ * @param[in]    check_permissions Check resource permissions when encoding.
+ *                                 Passing false will encode the resource
+ *                                 regardless of whether it has read permissions.
  *
  * @retval NRF_SUCCESS If the encoding was successful.
  */
 uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
                                    uint32_t         * p_buffer_len,
-                                   lwm2m_instance_t * p_instance);
+                                   lwm2m_instance_t * p_instance,
+                                   bool               check_permissions);
 
 /**@brief Decode a LWM2M security object from a TLV byte buffer.
  *

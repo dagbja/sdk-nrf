@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
+#include <lwm2m_tlv.h>
 
 // TODO: Move to new carrier specific extended object/header.
 typedef struct {
@@ -59,3 +60,6 @@ void lwm2m_security_reset(uint16_t instance_id);
 lwm2m_security_t * lwm2m_security_get_instance(uint16_t instance_id);
 
 lwm2m_object_t * lwm2m_security_get_object(void);
+
+uint32_t tlv_security_carrier_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv);
+uint32_t tlv_security_carrier_encode(uint16_t instance_id, uint8_t * p_buffer, uint32_t * p_buffer_len);

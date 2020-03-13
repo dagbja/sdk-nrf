@@ -16,6 +16,7 @@
 #define LWM2M_REMOTE_H__
 
 #include <stdint.h>
+#include <stddef.h>
 #include <nrf_socket.h>
 
 /**
@@ -25,6 +26,14 @@
  * @return     NRF_SUCCESS Initialization succeeded.
  */
 uint32_t lwm2m_remote_init(void);
+
+/**
+ * @brief Retrieve server location data.
+ *
+ * @param[in, out] p_loc    Location data.
+ * @param[out]     p_len    Length of the retrieved data.
+ */
+void lwm2m_remote_location_get(void **p_loc, size_t *p_len);
 
 /**
  * @brief      Register a new short server id. Must be used before lwm2m_remote_remote_save.
@@ -48,6 +57,15 @@ uint32_t lwm2m_remote_register(uint16_t short_server_id, struct nrf_sockaddr * p
  * @return     NRF_ERROR_NOT_FOUND The short_server_id was not found.
  */
 uint32_t lwm2m_remote_deregister(uint16_t short_server_id);
+
+/**
+ * @brief Check whether a server with the given short server ID is registered.
+ *
+ * @param short_server_id
+ * @return true
+ * @return false
+ */
+bool lwm2m_remote_is_registered(uint16_t short_server_id);
 
 /**
  * @brief      Find the short server id from a given remote struct.
@@ -88,16 +106,6 @@ uint32_t lwm2m_remote_location_save(char     * p_location,
                                     uint16_t   location_len,
                                     uint16_t   short_server_id);
 
-
-/**
- * @brief      Delete a location associated with a short server id.
- *
- * @param[in]  short_server_id  Short server id to associate with.
- *
- * @return     NRF_SUCCESS         The location was deleted.
- * @return     NRF_ERROR_NOT_FOUND The short_server_id was not found.
- */
-uint32_t lwm2m_remote_location_delete(uint16_t short_server_id);
 
 /**
  * @brief      Find the location associated with a given remote.

@@ -95,7 +95,7 @@ static int cmd_security_uri(const struct shell *shell, size_t argc, char **argv)
     }
 
     lwm2m_security_server_uri_set(instance_id, uri, uri_len);
-    lwm2m_instance_storage_security_store(instance_id);
+    lwm2m_storage_security_store();
 
     shell_print(shell, "Set URI %d: %s", instance_id, uri);
 
@@ -162,7 +162,7 @@ static int cmd_server_lifetime(const struct shell *shell, size_t argc, char **ar
         // Lifetime changed, send update server
         lwm2m_request_server_update(instance_id, false);
         lwm2m_server_lifetime_set(instance_id, lifetime);
-        lwm2m_instance_storage_server_store(instance_id);
+        lwm2m_storage_server_store();
 
         shell_print(shell, "Set lifetime %d: %d", instance_id, lifetime);
     }

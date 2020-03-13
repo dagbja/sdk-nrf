@@ -15,7 +15,6 @@ static void index_buffer_len_update(uint32_t * index, uint32_t * buffer_len, uin
     *buffer_len = max_buffer - *index;
 }
 
-
 static uint32_t lwm2m_tlv_resource_encode(uint8_t          * p_buffer,
                                           uint32_t         * p_buffer_len,
                                           lwm2m_instance_t * p_instance,
@@ -121,7 +120,8 @@ static uint32_t lwm2m_tlv_resource_encode(uint8_t          * p_buffer,
 
 uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
                                    uint32_t         * p_buffer_len,
-                                   lwm2m_instance_t * p_instance)
+                                   lwm2m_instance_t * p_instance,
+                                   bool               check_permissions)
 {
     NULL_PARAM_CHECK(p_buffer);
     NULL_PARAM_CHECK(p_buffer_len);
@@ -136,7 +136,8 @@ uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
 
     for (uint32_t i = 0; i < p_instance->num_resources; i++)
     {
-        if (!(p_operations[i] & LWM2M_OPERATION_CODE_READ))
+        if (check_permissions &&
+            !(p_operations[i] & LWM2M_OPERATION_CODE_READ))
         {
             continue;
         }
@@ -186,7 +187,7 @@ static uint32_t lwm2m_tlv_object_encode(uint8_t          * p_buffer,
 
         instance_buffer_len = sizeof(instance_buffer);
 
-        err_code = lwm2m_tlv_instance_encode(instance_buffer, &instance_buffer_len, p_instance);
+        err_code = lwm2m_tlv_instance_encode(instance_buffer, &instance_buffer_len, p_instance, true);
 
         if (err_code != 0)
         {
@@ -262,7 +263,7 @@ uint32_t lwm2m_tlv_element_encode(uint8_t        * p_buffer,
             return err_code;
         }
 
-        err_code = lwm2m_tlv_instance_encode(p_buffer, p_buffer_len, p_instance);
+        err_code = lwm2m_tlv_instance_encode(p_buffer, p_buffer_len, p_instance, true);
     }
     else if (path_len == 3)
     {
@@ -312,7 +313,7 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
         {
             case LWM2M_SECURITY_SERVER_URI:
             {
-                err_code = lwm2m_bytebuffer_to_string((char *)tlv.value,
+                err_code = lwm2m_bytebuffer_to_string(tlv.value,
                                                       tlv.length,
                                                       &p_security->server_uri);
                 break;
@@ -332,7 +333,7 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
 
             case LWM2M_SECURITY_PUBLIC_KEY:
             {
-                err_code = lwm2m_bytebuffer_to_opaque((char *)tlv.value,
+                err_code = lwm2m_bytebuffer_to_opaque(tlv.value,
                                                       tlv.length,
                                                       &p_security->public_key);
                 break;
@@ -340,7 +341,7 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
 
             case LWM2M_SECURITY_SERVER_PUBLIC_KEY:
             {
-                err_code = lwm2m_bytebuffer_to_opaque((char *)tlv.value,
+                err_code = lwm2m_bytebuffer_to_opaque(tlv.value,
                                                       tlv.length,
                                                       &p_security->server_public_key);
                 break;
@@ -348,7 +349,7 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
 
             case LWM2M_SECURITY_SECRET_KEY:
             {
-                err_code = lwm2m_bytebuffer_to_opaque((char *)tlv.value,
+                err_code = lwm2m_bytebuffer_to_opaque(tlv.value,
                                                       tlv.length,
                                                       &p_security->secret_key);
                 break;
@@ -362,7 +363,7 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
 
             case LWM2M_SECURITY_SMS_BINDING_KEY_PARAM:
             {
-                err_code = lwm2m_bytebuffer_to_opaque((char *)tlv.value,
+                err_code = lwm2m_bytebuffer_to_opaque(tlv.value,
                                                       tlv.length,
                                                       &p_security->sms_binding_key_param);
                 break;
@@ -370,7 +371,7 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
 
             case LWM2M_SECURITY_SMS_BINDING_SECRET_KEY:
             {
-                err_code = lwm2m_bytebuffer_to_opaque((char *)tlv.value,
+                err_code = lwm2m_bytebuffer_to_opaque(tlv.value,
                                                       tlv.length,
                                                       &p_security->sms_binding_secret_keys);
                 break;
@@ -378,7 +379,7 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
 
             case LWM2M_SECURITY_SERVER_SMS_NUMBER:
             {
-                err_code = lwm2m_bytebuffer_to_string((char *)tlv.value,
+                err_code = lwm2m_bytebuffer_to_string(tlv.value,
                                                       tlv.length,
                                                       &p_security->sms_number);
                 break;
@@ -404,7 +405,12 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
             {
                 if (resource_callback)
                 {
-                    err_code = resource_callback(((lwm2m_instance_t *)p_security)->instance_id, &tlv);
+                    err_code = resource_callback(p_security->proto.instance_id, &tlv);
+                }
+                else
+                {
+                        LWM2M_WRN("Unhandled resource /0/%d/%d when decoding",
+                                  p_security->proto.instance_id, tlv.id);
                 }
                 break;
             }
@@ -412,7 +418,7 @@ uint32_t lwm2m_tlv_security_decode(lwm2m_security_t   * p_security,
 
         if (err_code != 0)
         {
-            return EINVAL;
+            return err_code;
         }
     }
 
@@ -480,10 +486,11 @@ uint32_t lwm2m_tlv_security_encode(uint8_t          * p_buffer,
 
         case LWM2M_SECURITY_SECRET_KEY:
         {
-            err_code = lwm2m_tlv_opaque_encode(p_buffer,
-                                               p_buffer_len,
-                                               LWM2M_SECURITY_SECRET_KEY,
-                                               p_security->secret_key);
+            /* Omit the encoding of this specific resource to make sure
+             * it is not written to flash when saving this instance.
+             */
+            err_code = 0;
+            *p_buffer_len = 0;
             break;
         }
 
@@ -546,13 +553,15 @@ uint32_t lwm2m_tlv_security_encode(uint8_t          * p_buffer,
             // This is a callback to the instance, not a specific resource.
             err_code = lwm2m_tlv_instance_encode(p_buffer,
                                                  p_buffer_len,
-                                                 (lwm2m_instance_t *)p_security);
+                                                 (lwm2m_instance_t *)p_security,
+                                                 true);
             break;
         }
 
         default:
         {
-            err_code = ENOENT;
+            err_code = 0;
+            *p_buffer_len = 0;
             break;
         }
     }
@@ -659,7 +668,12 @@ uint32_t lwm2m_tlv_server_decode(lwm2m_server_t     * p_server,
             {
                 if (resource_callback)
                 {
-                    err_code = resource_callback(((lwm2m_instance_t *)p_server)->instance_id, &tlv);
+                    err_code = resource_callback(p_server->proto.instance_id, &tlv);
+                }
+                else
+                {
+                        LWM2M_WRN("Unhandled resource /1/%d/%d when decoding",
+                                  p_server->proto.instance_id, tlv.id);
                 }
                 break;
             }
@@ -667,7 +681,7 @@ uint32_t lwm2m_tlv_server_decode(lwm2m_server_t     * p_server,
 
         if (err_code != 0)
         {
-            return EINVAL;
+            return err_code;
         }
     }
 
@@ -763,13 +777,15 @@ uint32_t lwm2m_tlv_server_encode(uint8_t        * p_buffer,
             // This is a callback to the instance, not a specific resource.
             err_code = lwm2m_tlv_instance_encode(p_buffer,
                                                  p_buffer_len,
-                                                 (lwm2m_instance_t *)p_server);
+                                                 (lwm2m_instance_t *)p_server,
+                                                 true);
             break;
         }
 
         default:
         {
-            err_code = ENOENT;
+            err_code = 0;
+            *p_buffer_len = 0;
             break;
         }
     }
@@ -883,7 +899,7 @@ uint32_t lwm2m_tlv_connectivity_monitoring_decode(lwm2m_connectivity_monitoring_
             {
                 if (resource_callback)
                 {
-                    err_code = resource_callback(((lwm2m_instance_t *)p_conn_mon)->instance_id, &tlv);
+                    err_code = resource_callback(p_conn_mon->proto.instance_id, &tlv);
                 }
                 break;
             }
@@ -1016,13 +1032,15 @@ uint32_t lwm2m_tlv_connectivity_monitoring_encode(uint8_t                       
             // This is a callback to the instance, not a specific resource.
             err_code = lwm2m_tlv_instance_encode(p_buffer,
                                                  p_buffer_len,
-                                                 (lwm2m_instance_t *)p_conn_mon);
+                                                 (lwm2m_instance_t *)p_conn_mon,
+                                                 true);
             break;
         }
 
         default:
         {
-            err_code = ENOENT;
+            err_code = 0;
+            *p_buffer_len = 0;
             break;
         }
     }
@@ -1293,7 +1311,8 @@ uint32_t lwm2m_tlv_device_encode(uint8_t        * p_buffer,
             // This is a callback to the instance, not a specific resource.
             err_code = lwm2m_tlv_instance_encode(p_buffer,
                                                  p_buffer_len,
-                                                 (lwm2m_instance_t *)p_device);
+                                                 (lwm2m_instance_t *)p_device,
+                                                 true);
             break;
         }
 
@@ -1350,7 +1369,7 @@ uint32_t lwm2m_tlv_firmware_decode(lwm2m_firmware_t     * p_firmware,
             {
                 if (resource_callback)
                 {
-                    err_code = resource_callback(((lwm2m_instance_t *)p_firmware)->instance_id, &tlv);
+                    err_code = resource_callback(p_firmware->proto.instance_id, &tlv);
                 }
                 break;
             }
@@ -1446,13 +1465,15 @@ uint32_t lwm2m_tlv_firmware_encode(uint8_t          * p_buffer,
             // This is a callback to the instance, not a specific resource.
             err_code = lwm2m_tlv_instance_encode(p_buffer,
                                                  p_buffer_len,
-                                                 (lwm2m_instance_t *)p_firmware);
+                                                 (lwm2m_instance_t *)p_firmware,
+                                                 true);
             break;
         }
 
         default:
         {
-            err_code = ENOENT;
+            err_code = 0;
+            *p_buffer_len = 0;
             break;
         }
     }
@@ -1495,7 +1516,7 @@ uint32_t lwm2m_tlv_connectivity_statistics_decode(lwm2m_connectivity_statistics_
             {
                 if (resource_callback)
                 {
-                    err_code = resource_callback(((lwm2m_instance_t *)p_conn_stat)->instance_id, &tlv);
+                    err_code = resource_callback(p_conn_stat->proto.instance_id, &tlv);
                 }
                 break;
             }
@@ -1592,13 +1613,15 @@ uint32_t lwm2m_tlv_connectivity_statistics_encode(uint8_t                       
             // This is a callback to the instance, not a specific resource.
             err_code = lwm2m_tlv_instance_encode(p_buffer,
                                                  p_buffer_len,
-                                                 (lwm2m_instance_t *)p_conn_stat);
+                                                 (lwm2m_instance_t *)p_conn_stat,
+                                                 true);
             break;
         }
 
         default:
         {
-            err_code = ENOENT;
+            err_code = 0;
+            *p_buffer_len = 0;
             break;
         }
     }
@@ -1751,7 +1774,8 @@ uint32_t lwm2m_tlv_apn_connection_profile_encode(uint8_t               * p_buffe
             // This is a callback to the instance, not a specific resource.
             err_code = lwm2m_tlv_instance_encode(p_buffer,
                                                  p_buffer_len,
-                                                 (lwm2m_instance_t *)p_apn_conn_prof);
+                                                 (lwm2m_instance_t *)p_apn_conn_prof,
+                                                 true);
             break;
         }
 
@@ -1841,7 +1865,8 @@ uint32_t lwm2m_tlv_portfolio_encode(uint8_t           * p_buffer,
             // This is a callback to the instance, not a specific resource.
             err_code = lwm2m_tlv_instance_encode(p_buffer,
                                                  p_buffer_len,
-                                                 (lwm2m_instance_t *)p_portfolio);
+                                                 (lwm2m_instance_t *)p_portfolio,
+                                                 true);
             break;
         }
 
@@ -2023,7 +2048,8 @@ uint32_t lwm2m_tlv_connectivity_extension_encode(uint8_t                        
             // This is a callback to the instance, not a specific resource.
             err_code = lwm2m_tlv_instance_encode(p_buffer,
                                                  p_buffer_len,
-                                                 (lwm2m_instance_t *)p_conn_ext);
+                                                 (lwm2m_instance_t *)p_conn_ext,
+                                                 true);
             break;
         }
 

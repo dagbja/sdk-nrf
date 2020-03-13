@@ -587,6 +587,18 @@ uint32_t lwm2m_lookup_instance(lwm2m_instance_t ** pp_instance,
 uint32_t lwm2m_lookup_object(lwm2m_object_t  ** pp_object,
                              uint16_t           object_id);
 
+/**
+ * @brief Iterate instances
+ *
+ * @param[in, out]  p_instance  The instance being iterated.
+ *                              Pass NULL to begin iterating.
+ * @param[in, out]  prog        Progress.
+ *
+ * @return true     If a new instance was found
+ * @return false    When all instances have been iterated
+ */
+bool lwm2m_instance_next(lwm2m_instance_t **p_instance, size_t *prog);
+
 /**@brief Add an instance to coap_handler in order to match requests to the given instance.
  *
  * @details Add a new LWM2M instance to the coap_handler. The application MUST initialize
