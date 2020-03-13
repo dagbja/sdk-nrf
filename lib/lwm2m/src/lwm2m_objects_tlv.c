@@ -107,6 +107,7 @@ uint32_t lwm2m_tlv_instance_encode(uint8_t          * p_buffer,
                                                       p_buffer_len,
                                                       p_resource_ids[i],
                                                       (lwm2m_portfolio_t *)p_instance);
+                break;
             }
 
             case LWM2M_OBJ_CONN_EXT:
