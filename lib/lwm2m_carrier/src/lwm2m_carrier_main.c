@@ -943,18 +943,18 @@ void lwm2m_observer_notify_path(const uint16_t *p_path, uint8_t path_len, struct
 static void lwm2m_notif_attribute_default_value_set(uint8_t type, void * p_value, struct nrf_sockaddr *p_remote_server)
 {
     // TODO: Assert value != NULL && p_remote_server != NULL
-    uint16_t server_id;
+    uint16_t security_instance, server_instance, short_server_id;
 
-    lwm2m_remote_short_server_id_find(&server_id, p_remote_server);
-    server_id = lwm2m_server_short_server_id_get(server_id);
+    security_instance = lwm2m_security_instance_from_remote(p_remote_server, &short_server_id);
+    server_instance = server_instance_get(security_instance);
 
     switch (type)
     {
     case LWM2M_ATTRIBUTE_TYPE_MIN_PERIOD:
-        *(int32_t *)p_value = lwm2m_server_get_instance(server_id)->default_minimum_period;
+        *(int32_t *)p_value = lwm2m_server_get_instance(server_instance)->default_minimum_period;
         break;
     case LWM2M_ATTRIBUTE_TYPE_MAX_PERIOD:
-        *(int32_t *)p_value = lwm2m_server_get_instance(server_id)->default_maximum_period;
+        *(int32_t *)p_value = lwm2m_server_get_instance(server_instance)->default_maximum_period;
         break;
     case LWM2M_ATTRIBUTE_TYPE_GREATER_THAN:
         *(int32_t *)p_value = INT32_MAX;
