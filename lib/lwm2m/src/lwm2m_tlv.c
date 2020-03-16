@@ -334,31 +334,7 @@ uint32_t lwm2m_tlv_list_decode(lwm2m_tlv_t    tlv_range,
         switch (p_list->type)
         {
             case LWM2M_LIST_TYPE_UINT8:
-            {
-                err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value, tlv.length, &value);
-
-                if (err_code != 0)
-                {
-                    return err_code;
-                }
-
-                p_list->val.p_uint8[p_list->len] = (uint8_t)value;
-                break;
-            }
-
             case LWM2M_LIST_TYPE_UINT16:
-            {
-                err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value, tlv.length, &value);
-
-                if (err_code != 0)
-                {
-                    return err_code;
-                }
-
-                p_list->val.p_uint16[p_list->len] = (uint16_t)value;
-                break;
-            }
-
             case LWM2M_LIST_TYPE_INT32:
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value, tlv.length, &value);
@@ -368,7 +344,12 @@ uint32_t lwm2m_tlv_list_decode(lwm2m_tlv_t    tlv_range,
                     return err_code;
                 }
 
-                p_list->val.p_int32[p_list->len] = value;
+                err_code = lwm2m_list_integer_append(p_list, value);
+
+                if (err_code != 0)
+                {
+                    return err_code;
+                }
                 break;
             }
 
@@ -388,6 +369,7 @@ uint32_t lwm2m_tlv_list_decode(lwm2m_tlv_t    tlv_range,
 
                 p_list->val.p_string[p_list->len].p_val = string.p_val;
                 p_list->val.p_string[p_list->len].len   = string.len;
+                p_list->len++;
                 break;
             }
 
@@ -399,8 +381,6 @@ uint32_t lwm2m_tlv_list_decode(lwm2m_tlv_t    tlv_range,
         {
             p_list->p_id[p_list->len] = tlv.id;
         }
-
-        p_list->len++;
     }
 
     return 0;

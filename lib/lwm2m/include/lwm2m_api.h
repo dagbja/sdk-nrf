@@ -1029,6 +1029,38 @@ void lwm2m_coap_con_interval_set(int64_t con_interval);
  */
 bool lwm2m_observer_notification_is_con(const void *p_observable, uint16_t ssid);
 
+/**@brief Get an integer from a lwm2m_list_t.
+ *
+ * @param[in] p_list List to fetch integer from.
+ * @param[in] idx    Index of integer in list.
+ *
+ * @return Integer value at the given index.
+ */
+int32_t lwm2m_list_integer_get(lwm2m_list_t * p_list, uint32_t idx);
+
+/**@brief Set an integer in a lwm2m_list_t.
+ *
+ * @param[in] p_list List to set integer in.
+ * @param[in] idx    Index of integer in list.
+ * @param[in] value  Integer value to set.
+ *
+ * @retval  0         The set operation is successful.
+ * @retval  EINVAL    Illegal list definition.
+ * @retval  EMSGSIZE  Index is out of bounds.
+ */
+uint32_t lwm2m_list_integer_set(lwm2m_list_t * p_list, uint32_t idx, int32_t value);
+
+/**@brief Append an integer to a lwm2m_list_t.
+ *
+ * @param[in] p_list List to set integer in.
+ * @param[in] value  Integer value to append to list.
+ *
+ * @retval  0         The append operation is successful.
+ * @retval  EINVAL    Illegal list definition.
+ * @retval  EMSGSIZE  List is full.
+ */
+uint32_t lwm2m_list_integer_append(lwm2m_list_t * p_list, int32_t value);
+
 #ifdef __cplusplus
 }
 #endif

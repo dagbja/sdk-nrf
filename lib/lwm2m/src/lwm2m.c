@@ -1898,6 +1898,77 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint16_t object_id, uint16_t short_s
 }
 
 
+int32_t lwm2m_list_integer_get(lwm2m_list_t * p_list, uint32_t idx)
+{
+    if (!p_list || idx > p_list->len)
+    {
+        return 0;
+    }
+
+    int32_t value = 0;
+
+    switch (p_list->type)
+    {
+        case LWM2M_LIST_TYPE_UINT8:
+            value = p_list->val.p_uint8[idx];
+            break;
+
+        case LWM2M_LIST_TYPE_UINT16:
+            value = p_list->val.p_uint16[idx];
+            break;
+
+        case LWM2M_LIST_TYPE_INT32:
+            value = p_list->val.p_int32[idx];
+            break;
+
+        default:
+            break;
+    }
+
+    return value;
+}
+
+
+uint32_t lwm2m_list_integer_set(lwm2m_list_t * p_list, uint32_t idx, int32_t value)
+{
+    if (!p_list || idx > p_list->len || idx >= p_list->max_len)
+    {
+        return EMSGSIZE;
+    }
+
+    switch (p_list->type)
+    {
+        case LWM2M_LIST_TYPE_UINT8:
+            p_list->val.p_uint8[idx] = (uint8_t) value;
+            break;
+
+        case LWM2M_LIST_TYPE_UINT16:
+            p_list->val.p_uint16[idx] = (uint16_t) value;
+            break;
+
+        case LWM2M_LIST_TYPE_INT32:
+            p_list->val.p_int32[idx] = value;
+            break;
+
+        default:
+            return EINVAL;
+    }
+
+    if (idx == p_list->len) {
+        // Added a value to the list
+        p_list->len = idx + 1;
+    }
+
+    return 0;
+}
+
+
+uint32_t lwm2m_list_integer_append(lwm2m_list_t * p_list, int32_t value)
+{
+    return lwm2m_list_integer_set(p_list, p_list->len, value);
+}
+
+
 uint32_t lwm2m_init(lwm2m_alloc_t alloc_fn, lwm2m_free_t free_fn)
 {
     if ((alloc_fn == NULL) || (free_fn == NULL))
