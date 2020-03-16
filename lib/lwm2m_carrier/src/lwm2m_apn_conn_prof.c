@@ -8,6 +8,7 @@
 
 #include <lwm2m.h>
 #include <lwm2m_api.h>
+#include <lwm2m_time.h>
 #include <lwm2m_objects.h>
 #include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
@@ -22,6 +23,7 @@
 
 static lwm2m_object_t        m_object_apn_conn_prof;        /**< APN Connection Profile base object. */
 static lwm2m_apn_conn_prof_t m_instance_apn_conn_prof;      /**< APN Connection Profile object instance. */
+static uint8_t               m_apn_idx;
 
 // LWM2M core resources.
 
@@ -33,6 +35,56 @@ lwm2m_apn_conn_prof_t * lwm2m_apn_conn_prof_get_instance(uint16_t instance_id)
 lwm2m_object_t * lwm2m_apn_conn_prof_get_object(void)
 {
     return &m_object_apn_conn_prof;
+}
+
+static uint32_t list_integer_copy(lwm2m_list_t * p_list, int from_idx, int to_idx)
+{
+    int32_t value = lwm2m_list_integer_get(p_list, from_idx);
+    return lwm2m_list_integer_set(p_list, to_idx, value);
+}
+
+bool lwm2m_apn_conn_prof_activate(uint16_t instance_id,
+                                  uint8_t  reject_cause)
+{
+    // TODO: check if instance_id is valid
+    lwm2m_apn_conn_prof_t *apn_conn = &m_instance_apn_conn_prof;
+
+    if (m_apn_idx == apn_conn->conn_est_time.max_len)
+    {
+        // List is full, move all values one index down.
+        for (int i = 1; i < apn_conn->conn_est_time.max_len; i++)
+        {
+            list_integer_copy(&apn_conn->conn_est_time, i, i - 1);
+            list_integer_copy(&apn_conn->conn_est_result, i, i - 1);
+            list_integer_copy(&apn_conn->conn_est_reject_cause, i, i - 1);
+            list_integer_copy(&apn_conn->conn_end_time, i, i - 1);
+        }
+        m_apn_idx--;
+    }
+
+    lwm2m_list_integer_set(&apn_conn->conn_est_time, m_apn_idx, lwm2m_utc_time());
+    lwm2m_list_integer_set(&apn_conn->conn_est_result, m_apn_idx, (reject_cause == 0) ? 0 : 1);
+    lwm2m_list_integer_set(&apn_conn->conn_est_reject_cause, m_apn_idx, reject_cause);
+    lwm2m_list_integer_set(&apn_conn->conn_end_time, m_apn_idx, 0);
+
+    if (reject_cause != 0)
+    {
+        // When having an error we don't expect a deactivate.
+        m_apn_idx++;
+    }
+
+    return true;
+}
+
+bool lwm2m_apn_conn_prof_deactivate(uint16_t instance_id)
+{
+    // TODO: check if instance_id is valid
+    lwm2m_apn_conn_prof_t *apn_conn = &m_instance_apn_conn_prof;
+
+    lwm2m_list_integer_set(&apn_conn->conn_end_time, m_apn_idx, lwm2m_utc_time());
+    m_apn_idx++;
+
+    return true;
 }
 
 /**@brief Callback function for APN connection profile instances. */

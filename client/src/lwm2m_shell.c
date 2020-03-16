@@ -18,6 +18,7 @@
 #include <lwm2m_device.h>
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_conn_ext.h>
+#include <lwm2m_apn_conn_prof.h>
 #include <lwm2m_retry_delay.h>
 #include <lwm2m_instance_storage.h>
 #include <at_interface.h>
@@ -1208,6 +1209,86 @@ static int cmd_apn_get(const struct shell *shell, size_t argc, char **argv)
 }
 
 
+static int cmd_apn_activate(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2 && argc != 3)
+    {
+        shell_print(shell, "%s <instance> <reject_cause[=0]>", argv[0]);
+        return 0;
+    }
+
+    char *p_end;
+    int instance_id = strtol(argv[1], &p_end, 10);
+    uint8_t reject_cause = 0;
+
+    if (argc == 3)
+    {
+        reject_cause = (uint8_t) strtol(argv[2], &p_end, 10);
+    }
+
+    if (!lwm2m_apn_conn_prof_activate(instance_id, reject_cause)) {
+        shell_print(shell, "Illegal instance: %d", instance_id);
+    }
+    return 0;
+}
+
+
+static int cmd_apn_deactivate(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2)
+    {
+        shell_print(shell, "%s <instance>", argv[0]);
+        return 0;
+    }
+
+    int instance_id = atoi(argv[1]);
+
+    if (!lwm2m_apn_conn_prof_deactivate(instance_id)) {
+        shell_print(shell, "Illegal instance: %d", instance_id);
+    }
+
+    return 0;
+}
+
+#define TIME_STR_SIZE sizeof("1970-01-01T00:00:00Z")
+
+static void utc_time(int32_t timestamp, char *time_str)
+{
+    time_t time = (time_t)timestamp;
+    struct tm *tm = gmtime(&time);
+
+    strftime(time_str, TIME_STR_SIZE, "%FT%TZ", tm);
+}
+
+static int cmd_apn_print(const struct shell *shell, size_t argc, char **argv)
+{
+    char start_time_str[TIME_STR_SIZE];
+    char end_time_str[TIME_STR_SIZE];
+
+    // TODO: Loop all instances
+    for (int i = 0; i < 1; i++) {
+        lwm2m_apn_conn_prof_t * p_apn_conn = lwm2m_apn_conn_prof_get_instance(i);
+
+        shell_print(shell, "APN Connection Profile Instance /11/%d", i);
+        shell_print(shell, "  Profile Name   %s", p_apn_conn->profile_name);
+        shell_print(shell, "  APN            %s", p_apn_conn->apn);
+        shell_print(shell, "  Enable status  %s", p_apn_conn->enable_status ? "activated" : "deactivated");
+        shell_print(shell, "  Connection     Start time            Result  Cause  End time");
+        for (int j = 0; j < p_apn_conn->conn_est_time.len; j++) {
+            utc_time(lwm2m_list_integer_get(&p_apn_conn->conn_est_time, j), start_time_str);
+            utc_time(lwm2m_list_integer_get(&p_apn_conn->conn_end_time, j), end_time_str);
+            shell_print(shell, "    %1d            %s  %6d  %5d  %s", j,
+                        start_time_str,
+                        lwm2m_list_integer_get(&p_apn_conn->conn_est_result, j),
+                        lwm2m_list_integer_get(&p_apn_conn->conn_est_reject_cause, j),
+                        end_time_str);
+        }
+    }
+
+    return 0;
+}
+
+
 // Compare if obs1 is greater than obs2
 static bool observable_greater_than(lwm2m_observable_metadata_t *obs1, lwm2m_observable_metadata_t *obs2)
 {
@@ -1328,7 +1409,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_server,
 );
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_apn,
+    SHELL_CMD(activate, NULL, "Activate APN", cmd_apn_activate),
+    SHELL_CMD(deactivate, NULL, "Deactivate APN", cmd_apn_deactivate),
     SHELL_CMD(get, NULL, "Read APN", cmd_apn_get),
+    SHELL_CMD(print, NULL, "Print apn connection profile objects", cmd_apn_print),
     SHELL_CMD(set, NULL, "Write APN", cmd_apn_set),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );

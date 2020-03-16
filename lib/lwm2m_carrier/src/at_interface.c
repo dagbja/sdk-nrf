@@ -274,7 +274,7 @@ static void at_cclk_reponse_convert(const char *p_read_buf, int32_t *p_time, int
      * The Open Group Base Specifications Issue 7, 2018 edition
      * IEEE Std 1003.1-2017: 4.16 Seconds Since the Epoch
      *
-     * http://http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_16
+     * http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_16
      */
     *p_time = sec + min * 60 + hour * 3600 + yday * 86400 +
           (year - 70) * 31536000 + ((year - 69) / 4) * 86400 -

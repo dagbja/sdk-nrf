@@ -183,6 +183,17 @@ static void lwm2m_time_current_time_update(void)
     }
 }
 
+uint32_t lwm2m_utc_time(void)
+{
+    int32_t time;
+    int32_t utc_offset_15min;
+    int32_t dst_adjustment;
+
+    at_read_time(&time, &utc_offset_15min, &dst_adjustment);
+
+    return time; // UTC time is without adjusting offset or DST.
+}
+
 int32_t __WEAK lwm2m_carrier_utc_time_read(void)
 {
     lwm2m_time_current_time_update();
@@ -250,7 +261,7 @@ void __WEAK lwm2m_carrier_time_read(int32_t *utc_time, int *utc_offset, const ch
         int64_t delta_time = lwm2m_os_uptime_delta(&m_time_base_msecs);
         m_current_time_msecs += delta_time;
     }
-    
+
     // If any of the time resources is not set, update it from modem
     if (m_time_set == false || m_utc_offset_set == false || m_timezone_set == false)
     {
