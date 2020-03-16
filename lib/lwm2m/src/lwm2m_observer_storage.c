@@ -471,6 +471,10 @@ uint32_t lwm2m_observer_storage_restore(uint16_t                short_server_id,
                                                                  entry.resource_id,
                                                                  entry.short_server_id);
 
+            uint16_t path[] = { entry.object_id, entry.instance_id, entry.resource_id };
+
+            lwm2m_observable_metadata_init(p_remote, path, ARRAY_SIZE(path));
+
             observer_count++;
         }
     }
