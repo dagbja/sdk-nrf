@@ -22,8 +22,8 @@
 #define AT_APN_CLASS_OP_RD "AT%XAPNCLASS=0"
 #define AT_APN_CLASS_OP_WR "AT%XAPNCLASS=1"
 
-/** Cumulative days per month in a year
- *  Leap days are taken into account in the formula calculating the time since Epoch.
+/** Cumulative days per month in a year.
+ *  Leap days are not taken into account.
  *  */
 static int cum_ydays[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
 
@@ -291,15 +291,21 @@ static void at_cclk_reponse_convert(const char *p_read_buf, int32_t *p_time, int
 
     int yday = mday - 1 + cum_ydays[mon];
 
+    if ((mon > 1) && ((year % 4) == 0)) {
+        // This year is a leap year, add the extra day.
+        yday++;
+    }
+
     /*
      * The Open Group Base Specifications Issue 7, 2018 edition
      * IEEE Std 1003.1-2017: 4.16 Seconds Since the Epoch
      *
      * http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap04.html#tag_04_16
+     *
+     * Leap year for year 2100 and later are omitted on purpose.
      */
     *p_time = sec + min * 60 + hour * 3600 + yday * 86400 +
-          (year - 70) * 31536000 + ((year - 69) / 4) * 86400 -
-          ((year - 1) / 100) * 86400 + ((year + 299) / 400) * 86400;
+              (year - 70) * 31536000 + ((year - 69) / 4) * 86400;
 
     // UTC offset as 15 min units
     *p_utc_offset = (int32_t)strtol(p_end, &p_end, 10);
