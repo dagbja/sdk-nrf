@@ -23,15 +23,15 @@ static int32_t        m_power_source_current[LWM2M_DEVICE_MAX_POWER_SOURCES];
 static int32_t        m_error_codes[LWM2M_DEVICE_MAX_ERROR_CODES];
 
 // APN Connection Profile object
-static int32_t        m_conn_est_time[LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
-static uint8_t        m_conn_est_result[LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
-static uint8_t        m_conn_est_reject_cause[LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
-static int32_t        m_conn_end_time[LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
+static int32_t        m_conn_est_time[LWM2M_MAX_APN_COUNT][LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
+static uint8_t        m_conn_est_result[LWM2M_MAX_APN_COUNT][LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
+static uint8_t        m_conn_est_reject_cause[LWM2M_MAX_APN_COUNT][LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
+static int32_t        m_conn_end_time[LWM2M_MAX_APN_COUNT][LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS];
 
 // AT&T Connectivity extension object
-static uint8_t        m_apn_retries[LWM2M_CONN_EXT_MAX_APN_COUNT];
-static int32_t        m_apn_retry_period[LWM2M_CONN_EXT_MAX_APN_COUNT];
-static int32_t        m_apn_retry_back_off_period[LWM2M_CONN_EXT_MAX_APN_COUNT];
+static uint8_t        m_apn_retries[LWM2M_MAX_APN_COUNT];
+static int32_t        m_apn_retry_period[LWM2M_MAX_APN_COUNT];
+static int32_t        m_apn_retry_back_off_period[LWM2M_MAX_APN_COUNT];
 
 // lint -e516 -save // Symbol '__INTADDR__()' has arg. type conflict
 #define LWM2M_INSTANCE_OFFSET_SET(instance, type)                     \
@@ -489,13 +489,13 @@ void lwm2m_instance_software_update_init(lwm2m_software_update_t * p_instance)
     p_instance->resource_ids[8] = LWM2M_SW_UPDATE_SUPPORTED_OBJECTS;
 }
 
-void lwm2m_instance_apn_connection_profile_init(lwm2m_apn_conn_prof_t * p_instance)
+void lwm2m_instance_apn_connection_profile_init(lwm2m_apn_conn_prof_t * p_instance, uint16_t instance_id)
 {
     // Set prototype variables.
     LWM2M_INSTANCE_OFFSET_SET(p_instance, lwm2m_apn_conn_prof_t);
 
     p_instance->proto.object_id     = LWM2M_OBJ_APN_CONNECTION_PROFILE;
-    p_instance->proto.instance_id   = 0;
+    p_instance->proto.instance_id   = instance_id;
     p_instance->proto.num_resources = sizeof(((lwm2m_apn_conn_prof_t *)0)->operations);
 
     // Clear ACL.
@@ -524,25 +524,25 @@ void lwm2m_instance_apn_connection_profile_init(lwm2m_apn_conn_prof_t * p_instan
     // Setup lists.
     p_instance->conn_est_time.type                = LWM2M_LIST_TYPE_INT32;
     p_instance->conn_est_time.p_id                = NULL;
-    p_instance->conn_est_time.val.p_int32         = m_conn_est_time;
+    p_instance->conn_est_time.val.p_int32         = m_conn_est_time[instance_id];
     p_instance->conn_est_time.max_len             = LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS;
     p_instance->conn_est_time.len                 = 1;
 
     p_instance->conn_est_result.type              = LWM2M_LIST_TYPE_UINT8;
     p_instance->conn_est_result.p_id              = NULL;
-    p_instance->conn_est_result.val.p_uint8       = m_conn_est_result;
+    p_instance->conn_est_result.val.p_uint8       = m_conn_est_result[instance_id];
     p_instance->conn_est_result.max_len           = LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS;
     p_instance->conn_est_result.len               = 1;
 
     p_instance->conn_est_reject_cause.type        = LWM2M_LIST_TYPE_UINT8;
     p_instance->conn_est_reject_cause.p_id        = NULL;
-    p_instance->conn_est_reject_cause.val.p_uint8 = m_conn_est_reject_cause;
+    p_instance->conn_est_reject_cause.val.p_uint8 = m_conn_est_reject_cause[instance_id];
     p_instance->conn_est_reject_cause.max_len     = LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS;
     p_instance->conn_est_reject_cause.len         = 1;
 
     p_instance->conn_end_time.type                = LWM2M_LIST_TYPE_INT32;
     p_instance->conn_end_time.p_id                = NULL;
-    p_instance->conn_end_time.val.p_int32         = m_conn_end_time;
+    p_instance->conn_end_time.val.p_int32         = m_conn_end_time[instance_id];
     p_instance->conn_end_time.max_len             = LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS;
     p_instance->conn_end_time.len                 = 1;
 }
@@ -610,15 +610,15 @@ void lwm2m_instance_connectivity_extension_init(lwm2m_connectivity_extension_t *
     p_instance->apn_retries.type                      = LWM2M_LIST_TYPE_UINT8;
     p_instance->apn_retries.p_id                      = NULL;
     p_instance->apn_retries.val.p_uint8               = m_apn_retries;
-    p_instance->apn_retries.max_len                   = LWM2M_CONN_EXT_MAX_APN_COUNT;
+    p_instance->apn_retries.max_len                   = LWM2M_MAX_APN_COUNT;
 
     p_instance->apn_retry_period.type                 = LWM2M_LIST_TYPE_INT32;
     p_instance->apn_retry_period.p_id                 = NULL;
     p_instance->apn_retry_period.val.p_int32          = m_apn_retry_period;
-    p_instance->apn_retry_period.max_len              = LWM2M_CONN_EXT_MAX_APN_COUNT;
+    p_instance->apn_retry_period.max_len              = LWM2M_MAX_APN_COUNT;
 
     p_instance->apn_retry_back_off_period.type        = LWM2M_LIST_TYPE_INT32;
     p_instance->apn_retry_back_off_period.p_id        = NULL;
     p_instance->apn_retry_back_off_period.val.p_int32 = m_apn_retry_back_off_period;
-    p_instance->apn_retry_back_off_period.max_len     = LWM2M_CONN_EXT_MAX_APN_COUNT;
+    p_instance->apn_retry_back_off_period.max_len     = LWM2M_MAX_APN_COUNT;
 }

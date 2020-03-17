@@ -18,18 +18,24 @@
 #include <lwm2m_carrier_main.h>
 #include <at_interface.h>
 
-#define DEFAULT_PROFILE_NAME     "AT&T LWM2M APN"
-#define DEFAULT_APN              "attm2mglobal"
+static lwm2m_object_t        m_object_apn_conn_prof;                             /**< APN Connection Profile base object. */
+// TODO: Only two instances are currently supported.
+static lwm2m_apn_conn_prof_t m_instance_apn_conn_prof[LWM2M_MAX_APN_COUNT];      /**< APN Connection Profile object instances. */
+static uint8_t               m_apn_idx[ARRAY_SIZE(m_instance_apn_conn_prof)];
 
-static lwm2m_object_t        m_object_apn_conn_prof;        /**< APN Connection Profile base object. */
-static lwm2m_apn_conn_prof_t m_instance_apn_conn_prof;      /**< APN Connection Profile object instance. */
-static uint8_t               m_apn_idx;
+static char *                m_profile_name_default[] = { "AT&T LWM2M APN", "DEFAULT APN" };
+static char *                m_apn_default[] = { "attm2mglobal", "m2m.com.attz" };
 
 // LWM2M core resources.
 
 lwm2m_apn_conn_prof_t * lwm2m_apn_conn_prof_get_instance(uint16_t instance_id)
 {
-    return &m_instance_apn_conn_prof;
+    if (instance_id >= ARRAY_SIZE(m_instance_apn_conn_prof))
+    {
+        return NULL;
+    }
+
+    return &m_instance_apn_conn_prof[instance_id];
 }
 
 lwm2m_object_t * lwm2m_apn_conn_prof_get_object(void)
@@ -46,10 +52,14 @@ static uint32_t list_integer_copy(lwm2m_list_t * p_list, int from_idx, int to_id
 bool lwm2m_apn_conn_prof_activate(uint16_t instance_id,
                                   uint8_t  reject_cause)
 {
-    // TODO: check if instance_id is valid
-    lwm2m_apn_conn_prof_t *apn_conn = &m_instance_apn_conn_prof;
+    lwm2m_apn_conn_prof_t *apn_conn = lwm2m_apn_conn_prof_get_instance(instance_id);
 
-    if (m_apn_idx == apn_conn->conn_est_time.max_len)
+    if (!apn_conn)
+    {
+        return false;
+    }
+
+    if (m_apn_idx[instance_id] == apn_conn->conn_est_time.max_len)
     {
         // List is full, move all values one index down.
         for (int i = 1; i < apn_conn->conn_est_time.max_len; i++)
@@ -59,18 +69,18 @@ bool lwm2m_apn_conn_prof_activate(uint16_t instance_id,
             list_integer_copy(&apn_conn->conn_est_reject_cause, i, i - 1);
             list_integer_copy(&apn_conn->conn_end_time, i, i - 1);
         }
-        m_apn_idx--;
+        m_apn_idx[instance_id]--;
     }
 
-    lwm2m_list_integer_set(&apn_conn->conn_est_time, m_apn_idx, lwm2m_utc_time());
-    lwm2m_list_integer_set(&apn_conn->conn_est_result, m_apn_idx, (reject_cause == 0) ? 0 : 1);
-    lwm2m_list_integer_set(&apn_conn->conn_est_reject_cause, m_apn_idx, reject_cause);
-    lwm2m_list_integer_set(&apn_conn->conn_end_time, m_apn_idx, 0);
+    lwm2m_list_integer_set(&apn_conn->conn_est_time, m_apn_idx[instance_id], lwm2m_utc_time());
+    lwm2m_list_integer_set(&apn_conn->conn_est_result, m_apn_idx[instance_id], (reject_cause == 0) ? 0 : 1);
+    lwm2m_list_integer_set(&apn_conn->conn_est_reject_cause, m_apn_idx[instance_id], reject_cause);
+    lwm2m_list_integer_set(&apn_conn->conn_end_time, m_apn_idx[instance_id], 0);
 
     if (reject_cause != 0)
     {
         // When having an error we don't expect a deactivate.
-        m_apn_idx++;
+        m_apn_idx[instance_id]++;
     }
 
     return true;
@@ -78,11 +88,15 @@ bool lwm2m_apn_conn_prof_activate(uint16_t instance_id,
 
 bool lwm2m_apn_conn_prof_deactivate(uint16_t instance_id)
 {
-    // TODO: check if instance_id is valid
-    lwm2m_apn_conn_prof_t *apn_conn = &m_instance_apn_conn_prof;
+    lwm2m_apn_conn_prof_t *apn_conn = lwm2m_apn_conn_prof_get_instance(instance_id);
 
-    lwm2m_list_integer_set(&apn_conn->conn_end_time, m_apn_idx, lwm2m_utc_time());
-    m_apn_idx++;
+    if (!apn_conn)
+    {
+        return false;
+    }
+
+    lwm2m_list_integer_set(&apn_conn->conn_end_time, m_apn_idx[instance_id], lwm2m_utc_time());
+    m_apn_idx[instance_id]++;
 
     return true;
 }
@@ -97,8 +111,8 @@ uint32_t apn_conn_prof_instance_callback(lwm2m_instance_t * p_instance,
 
     uint16_t access = 0;
     uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                       p_instance,
-                                                       p_request->remote);
+                                                p_instance,
+                                                p_request->remote);
     if (err_code != 0)
     {
         return err_code;
@@ -116,7 +130,7 @@ uint32_t apn_conn_prof_instance_callback(lwm2m_instance_t * p_instance,
 
     uint16_t instance_id = p_instance->instance_id;
 
-    if (instance_id != 0)
+    if (instance_id >= ARRAY_SIZE(m_instance_apn_conn_prof))
     {
         (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
         return 0;
@@ -131,7 +145,7 @@ uint32_t apn_conn_prof_instance_callback(lwm2m_instance_t * p_instance,
         err_code = lwm2m_tlv_apn_connection_profile_encode(buffer,
                                                            &buffer_size,
                                                            resource_id,
-                                                           &m_instance_apn_conn_prof);
+                                                           &m_instance_apn_conn_prof[instance_id]);
         if (err_code == ENOENT)
         {
             (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
@@ -158,7 +172,7 @@ uint32_t apn_conn_prof_instance_callback(lwm2m_instance_t * p_instance,
 
         if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
         {
-            err_code = lwm2m_tlv_apn_connection_profile_decode(&m_instance_apn_conn_prof,
+            err_code = lwm2m_tlv_apn_connection_profile_decode(&m_instance_apn_conn_prof[instance_id],
                                                                 p_request->payload,
                                                                 p_request->payload_len,
                                                                 NULL);
@@ -206,20 +220,57 @@ uint32_t lwm2m_apn_conn_prof_object_callback(lwm2m_object_t * p_object,
 
     if (op_code == LWM2M_OPERATION_CODE_READ)
     {
-        uint32_t buffer_len = 255;
-        uint8_t  buffer[buffer_len];
+        uint32_t           buffer_max_size = 100 * ARRAY_SIZE(m_instance_apn_conn_prof);
+        uint32_t           buffer_len      = buffer_max_size;
+        uint8_t            buffer[buffer_max_size];
+        uint32_t           index           = 0;
 
-        err_code = lwm2m_tlv_apn_connection_profile_encode(buffer + 3, &buffer_len,
-                                                           LWM2M_NAMED_OBJECT,
-                                                           &m_instance_apn_conn_prof);
-        lwm2m_tlv_t tlv = {
-            .id_type = TLV_TYPE_OBJECT,
-            .length = buffer_len
-        };
-        err_code = lwm2m_tlv_header_encode(buffer, &buffer_len, &tlv);
-        buffer_len += tlv.length;
+        uint32_t instance_buffer_len = 100;
+        uint8_t  instance_buffer[instance_buffer_len];
 
-        err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LWM2M_TLV, p_request);
+        for (int i = 0; i < ARRAY_SIZE(m_instance_apn_conn_prof); i++)
+        {
+            uint16_t access = 0;
+            lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_apn_conn_prof_get_instance(i);
+            err_code = lwm2m_access_remote_get(&access,
+                                               p_instance,
+                                               p_request->remote);
+
+            if (err_code != 0 || (access & op_code) == 0)
+            {
+                continue;
+            }
+
+            instance_buffer_len = 100;
+            err_code = lwm2m_tlv_apn_connection_profile_encode(instance_buffer,
+                                                               &instance_buffer_len,
+                                                               LWM2M_NAMED_OBJECT,
+                                                               lwm2m_apn_conn_prof_get_instance(i));
+
+            if (err_code != 0)
+            {
+                // ENOMEM should not happen. Then it is a bug.
+                break;
+            }
+
+            lwm2m_tlv_t tlv = {
+                .id_type = TLV_TYPE_OBJECT,
+                .id = i,
+                .length = instance_buffer_len
+            };
+
+            err_code = lwm2m_tlv_header_encode(buffer + index, &buffer_len, &tlv);
+
+            index += buffer_len;
+            buffer_len = buffer_max_size - index;
+
+            memcpy(buffer + index, instance_buffer, instance_buffer_len);
+
+            index += instance_buffer_len;
+            buffer_len = buffer_max_size - index;
+        }
+
+        err_code = lwm2m_respond_with_payload(buffer, index, COAP_CT_APP_LWM2M_TLV, p_request);
     }
     else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
     {
@@ -235,7 +286,10 @@ uint32_t lwm2m_apn_conn_prof_object_callback(lwm2m_object_t * p_object,
 
 void lwm2m_apn_conn_prof_init_acl(void)
 {
-    lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_apn_conn_prof);
+    for (int i = 0; i < ARRAY_SIZE(m_instance_apn_conn_prof); i++)
+    {
+        lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_apn_conn_prof[i]);
+    }
 }
 
 void lwm2m_apn_conn_prof_init(void)
@@ -243,23 +297,25 @@ void lwm2m_apn_conn_prof_init(void)
     //
     // APN Connection Profile instance.
     //
-    lwm2m_instance_apn_connection_profile_init(&m_instance_apn_conn_prof);
-
     m_object_apn_conn_prof.object_id = LWM2M_OBJ_APN_CONNECTION_PROFILE;
-
-    (void)lwm2m_bytebuffer_to_string(DEFAULT_PROFILE_NAME, strlen(DEFAULT_PROFILE_NAME), &m_instance_apn_conn_prof.profile_name);
-    (void)lwm2m_bytebuffer_to_string(DEFAULT_APN, strlen(DEFAULT_APN), &m_instance_apn_conn_prof.apn);
-    m_instance_apn_conn_prof.enable_status = true;
-    m_instance_apn_conn_prof.authentication_type = 0;
-
     m_object_apn_conn_prof.callback = lwm2m_apn_conn_prof_object_callback;
-    m_instance_apn_conn_prof.proto.callback = apn_conn_prof_instance_callback;
 
-    // Set bootstrap server as owner.
-    (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_apn_conn_prof,
-                                     LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
+    for (uint16_t i = 0; i < ARRAY_SIZE(m_instance_apn_conn_prof); i++)
+    {
+        lwm2m_instance_apn_connection_profile_init(&m_instance_apn_conn_prof[i], i);
+
+        m_instance_apn_conn_prof[i].proto.callback = apn_conn_prof_instance_callback;
+
+        lwm2m_bytebuffer_to_string(m_profile_name_default[i], strlen(m_profile_name_default[i]), &m_instance_apn_conn_prof[i].profile_name);
+        lwm2m_bytebuffer_to_string(m_apn_default[i], strlen(m_apn_default[i]), &m_instance_apn_conn_prof[i].apn);
+        m_instance_apn_conn_prof[i].enable_status = true;
+        m_instance_apn_conn_prof[i].authentication_type = 0;
+
+        lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_apn_conn_prof[i],
+                                    LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
+
+        lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_apn_conn_prof[i]);
+    }
 
     lwm2m_apn_conn_prof_init_acl();
-
-    (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_apn_conn_prof);
 }

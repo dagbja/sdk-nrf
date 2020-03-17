@@ -230,7 +230,6 @@ extern "C" {
 #define LWM2M_CONN_EXT_SRXLEV                    8
 #define LWM2M_CONN_EXT_CE_MODE                   9
 
-#define LWM2M_CONN_EXT_MAX_APN_COUNT             5 // TODO: What is the maximum number?
 
 /**
  * LWM2M Enabler
@@ -569,9 +568,10 @@ void lwm2m_instance_software_update_init(lwm2m_software_update_t * p_instance);
  *
  * @details Must be called before any use of the instance.
  *
- * @param[in] p_instance Pointer to instance structure to initialize.
+ * @param[in] p_instance  Pointer to instance structure to initialize.
+ * @param[in] instance_id Instance identifier.
  */
-void lwm2m_instance_apn_connection_profile_init(lwm2m_apn_conn_prof_t * p_instance);
+void lwm2m_instance_apn_connection_profile_init(lwm2m_apn_conn_prof_t * p_instance, uint16_t instance_id);
 
 /**@brief Initialize a LWM2M Portfolio object instance
  *

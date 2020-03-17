@@ -1265,9 +1265,13 @@ static int cmd_apn_print(const struct shell *shell, size_t argc, char **argv)
     char start_time_str[TIME_STR_SIZE];
     char end_time_str[TIME_STR_SIZE];
 
-    // TODO: Loop all instances
-    for (int i = 0; i < 1; i++) {
+    for (int i = 0; i < LWM2M_MAX_APN_COUNT; i++) {
         lwm2m_apn_conn_prof_t * p_apn_conn = lwm2m_apn_conn_prof_get_instance(i);
+
+        if (!p_apn_conn || !p_apn_conn->apn.p_val)
+        {
+            continue;
+        }
 
         shell_print(shell, "APN Connection Profile Instance /11/%d", i);
         shell_print(shell, "  Profile Name   %s", p_apn_conn->profile_name);
