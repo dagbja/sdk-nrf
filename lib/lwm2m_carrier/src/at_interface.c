@@ -31,6 +31,9 @@ static int cum_ydays[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 33
 static volatile int8_t cid_number = -1;
 static volatile bool cid_ipv6_link_up = false;
 
+/** @brief ESM error code. */
+static uint32_t esm_error_code;
+
 /**
  * @brief At command events or notifications handler.
  *
@@ -42,11 +45,13 @@ typedef int (*at_notif_handler)(const char* evt);
 
 static int at_cgev_handler(const char *notif);
 static int at_cereg_handler(const char *notif);
+static int at_cnec_handler(const char *notif);
 
 static const at_notif_handler at_handlers[] = {
     at_cgev_handler,          ///< Parse AT CGEV events for PDN/IPv6.
     sms_receiver_notif_parse, ///< Parse received SMS events.
-    at_cereg_handler          ///< Parse AT CEREG events
+    at_cereg_handler,         ///< Parse AT CEREG events.
+    at_cnec_handler,          ///< Parse AT CNEC events.
 };
 
 at_net_reg_stat_cb_t m_net_reg_stat_cb;
@@ -245,6 +250,22 @@ static int at_cereg_handler(const char *notif)
     return -1;
 }
 
+static int at_cnec_handler(const char *notif)
+{
+    // Check if this is a CNEC event.
+    int length = strlen(notif);
+    if (length >= 12 && strncmp(notif, "+CNEC_ESM: ", 11) == 0)
+    {
+        esm_error_code = strtol(&notif[11], NULL, 0);
+
+        // CNEC event parsed.
+        return 0;
+    }
+
+    // Not a CNEC event.
+    return -1;
+}
+
 /**@brief Convert AT+CCLK? at command response into seconds since Epoch and UTC offset.
  *
  * @param[in]  p_read_buf   Pointer to response string
@@ -304,11 +325,17 @@ int at_if_init(void)
     return 0;
 }
 
+uint32_t at_esm_error_code_get(void)
+{
+    return esm_error_code;
+}
+
 int at_apn_register_for_packet_events(void)
 {
     // Clear previous state before registering for packet domain events.
     cid_number = -1;
     cid_ipv6_link_up = false;
+    esm_error_code = 0;
 
     // Register for packet domain event reporting +CGEREP.
     // The unsolicited result code is +CGEV: XXX.
@@ -627,6 +654,17 @@ void at_subscribe_net_reg_stat(at_net_reg_stat_cb_t net_reg_stat_cb)
 
     if (retval != 0) {
         LWM2M_ERR("AT+CEREG=2 failed: %d", (int)retval);
+    }
+}
+
+void at_subscribe_esm(void)
+{
+    int retval = 0;
+
+    retval = lwm2m_os_at_cmd_write("AT+CNEC=16", NULL, 0);
+
+    if (retval != 0) {
+        LWM2M_ERR("AT+CNEC=16 failed: %d", retval);
     }
 }
 

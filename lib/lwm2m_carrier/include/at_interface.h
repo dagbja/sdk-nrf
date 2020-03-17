@@ -19,6 +19,13 @@ typedef void (*at_net_reg_stat_cb_t)(uint32_t net_stat);
 int at_if_init(void);
 
 /**
+ * @brief Get last ESM error_code reported
+ *
+ * @return ESM error code.
+ */
+uint32_t at_esm_error_code_get(void);
+
+/**
  * @brief Register for packet domain events
  *
  * @return Zero on success, -1 otherwise.
@@ -212,6 +219,8 @@ int at_read_ipaddr(lwm2m_list_t * p_ipaddr_list);
  * @param[in] net_reg_stat_cb       Callback function to be called on changes
  */
 void at_subscribe_net_reg_stat(at_net_reg_stat_cb_t net_reg_stat_cb);
+
+void at_subscribe_esm(void);
 
 int at_read_connstat(lwm2m_connectivity_statistics_t * p_conn_stat);
 int at_start_connstat(void);

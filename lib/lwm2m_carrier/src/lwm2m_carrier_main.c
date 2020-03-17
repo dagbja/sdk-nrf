@@ -2897,6 +2897,9 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     // Register network registration status changes
     at_subscribe_net_reg_stat(lwm2m_net_reg_stat_cb);
 
+    // Subscribe ESM cause events
+    at_subscribe_esm();
+
     // Initialize debug settings from flash.
     app_debug_init();
 
