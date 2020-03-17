@@ -897,17 +897,23 @@ uint32_t lwm2m_tlv_connectivity_monitoring_decode(lwm2m_connectivity_monitoring_
 
             default:
             {
-                if (resource_callback)
-                {
-                    err_code = resource_callback(p_conn_mon->proto.instance_id, &tlv);
-                }
+                err_code = 0;
                 break;
             }
         }
 
         if (err_code != 0)
         {
-            return EINVAL;
+            return err_code;
+        }
+
+        if (resource_callback)
+        {
+            err_code = resource_callback(p_conn_mon->proto.instance_id, &tlv);
+            if (err_code != 0)
+            {
+                return err_code;
+            }
         }
     }
 
@@ -1039,8 +1045,7 @@ uint32_t lwm2m_tlv_connectivity_monitoring_encode(uint8_t                       
 
         default:
         {
-            err_code = 0;
-            *p_buffer_len = 0;
+            err_code = ENOTSUP;
             break;
         }
     }

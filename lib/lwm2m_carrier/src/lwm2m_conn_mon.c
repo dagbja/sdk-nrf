@@ -35,6 +35,16 @@ static void lwm2m_conn_mon_update_resource(uint16_t resource_id);
 
 // Verizon specific resources.
 
+static bool operation_is_allowed(uint16_t res, uint16_t op)
+{
+    if (res < ARRAY_SIZE(m_instance_conn_mon.operations)) {
+        return m_instance_conn_mon.operations[res] & op;
+    }
+
+    /* Allow by default, it could be a carrier-specific resource */
+    return true;
+}
+
 static int8_t class_apn_index(uint8_t apn_class)
 {
     int8_t apn_index = -1;
@@ -257,248 +267,348 @@ uint32_t tlv_conn_mon_resource_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv)
     return err_code;
 }
 
+static void on_read(const uint16_t path[3], uint8_t path_len,
+                    coap_message_t *p_req)
+{
+    uint32_t err;
+    uint8_t buf[256];
+    size_t len;
+
+    const uint16_t res = path[2];
+
+    len = sizeof(buf);
+
+    if (res == VERIZON_RESOURCE && operator_is_vzw(true)) {
+        err = tlv_conn_mon_verizon_encode(0, buf, &len);
+        if (err) {
+            goto reply_error;
+        }
+
+        lwm2m_respond_with_payload(buf, len, COAP_CT_APP_LWM2M_TLV, p_req);
+        return;
+    }
+
+    /* Update requested resource */
+    lwm2m_conn_mon_update_resource(res);
+
+    err = lwm2m_tlv_connectivity_monitoring_encode(buf, &len, res, &m_instance_conn_mon);
+    if (err) {
+        goto reply_error;
+    }
+
+    /* Append VzW resource */
+    if (res == LWM2M_NAMED_OBJECT && operator_is_vzw(true)) {
+        size_t plen = sizeof(buf) - len;
+        err = tlv_conn_mon_verizon_encode(0, buf + len, &plen);
+        if (err) {
+           goto reply_error;
+        }
+        len += plen;
+    }
+
+    lwm2m_respond_with_payload(buf, len, COAP_CT_APP_LWM2M_TLV, p_req);
+    return;
+
+reply_error: {
+        const coap_msg_code_t code =
+                (err == ENOTSUP) ? COAP_CODE_404_NOT_FOUND :
+                                   COAP_CODE_500_INTERNAL_SERVER_ERROR;
+
+        lwm2m_respond_with_code(code, p_req);
+    }
+}
+
+static void on_observe_start(const uint16_t path[3], uint8_t path_len,
+                             coap_message_t *p_req)
+{
+    uint32_t err;
+    uint8_t buf[256];
+    size_t len;
+    coap_message_t *p_rsp;
+
+    len = sizeof(buf);
+
+    LWM2M_INF("Observe register %s",
+              lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
+
+    err = lwm2m_tlv_element_encode(buf, &len, path, path_len);
+    if (err) {
+        const coap_msg_code_t code =
+                (err == ENOTSUP) ? COAP_CODE_404_NOT_FOUND :
+                                   COAP_CODE_400_BAD_REQUEST;
+        lwm2m_respond_with_code(code, p_req);
+        return;
+    }
+
+    err = lwm2m_observe_register(path, path_len, p_req, &p_rsp);
+    if (err) {
+        LWM2M_WRN("Failed to register observer, err %d", err);
+        lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_req);
+        return;
+    }
+
+    err = lwm2m_coap_message_send_to_remote(p_rsp, p_req->remote, buf, len);
+    if (err) {
+        LWM2M_WRN("Failed to respond to Observe request");
+        lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_req);
+        return;
+    }
+
+    err = lwm2m_observable_metadata_init(p_req->remote, path, path_len);
+    if (err) {
+        /* Already logged */
+    }
+
+    return;
+}
+
+static void on_observe_stop(const uint16_t path[3], uint8_t path_len,
+                            coap_message_t *p_req)
+{
+    uint32_t err;
+
+    const void *p_observable = lwm2m_observable_reference_get(path, path_len);
+
+    LWM2M_INF("Observe deregister %s",
+              lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
+
+    err = lwm2m_observe_unregister(p_req->remote, p_observable);
+    if (err) {
+        /* TODO */
+    }
+
+    lwm2m_notif_attr_storage_update(path, path_len, p_req->remote);
+
+    /* Process as a read */
+    on_read(path, path_len, p_req);
+}
+
+static void on_observe(const uint16_t path[3], uint8_t path_len,
+                       coap_message_t *p_req)
+{
+    uint32_t err = 1;
+    uint32_t opt;
+
+    for (uint8_t i = 0; i < p_req->options_count; i++) {
+        if (p_req->options[i].number == COAP_OPT_OBSERVE) {
+            err = coap_opt_uint_decode(&opt,
+                           p_req->options[i].length,
+                           p_req->options[i].data);
+            break;
+        }
+    }
+
+    if (err) {
+        lwm2m_respond_with_code(COAP_CODE_402_BAD_OPTION, p_req);
+        return;
+    }
+
+    switch (opt) {
+    case 0: /* observe start */
+        on_observe_start(path, path_len, p_req);
+        break;
+    case 1: /* observe stop */
+        on_observe_stop(path, path_len, p_req);
+        break;
+    default:
+        /* Unexpected opt value */
+        lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_req);
+        break;
+    }
+}
+
+static void on_write_attribute(const uint16_t path[3], uint8_t path_len,
+                               coap_message_t *p_req)
+{
+    int err;
+
+    err = lwm2m_write_attribute_handler(path, path_len, p_req);
+    if (err) {
+        const coap_msg_code_t code =
+            (err == -EINVAL) ? COAP_CODE_400_BAD_REQUEST :
+                               COAP_CODE_500_INTERNAL_SERVER_ERROR;
+        lwm2m_respond_with_code(code, p_req);
+        return;
+    }
+
+    lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_req);
+}
+
+static void on_write(const uint16_t path[3], uint8_t path_len,
+                     coap_message_t *p_req)
+{
+    uint32_t err;
+    uint32_t mask;
+
+    err = coap_message_ct_mask_get(p_req, &mask);
+    if (err) {
+        lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_req);
+        return;
+    }
+
+    if (mask & COAP_CT_MASK_APP_LWM2M_TLV) {
+        /* Decode TLV payload */
+        err = lwm2m_tlv_connectivity_monitoring_decode(&m_instance_conn_mon,
+                                                        p_req->payload,
+                                                        p_req->payload_len,
+                                                        tlv_conn_mon_resource_decode);
+    } else {
+        lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_req);
+        return;
+    }
+
+    if (err) {
+        /* Failed to decode or to process the payload.
+         * We attempted to decode a resource and failed because
+         * - memory contraints or
+         * - the payload contained unexpected data
+         */
+        const coap_msg_code_t code =
+            (err == ENOTSUP) ? COAP_CODE_404_NOT_FOUND :
+                               COAP_CODE_400_BAD_REQUEST;
+        lwm2m_respond_with_code(code, p_req);
+        return;
+    }
+
+    lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_req);
+}
+
+static void on_discover(const uint16_t path[3], uint8_t path_len,
+                        coap_message_t *p_req)
+{
+    uint32_t err;
+
+    const uint16_t res = path[2];
+
+    err = lwm2m_respond_with_instance_link(&m_instance_conn_mon.proto, res, p_req);
+    if (err) {
+        LWM2M_WRN("Failed to respond to discover on %s, err %d",
+                  lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)), err);
+    }
+}
 
 /**@brief Callback function for connectivity_monitoring instances. */
 uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                                     uint16_t           resource_id,
                                     uint8_t            op_code,
-                                    coap_message_t *   p_request)
+                                    coap_message_t   * p_request)
 {
-    LWM2M_TRC("conn_mon_instance_callback");
+    uint16_t access;
+    uint32_t err_code;
 
-    uint16_t access = 0;
-    uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                       p_instance,
-                                                       p_request->remote);
-    if (err_code != 0)
-    {
+    const uint8_t path_len = (resource_id == LWM2M_NAMED_OBJECT) ? 2 : 3;
+    const uint16_t path[] = {
+        p_instance->object_id,
+        p_instance->instance_id,
+        resource_id
+    };
+
+    err_code = lwm2m_access_remote_get(&access, p_instance, p_request->remote);
+    if (err_code != 0) {
         return err_code;
     }
 
-    // Set op_code to 0 if access not allowed for that op_code.
-    // op_code has the same bit pattern as ACL operates with.
+    /* Check server access */
     op_code = (access & op_code);
-
-    if (op_code == 0)
-    {
-        (void)lwm2m_respond_with_code(COAP_CODE_401_UNAUTHORIZED, p_request);
+    if (op_code == 0) {
+        lwm2m_respond_with_code(COAP_CODE_401_UNAUTHORIZED, p_request);
         return 0;
     }
 
-    uint16_t instance_id = p_instance->instance_id;
-
-    if (instance_id != 0)
-    {
-        (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
+    /* Check resource permissions */
+    if (!operation_is_allowed(resource_id, op_code)) {
+        LWM2M_WRN("Operation 0x%x on resource %s, not allowed", op_code,
+                  lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
+        lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
         return 0;
     }
 
-    uint8_t  buffer[200];
-    uint32_t buffer_size = sizeof(buffer);
-    uint16_t path[] = { p_instance->object_id, p_instance->instance_id, resource_id };
-    uint8_t  path_len = (resource_id == LWM2M_INVALID_RESOURCE) ? ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
-
-    if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
-    {
-        uint32_t observe_option = 0;
-        for (uint8_t index = 0; index < p_request->options_count; index++)
-        {
-            if (p_request->options[index].number == COAP_OPT_OBSERVE)
-            {
-                err_code = coap_opt_uint_decode(&observe_option,
-                                                p_request->options[index].length,
-                                                p_request->options[index].data);
-                break;
-            }
-        }
-
-        if (err_code == 0)
-        {
-            if (observe_option == 0) // Observe start
-            {
-                // Whitelist the resources that support observe.
-                switch (resource_id)
-                {
-                    case LWM2M_CONN_MON_NETWORK_BEARER:
-                    // case LWM2M_CONN_MON_AVAILABLE_NETWORK_BEARER:
-                    case LWM2M_CONN_MON_RADIO_SIGNAL_STRENGTH:
-                    case LWM2M_CONN_MON_LINK_QUALITY:
-                    // case LWM2M_CONN_MON_IP_ADDRESSES:
-                    // case LWM2M_CONN_MON_ROUTER_IP_ADRESSES:
-                    // case LWM2M_CONN_MON_LINK_UTILIZATION:
-                    // case LWM2M_CONN_MON_APN:
-                    case LWM2M_CONN_MON_CELL_ID:
-                    // case LWM2M_CONN_MON_SMNC:
-                    // case LWM2M_CONN_MON_SMCC:
-                    {
-                        coap_message_t *p_message;
-
-                        LWM2M_INF("Observe requested on resource %s", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
-                        err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
-                                                                            &buffer_size,
-                                                                            resource_id,
-                                                                            &m_instance_conn_mon);
-                        if (err_code != 0)
-                        {
-                            LWM2M_INF("Failed to perform the TLV encoding");
-                            lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
-                            return err_code;
-                        }
-
-                        err_code = lwm2m_observe_register(path, path_len, p_request, &p_message);
-                        if (err_code != 0)
-                        {
-                            LWM2M_INF("Failed to register the observer");
-                            lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
-                            return err_code;
-                        }
-
-                        err_code = lwm2m_coap_message_send_to_remote(p_message, p_request->remote, buffer, buffer_size);
-                        if (err_code != 0)
-                        {
-                            LWM2M_INF("Failed to respond to Observe request");
-                            lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
-                            return err_code;
-                        }
-
-                        lwm2m_observable_metadata_init(p_request->remote, path, path_len);
-
-                        break;
-                    }
-
-                    case LWM2M_INVALID_RESOURCE: // By design LWM2M_INVALID_RESOURCE indicates that this is on instance level.
-                    default:
-                    {
-                        // Process the GET request as usual.
-                        LWM2M_INF("Observe requested on element %s, no slots", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
-                        op_code = LWM2M_OPERATION_CODE_READ;
-                        break;
-                    }
-                }
-            }
-            else if (observe_option == 1) // Observe stop
-            {
-                if (resource_id == LWM2M_INVALID_RESOURCE) {
-                    LWM2M_INF("Observe cancel on instance %s, no match", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
-                } else {
-                    LWM2M_INF("Observe cancel on resource %s", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
-                    const void * p_observable = lwm2m_observable_reference_get(path, path_len);
-                    lwm2m_observe_unregister(p_request->remote, p_observable);
-                    lwm2m_notif_attr_storage_update(path, path_len, p_request->remote);
-                }
-
-                // Process the GET request as usual.
-                op_code = LWM2M_OPERATION_CODE_READ;
-            }
-            else
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-                return 0;
-            }
-        }
+    if (p_instance->instance_id != 0) {
+        lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
+        return 0;
     }
 
-    if (op_code == LWM2M_OPERATION_CODE_READ)
-    {
-        if (resource_id == VERIZON_RESOURCE && operator_is_vzw(true))
-        {
-            err_code = tlv_conn_mon_verizon_encode(instance_id, buffer, &buffer_size);
-        }
-        else
-        {
-            lwm2m_conn_mon_update_resource(resource_id);
-            err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
-                                                                &buffer_size,
-                                                                resource_id,
-                                                                &m_instance_conn_mon);
-            if (err_code == ENOENT)
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
-                return 0;
-            }
-
-            if (resource_id == LWM2M_NAMED_OBJECT)
-            {
-                if (operator_is_vzw(true)) {
-                    uint32_t added_size = sizeof(buffer) - buffer_size;
-                    err_code = tlv_conn_mon_verizon_encode(instance_id, buffer + buffer_size, &added_size);
-                    buffer_size += added_size;
-                }
-            }
-        }
-
-        if (err_code != 0)
-        {
-            return err_code;
-        }
-
-        (void)lwm2m_respond_with_payload(buffer, buffer_size, COAP_CT_APP_LWM2M_TLV, p_request);
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_WRITE)
-    {
-        uint32_t mask = 0;
-
-        err_code = coap_message_ct_mask_get(p_request, &mask);
-
-        if (err_code != 0)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-            return 0;
-        }
-
-        if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
-        {
-            err_code = lwm2m_tlv_connectivity_monitoring_decode(&m_instance_conn_mon,
-                                                                p_request->payload,
-                                                                p_request->payload_len,
-                                                                tlv_conn_mon_resource_decode);
-        }
-        else
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_request);
-            return 0;
-        }
-
-        if (err_code == 0)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-        }
-        else if (err_code == ENOTSUP)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
-        }
-        else
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-        }
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_WRITE_ATTR)
-    {
-        err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
-
-        if (err_code == 0)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-        }
-        else
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-        }
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
-    {
-        err_code = lwm2m_respond_with_instance_link(p_instance, resource_id, p_request);
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
-    {
-        // Already handled
-    }
-    else
-    {
-        (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+    switch (op_code) {
+    case LWM2M_OPERATION_CODE_READ:
+        on_read(path, path_len, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_WRITE:
+        on_write(path, path_len, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_OBSERVE:
+        on_observe(path, path_len, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_DISCOVER:
+        on_discover(path, path_len, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_WRITE_ATTR:
+        on_write_attribute(path, path_len, p_request);
+        break;
+    default:
+        lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+        break;
     }
 
-    return err_code;
+    return 0;
+}
+
+static void on_object_read(coap_message_t *p_req)
+{
+    uint32_t err;
+    uint8_t buf[256];
+    size_t len;
+
+    len = sizeof(buf);
+
+    err = lwm2m_tlv_connectivity_monitoring_encode(buf + 3, &len, LWM2M_NAMED_OBJECT,
+                                                   &m_instance_conn_mon);
+
+    if (err) {
+        /* TODO */
+        return;
+    }
+
+    lwm2m_tlv_t tlv = {
+        .id_type = TLV_TYPE_OBJECT,
+        .length = len
+    };
+
+    err = lwm2m_tlv_header_encode(buf, &len, &tlv);
+    if (err) {
+        /* TODO */
+        return;
+    }
+
+    len += tlv.length;
+
+    lwm2m_respond_with_payload(buf, len, COAP_CT_APP_LWM2M_TLV, p_req);
+}
+
+static void on_object_write_attribute(uint16_t instance, coap_message_t *p_req)
+{
+    int err;
+    uint16_t path[] = { LWM2M_OBJ_CONN_MON };
+
+    err = lwm2m_write_attribute_handler(path, ARRAY_SIZE(path), p_req);
+    if (err) {
+        const coap_msg_code_t code =
+            (err == -EINVAL) ? COAP_CODE_400_BAD_REQUEST :
+                               COAP_CODE_500_INTERNAL_SERVER_ERROR;
+        lwm2m_respond_with_code(code, p_req);
+        return;
+    }
+
+    lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_req);
+}
+
+static void on_object_discover(coap_message_t * p_req)
+{
+    int err;
+
+    err = lwm2m_respond_with_object_link(LWM2M_OBJ_CONN_MON, p_req);
+    if (err) {
+        LWM2M_WRN("Failed to discover connectivity monitoring object, err %d", err);
+    }
 }
 
 /**@brief Callback function for LWM2M conn_mon objects. */
@@ -507,54 +617,24 @@ uint32_t lwm2m_conn_mon_object_callback(lwm2m_object_t * p_object,
                                         uint8_t          op_code,
                                         coap_message_t * p_request)
 {
-    LWM2M_TRC("conn_mon_object_callback");
-
-    uint32_t err_code = 0;
-
-    if (op_code == LWM2M_OPERATION_CODE_READ)
-    {
-        uint32_t buffer_len = 255;
-        uint8_t  buffer[buffer_len];
-
-        err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer + 3, &buffer_len,
-                                                            LWM2M_NAMED_OBJECT,
-                                                            &m_instance_conn_mon);
-        lwm2m_tlv_t tlv = {
-            .id_type = TLV_TYPE_OBJECT,
-            .length = buffer_len
-        };
-        err_code = lwm2m_tlv_header_encode(buffer, &buffer_len, &tlv);
-        buffer_len += tlv.length;
-
-        err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LWM2M_TLV, p_request);
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
-    {
-        err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_WRITE_ATTR)
-    {
-        uint16_t path[] = { p_object->object_id };
-        uint8_t path_len = ARRAY_SIZE(path);
-
-        err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
-
-        if (err_code == 0)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-        }
-        else
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-        }
-    }
-    else
-    {
-        (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+    switch (op_code) {
+    case LWM2M_OPERATION_CODE_READ:
+        on_object_read(p_request);
+        break;
+    case LWM2M_OPERATION_CODE_WRITE_ATTR:
+        on_object_write_attribute(instance_id, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_DISCOVER:
+        on_object_discover(p_request);
+        break;
+    default:
+        lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+        break;
     }
 
-    return err_code;
+    return 0;
 }
+
 
 /* Fetch latest resource value */
 static void lwm2m_conn_mon_update_resource(uint16_t resource_id)

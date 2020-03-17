@@ -257,17 +257,17 @@ void lwm2m_instance_connectivity_monitoring_init(lwm2m_connectivity_monitoring_t
     memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
-    p_instance->operations[0]  = READ | WRATT;
-    p_instance->operations[1]  = READ | WRATT;
-    p_instance->operations[2]  = READ | WRATT;
-    p_instance->operations[3]  = READ | WRATT;
-    p_instance->operations[4]  = READ | WRATT;
-    p_instance->operations[5]  = READ | WRATT;
+    p_instance->operations[0]  = READ | WRATT | DISC | OBSV;
+    p_instance->operations[1]  = READ | WRATT | DISC;
+    p_instance->operations[2]  = READ | WRATT | DISC | OBSV;
+    p_instance->operations[3]  = READ | WRATT | DISC | OBSV;
+    p_instance->operations[4]  = READ | WRATT | DISC;
+    p_instance->operations[5]  = READ | WRATT | DISC;
     p_instance->operations[6]  = NONE; // "Link Utilization" is currently unused.
-    p_instance->operations[7]  = READ | WRATT;
-    p_instance->operations[8]  = READ | WRATT;
-    p_instance->operations[9]  = READ | WRATT;
-    p_instance->operations[10] = READ | WRATT;
+    p_instance->operations[7]  = READ | WRATT | DISC;
+    p_instance->operations[8]  = READ | WRATT | DISC | OBSV;
+    p_instance->operations[9]  = READ | WRATT | DISC;
+    p_instance->operations[10] = READ | WRATT | DISC;
 
     // Set resource IDs.
     p_instance->resource_ids[0]  = LWM2M_CONN_MON_NETWORK_BEARER;
