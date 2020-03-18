@@ -2048,3 +2048,23 @@ uint32_t lwm2m_init(lwm2m_alloc_t alloc_fn, lwm2m_free_t free_fn)
 
     return err_code;
 }
+
+const char * lwm2m_path_to_string(const uint16_t *p_path, uint8_t path_len)
+{
+    static char uri_path[sizeof("/65535/65535/65535/65535")];  /* Longest URI possible */
+    uint32_t index = 0;
+
+    if (!p_path)
+    {
+        return "";
+    }
+
+    for (int i = 0; i < path_len; i++)
+    {
+        index += snprintf(&uri_path[index], sizeof(uri_path) - index, "/%u", p_path[i]);
+    }
+
+    uri_path[index] = '\0';
+
+    return uri_path;
+}

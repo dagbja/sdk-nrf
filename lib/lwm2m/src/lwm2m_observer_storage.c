@@ -259,12 +259,14 @@ uint32_t lwm2m_observer_storage_store(coap_observer_t * p_observer, const uint16
     }
     else
     {
-        LWM2M_INF("Observer already exists in flash storage, updating entry");
+        LWM2M_INF("Observer (%s; ssid=%d) already exists in flash storage, updating entry",
+                  lwm2m_os_log_strdup(lwm2m_path_to_string(p_path, path_len)), short_server_id);
     }
 
     if (observer_store_cb(sid, (void *)&entry, OBSERVER_ENTRY_SIZE) != 0)
     {
-        LWM2M_ERR("Failed to store observer in flash storage");
+        LWM2M_ERR("Failed to store observer (%s; ssid=%d) in flash storage",
+                  lwm2m_os_log_strdup(lwm2m_path_to_string(p_path, path_len)), short_server_id);
         return EIO;
     }
 
@@ -301,7 +303,8 @@ uint32_t lwm2m_notif_attr_storage_store(const lwm2m_observable_metadata_t * p_me
     if (notif_attr_store_cb(sid, (void *)&entry, NOTIF_ATTR_ENTRY_SIZE) != 0)
     {
 
-        LWM2M_ERR("Failed to store notification attributes in the non-volatile storage");
+        LWM2M_ERR("Failed to store notification attributes (%s; ssid=%d) in flash storage",
+                  lwm2m_os_log_strdup(lwm2m_path_to_string(entry.path, entry.path_len)), entry.short_server_id);
         return EIO;
     }
     entry = (lwm2m_notif_attr_storage_entry_t)entry;
@@ -337,7 +340,11 @@ uint32_t lwm2m_observer_storage_delete(coap_observer_t * p_observer)
 
     if (err_code != 0) 
     {
-        LWM2M_ERR("Failed to delete observer from flash storage");
+        LWM2M_ERR("Failed to delete observer (%s; ssid=%d) from flash storage:"
+                  "%s (%ld), %s (%d)",
+                  lwm2m_os_log_strdup(lwm2m_path_to_string(entry.path, entry.path_len)), entry.short_server_id,
+                  lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                  lwm2m_os_log_strdup(strerror(errno)), errno);
     }
 
     return err_code;
@@ -366,7 +373,11 @@ uint32_t lwm2m_notif_attr_storage_delete(const lwm2m_observable_metadata_t * p_m
 
     err_code = notif_attr_delete_cb(sid);
     if (err_code != 0) {
-        LWM2M_ERR("Failed to delete notification attributes from the non-volatile storage");
+        LWM2M_ERR("Failed to delete notification attributes (%s; ssid=%d) from flash storage:"
+                  "%s (%ld), %s (%d)",
+                  lwm2m_os_log_strdup(lwm2m_path_to_string(entry.path, entry.path_len)), entry.short_server_id,
+                  lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                  lwm2m_os_log_strdup(strerror(errno)), errno);
         return EIO;
     }
 
@@ -424,12 +435,20 @@ uint32_t lwm2m_observer_storage_restore(uint16_t                short_server_id,
             rc = lwm2m_short_server_id_remote_find(&p_remote, entry.short_server_id);
             if (rc != 0)
             {
+                LWM2M_ERR("Finding remote for short server id: %d (observer: %s) failed: %s (%ld), %s (%d)",
+                          entry.short_server_id, lwm2m_os_log_strdup(lwm2m_path_to_string(entry.path, entry.path_len)),
+                          lwm2m_os_log_strdup(strerror(rc)), rc,
+                          lwm2m_os_log_strdup(strerror(errno)), errno);
                 continue;
             }
 
             p_observable = lwm2m_observable_reference_get(entry.path, entry.path_len);
             if (!p_observable)
             {
+                LWM2M_ERR("Locating observer (%s; ssid=%d) failed: %s (%ld), %s (%d)",
+                          lwm2m_os_log_strdup(lwm2m_path_to_string(entry.path, entry.path_len)), entry.short_server_id,
+                          lwm2m_os_log_strdup(strerror(rc)), rc,
+                          lwm2m_os_log_strdup(strerror(errno)), errno);
                 continue;
             }
 
@@ -443,14 +462,17 @@ uint32_t lwm2m_observer_storage_restore(uint16_t                short_server_id,
             rc = coap_observe_server_register(&handle, &observer);
             if (rc != 0)
             {
-                LWM2M_ERR("Loading observer failed: %s (%ld), %s (%d)",
-                           lwm2m_os_log_strdup(strerror(rc)), rc,
-                           lwm2m_os_log_strdup(strerror(errno)), errno);
+                LWM2M_ERR("Loading observer (%s; ssid=%d) failed: %s (%ld), %s (%d)",
+                          lwm2m_os_log_strdup(lwm2m_path_to_string(entry.path, entry.path_len)), entry.short_server_id,
+                          lwm2m_os_log_strdup(strerror(rc)), rc,
+                          lwm2m_os_log_strdup(strerror(errno)), errno);
 
                 continue;
             }
 
-            LWM2M_INF("Observer restored");
+            LWM2M_INF("Observer (%s; ssid=%d) restored",
+                      lwm2m_os_log_strdup(lwm2m_path_to_string(entry.path, entry.path_len)),
+                      entry.short_server_id);
 
             lwm2m_observable_metadata_init(p_remote, entry.path, entry.path_len);
 
@@ -491,7 +513,8 @@ uint32_t lwm2m_notif_attr_storage_restore(uint16_t short_server_id)
         err_code = lwm2m_observable_notif_attributes_restore(entry.attributes, entry.path, entry.path_len, entry.short_server_id);
         if (err_code != 0)
         {
-            LWM2M_ERR("Loading notification attributes failed: %s (%ld), %s (%d)",
+            LWM2M_ERR("Loading notification attributes (%s; ssid=%d) failed: %s (%ld), %s (%d)",
+                      lwm2m_os_log_strdup(lwm2m_path_to_string(entry.path, entry.path_len)), entry.short_server_id,
                       lwm2m_os_log_strdup(strerror(err_code)), err_code,
                       lwm2m_os_log_strdup(strerror(errno)), errno);
             continue;

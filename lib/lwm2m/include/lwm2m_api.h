@@ -1113,6 +1113,15 @@ uint32_t lwm2m_list_string_set(lwm2m_list_t * p_list, uint32_t idx, uint8_t * p_
  */
 uint32_t lwm2m_list_string_append(lwm2m_list_t * p_list, uint8_t * p_value, uint16_t value_len);
 
+/**@brief Convert a URI path into a string.
+ *
+ * @param[in] p_path   URI path to be converted.
+ * @param[in] path_len Length of the URI path to be converted.
+ *
+ * @return The URI path in string form, or NULL if p_path is NULL.
+ */
+const char * lwm2m_path_to_string(const uint16_t *p_path, uint8_t path_len);
+
 #ifdef __cplusplus
 }
 #endif

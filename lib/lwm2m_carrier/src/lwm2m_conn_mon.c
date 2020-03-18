@@ -333,7 +333,7 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                     {
                         coap_message_t *p_message;
 
-                        LWM2M_INF("Observe requested on resource /4/%i/%i", p_instance->instance_id, resource_id);
+                        LWM2M_INF("Observe requested on resource %s", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
                         err_code = lwm2m_tlv_connectivity_monitoring_encode(buffer,
                                                                             &buffer_size,
                                                                             resource_id,
@@ -367,17 +367,10 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
                     }
 
                     case LWM2M_INVALID_RESOURCE: // By design LWM2M_INVALID_RESOURCE indicates that this is on instance level.
-                    {
-                        // Process the GET request as usual.
-                        LWM2M_INF("Observe requested on instance /4/%i, no slots", p_instance->instance_id);
-                        op_code = LWM2M_OPERATION_CODE_READ;
-                        break;
-                    }
-
                     default:
                     {
                         // Process the GET request as usual.
-                        LWM2M_INF("Observe requested on resource /4/%i/%i, no slots", p_instance->instance_id, resource_id);
+                        LWM2M_INF("Observe requested on element %s, no slots", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
                         op_code = LWM2M_OPERATION_CODE_READ;
                         break;
                     }
@@ -386,9 +379,9 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
             else if (observe_option == 1) // Observe stop
             {
                 if (resource_id == LWM2M_INVALID_RESOURCE) {
-                    LWM2M_INF("Observe cancel on instance /4/%i, no match", p_instance->instance_id);
+                    LWM2M_INF("Observe cancel on instance %s, no match", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
                 } else {
-                    LWM2M_INF("Observe cancel on resource /4/%i/%i", p_instance->instance_id, resource_id);
+                    LWM2M_INF("Observe cancel on resource %s", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
                     const void * p_observable = lwm2m_observable_reference_get(path, path_len);
                     lwm2m_observe_unregister(p_request->remote, p_observable);
                     lwm2m_notif_attr_storage_update(path, path_len, p_request->remote);

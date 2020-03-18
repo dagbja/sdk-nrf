@@ -197,7 +197,7 @@ uint32_t lwm2m_portfolio_object_callback(lwm2m_object_t * p_object,
             {
                 coap_message_t *p_message;
 
-                LWM2M_INF("Observe requested on object /16");
+                LWM2M_INF("Observe requested on object %s", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
                 err_code = lwm2m_tlv_element_encode(buffer, &buffer_len, path, path_len);
                 if (err_code != 0)
                 {

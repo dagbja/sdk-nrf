@@ -545,7 +545,8 @@ static void observer_notify_path(const uint16_t *p_path, uint8_t path_len, struc
 
     if (!p_observable)
     {
-        LWM2M_WRN("Failed to notify the observer: could not find the observable");
+        LWM2M_WRN("Failed to notify the observer (%s): could not find the observable",
+                  lwm2m_os_log_strdup(lwm2m_path_to_string(p_path, path_len)));
         return;
     }
 
@@ -573,17 +574,15 @@ static void observer_notify_path(const uint16_t *p_path, uint8_t path_len, struc
 
         if (err_code)
         {
-            LWM2M_ERR("Failed to encode the observable: %lu", err_code);
+            LWM2M_ERR("Failed to encode the observable (%s): %lu", lwm2m_os_log_strdup(lwm2m_path_to_string(p_path, path_len)), err_code);
             continue;
         }
 
         coap_msg_type_t type = (lwm2m_observer_notification_is_con(p_observable, short_server_id)) ? COAP_TYPE_CON : COAP_TYPE_NON;
 
-        LWM2M_INF("Notification sent");
-        err_code = lwm2m_notify(payload,
-                                payload_len,
-                                p_observer,
-                                type);
+        LWM2M_INF("Notify %s", lwm2m_os_log_strdup(lwm2m_path_to_string(p_path, path_len)));
+
+        err_code = lwm2m_notify(payload, payload_len, p_observer, type);
 
         if (err_code)
         {

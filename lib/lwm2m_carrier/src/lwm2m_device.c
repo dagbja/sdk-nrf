@@ -262,13 +262,14 @@ static void on_read(uint16_t res, coap_message_t *p_req)
     uint8_t buf[256];
     size_t len;
 
+    const uint16_t path[] = { LWM2M_OBJ_DEVICE, 0, res };
+    uint8_t path_len = (res == LWM2M_INVALID_RESOURCE) ?
+                ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
+
     len = sizeof(buf);
 
-    if (res == LWM2M_NAMED_OBJECT) {
-        LWM2M_INF("Read /3/0");
-    } else {
-        LWM2M_INF("Read /3/0/%d", res);
-    }
+    LWM2M_INF("Read %s",
+                lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
 
     if (res == VERIZON_RESOURCE && operator_is_vzw(true)) {
         err = tlv_device_verizon_encode(buf, &len);
@@ -336,7 +337,8 @@ static void on_observe_start(uint16_t res, coap_message_t *p_req)
 
     len = sizeof(buf);
 
-    LWM2M_INF("Observe register /3/0/%d", res);
+    LWM2M_INF("Observe register %s",
+                lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
 
     err = lwm2m_tlv_device_encode(buf, &len, res, &m_instance_device);
     if (err) {
@@ -377,7 +379,8 @@ static void on_observe_stop(uint16_t res, coap_message_t *p_req)
                 ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
     const void * p_observable = lwm2m_observable_reference_get(path, path_len);
 
-    LWM2M_INF("Observe deregister /3/0/%d", res);
+    LWM2M_INF("Observe deregister %s",
+                lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
 
     err = lwm2m_observe_unregister(p_req->remote, p_observable);
 
@@ -447,12 +450,12 @@ static void on_write(uint16_t res, coap_message_t *p_req)
 {
     uint32_t err;
     uint32_t mask;
+    const uint16_t path[] = { LWM2M_OBJ_DEVICE, 0, res };
+    uint8_t path_len = (res == LWM2M_INVALID_RESOURCE) ?
+                ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
 
-    if (res == LWM2M_NAMED_OBJECT) {
-        LWM2M_INF("Write /3/0");
-    } else {
-        LWM2M_INF("Write /3/0/%d", res);
-    }
+    LWM2M_INF("Write %s",
+                lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
 
     err = coap_message_ct_mask_get(p_req, &mask);
     if (err) {
@@ -525,8 +528,12 @@ static void on_write(uint16_t res, coap_message_t *p_req)
 static void on_exec(uint16_t res, coap_message_t *p_req)
 {
     int err;
+    const uint16_t path[] = { LWM2M_OBJ_DEVICE, 0, res };
+    uint8_t path_len = (res == LWM2M_INVALID_RESOURCE) ?
+                ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
 
-    LWM2M_INF("Execute /3/0/%d", res);
+    LWM2M_INF("Execute %s",
+                lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
 
     switch (res) {
     case LWM2M_DEVICE_FACTORY_RESET:
@@ -560,10 +567,14 @@ static void on_exec(uint16_t res, coap_message_t *p_req)
 static void on_discover(uint16_t res, coap_message_t *p_req)
 {
     uint32_t err;
+    const uint16_t path[] = { LWM2M_OBJ_DEVICE, 0, res };
+    uint8_t path_len = (res == LWM2M_INVALID_RESOURCE) ?
+                ARRAY_SIZE(path) - 1 : ARRAY_SIZE(path);
 
     err = lwm2m_respond_with_instance_link(&m_instance_device.proto, res, p_req);
     if (err) {
-        LWM2M_WRN("Failed to respond to discover on /3/0/%d, err %d", res, err);
+        LWM2M_WRN("Failed to respond to discover on %s, err %d",
+            lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)), err);
     }
 }
 
