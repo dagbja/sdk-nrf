@@ -13,6 +13,7 @@
 #include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_conn_mon.h>
+#include <lwm2m_apn_conn_prof.h>
 #include <coap_message.h>
 #include <lwm2m_common.h>
 #include <lwm2m_carrier_main.h>
@@ -562,6 +563,14 @@ static void lwm2m_conn_mon_update_resource(uint16_t resource_id)
         break;
     case LWM2M_CONN_MON_IP_ADDRESSES:
         at_read_ipaddr(&m_instance_conn_mon.ip_addresses);
+        break;
+    case LWM2M_CONN_MON_APN:
+        if (!operator_is_vzw(true)) {
+            // TODO: Use APN used to connect to the Bootstrap Server
+            uint8_t apn_len = 0;
+            uint8_t *p_apn_name = lwm2m_apn_conn_prof_apn_get(0, &apn_len);
+            lwm2m_list_string_set(&m_instance_conn_mon.apn, 0, p_apn_name, apn_len);
+        }
         break;
     case LWM2M_CONN_MON_CELL_ID:
         at_read_cell_id(&m_instance_conn_mon.cell_id);
