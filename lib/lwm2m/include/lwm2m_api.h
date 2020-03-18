@@ -1062,6 +1062,31 @@ uint32_t lwm2m_list_integer_set(lwm2m_list_t * p_list, uint32_t idx, int32_t val
  */
 uint32_t lwm2m_list_integer_append(lwm2m_list_t * p_list, int32_t value);
 
+/**@brief Set a string in a lwm2m_list_t.
+ *
+ * @param[in] p_list    List to set string in.
+ * @param[in] idx       Index of string in list.
+ * @param[in] p_value   Pointer to string.
+ * @param[in] value_len Length of string
+ *
+ * @retval  0         The set operation is successful.
+ * @retval  EINVAL    Illegal list definition.
+ * @retval  EMSGSIZE  Index is out of bounds.
+ */
+uint32_t lwm2m_list_string_set(lwm2m_list_t * p_list, uint32_t idx, uint8_t * p_value, uint16_t value_len);
+
+/**@brief Append a string to a lwm2m_list_t.
+ *
+ * @param[in] p_list    List to set string in.
+ * @param[in] p_value   Pointer to string.
+ * @param[in] value_len Length of string
+ *
+ * @retval  0         The append operation is successful.
+ * @retval  EINVAL    Illegal list definition.
+ * @retval  EMSGSIZE  List is full.
+ */
+uint32_t lwm2m_list_string_append(lwm2m_list_t * p_list, uint8_t * p_value, uint16_t value_len);
+
 #ifdef __cplusplus
 }
 #endif

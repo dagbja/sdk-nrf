@@ -355,21 +355,12 @@ uint32_t lwm2m_tlv_list_decode(lwm2m_tlv_t    tlv_range,
 
             case LWM2M_LIST_TYPE_STRING:
             {
-                lwm2m_string_t string = {
-                    .p_val = NULL,
-                    .len   = 0
-                };
-
-                err_code = lwm2m_bytebuffer_to_string((char *)tlv.value, tlv.length, &string);
+                err_code = lwm2m_list_string_append(p_list, tlv.value, tlv.length);
 
                 if (err_code != 0)
                 {
                     return err_code;
                 }
-
-                p_list->val.p_string[p_list->len].p_val = string.p_val;
-                p_list->val.p_string[p_list->len].len   = string.len;
-                p_list->len++;
                 break;
             }
 

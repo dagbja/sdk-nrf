@@ -1969,6 +1969,38 @@ uint32_t lwm2m_list_integer_append(lwm2m_list_t * p_list, int32_t value)
 }
 
 
+uint32_t lwm2m_list_string_set(lwm2m_list_t * p_list, uint32_t idx, uint8_t * p_value, uint16_t value_len)
+{
+    if (!p_list || idx > p_list->len || idx >= p_list->max_len)
+    {
+        return EMSGSIZE;
+    }
+
+    switch (p_list->type)
+    {
+        case LWM2M_LIST_TYPE_STRING:
+            lwm2m_bytebuffer_to_string(p_value, value_len, &p_list->val.p_string[idx]);
+            break;
+
+        default:
+            return EINVAL;
+    }
+
+    if (idx == p_list->len) {
+        // Added a value to the list
+        p_list->len = idx + 1;
+    }
+
+    return 0;
+}
+
+
+uint32_t lwm2m_list_string_append(lwm2m_list_t * p_list, uint8_t * p_value, uint16_t value_len)
+{
+    return lwm2m_list_string_set(p_list, p_list->len, p_value, value_len);
+}
+
+
 uint32_t lwm2m_init(lwm2m_alloc_t alloc_fn, lwm2m_free_t free_fn)
 {
     if ((alloc_fn == NULL) || (free_fn == NULL))
