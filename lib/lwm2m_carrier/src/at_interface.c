@@ -366,14 +366,14 @@ int at_apn_unregister_from_packet_events(void)
 }
 
 
-int at_apn_setup_wait_for_ipv6(int *fd, const char *apn)
+int at_apn_setup_wait_for_ipv6(int *fd)
 {
     int err;
     int cid;
     int timeout_ms = K_MINUTES(1);
     nrf_socklen_t len = sizeof(cid);
 
-    if (fd == NULL || apn == NULL) {
+    if (fd == NULL) {
         return -1;
     }
 

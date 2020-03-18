@@ -43,6 +43,13 @@ lwm2m_object_t * lwm2m_apn_conn_prof_get_object(void)
     return &m_object_apn_conn_prof;
 }
 
+char * lwm2m_apn_conn_prof_apn_get(uint16_t instance_id, uint8_t * p_len)
+{
+    // TODO: Fetch from instance_id
+    *p_len = m_instance_apn_conn_prof[instance_id].apn.len;
+    return m_instance_apn_conn_prof[instance_id].apn.p_val;
+}
+
 static uint32_t list_integer_copy(lwm2m_list_t * p_list, int from_idx, int to_idx)
 {
     int32_t value = lwm2m_list_integer_get(p_list, from_idx);

@@ -44,11 +44,10 @@ int at_apn_unregister_from_packet_events(void);
  * Wait until IPv6 link is ready. Return an error after a timeout of one minute.
  *
  * @param[in,out] fd PDN socket handle.
- * @param[in] apn Access point name.
  *
  * @return Zero on success, -1 otherwise.
  */
-int at_apn_setup_wait_for_ipv6(int *fd, const char * apn);
+int at_apn_setup_wait_for_ipv6(int *fd);
 
 /**
  * @brief Read APN class name.

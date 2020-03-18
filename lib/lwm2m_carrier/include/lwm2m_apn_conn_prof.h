@@ -19,6 +19,8 @@ bool lwm2m_apn_conn_prof_activate(uint16_t instance_id, uint8_t reject_cause);
 
 bool lwm2m_apn_conn_prof_deactivate(uint16_t instance_id);
 
+char * lwm2m_apn_conn_prof_apn_get(uint16_t instance_id, uint8_t * p_len);
+
 lwm2m_apn_conn_prof_t * lwm2m_apn_conn_prof_get_instance(uint16_t instance_id);
 
 lwm2m_object_t * lwm2m_apn_conn_prof_get_object(void);

@@ -58,13 +58,13 @@ static int32_t lwm2m_retry_delay_pdn_att_get(void)
         m_retry_count_pdn = 0;
     }
 
-    m_retry_count_pdn++;
-
     if (m_retry_count_pdn == apn_retries) {
-        retry_delay = lwm2m_conn_ext_apn_retry_back_off_period_get(0, 0);
+        retry_delay = K_SECONDS(lwm2m_conn_ext_apn_retry_back_off_period_get(0, 0));
     } else {
-        retry_delay = lwm2m_conn_ext_apn_retry_period_get(0, 0);
+        retry_delay = K_SECONDS(lwm2m_conn_ext_apn_retry_period_get(0, 0));
     }
+
+    m_retry_count_pdn++;
 
     return retry_delay;
 }

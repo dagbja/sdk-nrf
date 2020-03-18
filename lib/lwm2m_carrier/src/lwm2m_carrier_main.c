@@ -505,7 +505,12 @@ static int admin_apn_get(char *buf, size_t len)
     char *apn_name;
     uint8_t read = 0;
 
-    apn_name = lwm2m_conn_mon_class_apn_get(2, &read);
+    if (operator_is_vzw(false)) {
+        apn_name = lwm2m_conn_mon_class_apn_get(2, &read);
+    } else {
+        apn_name = lwm2m_apn_conn_prof_apn_get(0, &read);
+    }
+
     if (len < read + 1) {
         return -1;
     }
@@ -521,7 +526,7 @@ int lwm2m_admin_pdn_activate(uint16_t security_instance)
 {
     int rc;
 
-    if (!operator_is_vzw(false) ||
+    if ((!operator_is_vzw(false) && !operator_is_att(false)) ||
         !m_use_admin_pdn[security_instance]) {
         /* Nothing to do */
         lwm2m_retry_delay_pdn_reset();
@@ -550,16 +555,18 @@ int lwm2m_admin_pdn_activate(uint16_t security_instance)
 
     LWM2M_INF("Activating %s", lwm2m_os_log_strdup(m_apn_name_buf));
 
-    /* PDN was reactived, wait for IPv6 */
-    rc = at_apn_setup_wait_for_ipv6(&m_admin_pdn_handle, m_apn_name_buf);
+    if (at_esm_error_code_get() != 50) // 50 == PDN type IPv4 only allowed
+    {
+        /* PDN was reactived, wait for IPv6 */
+        rc = at_apn_setup_wait_for_ipv6(&m_admin_pdn_handle);
 
-    /* Unregister from packet domain events after waiting for IPv6 */
-    at_apn_unregister_from_packet_events();
-
-    if (rc) {
-        return lwm2m_retry_delay_pdn_get();
+        if (rc) {
+            at_apn_unregister_from_packet_events();
+            return lwm2m_retry_delay_pdn_get();
+        }
     }
 
+    at_apn_unregister_from_packet_events();
     lwm2m_retry_delay_pdn_reset();
 
     return 0;
