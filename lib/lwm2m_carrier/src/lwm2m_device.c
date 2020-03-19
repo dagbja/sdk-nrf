@@ -331,6 +331,8 @@ static void on_observe_start(uint16_t res, coap_message_t *p_req)
 
     const uint16_t path[] = { LWM2M_OBJ_DEVICE, 0, res };
 
+    len = sizeof(buf);
+
     LWM2M_INF("Observe register /3/0/%d", res);
 
     err = lwm2m_tlv_device_encode(buf, &len, res, &m_instance_device);
