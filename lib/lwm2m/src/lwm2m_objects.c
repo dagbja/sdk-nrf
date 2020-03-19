@@ -526,25 +526,21 @@ void lwm2m_instance_apn_connection_profile_init(lwm2m_apn_conn_prof_t * p_instan
     p_instance->conn_est_time.p_id                = NULL;
     p_instance->conn_est_time.val.p_int32         = m_conn_est_time[instance_id];
     p_instance->conn_est_time.max_len             = LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS;
-    p_instance->conn_est_time.len                 = 1;
 
     p_instance->conn_est_result.type              = LWM2M_LIST_TYPE_UINT8;
     p_instance->conn_est_result.p_id              = NULL;
     p_instance->conn_est_result.val.p_uint8       = m_conn_est_result[instance_id];
     p_instance->conn_est_result.max_len           = LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS;
-    p_instance->conn_est_result.len               = 1;
 
     p_instance->conn_est_reject_cause.type        = LWM2M_LIST_TYPE_UINT8;
     p_instance->conn_est_reject_cause.p_id        = NULL;
     p_instance->conn_est_reject_cause.val.p_uint8 = m_conn_est_reject_cause[instance_id];
     p_instance->conn_est_reject_cause.max_len     = LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS;
-    p_instance->conn_est_reject_cause.len         = 1;
 
     p_instance->conn_end_time.type                = LWM2M_LIST_TYPE_INT32;
     p_instance->conn_end_time.p_id                = NULL;
     p_instance->conn_end_time.val.p_int32         = m_conn_end_time[instance_id];
     p_instance->conn_end_time.max_len             = LWM2M_APN_CONN_PROF_MAX_TIMESTAMPS;
-    p_instance->conn_end_time.len                 = 1;
 }
 
 void lwm2m_instance_portfolio_init(lwm2m_portfolio_t * p_instance)

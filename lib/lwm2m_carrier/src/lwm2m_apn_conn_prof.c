@@ -21,9 +21,8 @@
 static lwm2m_object_t        m_object_apn_conn_prof;                             /**< APN Connection Profile base object. */
 // TODO: Only two instances are currently supported.
 static lwm2m_apn_conn_prof_t m_instance_apn_conn_prof[LWM2M_MAX_APN_COUNT];      /**< APN Connection Profile object instances. */
-static uint8_t               m_apn_idx[ARRAY_SIZE(m_instance_apn_conn_prof)];
 
-static char *                m_profile_name_default[] = { "AT&T LWM2M APN", "DEFAULT APN" };
+static char *                m_profile_name_default[] = { "AT&T LWM2M APN", NULL };
 static char *                m_apn_default[] = { "attm2mglobal", "m2m.com.attz" };
 
 // LWM2M core resources.
@@ -66,7 +65,8 @@ bool lwm2m_apn_conn_prof_activate(uint16_t instance_id,
         return false;
     }
 
-    if (m_apn_idx[instance_id] == apn_conn->conn_est_time.max_len)
+    int apn_idx = apn_conn->conn_est_time.len;
+    if (apn_idx == apn_conn->conn_est_time.max_len)
     {
         // List is full, move all values one index down.
         for (int i = 1; i < apn_conn->conn_est_time.max_len; i++)
@@ -76,19 +76,14 @@ bool lwm2m_apn_conn_prof_activate(uint16_t instance_id,
             list_integer_copy(&apn_conn->conn_est_reject_cause, i, i - 1);
             list_integer_copy(&apn_conn->conn_end_time, i, i - 1);
         }
-        m_apn_idx[instance_id]--;
+        apn_idx--;
     }
 
-    lwm2m_list_integer_set(&apn_conn->conn_est_time, m_apn_idx[instance_id], lwm2m_utc_time());
-    lwm2m_list_integer_set(&apn_conn->conn_est_result, m_apn_idx[instance_id], (reject_cause == 0) ? 0 : 1);
-    lwm2m_list_integer_set(&apn_conn->conn_est_reject_cause, m_apn_idx[instance_id], reject_cause);
-    lwm2m_list_integer_set(&apn_conn->conn_end_time, m_apn_idx[instance_id], 0);
-
-    if (reject_cause != 0)
-    {
-        // When having an error we don't expect a deactivate.
-        m_apn_idx[instance_id]++;
-    }
+    int32_t utc_time = lwm2m_utc_time();
+    lwm2m_list_integer_set(&apn_conn->conn_est_time, apn_idx, utc_time);
+    lwm2m_list_integer_set(&apn_conn->conn_est_result, apn_idx, (reject_cause == 0) ? 0 : 1);
+    lwm2m_list_integer_set(&apn_conn->conn_est_reject_cause, apn_idx, reject_cause);
+    lwm2m_list_integer_set(&apn_conn->conn_end_time, apn_idx, (reject_cause == 0) ? 0 : utc_time);
 
     return true;
 }
@@ -102,8 +97,19 @@ bool lwm2m_apn_conn_prof_deactivate(uint16_t instance_id)
         return false;
     }
 
-    lwm2m_list_integer_set(&apn_conn->conn_end_time, m_apn_idx[instance_id], lwm2m_utc_time());
-    m_apn_idx[instance_id]++;
+    int apn_idx = 0;
+    while ((apn_idx < apn_conn->conn_est_time.max_len) &&
+           (lwm2m_list_integer_get(&apn_conn->conn_est_time, apn_idx) != 0))
+    {
+        apn_idx++;
+    }
+
+    if (apn_idx == 0)
+    {
+        return false;
+    }
+
+    lwm2m_list_integer_set(&apn_conn->conn_end_time, apn_idx - 1, lwm2m_utc_time());
 
     return true;
 }
@@ -313,7 +319,14 @@ void lwm2m_apn_conn_prof_init(void)
 
         m_instance_apn_conn_prof[i].proto.callback = apn_conn_prof_instance_callback;
 
-        lwm2m_bytebuffer_to_string(m_profile_name_default[i], strlen(m_profile_name_default[i]), &m_instance_apn_conn_prof[i].profile_name);
+        if (m_profile_name_default[i])
+        {
+            lwm2m_bytebuffer_to_string(m_profile_name_default[i], strlen(m_profile_name_default[i]), &m_instance_apn_conn_prof[i].profile_name);
+        }
+        else
+        {
+            lwm2m_bytebuffer_to_string(m_apn_default[i], strlen(m_apn_default[i]), &m_instance_apn_conn_prof[i].profile_name);
+        }
         lwm2m_bytebuffer_to_string(m_apn_default[i], strlen(m_apn_default[i]), &m_instance_apn_conn_prof[i].apn);
         m_instance_apn_conn_prof[i].enable_status = true;
         m_instance_apn_conn_prof[i].authentication_type = 0;
