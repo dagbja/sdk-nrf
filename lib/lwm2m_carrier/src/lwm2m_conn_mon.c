@@ -566,10 +566,9 @@ static void lwm2m_conn_mon_update_resource(uint16_t resource_id)
         break;
     case LWM2M_CONN_MON_APN:
         if (!operator_is_vzw(true)) {
-            // TODO: Use APN used to connect to the Bootstrap Server
             uint8_t apn_len = 0;
-            uint8_t *p_apn_name = lwm2m_apn_conn_prof_apn_get(0, &apn_len);
-            lwm2m_list_string_set(&m_instance_conn_mon.apn, 0, p_apn_name, apn_len);
+            uint8_t *p_apn = lwm2m_apn_conn_prof_apn_get(lwm2m_apn_instance(), &apn_len);
+            lwm2m_list_string_set(&m_instance_conn_mon.apn, 0, p_apn, apn_len);
         }
         break;
     case LWM2M_CONN_MON_CELL_ID:

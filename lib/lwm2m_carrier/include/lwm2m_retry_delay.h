@@ -11,7 +11,7 @@
  *
  * @return Retry delay in milliseconds.
  */
-int32_t lwm2m_retry_delay_pdn_get(void);
+int32_t lwm2m_retry_delay_pdn_get(uint16_t apn_instance, bool * p_is_last);
 
 /**@brief Reset PDN retry delay counter.
  */

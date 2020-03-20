@@ -49,6 +49,16 @@ char * lwm2m_apn_conn_prof_apn_get(uint16_t instance_id, uint8_t * p_len)
     return m_instance_apn_conn_prof[instance_id].apn.p_val;
 }
 
+bool lwm2m_apn_conn_prof_is_enabled(uint16_t instance_id)
+{
+    if (instance_id >= ARRAY_SIZE(m_instance_apn_conn_prof))
+    {
+        return false;
+    }
+
+    return m_instance_apn_conn_prof[instance_id].enable_status;
+}
+
 static uint32_t list_integer_copy(lwm2m_list_t * p_list, int from_idx, int to_idx)
 {
     int32_t value = lwm2m_list_integer_get(p_list, from_idx);

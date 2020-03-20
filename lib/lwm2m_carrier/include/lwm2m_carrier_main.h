@@ -43,6 +43,8 @@ typedef enum
 
 lwm2m_state_t lwm2m_state_get(void);
 
+uint16_t lwm2m_apn_instance(void);
+
 /**
  * @brief Get the device client id.
  *
