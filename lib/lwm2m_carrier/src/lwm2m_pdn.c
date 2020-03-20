@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <nrf_socket.h>
+#include <at_interface.h>
 
 #include <lwm2m.h>
 #include <lwm2m_os.h>
@@ -49,6 +50,14 @@ int lwm2m_pdn_activate(int *fd, const char *apn)
 	if (err) {
 		LWM2M_ERR("PDN connect failed: %s (%d)",
 			  lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
+
+		int timeout_ms = 100; // 100 millisecond timeout.
+		while (at_esm_error_code_get() == 0 && timeout_ms > 0) {
+			// Wait for ESM reject cause to be reported
+			lwm2m_os_sleep(10);
+			timeout_ms -= 10;
+		}
+
 		nrf_close(*fd);
 		*fd = -1;
 		return -1;

@@ -183,6 +183,8 @@ static int app_init_and_connect(void)
 
     int err = lwm2m_os_lte_link_up();
 
+    lwm2m_apn_conn_prof_activate(lwm2m_apn_conn_prof_default_instance(), 0);
+
     if (err == 0) {
         app_event_notify(LWM2M_CARRIER_EVENT_CONNECTED, NULL);
     } else {
@@ -199,6 +201,8 @@ static int app_offline(void)
     // Set state to DISCONNECTED to avoid detecting "no registered network"
     // when provisioning security keys.
     lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
+
+    lwm2m_apn_conn_prof_deactivate(lwm2m_apn_conn_prof_default_instance());
 
     int err = lwm2m_os_lte_link_down();
 
@@ -580,9 +584,8 @@ static void setup_carrier_apn(uint16_t security_instance)
     else if (operator_is_att(false))
     {
         // AT&T: Setup PDN unless using default (CID 0)
-        uint8_t apn_len = 0;
-        char * p_apn = lwm2m_apn_conn_prof_apn_get(m_apn_instance, &apn_len);
-        if (strncmp(m_default_apn, p_apn, apn_len) != 0)
+        uint16_t default_apn_instance = lwm2m_apn_conn_prof_default_instance();
+        if (m_apn_instance != default_apn_instance)
         {
             m_connection_use_pdn = true;
         }
@@ -612,6 +615,15 @@ bool lwm2m_carrier_pdn_activate(uint16_t security_instance, int32_t *retry_delay
 
     int rc = lwm2m_pdn_activate(&m_pdn_handle, m_current_apn);
     if (rc < 0) {
+        if (lwm2m_retry_count_pdn_get() == 0) {
+            /* Only report first activate reject when doing retries */
+            /* TODO: Check how to handle this properly */
+            uint32_t esm_error_code = at_esm_error_code_get();
+            if (esm_error_code == 0) {
+                esm_error_code = 34; // Service option temporarily out of order
+            }
+            lwm2m_apn_conn_prof_activate(m_apn_instance, esm_error_code);
+        }
         at_apn_unregister_from_packet_events();
         *retry_delay = pdn_retry_delay(security_instance);
 
@@ -626,6 +638,7 @@ bool lwm2m_carrier_pdn_activate(uint16_t security_instance, int32_t *retry_delay
     }
 
     LWM2M_INF("Activating %s", lwm2m_os_log_strdup(m_current_apn));
+    lwm2m_apn_conn_prof_activate(m_apn_instance, 0);
 
     if (at_esm_error_code_get() != 50) // 50 == PDN type IPv4 only allowed
     {
@@ -651,6 +664,7 @@ static void lwm2m_carrier_pdn_deactivate(void)
 {
     if (m_pdn_handle != -1)
     {
+        lwm2m_apn_conn_prof_deactivate(m_apn_instance);
         nrf_close(m_pdn_handle);
         m_pdn_handle = -1;
     }
@@ -2988,6 +3002,9 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 
     // Create LwM2M factory bootstrapped objects.
     app_lwm2m_create_objects();
+
+    // Default APN is connected at startup.
+    lwm2m_apn_conn_prof_activate(lwm2m_apn_conn_prof_default_instance(), 0);
 
     if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6)) {
         for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {

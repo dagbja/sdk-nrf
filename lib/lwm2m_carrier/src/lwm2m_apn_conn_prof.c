@@ -24,6 +24,7 @@ static lwm2m_apn_conn_prof_t m_instance_apn_conn_prof[LWM2M_MAX_APN_COUNT];     
 
 static char *                m_profile_name_default[] = { "AT&T LWM2M APN", NULL };
 static char *                m_apn_default[] = { "attm2mglobal", NULL };
+static uint16_t              m_default_apn_instance;
 
 // LWM2M core resources.
 
@@ -69,6 +70,11 @@ bool lwm2m_apn_conn_prof_is_enabled(uint16_t instance_id)
     }
 
     return m_instance_apn_conn_prof[instance_id].enable_status;
+}
+
+uint16_t lwm2m_apn_conn_prof_default_instance(void)
+{
+    return m_default_apn_instance;
 }
 
 static uint32_t list_integer_copy(lwm2m_list_t * p_list, int from_idx, int to_idx)
@@ -345,6 +351,7 @@ void lwm2m_apn_conn_prof_init(void)
         if (p_apn == NULL)
         {
             p_apn = lwm2m_default_apn_get();
+            m_default_apn_instance = i;
         }
 
         if (m_profile_name_default[i])

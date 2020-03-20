@@ -150,6 +150,11 @@ int32_t lwm2m_retry_delay_pdn_get(uint16_t apn_instance, bool * p_is_last)
     return retry_delay;
 }
 
+int32_t lwm2m_retry_count_pdn_get(void)
+{
+    return m_retry_count_pdn;
+}
+
 void lwm2m_retry_delay_pdn_reset(void)
 {
     m_retry_count_pdn = 0;

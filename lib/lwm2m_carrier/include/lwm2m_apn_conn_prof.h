@@ -25,6 +25,8 @@ bool lwm2m_apn_conn_prof_enabled_set(uint16_t instance_id, bool enable_status);
 
 bool lwm2m_apn_conn_prof_is_enabled(uint16_t instance_id);
 
+uint16_t lwm2m_apn_conn_prof_default_instance(void);
+
 lwm2m_apn_conn_prof_t * lwm2m_apn_conn_prof_get_instance(uint16_t instance_id);
 
 lwm2m_object_t * lwm2m_apn_conn_prof_get_object(void);

@@ -13,6 +13,12 @@
  */
 int32_t lwm2m_retry_delay_pdn_get(uint16_t apn_instance, bool * p_is_last);
 
+/**@brief Get PDN retry counter.
+ *
+ * @return Retry count.
+ */
+int32_t lwm2m_retry_count_pdn_get(void);
+
 /**@brief Reset PDN retry delay counter.
  */
 void lwm2m_retry_delay_pdn_reset(void);
