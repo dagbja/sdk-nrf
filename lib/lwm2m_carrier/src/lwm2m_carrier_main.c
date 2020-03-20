@@ -527,8 +527,8 @@ static int admin_apn_get(char *buf, size_t len)
     return read;
 }
 
-/**@brief Setup ADMIN PDN connection, if necessary */
-int lwm2m_admin_pdn_activate(uint16_t security_instance)
+/**@brief Setup PDN connection, if necessary */
+bool lwm2m_admin_pdn_activate(uint16_t security_instance, int32_t *retry_delay)
 {
     int rc;
 
@@ -536,7 +536,7 @@ int lwm2m_admin_pdn_activate(uint16_t security_instance)
         !m_use_admin_pdn[security_instance]) {
         /* Nothing to do */
         lwm2m_retry_delay_pdn_reset();
-        return 0;
+        return true;
     }
 
     admin_apn_get(m_apn_name_buf, sizeof(m_apn_name_buf));
@@ -548,15 +548,16 @@ int lwm2m_admin_pdn_activate(uint16_t security_instance)
     rc = lwm2m_pdn_activate(&m_admin_pdn_handle, m_apn_name_buf);
     if (rc < 0) {
         at_apn_unregister_from_packet_events();
+        *retry_delay = lwm2m_retry_delay_pdn_get();
 
-        return lwm2m_retry_delay_pdn_get();
+        return false;
     }
 
     /* PDN was active */
     if (rc == 0) {
         at_apn_unregister_from_packet_events();
         lwm2m_retry_delay_pdn_reset();
-        return 0;
+        return true;
     }
 
     LWM2M_INF("Activating %s", lwm2m_os_log_strdup(m_apn_name_buf));
@@ -568,14 +569,16 @@ int lwm2m_admin_pdn_activate(uint16_t security_instance)
 
         if (rc) {
             at_apn_unregister_from_packet_events();
-            return lwm2m_retry_delay_pdn_get();
+            *retry_delay = lwm2m_retry_delay_pdn_get();
+
+            return false;
         }
     }
 
     at_apn_unregister_from_packet_events();
     lwm2m_retry_delay_pdn_reset();
 
-    return 0;
+    return true;
 }
 
 /**@brief Disconnect ADMIN PDN connection. */
@@ -1874,8 +1877,8 @@ static void app_bootstrap_connect(void)
     uint32_t err_code;
     bool secure;
 
-    int32_t pdn_retry_delay = lwm2m_admin_pdn_activate(LWM2M_BOOTSTRAP_INSTANCE_ID);
-    if (pdn_retry_delay > 0) {
+    int32_t pdn_retry_delay = 0;
+    if (!lwm2m_admin_pdn_activate(LWM2M_BOOTSTRAP_INSTANCE_ID, &pdn_retry_delay)) {
         // Setup ADMIN PDN connection failed, try again
         if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT)) {
             LWM2M_INF("PDN retry delay for %ld seconds (server 0)", pdn_retry_delay / K_SECONDS(1));
@@ -2033,8 +2036,8 @@ static void app_server_connect(uint16_t security_instance)
     uint32_t err_code;
     bool secure;
 
-    int32_t pdn_retry_delay = lwm2m_admin_pdn_activate(security_instance);
-    if (pdn_retry_delay > 0) {
+    int32_t pdn_retry_delay = 0;
+    if (!lwm2m_admin_pdn_activate(security_instance, &pdn_retry_delay)) {
         // Setup ADMIN PDN connection failed, try again
         if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
             LWM2M_INF("PDN retry delay for %ld seconds (server %u)", pdn_retry_delay / K_SECONDS(1), security_instance);

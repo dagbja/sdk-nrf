@@ -303,7 +303,8 @@ static void download_task(void *w)
 			/* PDN is down, pass bootstrap instance because
 			 * the bootstrap server uses VZWADMIN PDN.
 			 */
-			int32_t retry_delay = lwm2m_admin_pdn_activate(0);
+			int32_t retry_delay = 0;
+			(void) lwm2m_admin_pdn_activate(0, &retry_delay);
 			lwm2m_os_timer_start(download_dwork, retry_delay);
 			return;
 		}
