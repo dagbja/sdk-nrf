@@ -77,7 +77,7 @@ uint32_t portfolio_instance_callback(lwm2m_instance_t * p_instance,
 
     uint16_t instance_id = p_instance->instance_id;
 
-    if (instance_id != 0)
+    if (instance_id >= ARRAY_SIZE(m_instance_portfolio))
     {
         (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
         return 0;
