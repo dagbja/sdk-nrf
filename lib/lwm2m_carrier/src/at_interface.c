@@ -852,6 +852,27 @@ int at_read_cell_id(uint32_t * p_cell_id)
     return retval;
 }
 
+int at_read_default_apn(char * p_apn, uint32_t apn_len)
+{
+    int retval = 0;
+
+    if (p_apn == NULL || apn_len == 0) {
+        return -EINVAL;
+    }
+
+    // Read default APN
+    int len = apn_len;
+    int err = at_response_param_to_string("AT+CGDCONT?", 12, 3, p_apn, &len);
+
+    if (err != 0)
+    {
+        LWM2M_ERR("Unable to read default APN. AT command error %d.", err);
+        retval = -EIO;
+    }
+
+    return retval;
+}
+
 int at_read_smnc_smcc(int32_t * p_smnc, int32_t *p_smcc)
 {
     int retval = 0;

@@ -66,6 +66,7 @@
 
 #define SECONDS_TO_UPDATE_EARLY         4                                                   /**< Number of seconds to Update early. */
 
+static char m_default_apn_buf[APP_APN_NAME_BUF_LENGTH];                                     /**< Default APN. */
 static char m_apn_name_buf[APP_APN_NAME_BUF_LENGTH];                                        /**< Buffer to store APN name. */
 
 /* Initialize config with default values. */
@@ -440,6 +441,11 @@ char *lwm2m_msisdn_get(void)
     }
 
     return p_msisdn;
+}
+
+char *lwm2m_default_apn_get(void)
+{
+    return m_default_apn_buf;
 }
 
 bool lwm2m_did_bootstrap(void)
@@ -1113,7 +1119,8 @@ static uint32_t app_resolve_server_uri(char                * server_uri,
 
     LWM2M_INF("Doing DNS lookup using %s (APN %s)",
             (family_type == NRF_AF_INET6) ? "IPv6" : "IPv4",
-            (pdn_handle > -1) ? lwm2m_os_log_strdup(m_apn_name_buf) : "default");
+            (pdn_handle > -1) ? lwm2m_os_log_strdup(m_apn_name_buf) :
+                                lwm2m_os_log_strdup(m_default_apn_buf));
 
     struct nrf_addrinfo *result;
     int ret_val = -1;
@@ -1943,7 +1950,8 @@ static void app_bootstrap_connect(void)
         }
 
         LWM2M_INF("Setup secure DTLS session (server 0) (APN %s)",
-                  (local_port.interface) ? lwm2m_os_log_strdup(m_apn_name_buf) : "default");
+                  (local_port.interface) ? lwm2m_os_log_strdup(m_apn_name_buf) :
+                                           lwm2m_os_log_strdup(m_default_apn_buf));
 
         err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_remote_server[LWM2M_BOOTSTRAP_INSTANCE_ID]);
 
@@ -2118,7 +2126,8 @@ static void app_server_connect(uint16_t security_instance)
 
         LWM2M_INF("Setup secure DTLS session (server %u) (APN %s)",
                   security_instance,
-                  (local_port.interface) ? lwm2m_os_log_strdup(m_apn_name_buf) : "default");
+                  (local_port.interface) ? lwm2m_os_log_strdup(m_apn_name_buf) :
+                                           lwm2m_os_log_strdup(m_default_apn_buf));
 
         err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_remote_server[security_instance]);
 
@@ -2928,6 +2937,11 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
         // IMEI is required to generate a unique Client ID. Cannot continue.
         LWM2M_ERR("Unable to read IMEI, cannot generate client ID");
         return -EIO;
+    }
+
+    err = at_read_default_apn(m_default_apn_buf, sizeof(m_default_apn_buf));
+    if (err != 0) {
+        LWM2M_ERR("Unable to read default APN");
     }
 
     // Initialize CoAP.

@@ -23,7 +23,7 @@ static lwm2m_object_t        m_object_apn_conn_prof;                            
 static lwm2m_apn_conn_prof_t m_instance_apn_conn_prof[LWM2M_MAX_APN_COUNT];      /**< APN Connection Profile object instances. */
 
 static char *                m_profile_name_default[] = { "AT&T LWM2M APN", NULL };
-static char *                m_apn_default[] = { "attm2mglobal", "m2m.com.attz" };
+static char *                m_apn_default[] = { "attm2mglobal", NULL };
 
 // LWM2M core resources.
 
@@ -319,15 +319,21 @@ void lwm2m_apn_conn_prof_init(void)
 
         m_instance_apn_conn_prof[i].proto.callback = apn_conn_prof_instance_callback;
 
+        char * p_apn = m_apn_default[i];
+        if (p_apn == NULL)
+        {
+            p_apn = lwm2m_default_apn_get();
+        }
+
         if (m_profile_name_default[i])
         {
             lwm2m_bytebuffer_to_string(m_profile_name_default[i], strlen(m_profile_name_default[i]), &m_instance_apn_conn_prof[i].profile_name);
         }
         else
         {
-            lwm2m_bytebuffer_to_string(m_apn_default[i], strlen(m_apn_default[i]), &m_instance_apn_conn_prof[i].profile_name);
+            lwm2m_bytebuffer_to_string(p_apn, strlen(p_apn), &m_instance_apn_conn_prof[i].profile_name);
         }
-        lwm2m_bytebuffer_to_string(m_apn_default[i], strlen(m_apn_default[i]), &m_instance_apn_conn_prof[i].apn);
+        lwm2m_bytebuffer_to_string(p_apn, strlen(p_apn), &m_instance_apn_conn_prof[i].apn);
         m_instance_apn_conn_prof[i].enable_status = true;
         m_instance_apn_conn_prof[i].authentication_type = 0;
 

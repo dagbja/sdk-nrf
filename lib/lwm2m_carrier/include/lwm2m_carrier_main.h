@@ -62,6 +62,11 @@ char *lwm2m_imei_get(void);
  */
 char *lwm2m_msisdn_get(void);
 
+/**
+ * @brief Get default APN.
+ */
+char *lwm2m_default_apn_get(void);
+
 bool lwm2m_is_admin_pdn_ready(void);
 int lwm2m_admin_pdn_activate(uint16_t instance_id);
 

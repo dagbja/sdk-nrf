@@ -186,6 +186,18 @@ int at_read_radio_signal_strength_and_link_quality(int32_t * p_signal_strength, 
 int at_read_cell_id(uint32_t * p_cell_id);
 
 /**
+ * @brief Read default APN.
+ *
+ * @param p_apn[out]  Buffer to store APN. Store a NULL-terminated string.
+ * @param apn_len[in] Size of the buffer.
+ *
+ * @retval EINVAL Invalid parameters.
+ * @retval EIO AT command error.
+ * @retval 0 Success.
+ */
+int at_read_default_apn(char * p_apn, uint32_t apn_len);
+
+/**
  * @brief Read Mobile Country Code (MCC) and Mobile Network Code (MNC) values from modem.
  *
  * @param[out] p_smnc Pointer to store the MNC value
