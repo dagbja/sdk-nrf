@@ -61,13 +61,11 @@
 #define APP_NET_REG_STAT_ROAM           5                                                   /**< Registered to roaming network. */
 
 #define APP_CLIENT_ID_LENGTH            128                                                 /**< Buffer size to store the Client ID. */
-
-#define APP_APN_NAME_BUF_LENGTH         64                                                  /**< Buffer size to store APN name. */
-
 #define SECONDS_TO_UPDATE_EARLY         4                                                   /**< Number of seconds to Update early. */
 
-static char m_default_apn_buf[APP_APN_NAME_BUF_LENGTH];                                     /**< Default APN. */
-static char m_apn_name_buf[APP_APN_NAME_BUF_LENGTH];                                        /**< Buffer to store APN name. */
+#define MAX_APN_LENGTH                  64                                                  /**< Maximum APN length. */
+static char m_default_apn[MAX_APN_LENGTH];                                                  /**< Default APN. */
+static char m_current_apn[MAX_APN_LENGTH];                                                  /**< Current APN. */
 
 /* Initialize config with default values. */
 static lwm2m_carrier_config_t              m_app_config;
@@ -82,7 +80,7 @@ static char m_bootstrap_object_alias_name[] = "bs";                             
 
 static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS];            /**< CoAP transport handles for the secure servers. Obtained on @coap_security_setup. */
 
-static int   m_admin_pdn_handle = -1;                                                         /**< VZWADMIN PDN connection handle. */
+static int      m_pdn_handle = -1;                                                            /**< PDN connection handle. */
 static uint16_t m_apn_instance;                                                               /**< Current APN index. */
 static bool     m_connection_use_pdn;                                                         /**< Use PDN for connection. */
 
@@ -446,17 +444,12 @@ char *lwm2m_msisdn_get(void)
 
 char *lwm2m_default_apn_get(void)
 {
-    return m_default_apn_buf;
+    return m_default_apn;
 }
 
 bool lwm2m_did_bootstrap(void)
 {
     return m_did_bootstrap;
-}
-
-bool lwm2m_is_admin_pdn_ready()
-{
-    return (m_admin_pdn_handle != -1);
 }
 
 uint16_t lwm2m_security_instance(void)
@@ -509,23 +502,23 @@ void lwm2m_system_reset(bool force_reset)
  */
 static int carrier_apn_get(char *buf, size_t len)
 {
-    char *apn_name;
-    uint8_t read = 0;
+    char *p_apn;
+    uint8_t apn_len = 0;
 
     if (operator_is_vzw(false)) {
-        apn_name = lwm2m_conn_mon_class_apn_get(2, &read);
+        p_apn = lwm2m_conn_mon_class_apn_get(2, &apn_len);
     } else {
-        apn_name = lwm2m_apn_conn_prof_apn_get(m_apn_instance, &read);
+        p_apn = lwm2m_apn_conn_prof_apn_get(m_apn_instance, &apn_len);
     }
 
-    if (len < read + 1) {
+    if (len < apn_len + 1) {
         return -1;
     }
 
-    memcpy(buf, apn_name, read);
-    buf[read] = '\0';
+    memcpy(buf, p_apn, apn_len);
+    buf[apn_len] = '\0';
 
-    return read;
+    return apn_len;
 }
 
 uint16_t lwm2m_apn_instance(void)
@@ -588,19 +581,20 @@ static void setup_carrier_apn(uint16_t security_instance)
         // AT&T: Setup PDN unless using default (CID 0)
         uint8_t apn_len = 0;
         char * p_apn = lwm2m_apn_conn_prof_apn_get(m_apn_instance, &apn_len);
-        if (strncmp(m_default_apn_buf, p_apn, apn_len) != 0) {
+        if (strncmp(m_default_apn, p_apn, apn_len) != 0)
+        {
             m_connection_use_pdn = true;
         }
     }
 
     if (m_connection_use_pdn)
     {
-        carrier_apn_get(m_apn_name_buf, sizeof(m_apn_name_buf));
+        carrier_apn_get(m_current_apn, sizeof(m_current_apn));
     }
 }
 
 /**@brief Setup PDN connection, if necessary */
-bool lwm2m_admin_pdn_activate(uint16_t security_instance, int32_t *retry_delay)
+bool lwm2m_carrier_pdn_activate(uint16_t security_instance, int32_t *retry_delay)
 {
     setup_carrier_apn(security_instance);
 
@@ -610,12 +604,12 @@ bool lwm2m_admin_pdn_activate(uint16_t security_instance, int32_t *retry_delay)
         return true;
     }
 
-    LWM2M_INF("PDN setup: %s", lwm2m_os_log_strdup(m_apn_name_buf));
+    LWM2M_INF("PDN setup: %s", lwm2m_os_log_strdup(m_current_apn));
 
-    /* Register for packet domain events before activating ADMIN PDN */
+    /* Register for packet domain events before activating PDN */
     at_apn_register_for_packet_events();
 
-    int rc = lwm2m_pdn_activate(&m_admin_pdn_handle, m_apn_name_buf);
+    int rc = lwm2m_pdn_activate(&m_pdn_handle, m_current_apn);
     if (rc < 0) {
         at_apn_unregister_from_packet_events();
         *retry_delay = pdn_retry_delay(security_instance);
@@ -630,12 +624,12 @@ bool lwm2m_admin_pdn_activate(uint16_t security_instance, int32_t *retry_delay)
         return true;
     }
 
-    LWM2M_INF("Activating %s", lwm2m_os_log_strdup(m_apn_name_buf));
+    LWM2M_INF("Activating %s", lwm2m_os_log_strdup(m_current_apn));
 
     if (at_esm_error_code_get() != 50) // 50 == PDN type IPv4 only allowed
     {
         /* PDN was reactived, wait for IPv6 */
-        rc = at_apn_setup_wait_for_ipv6(&m_admin_pdn_handle);
+        rc = at_apn_setup_wait_for_ipv6(&m_pdn_handle);
 
         if (rc) {
             at_apn_unregister_from_packet_events();
@@ -651,13 +645,13 @@ bool lwm2m_admin_pdn_activate(uint16_t security_instance, int32_t *retry_delay)
     return true;
 }
 
-/**@brief Disconnect ADMIN PDN connection. */
-static void lwm2m_admin_pdn_deactivate(void)
+/**@brief Disconnect carrier PDN connection. */
+static void lwm2m_carrier_pdn_deactivate(void)
 {
-    if (m_admin_pdn_handle != -1)
+    if (m_pdn_handle != -1)
     {
-        nrf_close(m_admin_pdn_handle);
-        m_admin_pdn_handle = -1;
+        nrf_close(m_pdn_handle);
+        m_pdn_handle = -1;
     }
 }
 
@@ -1183,15 +1177,15 @@ static uint32_t app_resolve_server_uri(char                * server_uri,
         apn_hints.ai_family    = NRF_AF_LTE;
         apn_hints.ai_socktype  = NRF_SOCK_MGMT;
         apn_hints.ai_protocol  = NRF_PROTO_PDN;
-        apn_hints.ai_canonname = m_apn_name_buf;
+        apn_hints.ai_canonname = m_current_apn;
 
         hints.ai_next = &apn_hints;
     }
 
     LWM2M_INF("Doing DNS lookup using %s (APN %s)",
             (family_type == NRF_AF_INET6) ? "IPv6" : "IPv4",
-            (pdn_handle > -1) ? lwm2m_os_log_strdup(m_apn_name_buf) :
-                                lwm2m_os_log_strdup(m_default_apn_buf));
+            (pdn_handle > -1) ? lwm2m_os_log_strdup(m_current_apn) :
+                                lwm2m_os_log_strdup(m_default_apn));
 
     struct nrf_addrinfo *result;
     int ret_val = -1;
@@ -1255,7 +1249,7 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t              short_
     uint32_t err_code;
 
     // Use DNS to lookup the IP
-    err_code = app_resolve_server_uri(server_uri, uri_len, p_remote, secure, m_family_type[LWM2M_BOOTSTRAP_INSTANCE_ID], m_admin_pdn_handle);
+    err_code = app_resolve_server_uri(server_uri, uri_len, p_remote, secure, m_family_type[LWM2M_BOOTSTRAP_INSTANCE_ID], m_pdn_handle);
 
     if (err_code == 0)
     {
@@ -1946,8 +1940,8 @@ static void app_bootstrap_connect(void)
     bool secure;
 
     int32_t pdn_retry_delay = 0;
-    if (!lwm2m_admin_pdn_activate(LWM2M_BOOTSTRAP_INSTANCE_ID, &pdn_retry_delay)) {
-        // Setup ADMIN PDN connection failed, try again
+    if (!lwm2m_carrier_pdn_activate(LWM2M_BOOTSTRAP_INSTANCE_ID, &pdn_retry_delay)) {
+        // Setup carrier PDN connection failed, try again
         if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT)) {
             LWM2M_INF("PDN retry delay for %ld seconds (server 0)", pdn_retry_delay / K_SECONDS(1));
             lwm2m_os_timer_start(state_update_timer, pdn_retry_delay);
@@ -2014,14 +2008,14 @@ static void app_bootstrap_connect(void)
             .protocol     = NRF_SPROTO_DTLS1v2
         };
 
-        if (m_connection_use_pdn && m_admin_pdn_handle != -1)
+        if (m_connection_use_pdn && m_pdn_handle != -1)
         {
-            local_port.interface = m_apn_name_buf;
+            local_port.interface = m_current_apn;
         }
 
         LWM2M_INF("Setup secure DTLS session (server 0) (APN %s)",
-                  (local_port.interface) ? lwm2m_os_log_strdup(m_apn_name_buf) :
-                                           lwm2m_os_log_strdup(m_default_apn_buf));
+                  (local_port.interface) ? lwm2m_os_log_strdup(m_current_apn) :
+                                           lwm2m_os_log_strdup(m_default_apn));
 
         err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_remote_server[LWM2M_BOOTSTRAP_INSTANCE_ID]);
 
@@ -2104,8 +2098,8 @@ static void app_server_connect(uint16_t security_instance)
     bool secure;
 
     int32_t pdn_retry_delay = 0;
-    if (!lwm2m_admin_pdn_activate(security_instance, &pdn_retry_delay)) {
-        // Setup ADMIN PDN connection failed, try again
+    if (!lwm2m_carrier_pdn_activate(security_instance, &pdn_retry_delay)) {
+        // Setup carrier PDN connection failed, try again
         if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
             LWM2M_INF("PDN retry delay for %ld seconds (server %u)", pdn_retry_delay / K_SECONDS(1), security_instance);
             lwm2m_os_timer_start(state_update_timer, pdn_retry_delay);
@@ -2144,7 +2138,7 @@ static void app_server_connect(uint16_t security_instance)
                                       (struct nrf_sockaddr *)&m_remote_server[security_instance],
                                       &secure,
                                       m_family_type[security_instance],
-                                      m_connection_use_pdn ? m_admin_pdn_handle : -1);
+                                      m_connection_use_pdn ? m_pdn_handle : -1);
     if (err_code != 0)
     {
         if (err_code == ENETDOWN) {
@@ -2188,15 +2182,15 @@ static void app_server_connect(uint16_t security_instance)
             .protocol     = NRF_SPROTO_DTLS1v2
         };
 
-        if (m_connection_use_pdn && m_admin_pdn_handle != -1)
+        if (m_connection_use_pdn && m_pdn_handle != -1)
         {
-            local_port.interface = m_apn_name_buf;
+            local_port.interface = m_current_apn;
         }
 
         LWM2M_INF("Setup secure DTLS session (server %u) (APN %s)",
                   security_instance,
-                  (local_port.interface) ? lwm2m_os_log_strdup(m_apn_name_buf) :
-                                           lwm2m_os_log_strdup(m_default_apn_buf));
+                  (local_port.interface) ? lwm2m_os_log_strdup(m_current_apn) :
+                                           lwm2m_os_log_strdup(m_default_apn));
 
         err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_remote_server[security_instance]);
 
@@ -2747,7 +2741,7 @@ static int app_lwm2m_process(void)
         {
             LWM2M_INF("Disconnect");
             app_disconnect();
-            lwm2m_admin_pdn_deactivate();
+            lwm2m_carrier_pdn_deactivate();
             lwm2m_sms_receiver_disable();
             break;
         }
@@ -3008,7 +3002,7 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
         return -EIO;
     }
 
-    err = at_read_default_apn(m_default_apn_buf, sizeof(m_default_apn_buf));
+    err = at_read_default_apn(m_default_apn, sizeof(m_default_apn));
     if (err != 0) {
         LWM2M_ERR("Unable to read default APN");
     }

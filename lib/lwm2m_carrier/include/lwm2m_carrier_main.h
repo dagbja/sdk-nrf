@@ -69,8 +69,7 @@ char *lwm2m_msisdn_get(void);
  */
 char *lwm2m_default_apn_get(void);
 
-bool lwm2m_is_admin_pdn_ready(void);
-bool lwm2m_admin_pdn_activate(uint16_t instance_id, int32_t *retry_delay);
+bool lwm2m_carrier_pdn_activate(uint16_t instance_id, int32_t *retry_delay);
 
 void lwm2m_request_link_up(void);
 void lwm2m_request_link_down(void);

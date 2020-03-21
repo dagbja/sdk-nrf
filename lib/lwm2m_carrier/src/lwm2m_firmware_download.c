@@ -304,7 +304,7 @@ static void download_task(void *w)
 			 * the bootstrap server uses VZWADMIN PDN.
 			 */
 			int32_t retry_delay = 0;
-			(void) lwm2m_admin_pdn_activate(0, &retry_delay);
+			(void) lwm2m_carrier_pdn_activate(0, &retry_delay);
 			lwm2m_os_timer_start(download_dwork, retry_delay);
 			return;
 		}
@@ -361,7 +361,7 @@ int lwm2m_firmware_download_init(void)
 	if (!reboot_dwork) {
 		return -1;
 	}
-	
+
 	err = lwm2m_os_download_init(callback);
 	if (err) {
 		return err;
@@ -515,7 +515,7 @@ int lwm2m_firmware_download_uri(char *package_uri, size_t len)
 int lwm2m_firmware_download_reboot_schedule(void)
 {
 	lwm2m_os_timer_start(reboot_dwork, K_NO_WAIT);
-	
+
 	return 0;
 }
 
