@@ -69,45 +69,67 @@ static int32_t lwm2m_retry_delay_pdn_att_get(void)
     return retry_delay;
 }
 
-static int32_t lwm2m_retry_delay_vzw_get(int instance_id, bool next_delay, bool * p_is_last)
+static int32_t lwm2m_retry_delay_vzw_get(uint16_t security_instance, bool * p_is_last)
 {
     int32_t retry_delay;
 
-    if (instance_id < 0 || instance_id >= 1+LWM2M_MAX_SERVERS) {
-        // Illegal instance_id.
+    if (security_instance < 0 || security_instance >= 1+LWM2M_MAX_SERVERS) {
+        // Illegal security_instance.
         return -1;
     }
 
-    if (next_delay) {
-        if (instance_id == 0 && m_retry_count_connect[instance_id] == ARRAY_SIZE(m_retry_delay_vzw) - 1) {
-            // Bootstrap retry does not use the last retry value and does not continue before next power up.
-            return -1;
-        }
-
-        if (m_retry_count_connect[instance_id] == ARRAY_SIZE(m_retry_delay_vzw)) {
-            // Retry counter wrap around.
-            m_retry_count_connect[instance_id] = 0;
-        }
-
-        // Fetch next retry delay.
-        retry_delay = m_retry_delay_vzw[m_retry_count_connect[instance_id]];
-        m_retry_count_connect[instance_id]++;
-    } else if (m_retry_count_connect[instance_id] > 0) {
+    if (m_retry_count_connect[security_instance] > 0) {
         // Fetch current retry delay.
-        retry_delay = m_retry_delay_vzw[m_retry_count_connect[instance_id] - 1];
+        retry_delay = m_retry_delay_vzw[m_retry_count_connect[security_instance] - 1];
     } else {
         // No retry delay started.
         retry_delay = -1;
     }
 
-    if (p_is_last && (m_retry_count_connect[instance_id] == ARRAY_SIZE(m_retry_delay_vzw))) {
+    if (p_is_last && (m_retry_count_connect[security_instance] == ARRAY_SIZE(m_retry_delay_vzw))) {
         *p_is_last = true;
     }
 
     return retry_delay;
 }
 
-static int32_t lwm2m_retry_delay_att_get(int instance_id, bool next_delay, bool * p_is_last)
+static int32_t lwm2m_retry_delay_vzw_next(uint16_t security_instance, bool * p_is_last)
+{
+    int32_t retry_delay;
+
+    if (security_instance < 0 || security_instance >= 1+LWM2M_MAX_SERVERS) {
+        // Illegal security_instance.
+        return -1;
+    }
+
+    if (security_instance == 0 && m_retry_count_connect[security_instance] == ARRAY_SIZE(m_retry_delay_vzw) - 1) {
+        // Bootstrap retry does not use the last retry value and does not continue before next power up.
+        return -1;
+    }
+
+    if (m_retry_count_connect[security_instance] == ARRAY_SIZE(m_retry_delay_vzw)) {
+        // Retry counter wrap around.
+        m_retry_count_connect[security_instance] = 0;
+    }
+
+    // Fetch next retry delay.
+    retry_delay = m_retry_delay_vzw[m_retry_count_connect[security_instance]];
+    m_retry_count_connect[security_instance]++;
+
+    if (p_is_last && (m_retry_count_connect[security_instance] == ARRAY_SIZE(m_retry_delay_vzw))) {
+        *p_is_last = true;
+    }
+
+    return retry_delay;
+}
+
+static int32_t lwm2m_retry_delay_att_get(uint16_t security_instance, bool * p_is_last)
+{
+    // TODO: Handle DTLS handshake retry delays for AT&T
+    return K_MINUTES(2);
+}
+
+static int32_t lwm2m_retry_delay_att_next(uint16_t security_instance, bool * p_is_last)
 {
     // TODO: Handle DTLS handshake retry delays for AT&T
     return K_MINUTES(2);
@@ -131,20 +153,33 @@ void lwm2m_retry_delay_pdn_reset(void)
     m_retry_count_pdn = 0;
 }
 
-int32_t lwm2m_retry_delay_connect_get(int instance_id, bool next_delay, bool * p_is_last)
+int32_t lwm2m_retry_delay_connect_get(uint16_t security_instance, bool * p_is_last)
 {
     int32_t retry_delay = 0;
 
     if (operator_is_vzw(true)) {
-        retry_delay = lwm2m_retry_delay_vzw_get(instance_id, next_delay, p_is_last);
+        retry_delay = lwm2m_retry_delay_vzw_get(security_instance, p_is_last);
     } else if (operator_is_att(true)) {
-        retry_delay = lwm2m_retry_delay_att_get(instance_id, next_delay, p_is_last);
+        retry_delay = lwm2m_retry_delay_att_get(security_instance, p_is_last);
     }
 
     return retry_delay;
 }
 
-void lwm2m_retry_delay_connect_reset(int instance_id)
+int32_t lwm2m_retry_delay_connect_next(uint16_t security_instance, bool * p_is_last)
 {
-    m_retry_count_connect[instance_id] = 0;
+    int32_t retry_delay = 0;
+
+    if (operator_is_vzw(true)) {
+        retry_delay = lwm2m_retry_delay_vzw_next(security_instance, p_is_last);
+    } else if (operator_is_att(true)) {
+        retry_delay = lwm2m_retry_delay_att_next(security_instance, p_is_last);
+    }
+
+    return retry_delay;
+}
+
+void lwm2m_retry_delay_connect_reset(uint16_t security_instance)
+{
+    m_retry_count_connect[security_instance] = 0;
 }

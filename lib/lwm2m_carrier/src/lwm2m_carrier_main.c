@@ -1219,7 +1219,7 @@ static void app_handle_connect_retry(uint16_t security_instance, bool fallback)
     if (start_retry_delay)
     {
         bool is_last = false;
-        int32_t retry_delay = lwm2m_retry_delay_connect_get(security_instance, true, &is_last);
+        int32_t retry_delay = lwm2m_retry_delay_connect_next(security_instance, &is_last);
 
         if (retry_delay == -1) {
             LWM2M_ERR("Bootstrap procedure failed");
@@ -1255,7 +1255,7 @@ static void app_set_bootstrap_if_last_retry_delay(uint16_t security_instance)
     {
         // Check if this is the last retry delay after an inability to establish a DTLS session.
         bool is_last = false;
-        (void) lwm2m_retry_delay_connect_get(security_instance, false, &is_last);
+        (void) lwm2m_retry_delay_connect_get(security_instance, &is_last);
 
         if (is_last) {
             // Repeat the bootstrap flow on timeout or reboot.
@@ -1382,14 +1382,14 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
                     (coap_code == COAP_CODE_400_BAD_REQUEST))
                 {
                     // Received 4.00 error from VzW DM server, use last defined retry delay.
-                    int32_t retry_delay = lwm2m_retry_delay_connect_get(security_instance, false, NULL);
+                    int32_t retry_delay = lwm2m_retry_delay_connect_get(security_instance, NULL);
 
                     // VZW HACK: Loop until the current delay is 8 minutes. This will give the
                     // last retry delay (24 hours) in the next call to lwm2m_retry_delay_connect_get()
                     // in app_handle_connect_retry().
                     while (retry_delay != K_MINUTES(8)) {
                         // If not second to last then fetch next.
-                        retry_delay = lwm2m_retry_delay_connect_get(security_instance, true, NULL);
+                        retry_delay = lwm2m_retry_delay_connect_next(security_instance, NULL);
                     }
                 }
 

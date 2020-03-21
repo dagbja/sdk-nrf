@@ -135,6 +135,7 @@
 ^lwm2m_request_reset$
 ^lwm2m_request_server_update$
 ^lwm2m_retry_delay_connect_get$
+^lwm2m_retry_delay_connect_next$
 ^lwm2m_security_server_uri_get$
 ^lwm2m_security_server_uri_set$
 ^lwm2m_server_get_instance$

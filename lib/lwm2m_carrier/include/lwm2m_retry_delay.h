@@ -17,20 +17,28 @@ int32_t lwm2m_retry_delay_pdn_get(void);
  */
 void lwm2m_retry_delay_pdn_reset(void);
 
-/**@brief Get current retry delay. Increase retry counter if requested.
+/**@brief Get current retry delay.
  *
  * @param[in]  instance_id  LwM2M security instance ID
- * @param[in]  next_delay   Fetch next delay
  * @param[out] p_is_last    Set to true if this is the last retry delay
  *
  * @return Retry delay in milliseconds. -1 if no more retries.
  */
-int32_t lwm2m_retry_delay_connect_get(int instance_id, bool next_delay, bool * p_is_last);
+int32_t lwm2m_retry_delay_connect_get(uint16_t security_instance, bool * p_is_last);
+
+/**@brief Get next retry delay. Increase retry counter.
+ *
+ * @param[in]  instance_id  LwM2M security instance ID
+ * @param[out] p_is_last    Set to true if this is the last retry delay
+ *
+ * @return Retry delay in milliseconds. -1 if no more retries.
+ */
+int32_t lwm2m_retry_delay_connect_next(uint16_t security_instance, bool * p_is_last);
 
 /**@brief Reset retry delay counter.
  *
  * @param[in]  instance_id  LwM2M security instance ID
  */
-void lwm2m_retry_delay_connect_reset(int instance_id);
+void lwm2m_retry_delay_connect_reset(uint16_t security_instance);
 
 #endif // LWM2M_RETRY_DELAY_H__
