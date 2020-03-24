@@ -1208,6 +1208,18 @@ static void app_handle_connect_retry(uint16_t security_instance, bool fallback)
 {
     bool start_retry_delay = true;
 
+    // Check if doing APN fallback
+    if (fallback && operator_is_att(false) &&
+        (m_family_type[security_instance] == NRF_AF_INET))
+    {
+        LWM2M_INF("Next APN fallback");
+        lwm2m_carrier_pdn_deactivate();
+        lwm2m_next_enabled_apn_instance();
+        start_retry_delay = false;
+    }
+
+    // Check if doing IP fallback
+    // TODO: check for both IPv6 and IPv4 support on PDN
     if (fallback && !lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6) && !lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_FALLBACK))
     {
         // Fallback to the other IP version
