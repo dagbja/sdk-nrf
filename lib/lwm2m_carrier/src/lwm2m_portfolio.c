@@ -40,6 +40,11 @@ static lwm2m_string_t    m_portfolio_identity[ARRAY_SIZE(m_instance_portfolio)][
 
 lwm2m_portfolio_t * lwm2m_portfolio_get_instance(uint16_t instance_id)
 {
+    if (instance_id >= ARRAY_SIZE(m_instance_portfolio))
+    {
+        return NULL;
+    }
+
     return &m_instance_portfolio[instance_id];
 }
 

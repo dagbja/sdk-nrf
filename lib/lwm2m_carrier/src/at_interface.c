@@ -13,6 +13,7 @@
 #include <lwm2m_api.h>
 #include <nrf_socket.h>
 #include <sms_receive.h>
+#include <lwm2m_portfolio.h>
 
 /**
  * @brief Max size for the AT responses.
@@ -43,15 +44,19 @@ static uint32_t esm_error_code;
  */
 typedef int (*at_notif_handler)(const char* evt);
 
+void at_subscribe_odis(void);
+
 static int at_cgev_handler(const char *notif);
 static int at_cereg_handler(const char *notif);
 static int at_cnec_handler(const char *notif);
+static int at_odis_handler(const char *notif);
 
 static const at_notif_handler at_handlers[] = {
     at_cgev_handler,          ///< Parse AT CGEV events for PDN/IPv6.
     sms_receiver_notif_parse, ///< Parse received SMS events.
     at_cereg_handler,         ///< Parse AT CEREG events.
     at_cnec_handler,          ///< Parse AT CNEC events.
+    at_odis_handler,          ///< Parse AT ODIS events.
 };
 
 at_net_reg_stat_cb_t m_net_reg_stat_cb;
@@ -201,6 +206,65 @@ static int at_cgev_handler(const char *notif)
     return -1;
 }
 
+static int at_odis_handler(const char *notif)
+{
+    int retval = 0;
+    struct lwm2m_os_at_param_list odis_params;
+    lwm2m_portfolio_t *portfolio_inst;
+
+    // Check if this is an ODIS event.
+    int len = strlen(notif);
+    retval = strncmp(notif, "+ODISNTF: ", 9);
+
+    if (len < 10 || retval != 0)
+    {
+        // Not an ODIS event.
+        return 0;
+    }
+
+    retval = lwm2m_os_at_params_list_init(&odis_params, 5);
+    if (retval != 0)
+    {
+        LWM2M_ERR("at_params_list_init failed");
+        return 0;
+    }
+
+    retval = lwm2m_os_at_parser_params_from_str(notif, NULL, &odis_params);
+    if (retval != 0)
+    {
+        LWM2M_ERR("at_parser_params_from_str failed");
+        lwm2m_os_at_params_list_free(&odis_params);
+        return 0;
+    }
+
+    portfolio_inst = lwm2m_portfolio_get_instance(0);
+    if (!portfolio_inst)
+    {
+        LWM2M_ERR("Primary Host Device Portfolio instance not found");
+        lwm2m_os_at_params_list_free(&odis_params);
+        return 0;
+    }
+
+    for (int i = 1; i < odis_params.param_count; i++)
+    {
+        len = sizeof(m_at_buffer);
+        retval = lwm2m_os_at_params_string_get(&odis_params, i, m_at_buffer, &len);
+        if (retval != 0)
+        {
+            LWM2M_ERR("parse failed: no string param found");
+            lwm2m_os_at_params_list_free(&odis_params);
+            return 0;
+        }
+
+        lwm2m_list_string_set(&portfolio_inst->identity, i - 1, m_at_buffer, len);
+    }
+
+    // TODO: Notify the observer
+    lwm2m_os_at_params_list_free(&odis_params);
+
+    return 0;
+}
+
 static int at_cereg_handler(const char *notif)
 {
     int retval = 0;
@@ -330,6 +394,9 @@ int at_if_init(void)
         LWM2M_ERR("Failed to register AT handler");
         return -1;
     }
+
+    // Subscribe ODIS notifications
+    at_subscribe_odis();
 
     return 0;
 }
@@ -700,6 +767,17 @@ void at_subscribe_esm(void)
 
     if (retval != 0) {
         LWM2M_ERR("AT+CNEC=16 failed: %d", retval);
+    }
+}
+
+void at_subscribe_odis(void)
+{
+    int retval = 0;
+
+    retval = lwm2m_os_at_cmd_write("AT+ODISNTF=1", NULL, 0);
+
+    if (retval != 0) {
+        LWM2M_ERR("AT+ODISNTF=1 failed: %d", retval);
     }
 }
 
