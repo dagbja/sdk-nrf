@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include <shell/shell.h>
 #include <fcntl.h>
@@ -29,6 +30,7 @@
 #include <lwm2m_carrier.h>
 #include <lwm2m_objects.h>
 #include <lwm2m_observer.h>
+#include <lwm2m_os.h>
 
 static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
 {
@@ -463,6 +465,119 @@ static int cmd_debug_operator_id(const struct shell *shell, size_t argc, char **
     lwm2m_debug_operator_id_set(operator_id);
 
     shell_print(shell, "Set carrier: %u (%s)", operator_id, operator_id_string(operator_id));
+
+    return 0;
+}
+
+static int cmd_flash_list(const struct shell *shell, size_t argc, char **argv)
+{
+    int read;
+    char buf[1];
+
+    shell_print(shell, "Record range 0x%4X - 0x%4X", LWM2M_OS_STORAGE_BASE, LWM2M_OS_STORAGE_END);
+
+    for (int i = LWM2M_OS_STORAGE_BASE; i < LWM2M_OS_STORAGE_END; i++) {
+        read = lwm2m_os_storage_read(i, buf, 1);
+        if (read > 0) {
+            shell_print(shell, "  Record %d (%d bytes)", i - LWM2M_OS_STORAGE_BASE, read);
+        }
+    }
+
+    return 0;
+}
+
+static void dump_as_hex(const struct shell *shell, char *data, int len)
+{
+    static const char hexchars[16] = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
+    int pos = 0;
+
+    while (pos < len) {
+        char hexbuf[256];
+        char *cur = hexbuf;
+        int i;
+
+        // Dump offset
+        cur += snprintf(cur, 20, "  %04X  ", pos);
+
+        // Dump bytes as hex
+        for (i = 0; i < 16 && pos + i < len; i++) {
+            *cur++ = hexchars[(data[pos + i] & 0xf0) >> 4];
+            *cur++ = hexchars[data[pos + i] & 0x0f];
+            *cur++ = ' ';
+            if (i == 7) {
+                *cur++ = ' ';
+            }
+        }
+
+        while (cur < hexbuf + 58) {
+            *cur++ = ' '; // Fill it up with space to ascii column
+        }
+
+        // Dump bytes as text
+        for (i = 0; i < 16 && pos + i < len; i++) {
+            if (isprint(data[pos + i])) {
+                *cur++ = data[pos + i];
+            } else {
+                *cur++ = '.';
+            }
+            if (i == 7) {
+                *cur++ = ' ';
+            }
+        }
+
+        pos += i;
+        *cur = 0;
+
+        shell_print(shell, "%s", hexbuf);
+    }
+}
+
+static void dump_record_content(const struct shell *shell, uint16_t id, char *data, int len)
+{
+    switch (id) {
+        // TODO: Dump according to content of record: TLV, struct, string, etc.
+        default:
+            dump_as_hex(shell, data, len);
+            break;
+    }
+}
+
+static bool dump_record(const struct shell *shell, uint16_t id)
+{
+    char buf[1];
+    int read = lwm2m_os_storage_read(id, buf, 1);
+
+    if (read <= 0) {
+        return false;
+    }
+
+    shell_print(shell, "Record %d - %d bytes", id - LWM2M_OS_STORAGE_BASE, read);
+
+    char * data = lwm2m_os_malloc(read);
+    lwm2m_os_storage_read(id, data, read);
+    dump_record_content(shell, id, data, read);
+    lwm2m_os_free(data);
+
+    return true;
+}
+
+static int cmd_flash_print(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc > 2) {
+        shell_print(shell, "%s [record]", argv[0]);
+        return 0;
+    }
+
+    if (argc == 2) {
+        uint16_t id = strtol(argv[1], NULL, 10);
+        if (!dump_record(shell, LWM2M_OS_STORAGE_BASE + id)) {
+            shell_print(shell, "Record %d does not exist", id);
+        }
+    } else {
+        for (int i = LWM2M_OS_STORAGE_BASE; i < LWM2M_OS_STORAGE_END; i++) {
+            (void)dump_record(shell, i);
+        }
+    }
 
     return 0;
 }
@@ -1469,6 +1584,12 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
 );
 
 
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_flash,
+    SHELL_CMD(list, NULL, "List records", cmd_flash_list),
+    SHELL_CMD(print, NULL, "Print record content", cmd_flash_print),
+    SHELL_SUBCMD_SET_END /* Array terminated. */
+);
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_lwm2m,
     SHELL_CMD(bootstrap, NULL, "Bootstrap", cmd_lwm2m_bootstrap),
     SHELL_CMD(deregister, NULL, "Deregister server", cmd_lwm2m_deregister),
@@ -1505,6 +1626,7 @@ SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
 SHELL_CMD_REGISTER(attribute, &sub_attribute, "Notification attributes operations", NULL);
 SHELL_CMD_REGISTER(debug, &sub_debug, "Debug configuration", NULL);
 SHELL_CMD_REGISTER(device, &sub_device, "Update or retrieve device information", NULL);
+SHELL_CMD_REGISTER(flash, &sub_flash, "Flash operations", NULL);
 SHELL_CMD_REGISTER(lwm2m, &sub_lwm2m, "LwM2M operations", NULL);
 SHELL_CMD_REGISTER(reboot, NULL, "Reboot", cmd_reboot);
 SHELL_CMD_REGISTER(security, &sub_security, "Security information", NULL);
