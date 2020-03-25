@@ -276,15 +276,16 @@ static int lwm2m_conn_ext_imsi_update(void)
     return ret;
 }
 
-static int lwm2m_conn_ext_sinr_update(void)
+static int lwm2m_conn_ext_sinr_and_srxlev_update(void)
 {
     int ret;
 
-    ret = at_read_radio_signal_to_noise_ratio(&m_instance_conn_ext.sinr);
+    ret = at_read_sinr_and_srxlev(&m_instance_conn_ext.sinr,
+                                  &m_instance_conn_ext.srxlev);
 
     if (ret != 0)
     {
-        LWM2M_WRN("Failed to read the SINR");
+        LWM2M_WRN("Failed to read the SINR and/or the SRXLEV");
     }
 
     return ret;
@@ -301,12 +302,13 @@ static void lwm2m_conn_ext_update_resource(uint16_t resource_id)
         lwm2m_conn_ext_imsi_update();
         break;
     case LWM2M_CONN_EXT_SINR:
-        lwm2m_conn_ext_sinr_update();
+    case LWM2M_CONN_EXT_SRXLEV:
+        lwm2m_conn_ext_sinr_and_srxlev_update();
         break;
     case LWM2M_NAMED_OBJECT:
         lwm2m_conn_ext_iccid_update();
         lwm2m_conn_ext_imsi_update();
-        lwm2m_conn_ext_sinr_update();
+        lwm2m_conn_ext_sinr_and_srxlev_update();
         break;
     default:
         break;
@@ -333,8 +335,8 @@ void lwm2m_conn_ext_init(void)
     m_instance_conn_ext.apn_retry_period.len = 1;
     m_instance_conn_ext.apn_retry_back_off_period.val.p_int32[0] = DEFAULT_APN_RETRY_BACK_OFF_PERIOD;
     m_instance_conn_ext.apn_retry_back_off_period.len = 1;
-    lwm2m_conn_ext_sinr_update();
-    m_instance_conn_ext.srxlev = 0;
+    lwm2m_conn_ext_sinr_and_srxlev_update();
+    // The only CE levels supported currently are 0 and 1 (Mode A)
     lwm2m_bytebuffer_to_string("Mode A", strlen("Mode A"), &m_instance_conn_ext.ce_mode);
 
     // Set bootstrap server as owner.

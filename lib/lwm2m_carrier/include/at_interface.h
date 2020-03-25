@@ -247,13 +247,14 @@ int at_start_connstat(void);
 int at_stop_connstat(void);
 
 /**
- * @brief Read radio signal to noise ratio.
+ * @brief Read radio signal to noise ratio and cell selection RX value.
  *
- * @param[out] p_sinr Pointer to store signal to noise ratio.
+ * @param[out] p_sinr   Pointer to store signal to noise ratio.
+ * @param[out] p_srxlev Pointer to store cell selection RX value.
  *
  * @return An error code if the read failed.
  */
-int at_read_radio_signal_to_noise_ratio(int32_t * p_sinr);
+int at_read_sinr_and_srxlev(int32_t * p_sinr, int32_t * p_srxlev);
 
 /**
  * @brief Read IMSI.

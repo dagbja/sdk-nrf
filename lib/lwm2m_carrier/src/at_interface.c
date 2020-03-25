@@ -1118,7 +1118,7 @@ int at_stop_connstat(void)
     return lwm2m_os_at_cmd_write("AT%XCONNSTAT=0", NULL, 0);
 }
 
-int at_read_radio_signal_to_noise_ratio(int32_t * p_sinr)
+int at_read_sinr_and_srxlev(int32_t * p_sinr, int32_t * p_srxlev)
 {
     int retval = 0;
     struct lwm2m_os_at_param_list xsnrsq_params;
@@ -1132,10 +1132,11 @@ int at_read_radio_signal_to_noise_ratio(int32_t * p_sinr)
 
     *p_sinr = 0;
 
-    retval = lwm2m_os_at_params_list_init(&xsnrsq_params, 2);
-    if (retval == 0)
+    if (lwm2m_os_at_params_list_init(&xsnrsq_params, 4) == 0)
     {
-        if (at_send_command_and_parse_params(at_xsnrsq, &xsnrsq_params) == 0)
+        retval = at_send_command_and_parse_params(at_xsnrsq, &xsnrsq_params);
+
+        if (xsnrsq_params.params && retval == 0)
         {
             uint32_t sinr;
             if (lwm2m_os_at_params_int_get(&xsnrsq_params, 1, &sinr) == 0)
@@ -1143,31 +1144,57 @@ int at_read_radio_signal_to_noise_ratio(int32_t * p_sinr)
                 if (sinr <= 50)
                 {
                     /*
-                     * 3GPP TS 138.133: SS-SINR measurement report mapping
                      *  Reported value   Measured quantity value   Unit
-                     *   SS-SINR_0            SS-SINR < -23         dB
-                     *   SS-SINR_1       -23 <= SS-SINR < -22.5     dB
-                     *   SS-SINR_2       -22.5 <= SS-SINR < -22     dB
+                     *   SS-SINR_0               SS-SINR < -24      dB
+                     *   SS-SINR_1        -24 <= SS-SINR < -23      dB
+                     *   SS-SINR_2        -22 <= SS-SINR < -21      dB
                      *   ...
                      *   ...
                      *   ...
-                     *   SS-SINR_125      39 <= SS-SINR < 39.5      dB
-                     *   SS-SINR_126      39.5 <= SS-SINR < 40      dB
-                     *   SS-SINR_127         40 <= SS-SINR          dB
-                     *
-                     *   Since lwm2m supports only integer value for SINR,
-                     *   we store the reported value without mapping it.
+                     *   SS-SINR_47        22 <= SS-SINR < 23       dB
+                     *   SS-SINR_48        23 <= SS-SINR < 24       dB
+                     *   SS-SINR_49        24 <= SS-SINR            dB
                      */
-                    *p_sinr = (int32_t)sinr;
+                    *p_sinr = -24 + (int32_t)sinr;
                 }
                 else
                 {
-                    retval = -EINVAL;
+                    LWM2M_WRN("SINR invalid or unknown");
                 }
             }
             else
             {
                 LWM2M_ERR("signal to noise ratio parse failed");
+                retval = -EINVAL;
+            }
+
+            uint32_t srxlev;
+            if (lwm2m_os_at_params_int_get(&xsnrsq_params, 2, &srxlev) == 0)
+            {
+                if (srxlev <= 255)
+                {
+                    /*
+                     *  Reported value   Measured quantity value   Unit
+                     *        0                SRXLEV <= -127       dB
+                     *        1         -127 < SRXLEV <= -126       dB
+                     *        2         -126 < SRXLEV <= -125       dB
+                     *       ...
+                     *       ...
+                     *       ...
+                     *       253        125 <= SRXLEV < 126         dB
+                     *       254        126 <= SRXLEV < 127         dB
+                     *       255        127 <= SRXLEV               dB
+                     */
+                    *p_srxlev = -127 + (int32_t)srxlev;
+                }
+                else
+                {
+                    LWM2M_WRN("SRXLEV invalid or unknown");
+                }
+            }
+            else
+            {
+                LWM2M_ERR("cell selection RX value parse failed");
                 retval = -EINVAL;
             }
         }
