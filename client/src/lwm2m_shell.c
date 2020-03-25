@@ -1250,6 +1250,32 @@ static int cmd_apn_deactivate(const struct shell *shell, size_t argc, char **arg
     return 0;
 }
 
+static int cmd_apn_enable_status(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 3)
+    {
+        shell_print(shell, "%s <instance> <value>", argv[0]);
+        shell_print(shell, " 0 = disable");
+        shell_print(shell, " 1 = enable");
+        return 0;
+    }
+
+    int instance_id = strtol(argv[1], NULL, 10);
+    int enable_status = strtol(argv[2], NULL, 10);
+
+    if (enable_status != 0 && enable_status != 1) {
+        shell_print(shell, "invalid value, must be 0 or 1");
+        return 0;
+    }
+
+    if (!lwm2m_apn_conn_prof_enabled_set(instance_id, enable_status)) {
+        shell_print(shell, "Illegal instance: %d", instance_id);
+    }
+
+    return 0;
+}
+
+
 #define TIME_STR_SIZE sizeof("1970-01-01T00:00:00Z")
 
 static void utc_time(int32_t timestamp, char *time_str)
@@ -1274,8 +1300,8 @@ static int cmd_apn_print(const struct shell *shell, size_t argc, char **argv)
         }
 
         shell_print(shell, "APN Connection Profile Instance /11/%d", i);
-        shell_print(shell, "  Profile Name   %s", p_apn_conn->profile_name);
-        shell_print(shell, "  APN            %s", p_apn_conn->apn);
+        shell_print(shell, "  Profile Name   %s", lwm2m_string_get(&p_apn_conn->profile_name));
+        shell_print(shell, "  APN            %s", lwm2m_string_get(&p_apn_conn->apn));
         shell_print(shell, "  Enable status  %s", p_apn_conn->enable_status ? "activated" : "deactivated");
         shell_print(shell, "  Connection     Start time            Result  Cause  End time");
         for (int j = 0; j < p_apn_conn->conn_est_time.len; j++) {
@@ -1415,6 +1441,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_server,
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_apn,
     SHELL_CMD(activate, NULL, "Activate APN", cmd_apn_activate),
     SHELL_CMD(deactivate, NULL, "Deactivate APN", cmd_apn_deactivate),
+    SHELL_CMD(enable_status, NULL, "Set enable status", cmd_apn_enable_status),
     SHELL_CMD(get, NULL, "Read APN", cmd_apn_get),
     SHELL_CMD(print, NULL, "Print apn connection profile objects", cmd_apn_print),
     SHELL_CMD(set, NULL, "Write APN", cmd_apn_set),
