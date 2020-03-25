@@ -145,7 +145,7 @@ static int at_response_param_to_string(const char * p_at_command, int param_coun
     }
     else
     {
-        LWM2M_ERR("lwm2m_os_at_params_list_init failed");
+        LWM2M_ERR("at_params_list_init failed");
         retval = -EINVAL;
     }
 
@@ -238,6 +238,9 @@ static int at_cereg_handler(const char *notif)
                 LWM2M_ERR("at_parser (%s) failed (%d)", lwm2m_os_log_strdup(notif), retval);
                 retval = EINVAL;
             }
+
+            lwm2m_os_at_params_list_free(&cereg_params);
+
         } else {
             LWM2M_ERR("cereg param list init failed: %d", (int)retval);
         }
