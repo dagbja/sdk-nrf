@@ -1076,52 +1076,6 @@ static const char * app_uri_get(char * server_uri, uint16_t * p_port, bool * p_s
     return hostname;
 }
 
-static void app_printable_ip_address(struct nrf_sockaddr * addr, char * ip_buffer, size_t ip_buffer_len)
-{
-    switch (addr->sa_family) {
-    case NRF_AF_INET:
-    {
-        uint32_t val = ((struct nrf_sockaddr_in *)addr)->sin_addr.s_addr;
-        snprintf(ip_buffer, ip_buffer_len, "%u.%u.%u.%u",
-                ((uint8_t *)&val)[0], ((uint8_t *)&val)[1], ((uint8_t *)&val)[2], ((uint8_t *)&val)[3]);
-        break;
-    }
-
-    case NRF_AF_INET6:
-    {
-        size_t pos = 0;
-        bool elided = false;
-
-        // Poor man's elided IPv6 address print.
-        for (uint8_t i = 0; i < 16; i += 2) {
-            uint16_t val = (((struct nrf_sockaddr_in6 *)addr)->sin6_addr.s6_addr[i] << 8) +
-                           (((struct nrf_sockaddr_in6 *)addr)->sin6_addr.s6_addr[i+1]);
-
-            if (elided || val != 0) {
-                if (pos >= 2 && ip_buffer[pos-2] == ':' && ip_buffer[pos-1] == ':') {
-                    elided = true;
-                }
-                pos += snprintf(&ip_buffer[pos], ip_buffer_len - pos, "%x", val);
-            }
-
-            if (pos >= 2 && (ip_buffer[pos-2] != ':' || ip_buffer[pos-1] != ':')) {
-                pos += snprintf(&ip_buffer[pos], ip_buffer_len - pos, ":");
-            }
-        }
-
-        if (pos >= 1 && ip_buffer[pos-1] == ':') {
-            // Remove trailing ':'
-            ip_buffer[pos-1] = '\0';
-        }
-        break;
-    }
-
-    default:
-        snprintf(ip_buffer, ip_buffer_len, "Unknown family: %d", addr->sa_family);
-        break;
-    }
-}
-
 static uint32_t app_resolve_server_uri(char                * server_uri,
                                        uint8_t               uri_len,
                                        struct nrf_sockaddr * addr,
@@ -1201,18 +1155,21 @@ static uint32_t app_resolve_server_uri(char                * server_uri,
 
     app_init_sockaddr_in(addr, result->ai_family, port);
 
+    void *p_addr;
     if (result->ai_family == NRF_AF_INET) {
         ((struct nrf_sockaddr_in *)addr)->sin_addr.s_addr = ((struct nrf_sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
+        p_addr = &((struct nrf_sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
     } else {
         memcpy(((struct nrf_sockaddr_in6 *)addr)->sin6_addr.s6_addr, ((struct nrf_sockaddr_in6 *)result->ai_addr)->sin6_addr.s6_addr, 16);
+        p_addr = &((struct nrf_sockaddr_in6 *)result->ai_addr)->sin6_addr.s6_addr;
     }
 
-    nrf_freeaddrinfo(result);
-    lwm2m_os_free(p_server_uri_val);
-
     char ip_buffer[64];
-    app_printable_ip_address(addr, ip_buffer, sizeof(ip_buffer));
+    nrf_inet_ntop(result->ai_family, p_addr, ip_buffer, sizeof(ip_buffer));
     LWM2M_INF("DNS result: %s", lwm2m_os_log_strdup(ip_buffer));
+
+    lwm2m_os_free(p_server_uri_val);
+    nrf_freeaddrinfo(result);
 
     return 0;
 }

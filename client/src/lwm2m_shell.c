@@ -44,6 +44,86 @@ static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
     return 0;
 }
 
+static int cmd_nslookup(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc < 2) {
+        shell_print(shell, "%s [-4|-6] name [apn]", argv[0]);
+        return 0;
+    }
+
+    struct nrf_addrinfo hints = {
+        .ai_socktype = NRF_SOCK_DGRAM
+    };
+    struct nrf_addrinfo *p_hints = NULL;
+    int argoff = 1;
+
+    if (argv[argoff][0] == '-') {
+        if (strcmp(argv[argoff], "-4") == 0) {
+            hints.ai_family = NRF_AF_INET;
+        } else if (strcmp(argv[argoff], "-6") == 0) {
+            hints.ai_family = NRF_AF_INET6;
+        } else {
+            shell_print(shell, "invalid argument: %s", argv[argoff]);
+            return 0;
+        }
+        p_hints = &hints;
+        argoff++;
+    }
+
+    char *hostname = argv[argoff++];
+
+    struct nrf_addrinfo apn_hints;
+    if (argc > argoff) {
+        apn_hints.ai_family    = NRF_AF_LTE;
+        apn_hints.ai_socktype  = NRF_SOCK_MGMT;
+        apn_hints.ai_protocol  = NRF_PROTO_PDN;
+        apn_hints.ai_canonname = argv[argoff];
+
+        hints.ai_next = &apn_hints;
+        if (!p_hints) {
+            // Need to hint family when specifying APN
+            hints.ai_family = NRF_AF_INET;
+            p_hints = &hints;
+        }
+    }
+
+    struct nrf_addrinfo *result;
+    int ret_val = nrf_getaddrinfo(hostname, NULL, p_hints, &result);
+
+    if (ret_val != 0) {
+        shell_print(shell, "error: %d", ret_val);
+        return 0;
+    }
+
+    char ip_buffer[64];
+    void *p_addr;
+    while (result) {
+        switch (result->ai_family) {
+        case NRF_AF_INET:
+            p_addr = &((struct nrf_sockaddr_in *)result->ai_addr)->sin_addr.s_addr;
+            nrf_inet_ntop(result->ai_family, p_addr, ip_buffer, sizeof(ip_buffer));
+            break;
+        case NRF_AF_INET6:
+            p_addr = &((struct nrf_sockaddr_in6 *)result->ai_addr)->sin6_addr.s6_addr;
+            nrf_inet_ntop(result->ai_family, p_addr, ip_buffer, sizeof(ip_buffer));
+            break;
+        default:
+            snprintf(ip_buffer, sizeof(ip_buffer), "Unknown family: %d", result->ai_family);
+            break;
+        }
+
+        // TODO: Print result->ai_canonname when NCSDK-4823 is fixed
+        shell_print(shell, "Name:    %s", hostname);
+        shell_print(shell, "Address:  %s", ip_buffer);
+
+        result = result->ai_next;
+    }
+
+    nrf_freeaddrinfo(result);
+
+    return 0;
+}
+
 
 static int cmd_security_print(const struct shell *shell, size_t argc, char **argv)
 {
@@ -1628,6 +1708,7 @@ SHELL_CMD_REGISTER(debug, &sub_debug, "Debug configuration", NULL);
 SHELL_CMD_REGISTER(device, &sub_device, "Update or retrieve device information", NULL);
 SHELL_CMD_REGISTER(flash, &sub_flash, "Flash operations", NULL);
 SHELL_CMD_REGISTER(lwm2m, &sub_lwm2m, "LwM2M operations", NULL);
+SHELL_CMD_REGISTER(nslookup, NULL, "Query Internet name servers", cmd_nslookup);
 SHELL_CMD_REGISTER(reboot, NULL, "Reboot", cmd_reboot);
 SHELL_CMD_REGISTER(security, &sub_security, "Security information", NULL);
 SHELL_CMD_REGISTER(server, &sub_server, "Server information", NULL);
