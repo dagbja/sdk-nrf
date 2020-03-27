@@ -2342,16 +2342,6 @@ static void app_remove_observers_on_deregister(uint16_t security_instance)
                           lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
                           security_instance);
             }
-
-            err_code = lwm2m_observer_storage_delete(p_observer);
-
-            if (err_code != 0)
-            {
-                LWM2M_ERR("Removing observer from flash failed: %s (%d), %s (%d) (server %d)",
-                          lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                          lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
-                          security_instance);
-            }
         }
     }
 }
