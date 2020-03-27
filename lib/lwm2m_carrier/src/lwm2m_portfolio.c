@@ -345,10 +345,6 @@ void lwm2m_portfolio_init(void)
         m_instance_portfolio[i].proto.instance_id = i;
         m_instance_portfolio[i].proto.callback = portfolio_instance_callback;
 
-        for (int j = 0; j < LWM2M_PORTFOLIO_IDENTITY_INSTANCES; j++)
-        {
-            (void)lwm2m_bytebuffer_to_string(m_portfolio_identity_val[i][j], strlen(m_portfolio_identity_val[i][j]), &m_portfolio_identity[i][j]);
-        }
         m_instance_portfolio[i].identity.val.p_string = m_portfolio_identity[i];
         m_instance_portfolio[i].identity.len = ARRAY_SIZE(m_portfolio_identity_val[i]);
 
@@ -356,6 +352,21 @@ void lwm2m_portfolio_init(void)
         (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_portfolio[i],
                                         LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
         (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_portfolio[i]);
+    }
+
+    uint16_t instance_id = 0;
+
+    if (at_read_host_device_info(&m_instance_portfolio[instance_id].identity) == 0)
+    {
+        ++instance_id;
+    }
+
+    for (int i = instance_id; i < ARRAY_SIZE(m_instance_portfolio); i++)
+    {
+        for (int j = 0; j < LWM2M_PORTFOLIO_IDENTITY_INSTANCES; j++)
+        {
+            (void)lwm2m_bytebuffer_to_string(m_portfolio_identity_val[i][j], strlen(m_portfolio_identity_val[i][j]), &m_portfolio_identity[i][j]);
+        }
     }
 
     // Initialize ACL

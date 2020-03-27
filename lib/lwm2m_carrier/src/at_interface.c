@@ -1308,3 +1308,54 @@ int at_read_imsi(lwm2m_string_t *p_imsi)
 
     return retval;
 }
+
+int at_read_host_device_info(lwm2m_list_t *p_list)
+{
+    int retval = 0;
+    struct lwm2m_os_at_param_list odis_params;
+
+    if (!p_list || !p_list->val.p_string) {
+        return -EINVAL;
+    }
+
+    // Read network registration status
+    const char *at_odis = "AT%ODIS?";
+
+    retval = lwm2m_os_at_params_list_init(&odis_params, 5);
+    if (retval != 0)
+    {
+        LWM2M_ERR("at_params_list_init failed");
+        return -retval;
+    }
+
+    retval = at_send_command_and_parse_params(at_odis, &odis_params);
+    if (retval != 0)
+    {
+        LWM2M_ERR("reading odis failed");
+        return -EIO;
+    }
+
+    for (int i = 1; i < odis_params.param_count; i++)
+    {
+        int len = sizeof(m_at_buffer);
+        retval = lwm2m_os_at_params_string_get(&odis_params, i, m_at_buffer, &len);
+        if (retval != 0)
+        {
+            LWM2M_ERR("parse failed: no string param found");
+            lwm2m_os_at_params_list_free(&odis_params);
+            return -retval;
+        }
+
+        retval = lwm2m_list_string_set(p_list, i - 1, m_at_buffer, len);
+        if (retval != 0)
+        {
+            LWM2M_ERR("failed to update host device information: invalid list definition");
+            lwm2m_os_at_params_list_free(&odis_params);
+            return -retval;
+        }
+    }
+
+    lwm2m_os_at_params_list_free(&odis_params);
+
+    return 0;
+}

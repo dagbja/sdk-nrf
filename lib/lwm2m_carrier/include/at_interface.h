@@ -265,4 +265,13 @@ int at_read_sinr_and_srxlev(int32_t * p_sinr, int32_t * p_srxlev);
  */
 int at_read_imsi(lwm2m_string_t *p_imsi);
 
+/**
+ * @brief Read the primary Host Device information.
+ *
+ * @param[out] p_list Pointer to a list of string type to store the Host Device information.
+ *
+ * @return An error code if the read failed.
+ */
+int at_read_host_device_info(lwm2m_list_t *p_list);
+
 #endif // AT_INTERFACE_H__
