@@ -502,7 +502,7 @@ int at_read_apn_class(uint8_t apn_class, char * const p_apn, int * p_apn_len)
         if (err != 0)
         {
             // AT command error
-            LWM2M_ERR("Unable to read APN Class. AT command error %d.", err);
+            LWM2M_ERR("Unable to read APN Class %u. AT command error %d.", apn_class, err);
             retval = EIO;
         }
     }
@@ -536,7 +536,7 @@ int at_write_apn_class(uint8_t apn_class, const char * p_apn, int apn_len)
     if (err != 0)
     {
         // AT command error
-        LWM2M_ERR("Unable to read APN Class. AT command error %d.", err);
+        LWM2M_ERR("Unable to write APN Class %u. AT command error %d.", apn_class, err);
         retval = EIO;
     }
 

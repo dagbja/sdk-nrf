@@ -1270,7 +1270,7 @@ static int cmd_device_factory_reset(const struct shell *shell, size_t argc, char
 }
 
 
-static int cmd_apn_set(const struct shell *shell, size_t argc, char **argv)
+static int cmd_apn_write_class(const struct shell *shell, size_t argc, char **argv)
 {
     if (argc != 3)
     {
@@ -1287,14 +1287,14 @@ static int cmd_apn_set(const struct shell *shell, size_t argc, char **argv)
     }
 
     char * p_apn = argv[2];
-    shell_print(shell, "Setting APN Class %d: %s", class, p_apn);
+    shell_print(shell, "Write APN Class %d: %s", class, p_apn);
 
     lwm2m_conn_mon_class_apn_set(class, p_apn, strlen(p_apn));
 
     return 0;
 }
 
-static int cmd_apn_get(const struct shell *shell, size_t argc, char **argv)
+static int cmd_apn_read_class(const struct shell *shell, size_t argc, char **argv)
 {
     if (argc != 2)
     {
@@ -1308,7 +1308,7 @@ static int cmd_apn_get(const struct shell *shell, size_t argc, char **argv)
     int class = strtol(argv[1], &p_end, 10);
     if ((class < 1) || (class > 10))
     {
-        shell_print(shell, "Invalid APN Class value: %u", class);
+        shell_print(shell, "Invalid APN Class: %u", class);
         return 0;
     }
 
@@ -1318,7 +1318,7 @@ static int cmd_apn_get(const struct shell *shell, size_t argc, char **argv)
     memcpy(buffer, p_apn, len);
     buffer[len] = '\0';
 
-    shell_print(shell, "APN Class %d: %s", class, buffer);
+    shell_print(shell, "Read APN Class %d: %s", class, buffer);
 
     return 0;
 }
@@ -1557,9 +1557,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_apn,
     SHELL_CMD(activate, NULL, "Activate APN", cmd_apn_activate),
     SHELL_CMD(deactivate, NULL, "Deactivate APN", cmd_apn_deactivate),
     SHELL_CMD(enable_status, NULL, "Set enable status", cmd_apn_enable_status),
-    SHELL_CMD(get, NULL, "Read APN", cmd_apn_get),
     SHELL_CMD(print, NULL, "Print apn connection profile objects", cmd_apn_print),
-    SHELL_CMD(set, NULL, "Write APN", cmd_apn_set),
+    SHELL_CMD(read_class, NULL, "Read APN class", cmd_apn_read_class),
+    SHELL_CMD(write_class, NULL, "Write APN class", cmd_apn_write_class),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );
 
