@@ -704,7 +704,7 @@ static int cmd_lwm2m_update(const struct shell *shell, size_t argc, char **argv)
     }
 
     if (lwm2m_state_get() == LWM2M_STATE_IDLE) {
-        lwm2m_request_server_update(instance_id, false);
+        lwm2m_request_server_update(instance_id, true);
     } else {
         shell_print(shell, "Not registered");
     }
@@ -727,6 +727,19 @@ static int cmd_lwm2m_deregister(const struct shell *shell, size_t argc, char **a
 
 static int cmd_lwm2m_disconnect(const struct shell *shell, size_t argc, char **argv)
 {
+    if (argc == 2) {
+        uint16_t instance_id = atoi(argv[1]);
+
+        if (instance_id < 1 || instance_id >= (1+LWM2M_MAX_SERVERS))
+        {
+            shell_print(shell, "instance must be between 1 and %d", LWM2M_MAX_SERVERS);
+            return 0;
+        }
+
+        lwm2m_request_server_disconnect(instance_id);
+        return 0;
+    }
+
     if (lwm2m_state_get() != LWM2M_STATE_DISCONNECTED) {
         lwm2m_request_disconnect();
     } else {

@@ -482,7 +482,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                     instance_id = 1;
                 }
 #endif
-                lwm2m_request_server_update(instance_id, false);
+                lwm2m_request_server_update(instance_id, true);
                 break;
             }
 

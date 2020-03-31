@@ -78,6 +78,7 @@ void lwm2m_request_connect(void);
 void lwm2m_request_server_update(uint16_t instance_id, bool reconnect);
 bool lwm2m_request_remote_reconnect(struct nrf_sockaddr *p_remote);
 void lwm2m_request_deregister(void);
+void lwm2m_request_server_disconnect(uint16_t instance_id);
 void lwm2m_request_disconnect(void);
 void lwm2m_request_reset(void);
 bool lwm2m_did_bootstrap(void);

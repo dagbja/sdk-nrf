@@ -37,7 +37,7 @@ static void app_button_handler(u32_t buttons, u32_t has_changed)
         }
         else if (app_state == LWM2M_STATE_IDLE)
         {
-            lwm2m_request_server_update(1, false);
+            lwm2m_request_server_update(1, true);
         }
     }
     else if (buttons & 0x02) // Button 2 has changed

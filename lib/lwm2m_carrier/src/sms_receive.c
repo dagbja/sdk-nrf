@@ -87,7 +87,7 @@ int sms_receiver_notif_parse(const char *notif)
         if (object == 1 && instance >= 0 && instance < 4 && resource == 8) {
             // Server Registration Update Trigger
             LWM2M_INF("SMS: Server Registration Update Trigger (server %u)", instance);
-            lwm2m_request_server_update(instance, false);
+            lwm2m_request_server_update(instance, true);
         } else if (object == 1 && instance == 0 && resource == 9) {
             // Bootstrap Request Trigger
             LWM2M_INF("SMS: Bootstrap Request Trigger");

@@ -113,7 +113,8 @@ typedef enum
 {
     LWM2M_REQUEST_NONE,
     LWM2M_REQUEST_UPDATE,
-    LWM2M_REQUEST_DEREGISTER
+    LWM2M_REQUEST_DEREGISTER,
+    LWM2M_REQUEST_DISCONNECT
 } lwm2m_update_request_t;
 
 struct connection_update_t {
@@ -132,7 +133,7 @@ static nrf_sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { NRF_AF_INET6, NRF_
 static struct nrf_sockaddr_in6 m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
 static volatile uint32_t tick_count = 0;
 
-static void app_server_disconnect(uint16_t security_instance);
+static void app_server_disconnect(uint16_t security_instance, bool keep_lifetime_timer);
 static int app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
 static int app_provision_secret_keys(void);
 static void app_disconnect(void);
@@ -382,6 +383,13 @@ void lwm2m_request_deregister(void)
         if (lwm2m_server_registered_get(i) && m_lwm2m_transport[i] != -1) {
             m_connection_update[i].requested = LWM2M_REQUEST_DEREGISTER;
         }
+    }
+}
+
+void lwm2m_request_server_disconnect(uint16_t security_instance)
+{
+    if (m_lwm2m_transport[security_instance] != -1) {
+        m_connection_update[security_instance].requested = LWM2M_REQUEST_DISCONNECT;
     }
 }
 
@@ -685,7 +693,7 @@ bool lwm2m_request_remote_reconnect(struct nrf_sockaddr *p_remote)
         if ((security_instance != UINT16_MAX) &&
             (m_lwm2m_transport[security_instance] != -1))
         {
-            app_server_disconnect(security_instance);
+            app_server_disconnect(security_instance, false);
             lwm2m_request_server_update(security_instance, true);
             lwm2m_remote_reconnecting_set(short_server_id);
 
@@ -1231,7 +1239,7 @@ static void app_handle_connect_retry(uint16_t security_instance, bool fallback)
             if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT) {
                 // This is the last retry delay after no response from server.
                 // Disconnect the session and retry on timeout.
-                app_server_disconnect(security_instance);
+                app_server_disconnect(security_instance, false);
             }
 
             app_event_notify(LWM2M_CARRIER_EVENT_DEFERRED, NULL);
@@ -1325,7 +1333,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         {
             LWM2M_ERR("Bootstrap procedure failed (%d.%02d)", coap_code >> 5, coap_code & 0x1f);
             m_app_state = LWM2M_STATE_DISCONNECTED;
-            app_server_disconnect(LWM2M_BOOTSTRAP_INSTANCE_ID);
+            app_server_disconnect(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
             lwm2m_retry_delay_connect_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
 
             app_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, 0);
@@ -1400,7 +1408,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         if (coap_code == 0) {
             // No response from update request
             LWM2M_INF("Update timeout, reconnect (server %d)", security_instance);
-            app_server_disconnect(security_instance);
+            app_server_disconnect(security_instance, false);
             lwm2m_request_server_update(security_instance, true);
 
             if (m_app_state == LWM2M_STATE_SERVER_REGISTER_WAIT) {
@@ -1470,7 +1478,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         if (m_app_state == LWM2M_STATE_SERVER_DEREGISTERING)
         {
             LWM2M_INF("Deregistered (server %d)", security_instance);
-            app_server_disconnect(security_instance);
+            app_server_disconnect(security_instance, false);
 
             if (lwm2m_is_deregistration_done()) {
                 m_app_state = LWM2M_STATE_DISCONNECTED;
@@ -1480,7 +1488,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         {
             int32_t delay = (int32_t) lwm2m_server_disable_timeout_get(server_instance);
             LWM2M_INF("Disable [%ld seconds] (server %d)", delay, security_instance);
-            app_server_disconnect(security_instance);
+            app_server_disconnect(security_instance, false);
 
             m_connection_update[security_instance].reconnect = true;
             lwm2m_os_timer_start(m_connection_update[security_instance].timer, K_SECONDS(delay));
@@ -1606,7 +1614,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     lwm2m_os_sleep(10); // TODO: figure out why this is needed before closing the connection
 
     // Close connection to bootstrap server.
-    app_server_disconnect(LWM2M_BOOTSTRAP_INSTANCE_ID);
+    app_server_disconnect(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
     lwm2m_retry_delay_connect_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
 
     if (app_provision_secret_keys() != 0) {
@@ -2223,7 +2231,7 @@ static void app_server_register(uint16_t security_instance)
                     lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
                     security_instance);
 
-        app_server_disconnect(security_instance);
+        app_server_disconnect(security_instance, false);
 
         if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
             app_handle_connect_retry(security_instance, false);
@@ -2252,7 +2260,7 @@ void app_server_update(uint16_t security_instance, bool connect_update)
                       lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
                       security_instance);
 
-            app_server_disconnect(security_instance);
+            app_server_disconnect(security_instance, false);
             lwm2m_request_server_update(security_instance, true);
 
             if (connect_update) {
@@ -2345,10 +2353,14 @@ static void app_server_deregister(uint16_t security_instance)
     lwm2m_state_set(LWM2M_STATE_SERVER_DEREGISTERING);
 }
 
-static void app_server_disconnect(uint16_t security_instance)
+static void app_server_disconnect(uint16_t security_instance, bool keep_lifetime_timer)
 {
     if (m_lwm2m_transport[security_instance] != -1) {
-        app_cancel_lifetime_timer(security_instance);
+        if (keep_lifetime_timer) {
+            m_connection_update[security_instance].reconnect = true;
+        } else {
+            app_cancel_lifetime_timer(security_instance);
+        }
         coap_security_destroy(m_lwm2m_transport[security_instance]);
         m_lwm2m_transport[security_instance] = -1;
     }
@@ -2358,7 +2370,7 @@ static void app_disconnect(void)
 {
     // Destroy the secure session if any.
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
-        app_server_disconnect(i);
+        app_server_disconnect(i, false);
     }
 
     m_app_state = LWM2M_STATE_DISCONNECTED;
@@ -2556,6 +2568,10 @@ static void app_check_server_update(void)
                     m_connection_update[i].requested = LWM2M_REQUEST_NONE;
                     lwm2m_state_set(LWM2M_STATE_SERVER_DEREGISTER);
                     break; // Break the loop to process the deregister
+                } else if (m_connection_update[i].requested == LWM2M_REQUEST_DISCONNECT) {
+                    LWM2M_INF("Server disconnect (server %u)", i);
+                    m_connection_update[i].requested = LWM2M_REQUEST_NONE;
+                    app_server_disconnect(i, true);
                 } else {
                     LWM2M_INF("Server update (server %u)", i);
                     m_connection_update[i].requested = LWM2M_REQUEST_NONE;
