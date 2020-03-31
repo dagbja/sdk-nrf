@@ -418,6 +418,12 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
         // Check if short_server_id is owner.
         for(int i = 0; i < m_num_instances; ++i)
         {
+            if (m_instances[i]->object_id == LWM2M_OBJ_SECURITY)
+            {
+                // Skip ACL for Security objects.
+                continue;
+            }
+
             if (m_instances[i]->acl.id == p_path[1])
             {
                 current_instance = m_instances[i];
@@ -466,7 +472,8 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
 
             case LWM2M_OPERATION_CODE_WRITE:
             {
-                if (!owner)
+                if ((short_server_id != LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID) &&
+                    (!owner))
                 {
                     LWM2M_MUTEX_UNLOCK();
 
@@ -568,6 +575,12 @@ static uint32_t internal_request_handle_acl(coap_message_t * p_request,
         // Check if owner
         for (int i = 0; i < m_num_instances; ++i)
         {
+            if (m_instances[i]->object_id == LWM2M_OBJ_SECURITY)
+            {
+                // Skip ACL for Security objects.
+                continue;
+            }
+
             if (m_instances[i]->acl.id == p_path[1])
             {
                 current_instance = m_instances[i];
