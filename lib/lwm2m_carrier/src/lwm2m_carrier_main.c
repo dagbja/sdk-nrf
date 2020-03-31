@@ -824,6 +824,8 @@ static int app_generate_client_id(void)
         char * p_msisdn = lwm2m_msisdn_get();
 
         len = lwm2m_last_used_msisdn_get(last_used_msisdn, sizeof(last_used_msisdn));
+        len = MIN(len, 15);
+        last_used_msisdn[len] = '\0';
         if (len > 0) {
             if (strlen(p_msisdn) > 0 && strcmp(p_msisdn, last_used_msisdn) != 0) {
                 // MSISDN has changed, factory reset and initiate bootstrap.
