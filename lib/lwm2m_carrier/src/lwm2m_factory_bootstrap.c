@@ -109,7 +109,7 @@ static void factory_server_bootstrap_vzw(void)
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
 
     lwm2m_instance_acl_t acl = {
-        .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
+        .owner = 100,
         .access = { rwde_access },
         .server = { 102 }
     };
@@ -129,7 +129,7 @@ static void factory_server_management_vzw(void)
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
 
     lwm2m_instance_acl_t acl = {
-        .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
+        .owner = 102,
         .access = { rwde_access, rwde_access, rwde_access },
         .server = { 101, 102, 1000 }
     };
@@ -168,7 +168,7 @@ static void factory_server_repository_vzw(void)
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
 
     lwm2m_instance_acl_t acl = {
-        .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
+        .owner = 1000,
         .access = { rwde_access, rwde_access, rwde_access },
         .server = { 101, 102, 1000 }
     };
@@ -182,7 +182,7 @@ static void factory_server_att(void)
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
 
     lwm2m_instance_acl_t acl = {
-        .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
+        .owner = 1,
         .access = { rwde_access },
         .server = { 1 }
     };
@@ -196,7 +196,7 @@ static void factory_server_test_att(void)
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
 
     lwm2m_instance_acl_t acl = {
-        .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
+        .owner = 1,
         .access = { rwde_access },
         .server = { 1 }
     };

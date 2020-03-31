@@ -69,9 +69,7 @@ void lwm2m_set_carrier_acl(lwm2m_instance_t * p_instance)
     uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
                             LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE);
 
-    lwm2m_instance_acl_t acl = {
-        .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID
-    };
+    lwm2m_instance_acl_t acl = { 0 };
 
     if (operator_is_vzw(true))
     {
@@ -81,17 +79,20 @@ void lwm2m_set_carrier_acl(lwm2m_instance_t * p_instance)
         acl.server[1] = 102;
         acl.access[2] = rwde_access;
         acl.server[2] = 1000;
+        acl.owner = 102;
     }
     else if (operator_is_att(true))
     {
         acl.access[0] = rwde_access;
         acl.server[0] = 1;
+        acl.owner = 1;
     }
     else
     {
         // TODO: Remove when fixing ACL
         acl.access[0] = rwde_access;
         acl.server[0] = 123;
+        acl.owner = 123;
     }
 
     lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
