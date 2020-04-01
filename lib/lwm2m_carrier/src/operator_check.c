@@ -21,19 +21,28 @@
 #define OPERATOR_ID_MAX                8        /**< The highest operator id supported. */
 /* Note: When adding operators also update operator_id_string() */
 
-#define IS_VZW(operator_id) \
-    (operator_id == OPERATOR_ID_VZW)
-
-#define IS_ATT(operator_id)                       \
-    ((operator_id == OPERATOR_ID_ATT)          || \
-     (operator_id == OPERATOR_ID_ATT_FIRSTNET) || \
-     (operator_id == OPERATOR_ID_ATT_CRICKET)  || \
-     (operator_id == OPERATOR_ID_ATT_JASPER))
-
 /** @brief Operator id from last read. */
 static uint32_t m_operator_id;
 
 static bool operator_is_custom(bool allow_debug);
+
+static bool is_not_identified(uint32_t operator_id)
+{
+    return (operator_id == OPERATOR_ID_NOT_IDENTIFIED);
+}
+
+static bool is_vzw(uint32_t operator_id)
+{
+    return (operator_id == OPERATOR_ID_VZW);
+}
+
+static bool is_att(uint32_t operator_id)
+{
+    return ((operator_id == OPERATOR_ID_ATT)          ||
+            (operator_id == OPERATOR_ID_ATT_FIRSTNET) ||
+            (operator_id == OPERATOR_ID_ATT_CRICKET)  ||
+            (operator_id == OPERATOR_ID_ATT_JASPER));
+}
 
 void operator_id_read(void)
 {
@@ -58,12 +67,12 @@ static bool operator_is_custom(bool allow_debug)
 
 bool operator_is_vzw(bool allow_debug)
 {
-    if (IS_VZW(m_operator_id)) {
+    if (is_vzw(m_operator_id)) {
         return true;
     }
 
     if (allow_debug && lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
-        return IS_VZW(lwm2m_debug_operator_id_get());
+        return is_not_identified(m_operator_id) && is_vzw(lwm2m_debug_operator_id_get());
     }
 
     return false;
@@ -71,12 +80,12 @@ bool operator_is_vzw(bool allow_debug)
 
 bool operator_is_att(bool allow_debug)
 {
-    if (IS_ATT(m_operator_id)) {
+    if (is_att(m_operator_id)) {
         return true;
     }
 
     if (allow_debug && lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
-        return IS_ATT(lwm2m_debug_operator_id_get());
+        return is_not_identified(m_operator_id) && is_att(lwm2m_debug_operator_id_get());
     }
 
     return false;
