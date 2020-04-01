@@ -138,6 +138,15 @@ uint32_t portfolio_instance_callback(lwm2m_instance_t * p_instance,
         if (err_code == 0)
         {
             (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+
+            if (instance_id == 0)
+            {
+                int ret = at_write_host_device_info(&m_instance_portfolio[instance_id].identity);
+                if (ret != 0)
+                {
+                    LWM2M_WRN("AT+ODIS failed: %d", ret);
+                }
+            }
         }
         else if (err_code == ENOTSUP)
         {

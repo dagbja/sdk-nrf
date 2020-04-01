@@ -1391,3 +1391,49 @@ int at_read_host_device_info(lwm2m_list_t *p_list)
 
     return 0;
 }
+
+int at_write_host_device_info(lwm2m_list_t *p_list)
+{
+    int len;
+    lwm2m_string_t *p_identity;
+
+    if (!p_list || !p_list->val.p_string || p_list->type != LWM2M_LIST_TYPE_STRING)
+    {
+        return -EINVAL;
+    }
+
+    len = snprintf(m_at_buffer, sizeof(m_at_buffer), "AT+ODIS=");
+
+    for (int i = 0; i < LWM2M_PORTFOLIO_IDENTITY_INSTANCES; i++)
+    {
+        p_identity = lwm2m_list_string_get(p_list, i);
+
+        if (!p_identity)
+        {
+            return -EINVAL;
+        }
+
+        // The string parameters appear between double quotes and are separated by a comma.
+        if (len + p_identity->len + 3 >= sizeof(m_at_buffer))
+        {
+            return -E2BIG;
+        }
+
+        m_at_buffer[len++] = '"';
+
+        memcpy(&m_at_buffer[len], p_identity->p_val, p_identity->len);
+        len += p_identity->len;
+
+        m_at_buffer[len++] = '"';
+        m_at_buffer[len++] = ',';
+    }
+
+    m_at_buffer[len] = '\0';
+
+    if (lwm2m_os_at_cmd_write(m_at_buffer, NULL, 0) != 0)
+    {
+        return -EIO;
+    }
+
+    return 0;
+}

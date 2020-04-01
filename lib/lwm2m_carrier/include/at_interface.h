@@ -295,4 +295,21 @@ int at_read_imsi(lwm2m_string_t *p_imsi);
  */
 int at_read_host_device_info(lwm2m_list_t *p_list);
 
+/**
+ * @brief Write the primary Host Device information.
+ *
+ * @note The function is to be called whenever the parameters of the first instance
+ *       of the Portfolio object, corresponding to the Primary Host, are modified,
+ *       in order to reflect those changes in  the modem.
+ *
+ * @param[in]  p_list Pointer to a list of string type that contains the Primary
+ *                    Host Device information.
+ *
+ * @retval     -EINVAL Invalid list definition.
+ * @retval     -E2BIG  Parameters to be written are too long.
+ * @retval     -EIO    AT command error.
+ * @retval     0       Success
+ */
+int at_write_host_device_info(lwm2m_list_t *p_list);
+
 #endif // AT_INTERFACE_H__
