@@ -259,6 +259,13 @@ static coap_transport_handle_t socket_create_and_bind(uint32_t index,
 						 * sizeof(nrf_sec_tag_t)));
 			}
 
+			if (err == 0) {
+				err = nrf_setsockopt(socket_fd, NRF_SOL_SECURE,
+						 NRF_SO_SEC_SESSION_CACHE,
+						 &local->setting->session_cache,
+						 sizeof(nrf_sec_session_cache_t));
+			}
+
 			if (err) {
 				/* Not all procedures succeeded with the socket
 				 * creation and initialization, hence free it.

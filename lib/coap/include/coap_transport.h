@@ -60,6 +60,9 @@ typedef struct {
 	/** Indicates the list of security tags to be used for the session. */
 	nrf_sec_tag_t *sec_tag_list;
 
+	/** Indicates the preference for session caching. */
+	nrf_sec_session_cache_t session_cache;
+
 	/** Peer hostname for ceritificate verification.
 	 *  May be NULL to skip hostname verification.
 	 */

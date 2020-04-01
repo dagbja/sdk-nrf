@@ -1955,6 +1955,7 @@ static void app_bootstrap_connect(void)
         coap_sec_config_t setting =
         {
             .role          = 0,    // 0 -> Client role
+            .session_cache = 1,    // 1 -> Enable session cache
             .sec_tag_count = SEC_TAG_COUNT,
             .sec_tag_list  = sec_tag_list
         };
@@ -2126,6 +2127,7 @@ static void app_server_connect(uint16_t security_instance)
         coap_sec_config_t setting =
         {
             .role          = 0,    // 0 -> Client role
+            .session_cache = 1,    // 1 -> Enable session cache
             .sec_tag_count = SEC_TAG_COUNT,
             .sec_tag_list  = sec_tag_list
         };
