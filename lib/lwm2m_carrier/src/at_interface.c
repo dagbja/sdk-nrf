@@ -259,8 +259,9 @@ static int at_odis_handler(const char *notif)
         lwm2m_list_string_set(&portfolio_inst->identity, i - 1, m_at_buffer, len);
     }
 
-    // TODO: Notify the observer
     lwm2m_os_at_params_list_free(&odis_params);
+
+    lwm2m_observable_resource_value_changed(LWM2M_OBJ_PORTFOLIO, 0, LWM2M_PORTFOLIO_IDENTITY);
 
     return 0;
 }

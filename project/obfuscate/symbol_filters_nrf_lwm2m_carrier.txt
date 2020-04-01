@@ -106,6 +106,7 @@
 ^lwm2m_instance_storage_init$
 ^lwm2m_observable_metadata_init$
 ^lwm2m_observable_reference_get_cb_set$
+^lwm2m_observable_resource_value_changed$
 ^lwm2m_observable_uptime_cb_initialize$
 ^lwm2m_observer_notification_is_con$
 ^lwm2m_observer_process$

@@ -421,6 +421,7 @@ typedef struct
     uint8_t                  type;                                       /**< Bitcode that identifies the data type of the observable. */
     uint8_t                  flags;                                      /**< Flags indicating whether the conditions defined by the attributes have been fulfilled. */
     uint16_t                 ssid;                                       /**< Short ID of the server that performed an OBSERVE or a WRITE-ATTRIBUTE request on the observable. */
+    uint8_t                  changed;                                    /**< Flag indicating whether the value of the observable has changed since the last notification has been sent. */
 } lwm2m_observable_metadata_t;
 
 /**@brief Callback interface from the enabler interface (bootstrap/register) to the application.
@@ -1133,6 +1134,19 @@ uint32_t lwm2m_list_string_append(lwm2m_list_t * p_list, uint8_t * p_value, uint
  * @return The URI path in string form, or NULL if p_path is NULL.
  */
 const char * lwm2m_path_to_string(const uint16_t *p_path, uint8_t path_len);
+
+/**@brief Report that the value of an observable resource has changed.
+ *
+ * @note The function will set the "changed" flag of the observable resource, if its
+ *       observable metadata has been initialized (either by requesting an observation
+ *       or updating its corresponding notification attributes), as well as the potential
+ *       object and object instance observables that share the same URI path elements.
+ *
+ * @param[in] object_id    Object identifier of the element.
+ * @param[in] instance_id  Instance identifier of the element.
+ * @param[in] resource_id  Resource identifier of the element.
+ */
+void lwm2m_observable_resource_value_changed(uint16_t object_id, uint16_t instance_id, uint16_t resource_id);
 
 #ifdef __cplusplus
 }

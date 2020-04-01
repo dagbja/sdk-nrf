@@ -75,6 +75,7 @@ static void lwm2m_observer_update_after_notification(int index)
 
     m_observables[index]->last_notification = 0;
     m_observables[index]->flags = 0;
+    m_observables[index]->changed = 0;
 }
 
 void lwm2m_notif_attr_default_cb_set(lwm2m_notif_attr_default_cb_t callback)
@@ -405,6 +406,17 @@ static uint8_t st_attribute_check(int index)
 static bool value_changed(int index)
 {
     // Assert m_observables[index] != NULL && index >= 0.
+    if ((m_observables[index]->type & LWM2M_OBSERVABLE_TYPE_NO_CHECK) != 0)
+    {
+        /* For strings and objects/object instances, we are checking whether the value has changed through the changed flag. */
+        if (m_observables[index]->changed)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     int32_t curr_value = *(int32_t *)m_observables[index]->observable;
 
     if (curr_value != m_observables[index]->prev_value)
@@ -474,20 +486,13 @@ static bool notification_send_check(int index)
         return true;
     }
 
-    /* Notifications regarding resources represented as strings or lists are currently
-       sent only upon pmax. */
-    if ((m_observables[index]->type & LWM2M_OBSERVABLE_TYPE_NO_CHECK) != 0)
-    {
-        return false;
-    }
-
     if (!value_changed(index))
     {
         return false;
     }
 
     /* If the change value conditions are absent, send a notification when pmin
-       has expired and the resource value has changed (valid for numerical resources only). */
+       has expired and the resource value has changed. */
     if (change_value_conditions_all_unset(index))
     {
         if (flags & LWM2M_ATTRIBUTE_MIN_PERIOD_CODE)
@@ -1189,4 +1194,58 @@ const void * lwm2m_observable_reference_get(const uint16_t *p_path, uint8_t path
     }
 
     return observable_reference_get_cb(p_path, path_len, NULL);
+}
+
+static void observable_object_value_changed(uint16_t object_id)
+{
+    for (int index = 0; index < LWM2M_MAX_OBSERVABLES_WITH_ATTRIBUTES; index++)
+    {
+        if (!m_observables[index] ||
+            m_observables[index]->path_len != 1 ||
+            m_observables[index]->path[0] != object_id)
+        {
+            continue;
+        }
+
+        m_observables[index]->changed = true;
+    }
+}
+
+static void observable_object_instance_value_changed(uint16_t object_id, uint16_t instance_id)
+{
+    for (int index = 0; index < LWM2M_MAX_OBSERVABLES_WITH_ATTRIBUTES; index++)
+    {
+        if (!m_observables[index] ||
+            m_observables[index]->path_len != 2 ||
+            m_observables[index]->path[0] != object_id ||
+            m_observables[index]->path[1] != instance_id)
+        {
+            continue;
+        }
+
+        m_observables[index]->changed = true;
+    }
+
+    observable_object_value_changed(object_id);
+}
+
+void lwm2m_observable_resource_value_changed(uint16_t object_id, uint16_t instance_id, uint16_t resource_id)
+{
+    /* Iterate the registered observables and match their corresponding URI to the one specified
+       in the request. */
+    for (int index = 0; index < LWM2M_MAX_OBSERVABLES_WITH_ATTRIBUTES; index++)
+    {
+        if (!m_observables[index] ||
+            m_observables[index]->path_len != 3 ||
+            m_observables[index]->path[0] != object_id ||
+            m_observables[index]->path[1] != instance_id ||
+            m_observables[index]->path[2] != resource_id)
+        {
+            continue;
+        }
+
+        m_observables[index]->changed = true;
+    }
+
+    observable_object_instance_value_changed(object_id, instance_id);
 }
