@@ -28,7 +28,7 @@
 #define BOOTSTRAP_URI_VZW_TEST         "coaps://ddocdpboot.do.motive.com:5684"               /**< Server URI to the bootstrap server when using security (DTLS). */
 #define DIAGNOSTICS_URI_VZW_TEST       ""                                                    /**< Server URI to the diagnostics server when using security (DTLS). */
 
-#define BOOTSTRAP_URI_ATT              "coaps://InteropBootstrap.dm.iot.att.com:5694"        /**< Server URI to the bootstrap server when using security (DTLS). */
+#define BOOTSTRAP_URI_ATT              "coaps://bootstrap.dm.iot.att.com:5694"               /**< Server URI to the bootstrap server when using security (DTLS). */
 #define BOOTSTRAP_URI_ATT_TEST         "coaps://InteropBootstrap.dm.iot.att.com:5694"        /**< Server URI to the bootstrap server when using security (DTLS). */
 
 // PSK: d6160c2e7c90399ee7d207a22611e3d3a87241b0462976b935341d000a91e747
