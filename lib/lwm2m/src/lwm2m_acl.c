@@ -282,6 +282,12 @@ uint32_t lwm2m_acl_deserialize_tlv(uint8_t          * buffer,
     uint16_t    instance_id = 0;
     uint16_t    control_owner = 0;
 
+    if (p_instance)
+    {
+        object_id = p_instance->object_id;
+        instance_id = p_instance->instance_id;
+    }
+
     while (index < buffer_len)
     {
         err_code = lwm2m_tlv_decode(&tlv, &index, buffer, buffer_len);
