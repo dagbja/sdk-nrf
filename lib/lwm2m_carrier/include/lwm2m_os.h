@@ -88,6 +88,7 @@ struct lwm2m_os_download_evt {
 struct lwm2m_os_download_cfg {
 	int sec_tag;
 	const char *apn;
+	int port;
 };
 
 /**
@@ -286,6 +287,13 @@ int lwm2m_os_download_init(lwm2m_os_download_callback_t lib_callback);
  */
 int lwm2m_os_download_start(const char *file, size_t from);
 
+/**
+ * @brief Retrieve size of file being downloaded.
+ *
+ * @param size Size of the file being downloaded.
+ */
+int lwm2m_os_download_file_size_get(size_t *size);
+
 /*
  * @brief Initialize and make a connection with the modem.
  */
@@ -314,21 +322,29 @@ const char *lwm2m_os_strerror(void);
 /**
  * @brief Check if a certificate chain credential exists in persistent storage.
  *
- * @param[in]  sec_tag		The tag to search for.
- * @param[out] exists		Whether the credential exists.
- *				Only valid if the operation is successful.
- * @param[out] perm_flags	The permission flags of the credential.
- *				Only valid if the operation is successful
- *				and @param exists is @c true.
- *				Not yet implemented.
+ * @param[in]  sec_tag	The tag to search for.
+ * @param[out] exists	Whether the credential exists.
+ *			Only valid if the operation is successful.
+ * @param[out] perm	The permission flags of the credential.
+ *			Not yet implemented.
  *
  * @retval 0		On success.
  * @retval -ENOBUFS	Insufficient memory.
  * @retval -EPERM	Insufficient permissions.
- * @retval -EIO		Internal error.
  */
-int lwm2m_os_sec_ca_chain_exists(uint32_t sec_tag, bool *exists,
-				 uint8_t *perm_flags);
+int lwm2m_os_sec_ca_chain_exists(uint32_t sec_tag, bool *exists, uint8_t *perm);
+
+/**
+ * @brief Compare a certificate chain.
+ *
+ * @param sec_tag	Security tag associated with the certificate chain.
+ * @param buf		Buffer to compare the certificate chain to.
+ * @param len		Length of the certificate chain.
+ * @retval 0		If the certificate chain match.
+ * @retval 1		If the certificate chain do not match.
+ * @retval < 0		On error.
+ */
+int lwm2m_os_sec_ca_chain_cmp(uint32_t sec_tag, const void *buf, size_t len);
 
 /**
  * @brief Provision a certificate chain or update an existing one.
@@ -347,10 +363,8 @@ int lwm2m_os_sec_ca_chain_exists(uint32_t sec_tag, bool *exists,
  * @retval -ENOMEM	Not enough memory to store the credential.
  * @retval -ENOENT	The security tag could not be written.
  * @retval -EPERM	Insufficient permissions.
- * @retval -EIO		Internal error.
  */
-int lwm2m_os_sec_ca_chain_write(uint32_t sec_tag, const void *buf,
-				uint16_t len);
+int lwm2m_os_sec_ca_chain_write(uint32_t sec_tag, const void *buf, size_t len);
 
 /**
  * @brief Check if a pre-shared key exists in persistent storage.

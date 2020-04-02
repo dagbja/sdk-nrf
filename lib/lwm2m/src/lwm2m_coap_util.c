@@ -245,7 +245,7 @@ uint32_t lwm2m_observe_unregister(struct nrf_sockaddr * p_remote, const void * p
 
     if (err_code != 0)
     {
-        LWM2M_INF("Observer unregister failed: %s (%ld), %s (%d)",
+        LWM2M_WRN("Observer unregister failed: %s (%ld), %s (%d)",
                   lwm2m_os_log_strdup(strerror(err_code)), err_code,
                   lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
     }

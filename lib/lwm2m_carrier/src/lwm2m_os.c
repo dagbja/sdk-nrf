@@ -10,13 +10,13 @@
 #include <stdbool.h>
 #include <zephyr.h>
 #include <string.h>
-#include <at_cmd.h>
-#include <at_notif.h>
-#include <at_cmd_parser/at_cmd_parser.h>
-#include <at_cmd_parser/at_params.h>
+#include <modem/at_cmd.h>
+#include <modem/at_notif.h>
+#include <modem/at_cmd_parser.h>
+#include <modem/at_params.h>
 #include <bsd.h>
-#include <lte_lc.h>
-#include <net/bsdlib.h>
+#include <modem/lte_lc.h>
+#include <modem/bsdlib.h>
 #include <net/download_client.h>
 #include <power/reboot.h>
 #include <sys/util.h>
@@ -25,7 +25,7 @@
 #include <logging/log.h>
 #include <errno.h>
 #include <nrf_errno.h>
-#include <modem_key_mgmt.h>
+#include <modem/modem_key_mgmt.h>
 
 /* NVS-related defines */
 
@@ -561,6 +561,7 @@ int lwm2m_os_download_connect(const char *host,
 	struct download_client_cfg config = {
 		.sec_tag = cfg->sec_tag,
 		.apn = cfg->apn,
+		.port = cfg->port,
 	};
 
 	return download_client_connect(&http_downloader, host, &config);
@@ -612,6 +613,11 @@ int lwm2m_os_download_init(lwm2m_os_download_callback_t lib_callback)
 int lwm2m_os_download_start(const char *file, size_t from)
 {
 	return download_client_start(&http_downloader, file, from);
+}
+
+int lwm2m_os_download_file_size_get(size_t *size)
+{
+	return download_client_file_size_get(&http_downloader, size);
 }
 
 /* LTE LC module abstractions. */
@@ -730,17 +736,22 @@ const char *lwm2m_os_strerror(void)
 	return strerror(errno);
 }
 
-int lwm2m_os_sec_ca_chain_exists(uint32_t sec_tag, bool *exists,
-				 uint8_t *perm_flags)
+int lwm2m_os_sec_ca_chain_exists(uint32_t sec_tag, bool *exists, uint8_t *flags)
 {
-	return modem_key_mgmt_exists(sec_tag, MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN,
-				     exists, perm_flags);
+	return modem_key_mgmt_exists(sec_tag,
+		MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN, exists, flags);
 }
 
-int lwm2m_os_sec_ca_chain_write(uint32_t sec_tag, const void *buf, uint16_t len)
+int lwm2m_os_sec_ca_chain_cmp(uint32_t sec_tag, const void *buf, size_t len)
 {
-	return modem_key_mgmt_write(sec_tag, MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN,
-				    buf, len);
+	return modem_key_mgmt_cmp(sec_tag,
+		MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN, buf, len);
+}
+
+int lwm2m_os_sec_ca_chain_write(uint32_t sec_tag, const void *buf, size_t len)
+{
+	return modem_key_mgmt_write(sec_tag,
+		MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN, buf, len);
 }
 
 int lwm2m_os_sec_psk_exists(uint32_t sec_tag, bool *exists, uint8_t *perm_flags)

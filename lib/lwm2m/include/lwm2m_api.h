@@ -142,6 +142,11 @@ typedef struct
 #define LWM2M_INVALID_RESOURCE        65535 /**< Invalid Resource ID. */
 #define LWM2M_INVALID_INSTANCE        65535 /**< Invalid Instance ID. */
 
+ /* Passed to the instance callback as the `resource` parameter
+  * when the operation involves an object instance
+  */
+#define LWM2M_OBJECT_INSTANCE         65535
+
 #define LWM2M_PERMISSION_READ         0x01  /**< Bit mask for LWM2M read permission. */
 #define LWM2M_PERMISSION_WRITE        0x02  /**< Bit mask for LWM2M write permission. */
 #define LWM2M_PERMISSION_EXECUTE      0x04  /**< Bit mask for LWM2M execute permission. */

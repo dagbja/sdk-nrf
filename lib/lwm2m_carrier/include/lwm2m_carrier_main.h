@@ -69,6 +69,15 @@ char *lwm2m_msisdn_get(void);
  */
 char *lwm2m_default_apn_get(void);
 
+/**
+ * @brief Get carrier APN.
+ *
+ * @param[out] buf Buffer to store the APN into.
+ * @param len Size of the buffer.
+ * @return Length of the APN.
+ */
+int lwm2m_carrier_apn_get(char *buf, size_t len);
+
 bool lwm2m_carrier_pdn_activate(uint16_t instance_id, int32_t *retry_delay);
 
 void lwm2m_request_link_up(void);

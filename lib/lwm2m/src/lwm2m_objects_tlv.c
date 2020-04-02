@@ -109,7 +109,7 @@ static uint32_t lwm2m_tlv_resource_encode(uint8_t          * p_buffer,
 
         default:
         {
-            err_code = ENOENT;
+            err_code = ENOTSUP;
             break;
         }
     }
@@ -486,9 +486,8 @@ uint32_t lwm2m_tlv_security_encode(uint8_t          * p_buffer,
 
         case LWM2M_SECURITY_SECRET_KEY:
         {
-            /* Omit the encoding of this specific resource to make sure
-             * it is not written to flash when saving this instance.
-             */
+            // Omit the encoding of this specific resource to make sure
+            // it is not written to flash when saving this instance.
             err_code = 0;
             *p_buffer_len = 0;
             break;
@@ -560,8 +559,7 @@ uint32_t lwm2m_tlv_security_encode(uint8_t          * p_buffer,
 
         default:
         {
-            err_code = 0;
-            *p_buffer_len = 0;
+            err_code = ENOTSUP;
             break;
         }
     }
@@ -772,6 +770,19 @@ uint32_t lwm2m_tlv_server_encode(uint8_t        * p_buffer,
             break;
         }
 
+        // These resource are normally not encoded since they are executable,
+        // unless the permission check is omitted, which happens when objects
+        // are being saved to flash. In that case we must take care of updating
+        // p_buffer_len or the caller will think the buffer was filled.
+        case LWM2M_SERVER_DISABLE:
+        case LWM2M_SERVER_REGISTRATION_UPDATE_TRIGGER:
+        case LWM2M_SERVER_BOOTSTRAP_REQUEST_TRIGGER:
+        {
+            err_code = 0;
+            *p_buffer_len = 0;
+            break;
+        }
+
         case LWM2M_NAMED_OBJECT:
         {
             // This is a callback to the instance, not a specific resource.
@@ -784,8 +795,7 @@ uint32_t lwm2m_tlv_server_encode(uint8_t        * p_buffer,
 
         default:
         {
-            err_code = 0;
-            *p_buffer_len = 0;
+            err_code = ENOTSUP;
             break;
         }
     }
@@ -1347,7 +1357,6 @@ uint32_t lwm2m_tlv_firmware_decode(lwm2m_firmware_t     * p_firmware,
     while (index < buffer_len)
     {
         err_code = lwm2m_tlv_decode(&tlv, &index, p_buffer, buffer_len);
-
         if (err_code != 0)
         {
             return err_code;
@@ -1355,16 +1364,9 @@ uint32_t lwm2m_tlv_firmware_decode(lwm2m_firmware_t     * p_firmware,
 
         switch (tlv.id)
         {
-            case LWM2M_FIRMWARE_PACKAGE:
-            {
-                p_firmware->package.p_val = tlv.value;
-                p_firmware->package.len   = tlv.length;
-                break;
-            }
-
             case LWM2M_FIRMWARE_PACKAGE_URI:
             {
-                err_code = lwm2m_bytebuffer_to_string((char *)tlv.value,
+                err_code = lwm2m_bytebuffer_to_string(tlv.value,
                                                       tlv.length,
                                                       &p_firmware->package_uri);
                 break;
@@ -1372,17 +1374,23 @@ uint32_t lwm2m_tlv_firmware_decode(lwm2m_firmware_t     * p_firmware,
 
             default:
             {
-                if (resource_callback)
-                {
-                    err_code = resource_callback(p_firmware->proto.instance_id, &tlv);
-                }
+                err_code = 0;
                 break;
             }
         }
 
         if (err_code != 0)
         {
-            return EINVAL;
+            return err_code;
+        }
+
+        if (resource_callback)
+        {
+            err_code = resource_callback(p_firmware->proto.instance_id, &tlv);
+            if (err_code != 0)
+            {
+                return err_code;
+            }
         }
     }
 
@@ -1477,8 +1485,7 @@ uint32_t lwm2m_tlv_firmware_encode(uint8_t          * p_buffer,
 
         default:
         {
-            err_code = 0;
-            *p_buffer_len = 0;
+            err_code = ENOTSUP;
             break;
         }
     }
@@ -1786,7 +1793,7 @@ uint32_t lwm2m_tlv_apn_connection_profile_encode(uint8_t               * p_buffe
 
         default:
         {
-            err_code = ENOENT;
+            err_code = ENOTSUP;
             break;
         }
     }
@@ -1877,7 +1884,7 @@ uint32_t lwm2m_tlv_portfolio_encode(uint8_t           * p_buffer,
 
         default:
         {
-            err_code = ENOENT;
+            err_code = ENOTSUP;
             break;
         }
     }
@@ -2060,7 +2067,7 @@ uint32_t lwm2m_tlv_connectivity_extension_encode(uint8_t                        
 
         default:
         {
-            err_code = ENOENT;
+            err_code = ENOTSUP;
             break;
         }
     }

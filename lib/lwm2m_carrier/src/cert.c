@@ -4,19 +4,20 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
+#include <string.h>
 #include <lwm2m.h>
 #include <lwm2m_os.h>
 #include <toolchain.h>
 
+#define ORANGE "\e[0;33m"
+#define GREEN "\e[0;32m"
+
 static const char ca_chain[] = {
-#if 1
+	#include "../certs/DigiCertGlobalRootCA.pem" /* VzW and AT&T*/
 	#include "../certs/DigiCertGlobalRootG2.pem" /* Motive */
-#else
-	#include "../certs/DigiCertGlobalRootCA.pem" /* VzW    */
-#endif
 };
 
-BUILD_ASSERT_MSG(sizeof(ca_chain) < 4096, "CA is too large");
+BUILD_ASSERT_MSG(sizeof(ca_chain) < 4096, "CA chain is too large");
 
 int cert_provision(void)
 {
@@ -35,18 +36,27 @@ int cert_provision(void)
 
 	err = lwm2m_os_sec_ca_chain_exists(tag, &provisioned, &dummy);
 	if (!err && provisioned) {
-		LWM2M_INF("Certificates found, tag %lu", tag);
-		return 0;
+		/* 0 on match, 1 otherwise; like memcmp() */
+		err = lwm2m_os_sec_ca_chain_cmp(tag, ca_chain,
+						sizeof(ca_chain) - 1);
+
+		LWM2M_INF("Certificate found, tag %d: %s", tag,
+			  err ? ORANGE "mismatch" : GREEN "match");
+
+		if (!err) {
+			return err;
+		}
+
+		/* continue to overwrite the certificate */
 	}
 
-	err = lwm2m_os_sec_ca_chain_write(tag, (char *)ca_chain, sizeof(ca_chain) - 1);
-
+	err = lwm2m_os_sec_ca_chain_write(tag, ca_chain, sizeof(ca_chain) - 1);
 	if (err) {
 		LWM2M_ERR("Unable to provision certificate, err: %d", err);
 		return err;
 	}
 
-	LWM2M_INF("Provisioned certificate, tag %lu", tag);
+	LWM2M_INF("Provisioned certificate, tag %d", tag);
 
 	return 0;
 }

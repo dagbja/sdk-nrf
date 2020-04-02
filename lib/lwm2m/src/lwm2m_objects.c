@@ -217,13 +217,16 @@ void lwm2m_instance_firmware_init(lwm2m_firmware_t * p_instance)
     p_instance->operations[0] = WRITE;
     p_instance->operations[1] = WRITE;
     p_instance->operations[2] = EXEC;
-    p_instance->operations[3] = READ | WRATT;
-    p_instance->operations[4] = NONE; // "Update Supported Objects" is not available anymore, but reserved.
-    p_instance->operations[5] = READ | WRATT;
-    p_instance->operations[6] = READ | WRATT;
-    p_instance->operations[7] = READ | WRATT;
-    p_instance->operations[8] = READ | WRATT;
-    p_instance->operations[9] = READ | WRATT;
+    p_instance->operations[3] = READ | WRATT | DISC | OBSV;
+
+     // "Update Supported Objects" is not available anymore, but reserved.
+    p_instance->operations[4] = NONE;
+
+    p_instance->operations[5] = READ | WRATT | DISC | OBSV;
+    p_instance->operations[6] = READ | WRATT | DISC;
+    p_instance->operations[7] = READ | WRATT | DISC;
+    p_instance->operations[8] = READ | WRATT | DISC;
+    p_instance->operations[9] = READ | WRATT | DISC;
 
     // Set resource IDs.
     p_instance->resource_ids[0] = LWM2M_FIRMWARE_PACKAGE;

@@ -596,7 +596,7 @@ static void dump_as_hex(const struct shell *shell, char *data, int len)
 
         // Dump bytes as text
         for (i = 0; i < 16 && pos + i < len; i++) {
-            if (isprint(data[pos + i])) {
+            if (isprint((int)data[pos + i])) {
                 *cur++ = data[pos + i];
             } else {
                 *cur++ = '.';

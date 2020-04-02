@@ -16,6 +16,8 @@ int dfusock_close(void);
 int dfusock_offset_get(uint32_t *off);
 int dfusock_offset_set(uint32_t off);
 
+int dfusock_flash_size_get(uint32_t *size);
+
 /**@brief Retrive the modem firmware version.
  *
  * If the buffer is large enough, additionally NULL-terminates

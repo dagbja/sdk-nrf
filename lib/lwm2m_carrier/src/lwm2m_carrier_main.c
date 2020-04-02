@@ -513,7 +513,7 @@ void lwm2m_system_reset(bool force_reset)
 /* Read the access point name into a buffer, and null-terminate it.
  * Returns the length of the access point name.
  */
-static int carrier_apn_get(char *buf, size_t len)
+int lwm2m_carrier_apn_get(char *buf, size_t len)
 {
     char *p_apn;
     uint8_t apn_len = 0;
@@ -601,7 +601,7 @@ static void setup_carrier_apn(uint16_t security_instance)
 
     if (m_connection_use_pdn)
     {
-        carrier_apn_get(m_current_apn, sizeof(m_current_apn));
+        lwm2m_carrier_apn_get(m_current_apn, sizeof(m_current_apn));
     }
 }
 

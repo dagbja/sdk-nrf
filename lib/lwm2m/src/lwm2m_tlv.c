@@ -530,7 +530,9 @@ uint32_t lwm2m_tlv_header_encode(uint8_t * p_buffer, uint32_t * p_buffer_len, lw
     uint8_t id_len;
 
     uint8_t  id[2]  = {0, };
-    uint8_t  len[3] = {0, };
+    // Length is at most 3 bytes, we declare it 4 bytes long to prevent
+    // a compiler warning when passing it to lwm2m_tlv_uint32_to_bytebuffer().
+    uint8_t  len[4] = {0, };
     uint16_t index  = 0;
     uint8_t  type   = 0;
 
@@ -565,7 +567,7 @@ uint32_t lwm2m_tlv_header_encode(uint8_t * p_buffer, uint32_t * p_buffer_len, lw
     }
     else
     {
-        lwm2m_tlv_uint32_to_bytebuffer(&len[0], &length_len, p_tlv->length);
+        lwm2m_tlv_uint32_to_bytebuffer(len, &length_len, p_tlv->length);
 
         // Length can not be larger than 24-bit.
         if (length_len > TLV_LEN_TYPE_24BIT)

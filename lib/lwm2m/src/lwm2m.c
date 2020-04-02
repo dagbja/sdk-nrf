@@ -1066,7 +1066,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
             LWM2M_MUTEX_UNLOCK();
 
-            err_code = p_object->callback(p_object, LWM2M_INVALID_INSTANCE, operation, p_request);
+            err_code = p_object->callback(p_object, LWM2M_OBJECT_INSTANCE, operation, p_request);
 
             LWM2M_MUTEX_LOCK();
 
@@ -1463,7 +1463,7 @@ static uint32_t lwm2m_coap_handler_handle_request(coap_message_t * p_request)
                             LWM2M_MUTEX_UNLOCK();
 
                             err_code = m_objects[i]->callback(m_objects[i],
-                                                              LWM2M_INVALID_INSTANCE,
+                                                              LWM2M_OBJECT_INSTANCE,
                                                               LWM2M_OPERATION_CODE_NONE,
                                                               p_request);
 
@@ -2010,7 +2010,7 @@ uint32_t lwm2m_init(lwm2m_alloc_t alloc_fn, lwm2m_free_t free_fn)
 
 const char * lwm2m_path_to_string(const uint16_t *p_path, uint8_t path_len)
 {
-    static char uri_path[sizeof("/65535/65535/65535/65535")];  /* Longest URI possible */
+    static char uri_path[sizeof("/65535/65535/65535/65535")]; /* Longest URI possible */
     uint32_t index = 0;
 
     if (!p_path)
