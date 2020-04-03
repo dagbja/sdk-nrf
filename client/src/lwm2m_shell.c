@@ -663,6 +663,24 @@ static int cmd_flash_print(const struct shell *shell, size_t argc, char **argv)
     return 0;
 }
 
+static int cmd_flash_delete(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s <record>", argv[0]);
+        return 0;
+    }
+
+    uint16_t id = strtol(argv[1], NULL, 10);
+    if (id > 255) {
+        shell_print(shell, "Record %d is not a LwM2M record", id);
+        return 0;
+    }
+
+    lwm2m_os_storage_delete(LWM2M_OS_STORAGE_BASE + id);
+
+    return 0;
+}
+
 static int cmd_lwm2m_bootstrap(const struct shell *shell, size_t argc, char **argv)
 {
     if ((lwm2m_state_get() == LWM2M_STATE_IDLE) ||
@@ -1796,6 +1814,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
 
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_flash,
+    SHELL_CMD(delete, NULL, "Delete record", cmd_flash_delete),
     SHELL_CMD(list, NULL, "List records", cmd_flash_list),
     SHELL_CMD(print, NULL, "Print record content", cmd_flash_print),
     SHELL_SUBCMD_SET_END /* Array terminated. */
