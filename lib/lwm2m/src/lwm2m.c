@@ -939,7 +939,14 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
         case COAP_CODE_POST:
         {
-            operation = LWM2M_OPERATION_CODE_WRITE;
+            if (path_len == 1)
+            {
+                operation = LWM2M_OPERATION_CODE_CREATE;
+            }
+            else
+            {
+                operation = LWM2M_OPERATION_CODE_WRITE;
+            }
             break;
         }
 
@@ -1176,52 +1183,6 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
                           p_path[0],
                           p_path[1],
                           (err_code == 0) ? "SUCCESS" : "NOT_FOUND");
-            }
-
-            if (err_code == ENOENT &&
-                operation == LWM2M_OPERATION_CODE_WRITE &&
-                p_request->header.code == COAP_CODE_POST)
-            {
-                LWM2M_TRC(">> CREATE object /%u/%u/",
-                          p_path[0],
-                          p_path[1]);
-
-                lwm2m_object_t * p_object;
-
-                err_code = lwm2m_lookup_object(&p_object, p_path[0]);
-
-                if (err_code != 0)
-                {
-                    LWM2M_MUTEX_UNLOCK();
-
-                    err_code = lwm2m_handler_error(short_server_id,
-                                                   NULL,
-                                                   p_request,
-                                                   ENOENT);
-
-                    LWM2M_MUTEX_LOCK();
-
-                    if (err_code != 0)
-                    {
-                        err_code = lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
-                    }
-                    break;
-                }
-
-                LWM2M_MUTEX_UNLOCK();
-
-                err_code = p_object->callback(p_object,
-                                              p_path[1],
-                                              LWM2M_OPERATION_CODE_CREATE,
-                                              p_request);
-
-                LWM2M_MUTEX_LOCK();
-
-                LWM2M_TRC("<< CREATE object /%u/%u/, result: %s",
-                          p_path[0],
-                          p_path[1],
-                          (err_code == 0) ? "SUCCESS" : "NOT_FOUND");
-                break;
             }
 
             // Instance was not found

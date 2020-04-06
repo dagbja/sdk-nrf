@@ -27,8 +27,11 @@
 #define HOST_DEVICE_MODEL_1        "HMOD1"
 #define HOST_DEVICE_SW_VERSION_1   "HSW1"
 
-static lwm2m_object_t    m_object_portfolio;          /**< Portfolio base object. */
-static lwm2m_portfolio_t m_instance_portfolio[2];     /**< Portfolio object instance. */
+#define LWM2M_PORTFOLIO_MAX_INSTANCES    3
+#define LWM2M_PORTFOLIO_CARRIER_INSTANCE 2
+
+static lwm2m_object_t    m_object_portfolio;                                  /**< Portfolio base object. */
+static lwm2m_portfolio_t m_instance_portfolio[LWM2M_PORTFOLIO_MAX_INSTANCES]; /**< Portfolio object instance. */
 static char *            m_portfolio_identity_val[][LWM2M_PORTFOLIO_IDENTITY_INSTANCES] =
 {
     { HOST_DEVICE_ID_0, HOST_DEVICE_MANUFACTURER_0, HOST_DEVICE_MODEL_0, HOST_DEVICE_SW_VERSION_0 },
@@ -40,8 +43,15 @@ static void on_object_read(coap_message_t *p_req);
 
 static bool operation_is_allowed(uint16_t inst, uint16_t res, uint16_t op)
 {
-    if (res < ARRAY_SIZE(m_instance_portfolio[inst].operations)) {
-        return m_instance_portfolio[inst].operations[res] & op;
+    lwm2m_portfolio_t *p_instance = lwm2m_portfolio_get_instance(inst);
+
+    if (!p_instance)
+    {
+        return false;
+    }
+
+    if (res < ARRAY_SIZE(p_instance->operations)) {
+        return p_instance->operations[res] & op;
     }
 
     /* Allow by default, it could be a carrier-specific resource */
@@ -50,12 +60,17 @@ static bool operation_is_allowed(uint16_t inst, uint16_t res, uint16_t op)
 
 lwm2m_portfolio_t * lwm2m_portfolio_get_instance(uint16_t instance_id)
 {
-    if (instance_id >= ARRAY_SIZE(m_instance_portfolio))
+    lwm2m_portfolio_t *p_instance = NULL;
+
+    for (int i = 0; i < ARRAY_SIZE(m_instance_portfolio); i++)
     {
-        return NULL;
+        if (m_instance_portfolio[i].proto.instance_id == instance_id)
+        {
+            p_instance = &m_instance_portfolio[i];
+        }
     }
 
-    return &m_instance_portfolio[instance_id];
+    return p_instance;
 }
 
 lwm2m_object_t * lwm2m_portfolio_get_object(void)
@@ -67,14 +82,17 @@ static void on_read(const uint16_t path[3], uint8_t path_len,
                     coap_message_t *p_req)
 {
     uint32_t err;
-    uint8_t buf[200];
+    uint8_t buf[100];
     size_t len;
+    lwm2m_portfolio_t *p_instance;
 
     const uint16_t inst = path[1];
     const uint16_t res = path[2];
 
+    p_instance = lwm2m_portfolio_get_instance(inst);
+
     len = sizeof(buf);
-    err = lwm2m_tlv_portfolio_encode(buf, &len, res, &m_instance_portfolio[inst]);
+    err = lwm2m_tlv_portfolio_encode(buf, &len, res, p_instance);
     if (err) {
         const coap_msg_code_t code =
                 (err == ENOTSUP) ? COAP_CODE_404_NOT_FOUND :
@@ -161,7 +179,7 @@ static void on_observe_start(const uint16_t path[3], uint8_t path_len,
                              coap_message_t *p_req)
 {
     uint32_t err;
-    uint8_t buf[200];
+    uint8_t buf[300];
     size_t len;
     coap_message_t *p_rsp;
 
@@ -263,11 +281,14 @@ static void on_discover(const uint16_t path[3], uint8_t path_len,
                         coap_message_t *p_req)
 {
     uint32_t err;
+    lwm2m_portfolio_t *p_instance;
 
     const uint16_t inst = path[1];
     const uint16_t res = path[2];
 
-    err = lwm2m_respond_with_instance_link(&m_instance_portfolio[inst].proto, res, p_req);
+    p_instance = lwm2m_portfolio_get_instance(inst);
+
+    err = lwm2m_respond_with_instance_link(&p_instance->proto, res, p_req);
     if (err) {
         LWM2M_WRN("Failed to respond to discover on %s, err %d",
             lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)), err);
@@ -282,6 +303,7 @@ uint32_t portfolio_instance_callback(lwm2m_instance_t * p_instance,
 {
     uint16_t access;
     uint32_t err_code;
+    lwm2m_instance_t *p_portfolio;
 
     const uint8_t path_len = (resource_id == LWM2M_NAMED_OBJECT) ? 2 : 3;
     const uint16_t path[] = {
@@ -310,7 +332,8 @@ uint32_t portfolio_instance_callback(lwm2m_instance_t * p_instance,
         return 0;
     }
 
-    if (!lwm2m_portfolio_get_instance(path[1])) {
+    // The last instance might have not been created yet.
+    if (lwm2m_lookup_instance(&p_portfolio, LWM2M_OBJ_PORTFOLIO, p_instance->instance_id) != 0) {
         lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
         return 0;
     }
@@ -341,7 +364,7 @@ uint32_t portfolio_instance_callback(lwm2m_instance_t * p_instance,
 static void on_object_read(coap_message_t *p_req)
 {
     uint32_t err;
-    uint8_t buf[200];
+    uint8_t buf[300];
     size_t len;
 
     const uint16_t path[] = { LWM2M_OBJ_PORTFOLIO };
@@ -371,6 +394,75 @@ static void on_object_discover(coap_message_t * p_req)
     }
 }
 
+int lwm2m_portfolio_instance_create(uint16_t instance_id)
+{
+    int err;
+    lwm2m_instance_t *p_instance;
+    uint16_t *p_instance_id;
+
+    p_instance_id = &m_instance_portfolio[LWM2M_PORTFOLIO_CARRIER_INSTANCE].proto.instance_id;
+
+    /* Check if the instance has already been added to the handler. */
+    err = lwm2m_lookup_instance(&p_instance, LWM2M_OBJ_PORTFOLIO, *p_instance_id);
+    if (err == 0)
+    {
+        LWM2M_WRN("Failed to create a new portfolio object instance, no slots available");
+        return -ENOMEM;
+    }
+
+    /* Check if the instance identifier is already in use. */
+    for (int i = 0; i < ARRAY_SIZE(m_instance_portfolio) - 1; i++)
+    {
+        if (m_instance_portfolio[i].proto.instance_id == instance_id)
+        {
+            LWM2M_WRN("Failed to create a new portfolio object instance, identifier already in use");
+            return -EINVAL;
+        }
+    }
+
+    *p_instance_id = instance_id;
+
+    lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_portfolio[LWM2M_PORTFOLIO_CARRIER_INSTANCE]);
+
+    return 0;
+}
+
+static void on_object_create(coap_message_t *p_req)
+{
+    uint32_t err;
+    uint16_t instance_id;
+
+    /* Check if the TLV payload specifies the new object instance ID. */
+    if (p_req->payload)
+    {
+        lwm2m_tlv_t tlv;
+        uint32_t index = 0;
+
+        err = lwm2m_tlv_decode(&tlv, &index, p_req->payload, p_req->payload_len);
+
+        if (err != 0)
+        {
+            lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_req);
+            return;
+        }
+
+        instance_id = tlv.id;
+    }
+    else
+    {
+        instance_id = LWM2M_PORTFOLIO_CARRIER_INSTANCE;
+    }
+
+    err = lwm2m_portfolio_instance_create(instance_id);
+
+    if (err != 0)
+    {
+        lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_req);
+    }
+
+    lwm2m_respond_with_code(COAP_CODE_201_CREATED, p_req);
+}
+
 /**@brief Callback function for LWM2M portfolio objects. */
 uint32_t lwm2m_portfolio_object_callback(lwm2m_object_t * p_object,
                                          uint16_t         instance_id,
@@ -392,6 +484,9 @@ uint32_t lwm2m_portfolio_object_callback(lwm2m_object_t * p_object,
         break;
     case LWM2M_OPERATION_CODE_DISCOVER:
         on_object_discover(p_request);
+        break;
+    case LWM2M_OPERATION_CODE_CREATE:
+        on_object_create(p_request);
         break;
     default:
         lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
@@ -430,7 +525,13 @@ void lwm2m_portfolio_init(void)
         // Set bootstrap server as owner.
         (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_portfolio[i],
                                         LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-        (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_portfolio[i]);
+
+        /* The last instance is reserved for the carrier and will be added to the
+           handler upon a CREATE request. */
+        if (i != LWM2M_PORTFOLIO_CARRIER_INSTANCE)
+        {
+            (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_portfolio[i]);
+        }
     }
 
     uint16_t instance_id = 0;
@@ -440,7 +541,7 @@ void lwm2m_portfolio_init(void)
         ++instance_id;
     }
 
-    for (int i = instance_id; i < ARRAY_SIZE(m_instance_portfolio); i++)
+    for (int i = instance_id; i < ARRAY_SIZE(m_instance_portfolio) - 1; i++)
     {
         for (int j = 0; j < LWM2M_PORTFOLIO_IDENTITY_INSTANCES; j++)
         {
