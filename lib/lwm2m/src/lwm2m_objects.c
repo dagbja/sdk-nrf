@@ -559,7 +559,7 @@ void lwm2m_instance_portfolio_init(lwm2m_portfolio_t * p_instance)
     memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
-    p_instance->operations[0] = READ | WRATT | WRITE;
+    p_instance->operations[0] = READ | WRATT | WRITE | DISC | OBSV;
 
     // Set resource IDs.
     p_instance->resource_ids[0] = LWM2M_PORTFOLIO_IDENTITY;

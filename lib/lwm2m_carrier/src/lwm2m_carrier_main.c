@@ -994,6 +994,9 @@ const void * observable_reference_get(const uint16_t *p_path, uint8_t path_len, 
     case LWM2M_OBJ_SERVER:
         value = lwm2m_server_resource_reference_get(p_path[1], p_path[2], p_type);
         break;
+    case LWM2M_OBJ_PORTFOLIO:
+        value = lwm2m_portfolio_resource_reference_get(p_path[1], p_path[2], p_type);
+        break;
     case LWM2M_OBJ_SECURITY:
     case LWM2M_OBJ_ACL:
     case LWM2M_OBJ_LOCATION:

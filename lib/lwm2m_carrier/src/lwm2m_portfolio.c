@@ -36,7 +36,17 @@ static char *            m_portfolio_identity_val[][LWM2M_PORTFOLIO_IDENTITY_INS
 };
 static lwm2m_string_t    m_portfolio_identity[ARRAY_SIZE(m_instance_portfolio)][LWM2M_PORTFOLIO_IDENTITY_INSTANCES];
 
-// LWM2M core resources.
+static void on_object_read(coap_message_t *p_req);
+
+static bool operation_is_allowed(uint16_t inst, uint16_t res, uint16_t op)
+{
+    if (res < ARRAY_SIZE(m_instance_portfolio[inst].operations)) {
+        return m_instance_portfolio[inst].operations[res] & op;
+    }
+
+    /* Allow by default, it could be a carrier-specific resource */
+    return true;
+}
 
 lwm2m_portfolio_t * lwm2m_portfolio_get_instance(uint16_t instance_id)
 {
@@ -53,120 +63,312 @@ lwm2m_object_t * lwm2m_portfolio_get_object(void)
     return &m_object_portfolio;
 }
 
+static void on_read(const uint16_t path[3], uint8_t path_len,
+                    coap_message_t *p_req)
+{
+    uint32_t err;
+    uint8_t buf[200];
+    size_t len;
+
+    const uint16_t inst = path[1];
+    const uint16_t res = path[2];
+
+    len = sizeof(buf);
+    err = lwm2m_tlv_portfolio_encode(buf, &len, res, &m_instance_portfolio[inst]);
+    if (err) {
+        const coap_msg_code_t code =
+                (err == ENOTSUP) ? COAP_CODE_404_NOT_FOUND :
+                                   COAP_CODE_500_INTERNAL_SERVER_ERROR;
+
+        lwm2m_respond_with_code(code, p_req);
+        return;
+    }
+
+    lwm2m_respond_with_payload(buf, len, COAP_CT_APP_LWM2M_TLV, p_req);
+}
+
+static void on_write_attribute(const uint16_t path[3], uint8_t path_len,
+                               coap_message_t *p_req)
+{
+    int err;
+
+    err = lwm2m_write_attribute_handler(path, path_len, p_req);
+    if (err) {
+        const coap_msg_code_t code =
+            (err == -EINVAL) ? COAP_CODE_400_BAD_REQUEST :
+                               COAP_CODE_500_INTERNAL_SERVER_ERROR;
+        lwm2m_respond_with_code(code, p_req);
+        return;
+    }
+
+    lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_req);
+}
+
+static void on_write(const uint16_t path[3], uint8_t path_len,
+                     coap_message_t *p_req)
+{
+    uint32_t err;
+    uint32_t mask;
+    lwm2m_portfolio_t *p_instance;
+
+    const uint16_t inst = path[1];
+
+    p_instance = lwm2m_portfolio_get_instance(inst);
+
+    err = coap_message_ct_mask_get(p_req, &mask);
+    if (err) {
+        lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_req);
+        return;
+    }
+
+    if (mask & COAP_CT_MASK_APP_LWM2M_TLV) {
+        /* Decode TLV payload */
+        err = lwm2m_tlv_portfolio_decode(p_instance,
+                                         p_req->payload,
+                                         p_req->payload_len,
+                                         NULL);
+    } else {
+        lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_req);
+        return;
+    }
+
+    if (err) {
+        /* Failed to decode or to process the payload.
+         * We attempted to decode a resource and failed because
+         * - memory contraints or
+         * - the payload contained unexpected data
+         */
+        const coap_msg_code_t code =
+            (err == ENOTSUP) ? COAP_CODE_404_NOT_FOUND :
+                               COAP_CODE_400_BAD_REQUEST;
+        lwm2m_respond_with_code(code, p_req);
+        return;
+    }
+
+    if (inst == 0)
+    {
+        int ret = at_write_host_device_info(&m_instance_portfolio[inst].identity);
+        if (ret != 0)
+        {
+            LWM2M_WRN("AT+ODIS failed: %d", ret);
+        }
+    }
+
+    lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_req);
+}
+
+static void on_observe_start(const uint16_t path[3], uint8_t path_len,
+                             coap_message_t *p_req)
+{
+    uint32_t err;
+    uint8_t buf[200];
+    size_t len;
+    coap_message_t *p_rsp;
+
+    len = sizeof(buf);
+
+    LWM2M_INF("Observe register %s",
+              lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
+
+    err = lwm2m_tlv_element_encode(buf, &len, path, path_len);
+    if (err) {
+        const coap_msg_code_t code =
+            (err == ENOTSUP) ? COAP_CODE_404_NOT_FOUND :
+                               COAP_CODE_400_BAD_REQUEST;
+        lwm2m_respond_with_code(code, p_req);
+        return;
+    }
+
+    err = lwm2m_observe_register(path, path_len, p_req, &p_rsp);
+    if (err) {
+        LWM2M_WRN("Failed to register observer, err %d", err);
+        lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_req);
+        return;
+    }
+
+    err = lwm2m_coap_message_send_to_remote(p_rsp, p_req->remote, buf, len);
+    if (err) {
+        LWM2M_WRN("Failed to respond to Observe request");
+        lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_req);
+        return;
+    }
+
+    err = lwm2m_observable_metadata_init(p_req->remote, path, path_len);
+    if (err) {
+        /* Already logged */
+    }
+}
+
+static void on_observe_stop(const uint16_t path[3], uint8_t path_len,
+                            coap_message_t *p_req)
+{
+    uint32_t err;
+
+    const void * p_observable = lwm2m_observable_reference_get(path, path_len);
+
+    LWM2M_INF("Observe deregister %s",
+              lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
+
+    err = lwm2m_observe_unregister(p_req->remote, p_observable);
+
+    if (err) {
+        /* TODO */
+    }
+
+    lwm2m_notif_attr_storage_update(path, path_len, p_req->remote);
+
+    /* Process as a read */
+    if (path_len == 1) {
+        on_object_read(p_req);
+    } else {
+        on_read(path, path_len, p_req);
+    }
+}
+
+static void on_observe(const uint16_t path[3], uint8_t path_len,
+                       coap_message_t *p_req)
+{
+    uint32_t err = 1;
+    uint32_t opt;
+
+    for (uint8_t i = 0; i < p_req->options_count; i++) {
+        if (p_req->options[i].number == COAP_OPT_OBSERVE) {
+            err = coap_opt_uint_decode(&opt,
+                           p_req->options[i].length,
+                           p_req->options[i].data);
+            break;
+        }
+    }
+
+    if (err) {
+        lwm2m_respond_with_code(COAP_CODE_402_BAD_OPTION, p_req);
+        return;
+    }
+
+    switch (opt) {
+    case 0: /* observe start */
+        on_observe_start(path, path_len, p_req);
+        break;
+    case 1: /* observe stop */
+        on_observe_stop(path, path_len, p_req);
+        break;
+    default:
+        /* Unexpected opt value */
+        lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_req);
+        break;
+    }
+}
+
+static void on_discover(const uint16_t path[3], uint8_t path_len,
+                        coap_message_t *p_req)
+{
+    uint32_t err;
+
+    const uint16_t inst = path[1];
+    const uint16_t res = path[2];
+
+    err = lwm2m_respond_with_instance_link(&m_instance_portfolio[inst].proto, res, p_req);
+    if (err) {
+        LWM2M_WRN("Failed to respond to discover on %s, err %d",
+            lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)), err);
+    }
+}
+
 /**@brief Callback function for portfolio instances. */
 uint32_t portfolio_instance_callback(lwm2m_instance_t * p_instance,
                                      uint16_t           resource_id,
                                      uint8_t            op_code,
                                      coap_message_t *   p_request)
 {
-    LWM2M_TRC("portfolio_instance_callback");
+    uint16_t access;
+    uint32_t err_code;
 
-    uint16_t access = 0;
-    uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                p_instance,
-                                                p_request->remote);
-    if (err_code != 0)
-    {
+    const uint8_t path_len = (resource_id == LWM2M_NAMED_OBJECT) ? 2 : 3;
+    const uint16_t path[] = {
+        p_instance->object_id,
+        p_instance->instance_id,
+        resource_id
+    };
+
+    err_code = lwm2m_access_remote_get(&access, p_instance, p_request->remote);
+    if (err_code != 0) {
         return err_code;
     }
 
-    // Set op_code to 0 if access not allowed for that op_code.
-    // op_code has the same bit pattern as ACL operates with.
+    /* Check server access */
     op_code = (access & op_code);
-
-    if (op_code == 0)
-    {
-        (void)lwm2m_respond_with_code(COAP_CODE_401_UNAUTHORIZED, p_request);
+    if (op_code == 0) {
+        lwm2m_respond_with_code(COAP_CODE_401_UNAUTHORIZED, p_request);
         return 0;
     }
 
-    uint16_t instance_id = p_instance->instance_id;
-
-    if (instance_id >= ARRAY_SIZE(m_instance_portfolio))
-    {
-        (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
+    /* Check resource permissions */
+    if (!operation_is_allowed(path[1], path[2], op_code)) {
+        LWM2M_WRN("Operation 0x%x on %s, not allowed", op_code,
+                  lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
+        lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
         return 0;
     }
 
-    uint8_t  buffer[200];
-    uint32_t buffer_size = sizeof(buffer);
-
-    if (op_code == LWM2M_OPERATION_CODE_READ)
-    {
-
-        err_code = lwm2m_tlv_portfolio_encode(buffer,
-                                              &buffer_size,
-                                              resource_id,
-                                              &m_instance_portfolio[instance_id]);
-        if (err_code == ENOENT)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
-            return 0;
-        }
-
-        if (err_code != 0)
-        {
-            return err_code;
-        }
-
-        (void)lwm2m_respond_with_payload(buffer, buffer_size, COAP_CT_APP_LWM2M_TLV, p_request);
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_WRITE)
-    {
-        uint32_t mask = 0;
-        err_code = coap_message_ct_mask_get(p_request, &mask);
-
-        if (err_code != 0)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-            return 0;
-        }
-
-        if (mask & COAP_CT_MASK_APP_LWM2M_TLV)
-        {
-            err_code = lwm2m_tlv_portfolio_decode(&m_instance_portfolio[instance_id],
-                                                  p_request->payload,
-                                                  p_request->payload_len,
-                                                  NULL);
-        }
-        else
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT, p_request);
-            return 0;
-        }
-
-        if (err_code == 0)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-
-            if (instance_id == 0)
-            {
-                int ret = at_write_host_device_info(&m_instance_portfolio[instance_id].identity);
-                if (ret != 0)
-                {
-                    LWM2M_WRN("AT+ODIS failed: %d", ret);
-                }
-            }
-        }
-        else if (err_code == ENOTSUP)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
-        }
-        else
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-        }
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
-    {
-        err_code = lwm2m_respond_with_instance_link(p_instance, resource_id, p_request);
-    }
-    else
-    {
-        (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+    if (!lwm2m_portfolio_get_instance(path[1])) {
+        lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
+        return 0;
     }
 
-    return err_code;
+    switch (op_code) {
+    case LWM2M_OPERATION_CODE_READ:
+        on_read(path, path_len, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_WRITE:
+        on_write(path, path_len, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_OBSERVE:
+        on_observe(path, path_len, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_DISCOVER:
+        on_discover(path, path_len, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_WRITE_ATTR:
+        on_write_attribute(path, path_len, p_request);
+    default:
+        lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+        break;
+    }
+
+    return 0;
+}
+
+static void on_object_read(coap_message_t *p_req)
+{
+    uint32_t err;
+    uint8_t buf[200];
+    size_t len;
+
+    const uint16_t path[] = { LWM2M_OBJ_PORTFOLIO };
+
+    len = sizeof(buf);
+
+    err = lwm2m_tlv_element_encode(buf, &len, path, ARRAY_SIZE(path));
+    if (err) {
+        const coap_msg_code_t code =
+                (err == ENOTSUP) ? COAP_CODE_404_NOT_FOUND :
+                                   COAP_CODE_500_INTERNAL_SERVER_ERROR;
+
+        lwm2m_respond_with_code(code, p_req);
+        return;
+    }
+
+    lwm2m_respond_with_payload(buf, len, COAP_CT_APP_LWM2M_TLV, p_req);
+}
+
+static void on_object_discover(coap_message_t * p_req)
+{
+    int err;
+
+    err = lwm2m_respond_with_object_link(LWM2M_OBJ_PORTFOLIO, p_req);
+    if (err) {
+        LWM2M_WRN("Failed to discover portfolio object, err %d", err);
+    }
 }
 
 /**@brief Callback function for LWM2M portfolio objects. */
@@ -175,160 +377,28 @@ uint32_t lwm2m_portfolio_object_callback(lwm2m_object_t * p_object,
                                          uint8_t          op_code,
                                          coap_message_t * p_request)
 {
-    LWM2M_TRC("portfolio_object_callback");
+    const uint16_t path[] = { LWM2M_OBJ_PORTFOLIO, LWM2M_INVALID_INSTANCE, LWM2M_INVALID_RESOURCE};
+    const uint8_t path_len = 1;
 
-    uint32_t err_code = 0;
-    uint8_t  buffer[300];
-    uint32_t buffer_len      = sizeof(buffer);
-    uint32_t buffer_max_size = buffer_len;
-    const uint16_t path[] = { LWM2M_OBJ_PORTFOLIO };
-    uint8_t  path_len = ARRAY_SIZE(path);
-
-    if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
-    {
-        uint32_t observe_option = 0;
-
-        if (instance_id != LWM2M_INVALID_INSTANCE)
-        {
-            lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
-            return 0;
-        }
-
-        for (uint8_t index = 0; index < p_request->options_count; index++)
-        {
-            if (p_request->options[index].number == COAP_OPT_OBSERVE)
-            {
-                err_code = coap_opt_uint_decode(&observe_option,
-                                                p_request->options[index].length,
-                                                p_request->options[index].data);
-                break;
-            }
-        }
-
-        if (err_code == 0)
-        {
-            if (observe_option == 0) // Observe start
-            {
-                coap_message_t *p_message;
-
-                LWM2M_INF("Observe requested on object %s", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
-                err_code = lwm2m_tlv_element_encode(buffer, &buffer_len, path, path_len);
-                if (err_code != 0)
-                {
-                    LWM2M_INF("Failed to perform the TLV encoding, err %d", err_code);
-                    lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
-                    return err_code;
-                }
-
-                err_code = lwm2m_observe_register(path, path_len, p_request, &p_message);
-                if (err_code != 0)
-                {
-                    LWM2M_INF("Failed to register the observer");
-                    lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
-                    return err_code;
-                }
-
-                err_code = lwm2m_coap_message_send_to_remote(p_message, p_request->remote, buffer, buffer_len);
-                if (err_code != 0)
-                {
-                    LWM2M_INF("Failed to respond to Observe request");
-                    lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
-                    return err_code;
-                }
-
-                lwm2m_observable_metadata_init(p_request->remote, path, path_len);
-            }
-            else if (observe_option == 1) // Observe stop
-            {
-                LWM2M_INF("Observe cancel on object /16");
-                const void * p_observable = lwm2m_observable_reference_get(path, path_len);
-                lwm2m_observe_unregister(p_request->remote, p_observable);
-                lwm2m_notif_attr_storage_update(path, path_len, p_request->remote);
-
-                // Process the GET request as usual.
-                op_code = LWM2M_OPERATION_CODE_READ;
-            }
-            else
-            {
-                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-                return 0;
-            }
-        }
+    switch (op_code) {
+    case LWM2M_OPERATION_CODE_READ:
+        on_object_read(p_request);
+        break;
+    case LWM2M_OPERATION_CODE_OBSERVE:
+        on_observe(path, path_len, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_WRITE_ATTR:
+        on_write_attribute(path, path_len, p_request);
+        break;
+    case LWM2M_OPERATION_CODE_DISCOVER:
+        on_object_discover(p_request);
+        break;
+    default:
+        lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
+        break;
     }
 
-    if (op_code == LWM2M_OPERATION_CODE_READ)
-    {
-        uint32_t index = 0;
-        uint8_t  instance_buffer[150];
-        uint32_t instance_buffer_len = sizeof(instance_buffer);
-
-        for (int i = 0; i < ARRAY_SIZE(m_instance_portfolio); i++)
-        {
-            uint16_t access = 0;
-            lwm2m_instance_t * p_instance = (lwm2m_instance_t *)&m_instance_portfolio[i];
-            uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                        p_instance,
-                                                        p_request->remote);
-            if (err_code != 0 || (access & op_code) == 0)
-            {
-                continue;
-            }
-
-            instance_buffer_len = 150;
-            err_code = lwm2m_tlv_portfolio_encode(instance_buffer,
-                                                  &instance_buffer_len,
-                                                  LWM2M_NAMED_OBJECT,
-                                                  &m_instance_portfolio[i]);
-            if (err_code != 0)
-            {
-                // ENOMEM should not happen. Then it is a bug.
-                break;
-            }
-
-            lwm2m_tlv_t tlv = {
-                .id_type = TLV_TYPE_OBJECT,
-                .id = i,
-                .length = instance_buffer_len
-            };
-            err_code = lwm2m_tlv_header_encode(buffer + index, &buffer_len, &tlv);
-
-            index += buffer_len;
-            buffer_len = buffer_max_size - index;
-
-            memcpy(buffer + index, instance_buffer, instance_buffer_len);
-
-            index += instance_buffer_len;
-            buffer_len = buffer_max_size - index;
-        }
-
-        err_code = lwm2m_respond_with_payload(buffer, index, COAP_CT_APP_LWM2M_TLV, p_request);
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_DISCOVER)
-    {
-        err_code = lwm2m_respond_with_object_link(p_object->object_id, p_request);
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_WRITE_ATTR)
-    {
-        err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
-        if (err_code != 0)
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
-        }
-        else
-        {
-            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-        }
-    }
-    else if (op_code == LWM2M_OPERATION_CODE_OBSERVE)
-    {
-        // Already handled
-    }
-    else
-    {
-        (void)lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
-    }
-
-    return err_code;
+    return 0;
 }
 
 void lwm2m_portfolio_init_acl(void)
@@ -380,4 +450,27 @@ void lwm2m_portfolio_init(void)
 
     // Initialize ACL
     lwm2m_portfolio_init_acl();
+}
+
+const void * lwm2m_portfolio_resource_reference_get(uint16_t instance_id, uint16_t resource_id, uint8_t *p_type)
+{
+    const void *p_observable = NULL;
+    uint8_t type;
+
+    switch (resource_id)
+    {
+    case LWM2M_PORTFOLIO_IDENTITY:
+        type = LWM2M_OBSERVABLE_TYPE_LIST;
+        p_observable = &m_instance_portfolio[instance_id].identity;
+        break;
+    default:
+        type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;
+    }
+
+    if (p_type)
+    {
+        *p_type = type;
+    }
+
+    return p_observable;
 }

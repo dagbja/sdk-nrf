@@ -26,4 +26,6 @@ uint32_t lwm2m_portfolio_object_callback(lwm2m_object_t * p_object,
 
 void lwm2m_portfolio_init_acl(void);
 
+const void * lwm2m_portfolio_resource_reference_get(uint16_t instance_id, uint16_t resource_id, uint8_t *p_type);
+
 #endif /* LWM2M_PORTFOIO_H__ */
