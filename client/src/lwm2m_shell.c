@@ -296,6 +296,23 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "  SMS Counter    %u", lwm2m_sms_receive_counter());
     shell_print(shell, "  Network status %u", lwm2m_net_reg_stat_get());
 
+    lwm2m_string_t psk_str;
+    int32_t ret = lwm2m_debug_bootstrap_psk_get(&psk_str);
+    if(ret == 0)
+    {
+        // * 2 since a byte 0xAB must be represented by two characters "AB".
+        // + 1 for NUL termination at the end.
+        char psk[LWM2M_DEBUG_PSK_MAX_LEN * 2 + 1];
+
+        int offset = 0;
+        for(int i = 0; i < psk_str.len;i++)
+        {
+            offset += snprintf(&psk[offset], sizeof(psk) - offset, "%02x", psk_str.p_val[i]);
+        }
+        psk[offset] = '\0';
+
+        shell_print(shell, "  Bootstrap PSK  %s", psk);
+    }
     return 0;
 }
 
@@ -547,6 +564,107 @@ static int cmd_debug_operator_id(const struct shell *shell, size_t argc, char **
 
     shell_print(shell, "Set carrier: %u (%s)", operator_id, operator_id_string(operator_id));
 
+    return 0;
+}
+
+
+/**@brief Encode a (hex) ascii string to a hex.
+ *
+ * @param[in]  source_str input string with ascii characters.
+ * @param[out] dest_buffer buffer to place the resulting bytes.
+ * @param[in]  buf_len Max bytes to be encoded.
+ *
+ * @details example "1155BB" becomes [0x11 0x55 0xBB].
+ *          Stops at first non hex character (should be NULL) when p_source_str is a string.
+ *
+ * @return Length of the resulting buffer.
+ */
+static int string_to_hex(char *p_source_str, uint8_t *p_dest_buffer, uint16_t buf_len)
+{
+  char *p_data = p_source_str;
+  int offset;
+  int read_byte;
+  int data_len = 0;
+  bool read_was_hex = true;
+
+  // Stop at first non-hex character or if the buf_len is reached.
+  while (read_was_hex && (data_len < buf_len))
+  {
+    // read one hex number from data, put into read_byte,
+    // output number of characters read to offset.
+    if(sscanf(p_data, " %02x%n", &read_byte, &offset) == 1)
+    {
+        read_was_hex = true;
+        p_dest_buffer[data_len++] = read_byte;
+        p_data += offset;
+    }
+    else
+    {
+        read_was_hex = false;
+    }
+  }
+  return data_len;
+}
+
+
+/**@brief Check if a string contains only ascii characters 0-9 and A-F.
+ *
+ * @param[in] p_str String to check.
+ *
+ * @return True if all characters are hex. False if if not.
+ */
+static bool string_is_hex(char * p_str)
+{
+    for (int i = 0; i < strlen(p_str); i++)
+    {
+        if(!isxdigit(p_str[i]))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+/**@brief Check if a string contains only ascii characters 0-9 and A-F.
+ *
+ * @param[in] shell Shell Instance.
+ * @param[in] argc  Argument count.
+ * @param[in] argv  Argument vector, array of strings.
+ *
+ * @return Always returns 0, Observe the printet shell output to determine errors.
+ */
+static int cmd_debug_bootstrap_psk_nvm_set(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "Pre-shared key in hex format. Example: 3e48a2");
+        return 0;
+    }
+
+    uint8_t psk[LWM2M_DEBUG_PSK_MAX_LEN];
+
+    if(!string_is_hex(argv[1]))
+    {
+        shell_print(shell, "String is not correct hex format. Example: 3e48a2");
+        return 0;
+    }
+
+    // Input string can be twice the length of out inernal PSK buffer.
+    // For example "AABB" will become {0xAA, 0xBB}.
+    if (strlen(argv[1]) > (ARRAY_SIZE(psk) * 2))
+    {
+        shell_print(shell, "String is too long. Max size %i", LWM2M_DEBUG_PSK_MAX_LEN*2);
+    }
+
+    lwm2m_string_t psk_str;
+    psk_str.p_val = psk;
+    psk_str.len = string_to_hex(argv[1], psk_str.p_val, LWM2M_DEBUG_PSK_MAX_LEN);
+
+    int32_t ret = lwm2m_debug_bootstrap_psk_set(&psk_str);
+    if (ret < 0)
+    {
+        shell_print(shell, "Store operation failed, err %d", ret);
+    }
     return 0;
 }
 
@@ -1798,6 +1916,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_attribute,
 
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_debug,
+    SHELL_CMD(bootstrap_psk, NULL, "Set bootstrap PSK", cmd_debug_bootstrap_psk_nvm_set),
     SHELL_CMD(carrier, NULL, "Set debug carrier", cmd_debug_operator_id),
     SHELL_CMD(carrier_check, NULL, "Set carrier check", cmd_debug_carrier_check),
     SHELL_CMD(con_interval, NULL, "Set CoAP CON timer", cmd_debug_con_interval),
