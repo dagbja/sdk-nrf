@@ -51,7 +51,6 @@ void lwm2m_firmware_state_set(uint16_t instance_id, uint8_t value)
     if (m_instance_firmware.state != value)
     {
         m_instance_firmware.state  = value;
-        lwm2m_firmware_notify_resource(NULL, LWM2M_FIRMWARE_STATE);
     }
 }
 
@@ -65,7 +64,6 @@ void lwm2m_firmware_update_result_set(uint16_t instance_id, uint8_t value)
     if (m_instance_firmware.update_result != value)
     {
         m_instance_firmware.update_result  = value;
-        lwm2m_firmware_notify_resource(NULL, LWM2M_FIRMWARE_UPDATE_RESULT);
     }
 }
 
@@ -451,62 +449,6 @@ const void * lwm2m_firmware_resource_reference_get(uint16_t resource_id, uint8_t
     }
 
     return p_observable;
-}
-
-void lwm2m_firmware_notify_resource(struct nrf_sockaddr * p_remote_server, uint16_t resource_id)
-{
-    uint16_t short_server_id;
-    coap_observer_t * p_observer = NULL;
-    const void *p_observable = lwm2m_firmware_resource_reference_get(resource_id, NULL);
-
-    while (coap_observe_server_next_get(&p_observer, p_observer,
-               (void *)&m_instance_firmware.resource_ids[resource_id]) == 0)
-    {
-        lwm2m_remote_short_server_id_find(&short_server_id, p_observer->remote);
-        if (lwm2m_remote_reconnecting_get(short_server_id)) {
-            /* Wait for reconnection */
-            continue;
-        }
-
-        if (p_remote_server != NULL) {
-            /* Only notify to given remote */
-            if (memcmp(p_observer->remote, p_remote_server,
-                       sizeof(struct nrf_sockaddr)) != 0) {
-                continue;
-            }
-        }
-
-        uint32_t err_code;
-        uint8_t  buffer[200];
-        uint32_t buffer_size = sizeof(buffer);
-
-        LWM2M_TRC("Observer found");
-        err_code = lwm2m_tlv_firmware_encode(buffer,
-                                             &buffer_size,
-                                             resource_id,
-                                             &m_instance_firmware);
-        if (err_code)
-        {
-            LWM2M_ERR("Could not encode resource_id %u, error code: %lu",
-                      resource_id, err_code);
-        }
-
-        coap_msg_type_t type = (lwm2m_observer_notification_is_con(p_observable, short_server_id)) ? COAP_TYPE_CON : COAP_TYPE_NON;
-
-        LWM2M_INF("Notify /5/0/%d", resource_id);
-        err_code =  lwm2m_notify(buffer,
-                                 buffer_size,
-                                 p_observer,
-                                 type);
-        if (err_code)
-        {
-            LWM2M_INF("Notify /5/0/%d failed: %s (%ld), %s (%d)", resource_id,
-                      lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                      lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
-
-            lwm2m_request_remote_reconnect(p_observer->remote);
-        }
-    }
 }
 
 /**@brief Callback function for LWM2M firmware objects. */
