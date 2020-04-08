@@ -18,6 +18,7 @@
 #include <lwm2m_common.h>
 #include <lwm2m_carrier_main.h>
 #include <at_interface.h>
+#include <lwm2m_instance_storage.h>
 
 static lwm2m_object_t        m_object_apn_conn_prof;                             /**< APN Connection Profile base object. */
 // TODO: Only two instances are currently supported.
@@ -117,6 +118,8 @@ bool lwm2m_apn_conn_prof_activate(uint16_t instance_id,
     lwm2m_list_integer_set(&apn_conn->conn_est_reject_cause, apn_idx, reject_cause);
     lwm2m_list_integer_set(&apn_conn->conn_end_time, apn_idx, (reject_cause == 0) ? 0 : utc_time);
 
+    lwm2m_storage_apn_conn_prof_store();
+
     return true;
 }
 
@@ -142,6 +145,8 @@ bool lwm2m_apn_conn_prof_deactivate(uint16_t instance_id)
     }
 
     lwm2m_list_integer_set(&apn_conn->conn_end_time, apn_idx - 1, lwm2m_utc_time());
+
+    lwm2m_storage_apn_conn_prof_store();
 
     return true;
 }
@@ -237,7 +242,14 @@ uint32_t apn_conn_prof_instance_callback(lwm2m_instance_t * p_instance,
                 lwm2m_apn_conn_prof_enabled_set(instance_id, !previous_status);
             }
 
-            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            if (lwm2m_storage_apn_conn_prof_store() == 0)
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            }
         }
         else if (err_code == ENOTSUP)
         {
@@ -344,19 +356,42 @@ void lwm2m_apn_conn_prof_init_acl(void)
     }
 }
 
-void lwm2m_apn_conn_prof_init(void)
+void lwm2m_apn_conn_prof_apn_status_update(void)
 {
     uint8_t apn_status[128];
     uint8_t apn_quoted[64];
+    lwm2m_apn_conn_prof_t *p_instance;
+    int offset;
 
     if (at_read_apn_status(apn_status, sizeof(apn_status)) != 0)
     {
         LWM2M_ERR("Error reading APN status");
+        return;
     }
 
-    //
-    // APN Connection Profile instance.
-    //
+    for (int i = 0; i < ARRAY_SIZE(m_instance_apn_conn_prof); i++)
+    {
+        p_instance = lwm2m_apn_conn_prof_get_instance(i);
+
+        if (!p_instance || !p_instance->apn.p_val)
+        {
+            continue;
+        }
+
+        offset = 0;
+
+        apn_quoted[offset++] = '"';
+        memcpy(&apn_quoted[offset], p_instance->apn.p_val, p_instance->apn.len);
+        offset += p_instance->apn.len;
+        apn_quoted[offset++] = '"';
+        apn_quoted[offset] = '\0';
+
+        p_instance->enable_status = (strstr(apn_status, apn_quoted) == NULL) ? true : false;
+    }
+}
+
+void lwm2m_apn_conn_prof_init(void)
+{
     m_object_apn_conn_prof.object_id = LWM2M_OBJ_APN_CONNECTION_PROFILE;
     m_object_apn_conn_prof.callback = lwm2m_apn_conn_prof_object_callback;
 
@@ -373,8 +408,6 @@ void lwm2m_apn_conn_prof_init(void)
             m_default_apn_instance = i;
         }
 
-        snprintf(apn_quoted, sizeof(apn_quoted), "\"%s\"", p_apn);
-
         if (m_profile_name_default[i])
         {
             lwm2m_bytebuffer_to_string(m_profile_name_default[i], strlen(m_profile_name_default[i]), &m_instance_apn_conn_prof[i].profile_name);
@@ -384,8 +417,8 @@ void lwm2m_apn_conn_prof_init(void)
             lwm2m_bytebuffer_to_string(p_apn, strlen(p_apn), &m_instance_apn_conn_prof[i].profile_name);
         }
         lwm2m_bytebuffer_to_string(p_apn, strlen(p_apn), &m_instance_apn_conn_prof[i].apn);
-        m_instance_apn_conn_prof[i].enable_status = (strstr(apn_status, apn_quoted) == NULL) ? true : false;
         m_instance_apn_conn_prof[i].authentication_type = 0;
+        m_instance_apn_conn_prof[i].enable_status = false;
 
         lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_apn_conn_prof[i],
                                     LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);

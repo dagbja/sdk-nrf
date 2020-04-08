@@ -38,4 +38,6 @@ uint32_t lwm2m_apn_conn_prof_object_callback(lwm2m_object_t * p_object,
 
 void lwm2m_apn_conn_prof_init_acl(void);
 
+void lwm2m_apn_conn_prof_apn_status_update(void);
+
 #endif /* LWM2M_APN_CONN_PROF_H__ */

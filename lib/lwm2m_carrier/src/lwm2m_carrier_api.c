@@ -12,6 +12,7 @@
 #include <lwm2m_carrier.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <lwm2m_instance_storage.h>
 
 #define LWM2M_CARRIER_STRING_MAX_LEN 200
 
@@ -343,6 +344,7 @@ int lwm2m_carrier_identity_read(uint16_t instance_id, uint16_t identity_type, ch
 int lwm2m_carrier_identity_write(uint16_t instance_id, uint16_t identity_type, const char *value)
 {
     lwm2m_portfolio_t *portfolio_instance;
+    int ret;
 
     if (instance_id == LWM2M_PRIMARY_HOST_DEVICE_PORTFOLIO)
     {
@@ -366,7 +368,11 @@ int lwm2m_carrier_identity_write(uint16_t instance_id, uint16_t identity_type, c
         return -ENOENT;
     }
 
-    return -lwm2m_list_string_set(&portfolio_instance->identity, identity_type, value, strlen(value));
+    ret = -lwm2m_list_string_set(&portfolio_instance->identity, identity_type, value, strlen(value));
+
+    lwm2m_storage_portfolio_store();
+
+    return ret;
 }
 
 int lwm2m_carrier_portfolio_instance_create(uint16_t instance_id)

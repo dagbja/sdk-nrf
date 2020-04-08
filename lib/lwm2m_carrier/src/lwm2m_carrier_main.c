@@ -1753,6 +1753,9 @@ void lwm2m_factory_reset(void)
     lwm2m_storage_security_delete();
     lwm2m_storage_server_delete();
     lwm2m_storage_acl_delete();
+    lwm2m_storage_apn_conn_prof_delete();
+    lwm2m_storage_portfolio_delete();
+    lwm2m_storage_conn_ext_delete();
     lwm2m_observer_storage_delete_all();
     lwm2m_notif_attr_storage_delete_all();
 }
@@ -1804,6 +1807,10 @@ static void app_load_flash_objects(void)
     // Load location
     lwm2m_storage_location_load();
 
+    lwm2m_storage_apn_conn_prof_load();
+    lwm2m_storage_portfolio_load();
+    lwm2m_storage_conn_ext_load();
+
     server_instance_update_map();
 
     lwm2m_storage_misc_data_t misc_data;
@@ -1837,8 +1844,11 @@ static void app_lwm2m_create_objects(void)
     lwm2m_portfolio_init();
     lwm2m_conn_ext_init();
 
-    // Initialize security, server and acl from flash.
+    // Initialize objects from flash, if they exist in NVS.
     app_load_flash_objects();
+
+    // Read APN status and reflect it in the APN Connection Profile object.
+    lwm2m_apn_conn_prof_apn_status_update();
 
     if (operator_is_att(true)) {
         lwm2m_first_enabled_apn_instance();

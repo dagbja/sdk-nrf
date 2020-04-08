@@ -39,6 +39,18 @@ int lwm2m_storage_location_load(void);
 int lwm2m_storage_location_store(void);
 int lwm2m_storage_location_delete(void);
 
+int lwm2m_storage_apn_conn_prof_load(void);
+int lwm2m_storage_apn_conn_prof_store(void);
+int lwm2m_storage_apn_conn_prof_delete(void);
+
+int lwm2m_storage_portfolio_load(void);
+int lwm2m_storage_portfolio_store(void);
+int lwm2m_storage_portfolio_delete(void);
+
+int lwm2m_storage_conn_ext_load(void);
+int lwm2m_storage_conn_ext_store(void);
+int lwm2m_storage_conn_ext_delete(void);
+
 int32_t lwm2m_storage_misc_data_load(lwm2m_storage_misc_data_t * p_value);
 int32_t lwm2m_storage_misc_data_store(lwm2m_storage_misc_data_t * p_value);
 

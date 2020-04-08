@@ -16,6 +16,7 @@
 #include <lwm2m_common.h>
 #include <lwm2m_carrier_main.h>
 #include <at_interface.h>
+#include <lwm2m_instance_storage.h>
 
 #define HOST_DEVICE_ID_0           "HUID0"
 #define HOST_DEVICE_MANUFACTURER_0 "HMAN0"
@@ -171,6 +172,8 @@ static void on_write(const uint16_t path[3], uint8_t path_len,
             LWM2M_WRN("AT+ODIS failed: %d", ret);
         }
     }
+
+    lwm2m_storage_portfolio_store();
 
     lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_req);
 }

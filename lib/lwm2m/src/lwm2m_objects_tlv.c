@@ -1793,7 +1793,8 @@ uint32_t lwm2m_tlv_apn_connection_profile_encode(uint8_t               * p_buffe
 
         default:
         {
-            err_code = ENOTSUP;
+            err_code = 0;
+            *p_buffer_len = 0;
             break;
         }
     }
@@ -1884,7 +1885,8 @@ uint32_t lwm2m_tlv_portfolio_encode(uint8_t           * p_buffer,
 
         default:
         {
-            err_code = ENOTSUP;
+            err_code = 0;
+            *p_buffer_len = 0;
             break;
         }
     }
@@ -2067,7 +2069,8 @@ uint32_t lwm2m_tlv_connectivity_extension_encode(uint8_t                        
 
         default:
         {
-            err_code = ENOTSUP;
+            err_code = 0;
+            *p_buffer_len = 0;
             break;
         }
     }

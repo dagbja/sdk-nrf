@@ -12,6 +12,9 @@
 #include <lwm2m_security.h>
 #include <lwm2m_server.h>
 #include <lwm2m_acl.h>
+#include <lwm2m_apn_conn_prof.h>
+#include <lwm2m_portfolio.h>
+#include <lwm2m_conn_ext.h>
 
 #include <lwm2m_os.h>
 
@@ -31,6 +34,9 @@
 #define LWM2M_MODEM_FIRMWARE_UPDATE         (LWM2M_OS_STORAGE_END - 9)
 #define LWM2M_MODEM_FIRMWARE_URI            (LWM2M_OS_STORAGE_END - 10)
 #define LWM2M_STORAGE_OPERATOR_ID           (LWM2M_OS_STORAGE_END - 11)
+#define LWM2M_STORAGE_APN_CONN_PROFILE      (LWM2M_OS_STORAGE_END - 12)
+#define LWM2M_STORAGE_PORTFOLIO             (LWM2M_OS_STORAGE_END - 13)
+#define LWM2M_STORAGE_CONN_EXTENSION        (LWM2M_OS_STORAGE_END - 14)
 #define LWM2M_STORAGE_ID_VERSION            (LWM2M_OS_STORAGE_END - 16)
 
 #define LWM2M_OBSERVERS_BASE                (LWM2M_OS_STORAGE_BASE + 0)
@@ -153,11 +159,24 @@ static void lwm2m_storage_version_update(uint8_t from_version)
     }
 }
 
-static const char *obj_str[] =
+static const char *obj_str_get(uint16_t id)
 {
-    [LWM2M_OBJ_SECURITY] = "security",
-    [LWM2M_OBJ_SERVER] = "server",
-    [LWM2M_OBJ_ACL] = "ACL"
+    switch (id) {
+    case LWM2M_OBJ_SECURITY:
+        return "security";
+    case LWM2M_OBJ_SERVER:
+        return "server";
+    case LWM2M_OBJ_ACL:
+        return "ACL";
+    case LWM2M_OBJ_APN_CONNECTION_PROFILE:
+        return "apn connection profile";
+    case LWM2M_OBJ_PORTFOLIO:
+        return "portfolio";
+    case LWM2M_OBJ_CONN_EXT:
+        return "connectivity extension";
+    default:
+        return "unknown";
+    }
 };
 
 static int carrier_encode(uint16_t obj, uint16_t id, uint8_t *buf, size_t *size)
@@ -172,7 +191,8 @@ static int carrier_encode(uint16_t obj, uint16_t id, uint8_t *buf, size_t *size)
         err = tlv_server_carrier_encode(id, buf, size);
         break;
     default:
-        err = -1;
+        err = 0;
+        *size = 0;
         break;
     }
 
@@ -226,11 +246,23 @@ static int obj_instance_encode(lwm2m_instance_t *inst, uint8_t *buf,
     err = lwm2m_tlv_encode(buf, len, &tlv);
     if (err) {
         __ASSERT(false, "Encoding %s instances failed, err %d",
-                         obj_str[inst->object_id], err);
+                         obj_str_get(inst->object_id), err);
         return err;
     }
 
     return 0;
+}
+
+static bool skip_instance(uint16_t obj, uint16_t inst)
+{
+    switch (obj) {
+    case LWM2M_OBJ_PORTFOLIO:
+        if (inst == LWM2M_PRIMARY_HOST_DEVICE_PORTFOLIO) {
+            return true;
+        }
+    default:
+        return false;
+    }
 }
 
 static int obj_instances_encode(uint16_t obj, uint8_t *buf, size_t *len)
@@ -247,6 +279,10 @@ static int obj_instances_encode(uint16_t obj, uint8_t *buf, size_t *len)
     /* Encode all instances of given object */
     while (lwm2m_instance_next(&inst, &progress)) {
         if (inst->object_id != obj) {
+            continue;
+        }
+
+        if (skip_instance(obj, inst->instance_id)) {
             continue;
         }
 
@@ -300,6 +336,21 @@ static int obj_instances_decode(uint16_t obj, uint8_t *buf, size_t *size)
         case LWM2M_OBJ_ACL:
             err = lwm2m_acl_deserialize_tlv(tlv.value, tlv.length, NULL);
             break;
+        case LWM2M_OBJ_APN_CONNECTION_PROFILE:
+            err = lwm2m_tlv_apn_connection_profile_decode(
+                lwm2m_apn_conn_prof_get_instance(tlv.id),
+                tlv.value, tlv.length, NULL);
+            break;
+        case LWM2M_OBJ_PORTFOLIO:
+            err = lwm2m_tlv_portfolio_decode(
+                lwm2m_portfolio_get_instance(tlv.id),
+                tlv.value, tlv.length, NULL);
+            break;
+        case LWM2M_OBJ_CONN_EXT:
+            err = lwm2m_tlv_connectivity_extension_decode(
+                lwm2m_conn_ext_get_instance(tlv.id),
+                tlv.value, tlv.length, NULL);
+            break;
         }
 
         if (err) {
@@ -320,6 +371,12 @@ static uint16_t storage_id_get(uint16_t obj)
         return LWM2M_STORAGE_ID_SERVER;
     case LWM2M_OBJ_ACL:
         return LWM2M_STORAGE_ID_ACL;
+    case LWM2M_OBJ_APN_CONNECTION_PROFILE:
+        return LWM2M_STORAGE_APN_CONN_PROFILE;
+    case LWM2M_OBJ_PORTFOLIO:
+        return LWM2M_STORAGE_PORTFOLIO;
+    case LWM2M_OBJ_CONN_EXT:
+        return LWM2M_STORAGE_CONN_EXTENSION;
     default:
         __ASSERT_NO_MSG(false);
         return 0;
@@ -333,7 +390,10 @@ static int lwm2m_storage_obj_instances_store(uint16_t obj)
     uint16_t storage_id;
 
     __ASSERT(obj == LWM2M_OBJ_SECURITY ||
-             obj == LWM2M_OBJ_SERVER,
+             obj == LWM2M_OBJ_SERVER ||
+             obj == LWM2M_OBJ_APN_CONNECTION_PROFILE ||
+             obj == LWM2M_OBJ_PORTFOLIO ||
+             obj == LWM2M_OBJ_CONN_EXT,
             "Tried to store unexpected object %d", obj);
 
     len = sizeof(buf);
@@ -347,12 +407,12 @@ static int lwm2m_storage_obj_instances_store(uint16_t obj)
 
     err = lwm2m_os_storage_write(storage_id, buf, len);
     if (err < 0) {
-        LWM2M_ERR("Failed to store %s object, err %d", obj_str[obj], err);
+        LWM2M_ERR("Failed to store %s object, err %d", obj_str_get(obj), err);
         return err;
     }
 
     if (err == 0) {
-        LWM2M_WRN("Storing %s instances (len %d), no change", obj_str[obj], len);
+        LWM2M_WRN("Storing %s instances (len %d), no change", obj_str_get(obj), len);
     }
 
     return 0;
@@ -366,7 +426,10 @@ static int lwm2m_storage_obj_instances_load(uint16_t obj)
 
     __ASSERT(obj == LWM2M_OBJ_SECURITY ||
              obj == LWM2M_OBJ_SERVER ||
-             obj == LWM2M_OBJ_ACL,
+             obj == LWM2M_OBJ_ACL ||
+             obj == LWM2M_OBJ_APN_CONNECTION_PROFILE ||
+             obj == LWM2M_OBJ_PORTFOLIO ||
+             obj == LWM2M_OBJ_CONN_EXT,
             "Tried to load unexpected object %d", obj);
 
     len = sizeof(buf);
@@ -374,7 +437,7 @@ static int lwm2m_storage_obj_instances_load(uint16_t obj)
 
     read = lwm2m_os_storage_read(storage_id, buf, len);
     if (read < 1) {
-        LWM2M_TRC("Failed to read %s objects, err %d", obj_str[obj], read);
+        LWM2M_TRC("Failed to read %s objects, err %d", obj_str_get(obj), read);
         return -1;
     }
 
@@ -390,7 +453,7 @@ static int lwm2m_storage_obj_instances_delete(uint16_t obj)
     err = lwm2m_os_storage_delete(storage_id);
     if (err) {
         LWM2M_WRN("Failed to delete %s instances from flash, err %d",
-                   obj_str[obj], err);
+                   obj_str_get(obj), err);
         return err;
     }
 
@@ -425,6 +488,51 @@ int lwm2m_storage_server_store(void)
 int lwm2m_storage_server_delete(void)
 {
     return lwm2m_storage_obj_instances_delete(LWM2M_OBJ_SERVER);
+}
+
+int lwm2m_storage_apn_conn_prof_store(void)
+{
+    return lwm2m_storage_obj_instances_store(LWM2M_OBJ_APN_CONNECTION_PROFILE);
+}
+
+int lwm2m_storage_apn_conn_prof_load(void)
+{
+    return lwm2m_storage_obj_instances_load(LWM2M_OBJ_APN_CONNECTION_PROFILE);
+}
+
+int lwm2m_storage_apn_conn_prof_delete(void)
+{
+    return lwm2m_storage_obj_instances_delete(LWM2M_OBJ_APN_CONNECTION_PROFILE);
+}
+
+int lwm2m_storage_portfolio_store(void)
+{
+    return lwm2m_storage_obj_instances_store(LWM2M_OBJ_PORTFOLIO);
+}
+
+int lwm2m_storage_portfolio_load(void)
+{
+    return lwm2m_storage_obj_instances_load(LWM2M_OBJ_PORTFOLIO);
+}
+
+int lwm2m_storage_portfolio_delete(void)
+{
+    return lwm2m_storage_obj_instances_delete(LWM2M_OBJ_PORTFOLIO);
+}
+
+int lwm2m_storage_conn_ext_store(void)
+{
+    return lwm2m_storage_obj_instances_store(LWM2M_OBJ_CONN_EXT);
+}
+
+int lwm2m_storage_conn_ext_load(void)
+{
+    return lwm2m_storage_obj_instances_load(LWM2M_OBJ_CONN_EXT);
+}
+
+int lwm2m_storage_conn_ext_delete(void)
+{
+    return lwm2m_storage_obj_instances_delete(LWM2M_OBJ_CONN_EXT);
 }
 
 int lwm2m_storage_acl_load(void)

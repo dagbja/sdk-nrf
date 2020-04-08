@@ -40,6 +40,8 @@ void lwm2m_conn_ext_msisdn_set(char * p_value, uint8_t len)
     {
         LWM2M_ERR("Could not set MSISDN");
     }
+
+    lwm2m_storage_conn_ext_store();
 }
 
 uint8_t lwm2m_conn_ext_apn_retries_get(uint16_t instance_id, uint16_t apn_instance)
@@ -177,7 +179,14 @@ uint32_t conn_ext_instance_callback(lwm2m_instance_t * p_instance,
 
         if (err_code == 0)
         {
-            (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            if (lwm2m_storage_conn_ext_store() == 0)
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+            }
+            else
+            {
+                (void)lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_request);
+            }
         }
         else if (err_code == ENOTSUP)
         {
