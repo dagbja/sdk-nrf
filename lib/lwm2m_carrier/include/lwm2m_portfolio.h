@@ -19,6 +19,8 @@ lwm2m_portfolio_t * lwm2m_portfolio_get_instance(uint16_t instance_id);
 
 lwm2m_object_t * lwm2m_portfolio_get_object(void);
 
+int lwm2m_portfolio_instance_create(uint16_t instance_id);
+
 uint32_t lwm2m_portfolio_object_callback(lwm2m_object_t * p_object,
                                          uint16_t         instance_id,
                                          uint8_t          op_code,

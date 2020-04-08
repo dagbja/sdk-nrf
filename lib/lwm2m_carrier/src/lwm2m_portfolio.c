@@ -430,14 +430,16 @@ int lwm2m_portfolio_instance_create(uint16_t instance_id)
 static void on_object_create(coap_message_t *p_req)
 {
     uint32_t err;
-    uint16_t instance_id;
+    uint16_t instance_id = LWM2M_PORTFOLIO_CARRIER_INSTANCE;
+    uint32_t index = 0;
+    lwm2m_portfolio_t *p_portfolio;
+    lwm2m_tlv_t tlv = { .value = NULL };
+    uint8_t *p_identity = NULL;
+    uint32_t identity_len;
 
     /* Check if the TLV payload specifies the new object instance ID. */
     if (p_req->payload)
     {
-        lwm2m_tlv_t tlv;
-        uint32_t index = 0;
-
         err = lwm2m_tlv_decode(&tlv, &index, p_req->payload, p_req->payload_len);
 
         if (err != 0)
@@ -446,11 +448,22 @@ static void on_object_create(coap_message_t *p_req)
             return;
         }
 
-        instance_id = tlv.id;
-    }
-    else
-    {
-        instance_id = LWM2M_PORTFOLIO_CARRIER_INSTANCE;
+        if (tlv.id_type == TLV_TYPE_OBJECT)
+        {
+            instance_id = tlv.id;
+
+            // Check whether there is more payload to decode (TLV of object type is 3 bits long)
+            if (tlv.length > 3)
+            {
+                p_identity = tlv.value;
+                identity_len = tlv.length;
+            }
+        }
+        else
+        {
+            p_identity = p_req->payload;
+            identity_len = p_req->payload_len;
+        }
     }
 
     err = lwm2m_portfolio_instance_create(instance_id);
@@ -458,6 +471,17 @@ static void on_object_create(coap_message_t *p_req)
     if (err != 0)
     {
         lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_req);
+    }
+
+    if (p_identity)
+    {
+        p_portfolio = lwm2m_portfolio_get_instance(instance_id);
+        err = lwm2m_tlv_portfolio_decode(p_portfolio, p_identity, identity_len, NULL);
+
+        if (err != 0)
+        {
+            LWM2M_WRN("Failed to decode the payload of the CREATE request");
+        }
     }
 
     lwm2m_respond_with_code(COAP_CODE_201_CREATED, p_req);
@@ -556,13 +580,20 @@ void lwm2m_portfolio_init(void)
 const void * lwm2m_portfolio_resource_reference_get(uint16_t instance_id, uint16_t resource_id, uint8_t *p_type)
 {
     const void *p_observable = NULL;
+    lwm2m_portfolio_t *p_instance;
     uint8_t type;
+
+    p_instance = lwm2m_portfolio_get_instance(instance_id);
+    if (!p_instance)
+    {
+        return NULL;
+    }
 
     switch (resource_id)
     {
     case LWM2M_PORTFOLIO_IDENTITY:
         type = LWM2M_OBSERVABLE_TYPE_LIST;
-        p_observable = &m_instance_portfolio[instance_id].identity;
+        p_observable = &p_instance->identity;
         break;
     default:
         type = LWM2M_OBSERVABLE_TYPE_NO_CHECK;

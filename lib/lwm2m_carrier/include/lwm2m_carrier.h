@@ -498,4 +498,19 @@ int lwm2m_carrier_identity_read(uint16_t instance_id, uint16_t identity_type,
 int lwm2m_carrier_identity_write(uint16_t instance_id, uint16_t identity_type,
 					  const char *value);
 
+/**
+ * @brief      Create a new instance of the Portfolio object.
+ *
+ * @param[in]  instance_id    The identifier to be used for the new instance.
+ *
+ * @retval	   -ENOMEM		  If it was not possible to create the instance
+ * 							  because the maximum number of supported
+ * 							  object instances has already been reached.
+ * @retval	   -EINVAL        If the provided instance identifier is already in
+ * 							  use.
+ * @retval     0              If the instance has been created successfully.
+ */
+int lwm2m_carrier_portfolio_instance_create(uint16_t instance_id);
+
+
 #endif /* LWM2M_CARRIER_H__ */
