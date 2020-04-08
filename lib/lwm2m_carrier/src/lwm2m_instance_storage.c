@@ -304,11 +304,32 @@ static int obj_instances_encode(uint16_t obj, uint8_t *buf, size_t *len)
     return 0;
 }
 
+static void obj_instance_add_to_handler(uint16_t obj, uint16_t inst)
+{
+    lwm2m_instance_t *p_instance = NULL;
+
+    switch (obj) {
+    case LWM2M_OBJ_APN_CONNECTION_PROFILE:
+        p_instance = (lwm2m_instance_t *)lwm2m_apn_conn_prof_get_instance(inst);
+        break;
+    case LWM2M_OBJ_PORTFOLIO:
+        p_instance = (lwm2m_instance_t *)lwm2m_portfolio_get_instance(inst);
+        break;
+    default:
+        break;
+    }
+
+    if (p_instance) {
+        lwm2m_coap_handler_instance_add(p_instance);
+    }
+}
+
 static int obj_instances_decode(uint16_t obj, uint8_t *buf, size_t *size)
 {
     int err;
     size_t off;
     lwm2m_tlv_t tlv;
+    lwm2m_instance_t *p_instance;
 
     off = 0;
 
@@ -321,6 +342,13 @@ static int obj_instances_decode(uint16_t obj, uint8_t *buf, size_t *size)
         }
 
         LWM2M_TRC("Decoded /%d/%d (%d bytes)", obj, tlv.id, tlv.length);
+
+        /* Some instances might have not been added to the handler during the
+           initialization, such as the ones that can be created at runtime. */
+        if (lwm2m_lookup_instance(&p_instance, obj, tlv.id) != 0)
+        {
+            obj_instance_add_to_handler(obj, tlv.id);
+        }
 
         switch (obj) {
         case LWM2M_OBJ_SECURITY:

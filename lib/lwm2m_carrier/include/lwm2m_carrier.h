@@ -116,6 +116,8 @@ typedef struct {
 	char *psk;
 	/** Length of the pre-shared key. */
 	size_t psk_length;
+	/** Optional custom APN, null-terminated. */
+	char *apn;
 } lwm2m_carrier_config_t;
 
 /**

@@ -178,7 +178,7 @@ typedef struct
 #define LWM2M_OBSERVABLE_TYPE_NO_CHECK    0x0E /**< Observable structure of a noncomparable data type. */
 
 #define LWM2M_URI_PATH_MAX_LEN            4 /**< Maximum supported length of the URI path to identify an LwM2M resource. */
-#define LWM2M_MAX_APN_COUNT               2 /**< Maximum supported APNs. */
+#define LWM2M_MAX_APN_COUNT               3 /**< Maximum supported APNs. */
 /**@} */
 
 /**@cond */

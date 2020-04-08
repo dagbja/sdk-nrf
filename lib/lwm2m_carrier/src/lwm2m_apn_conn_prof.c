@@ -19,13 +19,17 @@
 #include <lwm2m_carrier_main.h>
 #include <at_interface.h>
 #include <lwm2m_instance_storage.h>
+#include <operator_check.h>
+
+#define LWM2M_APN_CONN_PROF_CUSTOM_INSTANCE  1
+#define LWM2M_APN_CONN_PROF_DEFAULT_INSTANCE 2
 
 static lwm2m_object_t        m_object_apn_conn_prof;                             /**< APN Connection Profile base object. */
 // TODO: Only two instances are currently supported.
 static lwm2m_apn_conn_prof_t m_instance_apn_conn_prof[LWM2M_MAX_APN_COUNT];      /**< APN Connection Profile object instances. */
 
-static char *                m_profile_name_default[] = { "AT&T LWM2M APN", NULL };
-static char *                m_apn_default[] = { "attm2mglobal", NULL };
+static char *                m_profile_name_default[] = { "AT&T LWM2M APN", NULL, NULL };
+static char *                m_apn_default[] = { "attm2mglobal", NULL, NULL };
 static uint16_t              m_default_apn_instance;
 
 // LWM2M core resources.
@@ -91,12 +95,14 @@ static uint32_t list_integer_copy(lwm2m_list_t * p_list, int from_idx, int to_id
 bool lwm2m_apn_conn_prof_activate(uint16_t instance_id,
                                   uint8_t  reject_cause)
 {
-    lwm2m_apn_conn_prof_t *apn_conn = lwm2m_apn_conn_prof_get_instance(instance_id);
+    lwm2m_instance_t *p_instance;
 
-    if (!apn_conn)
+    if (lwm2m_lookup_instance(&p_instance, LWM2M_OBJ_APN_CONNECTION_PROFILE, instance_id) != 0)
     {
         return false;
     }
+
+    lwm2m_apn_conn_prof_t *apn_conn = (lwm2m_apn_conn_prof_t *)p_instance;
 
     int apn_idx = apn_conn->conn_est_time.len;
     if (apn_idx == apn_conn->conn_est_time.max_len)
@@ -125,12 +131,14 @@ bool lwm2m_apn_conn_prof_activate(uint16_t instance_id,
 
 bool lwm2m_apn_conn_prof_deactivate(uint16_t instance_id)
 {
-    lwm2m_apn_conn_prof_t *apn_conn = lwm2m_apn_conn_prof_get_instance(instance_id);
+    lwm2m_instance_t *p_instance;
 
-    if (!apn_conn)
+    if (lwm2m_lookup_instance(&p_instance, LWM2M_OBJ_APN_CONNECTION_PROFILE, instance_id) != 0)
     {
         return false;
     }
+
+    lwm2m_apn_conn_prof_t *apn_conn = (lwm2m_apn_conn_prof_t *)p_instance;
 
     int apn_idx = 0;
     while ((apn_idx < apn_conn->conn_est_time.max_len) &&
@@ -149,6 +157,55 @@ bool lwm2m_apn_conn_prof_deactivate(uint16_t instance_id)
     lwm2m_storage_apn_conn_prof_store();
 
     return true;
+}
+
+uint32_t lwm2m_apn_conn_prof_custom_apn_set(char *p_apn)
+{
+    lwm2m_instance_t *p_instance;
+    uint32_t err_code;
+    uint8_t apn_status[128];
+    uint8_t apn_quoted[64];
+
+    if (!p_apn || strlen(p_apn) == 0)
+    {
+        return EINVAL;
+    }
+
+    if (!operator_is_att(true))
+    {
+        return EPERM;
+    }
+
+    err_code = lwm2m_bytebuffer_to_string(p_apn, strlen(p_apn), &m_instance_apn_conn_prof[LWM2M_APN_CONN_PROF_CUSTOM_INSTANCE].apn);
+    if (err_code != 0)
+    {
+        return err_code;
+    }
+
+    err_code = lwm2m_bytebuffer_to_string(p_apn, strlen(p_apn), &m_instance_apn_conn_prof[LWM2M_APN_CONN_PROF_CUSTOM_INSTANCE].profile_name);
+    if (err_code != 0)
+    {
+        return err_code;
+    }
+
+    err_code = lwm2m_lookup_instance(&p_instance, LWM2M_OBJ_APN_CONNECTION_PROFILE, LWM2M_APN_CONN_PROF_CUSTOM_INSTANCE);
+    if (err_code == ENOENT)
+    {
+        err_code = lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_apn_conn_prof[LWM2M_APN_CONN_PROF_CUSTOM_INSTANCE]);
+    }
+
+    if (at_read_apn_status(apn_status, sizeof(apn_status)) != 0)
+    {
+        LWM2M_ERR("Error reading APN status");
+    }
+
+    snprintf(apn_quoted, sizeof(apn_quoted), "\"%s\"", p_apn);
+
+    m_instance_apn_conn_prof[LWM2M_APN_CONN_PROF_CUSTOM_INSTANCE].enable_status = (strstr(apn_status, apn_quoted) == NULL) ? true : false;
+
+    lwm2m_storage_apn_conn_prof_store();
+
+    return err_code;
 }
 
 /**@brief Callback function for APN connection profile instances. */
@@ -179,8 +236,9 @@ uint32_t apn_conn_prof_instance_callback(lwm2m_instance_t * p_instance,
     }
 
     uint16_t instance_id = p_instance->instance_id;
+    lwm2m_apn_conn_prof_t *p_apn_conn_prof = lwm2m_apn_conn_prof_get_instance(instance_id);
 
-    if (instance_id >= ARRAY_SIZE(m_instance_apn_conn_prof))
+    if (!p_apn_conn_prof)
     {
         (void)lwm2m_respond_with_code(COAP_CODE_404_NOT_FOUND, p_request);
         return 0;
@@ -295,7 +353,13 @@ uint32_t lwm2m_apn_conn_prof_object_callback(lwm2m_object_t * p_object,
         for (int i = 0; i < ARRAY_SIZE(m_instance_apn_conn_prof); i++)
         {
             uint16_t access = 0;
-            lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_apn_conn_prof_get_instance(i);
+            lwm2m_instance_t * p_instance;
+
+            if (lwm2m_lookup_instance(&p_instance, LWM2M_OBJ_APN_CONNECTION_PROFILE, i) != 0)
+            {
+                continue;
+            }
+
             err_code = lwm2m_access_remote_get(&access,
                                                p_instance,
                                                p_request->remote);
@@ -402,28 +466,32 @@ void lwm2m_apn_conn_prof_init(void)
         m_instance_apn_conn_prof[i].proto.callback = apn_conn_prof_instance_callback;
 
         char * p_apn = m_apn_default[i];
-        if (p_apn == NULL)
+        if (i == LWM2M_APN_CONN_PROF_DEFAULT_INSTANCE)
         {
             p_apn = lwm2m_default_apn_get();
             m_default_apn_instance = i;
         }
 
-        if (m_profile_name_default[i])
-        {
-            lwm2m_bytebuffer_to_string(m_profile_name_default[i], strlen(m_profile_name_default[i]), &m_instance_apn_conn_prof[i].profile_name);
-        }
-        else
-        {
-            lwm2m_bytebuffer_to_string(p_apn, strlen(p_apn), &m_instance_apn_conn_prof[i].profile_name);
-        }
-        lwm2m_bytebuffer_to_string(p_apn, strlen(p_apn), &m_instance_apn_conn_prof[i].apn);
         m_instance_apn_conn_prof[i].authentication_type = 0;
         m_instance_apn_conn_prof[i].enable_status = false;
 
+        if (i != LWM2M_APN_CONN_PROF_CUSTOM_INSTANCE)
+        {
+            if (m_profile_name_default[i])
+            {
+                lwm2m_bytebuffer_to_string(m_profile_name_default[i], strlen(m_profile_name_default[i]), &m_instance_apn_conn_prof[i].profile_name);
+            }
+            else
+            {
+                lwm2m_bytebuffer_to_string(p_apn, strlen(p_apn), &m_instance_apn_conn_prof[i].profile_name);
+            }
+            lwm2m_bytebuffer_to_string(p_apn, strlen(p_apn), &m_instance_apn_conn_prof[i].apn);
+
+            lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_apn_conn_prof[i]);
+        }
+
         lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_apn_conn_prof[i],
                                     LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-
-        lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_apn_conn_prof[i]);
     }
 
     lwm2m_apn_conn_prof_init_acl();

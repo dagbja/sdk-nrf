@@ -559,15 +559,22 @@ static bool lwm2m_first_enabled_apn_instance(void)
 
 static bool lwm2m_next_enabled_apn_instance(void)
 {
-    lwm2m_apn_conn_prof_t * p_apn_conn_prof;
+    lwm2m_instance_t * p_instance;
     bool instance_wrap = false;
 
-    do {
+    while (m_apn_instance < LWM2M_MAX_APN_COUNT) {
         m_apn_instance++;
-        p_apn_conn_prof = lwm2m_apn_conn_prof_get_instance(m_apn_instance);
-    } while (p_apn_conn_prof && !lwm2m_apn_conn_prof_is_enabled(m_apn_instance));
 
-    if (m_apn_instance == LWM2M_MAX_APN_COUNT) {
+        if (lwm2m_lookup_instance(&p_instance, LWM2M_OBJ_APN_CONNECTION_PROFILE, m_apn_instance) != 0) {
+            continue;
+        }
+
+        if (lwm2m_apn_conn_prof_is_enabled(m_apn_instance)) {
+            break;
+        }
+    }
+
+    if (m_apn_instance >= LWM2M_MAX_APN_COUNT) {
         m_apn_instance = 0;
         instance_wrap = true;
     }
@@ -1850,6 +1857,15 @@ static void app_lwm2m_create_objects(void)
     // Read APN status and reflect it in the APN Connection Profile object.
     lwm2m_apn_conn_prof_apn_status_update();
 
+    // Register the custom APN if it has been provided.
+    if (m_app_config.apn)
+    {
+        int err = lwm2m_apn_conn_prof_custom_apn_set(m_app_config.apn);
+        if (err != 0 || err != EPERM) {
+            LWM2M_ERR("Unable to setup custom APN, err %d", err);
+        }
+    }
+
     if (operator_is_att(true)) {
         lwm2m_first_enabled_apn_instance();
     }
@@ -2947,6 +2963,10 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
     if ((config != NULL) && (config->psk != NULL)) {
         m_app_config.psk        = config->psk;
         m_app_config.psk_length = config->psk_length;
+    }
+
+    if ((config != NULL) && (config->apn != NULL)) {
+        m_app_config.apn = config->apn;
     }
 
     // Initialize OS abstraction layer.

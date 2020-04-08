@@ -1578,6 +1578,39 @@ static int cmd_apn_activate(const struct shell *shell, size_t argc, char **argv)
 }
 
 
+static int cmd_apn_set_custom(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2)
+    {
+        shell_print(shell, "%s <apn>", argv[0]);
+        return 0;
+    }
+
+    uint32_t err_code = lwm2m_apn_conn_prof_custom_apn_set(argv[1]);
+
+    switch (err_code)
+    {
+    case 0:
+        shell_print(shell, "Successfuly set the custom APN");
+        break;
+    case EPERM:
+        shell_print(shell, "Invalid operator");
+        break;
+    case EINVAL:
+        shell_print(shell, "Invalid APN");
+        break;
+    case ENOMEM:
+        shell_print(shell, "Insufficient memory");
+        break;
+    default:
+        shell_print(shell, "Unknown error %d", err_code);
+        break;
+    }
+
+    return 0;
+}
+
+
 static int cmd_apn_deactivate(const struct shell *shell, size_t argc, char **argv)
 {
     if (argc != 2)
@@ -1903,6 +1936,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_server,
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_apn,
     SHELL_CMD(activate, NULL, "Activate APN", cmd_apn_activate),
+    SHELL_CMD(set_custom, NULL, "Set custom APN", cmd_apn_set_custom),
     SHELL_CMD(deactivate, NULL, "Deactivate APN", cmd_apn_deactivate),
     SHELL_CMD(enable_status, NULL, "Set enable status", cmd_apn_enable_status),
     SHELL_CMD(print, NULL, "Print apn connection profile objects", cmd_apn_print),
