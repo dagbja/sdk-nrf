@@ -207,6 +207,27 @@ int at_read_cell_id(uint32_t * p_cell_id);
 int at_read_default_apn(char * p_apn, uint32_t apn_len);
 
 /**
+ * @brief Read APN disable status.
+ *
+ * @param p_apn_status[out]  Buffer containing all disabled APNs.
+ * @param apn_status_len[in] Size of the apn_status buffer.
+ *
+ * @return An error code if the read fails.
+ */
+int at_read_apn_status(uint8_t *p_apn_status, uint32_t apn_status_len);
+
+/**
+ * @brief Write APN disable status.
+ *
+ * @param status[in]  APN status: 0 for disable, 1 for enable.
+ * @param p_apn[in]   Pointer to APN.
+ * @param apn_len[in] Length of APN.
+ *
+ * @return An error code if the write fails.
+ */
+int at_write_apn_status(int status, const uint8_t *p_apn, uint32_t apn_len);
+
+/**
  * @brief Read Mobile Country Code (MCC) and Mobile Network Code (MNC) values from modem.
  *
  * @param[out] p_smnc Pointer to store the MNC value

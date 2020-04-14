@@ -22,6 +22,8 @@
 
 #define AT_APN_CLASS_OP_RD "AT%XAPNCLASS=0"
 #define AT_APN_CLASS_OP_WR "AT%XAPNCLASS=1"
+#define AT_APN_STATUS_OP_RD "AT%XAPNSTATUS?"
+#define AT_APN_STATUS_OP_WR "AT%XAPNSTATUS"
 
 /** Cumulative days per month in a year.
  *  Leap days are not taken into account.
@@ -436,6 +438,35 @@ int at_apn_unregister_from_packet_events(void)
     return 0;
 }
 
+int at_read_apn_status(uint8_t *p_apn_status, uint32_t apn_status_len)
+{
+    int retval = lwm2m_os_at_cmd_write(AT_APN_STATUS_OP_RD, m_at_buffer,
+                                       sizeof(m_at_buffer));
+
+    if ((retval == 0) &&
+        (strncmp(m_at_buffer, "%XAPNSTATUS: ", 13) == 0) &&
+        ((strlen(m_at_buffer) - 13) < apn_status_len))
+    {
+        strncpy(p_apn_status, &m_at_buffer[13], apn_status_len);
+    } else {
+        retval = EIO;
+    }
+
+    return retval;
+}
+
+int at_write_apn_status(int status, const uint8_t *p_apn, uint32_t apn_len)
+{
+    int offset = snprintf(m_at_buffer, sizeof(m_at_buffer),
+                          "%s=%d,\"", AT_APN_STATUS_OP_WR, status);
+
+    memcpy(&m_at_buffer[offset], p_apn, apn_len);
+    offset += apn_len;
+
+    snprintf(&m_at_buffer[offset], sizeof(m_at_buffer) - offset, "\"");
+
+    return lwm2m_os_at_cmd_write(m_at_buffer, NULL, 0);
+}
 
 int at_apn_setup_wait_for_ipv6(int *fd)
 {
