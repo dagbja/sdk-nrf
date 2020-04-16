@@ -11,6 +11,7 @@
 #include <lwm2m.h>
 #include <lwm2m_os.h>
 #include <lwm2m_api.h>
+#include <lwm2m_pdn.h>
 #include <nrf_socket.h>
 #include <sms_receive.h>
 #include <lwm2m_portfolio.h>
@@ -25,6 +26,17 @@
 #define AT_APN_STATUS_OP_RD "AT%XAPNSTATUS?"
 #define AT_APN_STATUS_OP_WR "AT%XAPNSTATUS"
 
+enum {
+    IPv6_FAIL = -1,
+    IPv6_WAIT,
+    IPv6_LINK_UP,
+};
+
+struct cid_status {
+    uint8_t esm_code : 7;
+    uint8_t deactive : 1;
+};
+
 /** Cumulative days per month in a year.
  *  Leap days are not taken into account.
  *  */
@@ -32,10 +44,11 @@ static int cum_ydays[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 33
 
 /** @brief PDN context ID. Negative values if no CID found. */
 static volatile int8_t cid_number = -1;
-static volatile bool cid_ipv6_link_up = false;
+static volatile int8_t cid_ipv6_link_up = IPv6_WAIT;
 
 /** @brief ESM error code. */
-static uint32_t esm_error_code;
+static volatile struct cid_status esm_error_code[MAX_NUM_OF_PDN_CONTEXTS];
+static volatile struct at_restriction restriction_error;
 
 /**
  * @brief At command events or notifications handler.
@@ -182,21 +195,60 @@ static int at_cgev_handler(const char *notif)
         // Check type of CGEV event.
         const char * cgev_evt = &notif[7];
 
-        // IPv6 link is up for the default bearer.
-        if (strncmp(cgev_evt, "IPV6 ", 5) == 0)
-        {
-            int timeout_ms = 100; // 100 millisecond timeout.
-            while (cid_number == -1 && timeout_ms > 0) {
-                // Wait for nrf_getsockopt() to set cid_number.
-                 lwm2m_os_sleep(10);
-                 timeout_ms -= 10;
+        //LWM2M_INF("CGEV: %s", lwm2m_os_log_strdup(cgev_evt));
+
+        if (strstr(cgev_evt, "PDN DEACT") != NULL) {
+            /* AT event: +CGEV: ME/NW PDN DEACT <cid> */
+            cgev_evt = strstr(cgev_evt, "DEACT ");
+            if (cgev_evt != NULL) {
+                int cid = strtol(cgev_evt + 6, NULL, 0);
+
+                if (cid >= 0 && cid < MAX_NUM_OF_PDN_CONTEXTS) {
+                    /* PDN deactivated */
+                    esm_error_code[cid].deactive = 1;
+                }
+            }
+        } else if (strstr(cgev_evt, "RESTR ") != NULL) {
+            /* AT event: +CGEV: RESTR <cause>, <validity>
+             *
+             * This event is received in case of earlier failure of the PDN.
+             * Modem has set the restriction for APN and it cannot be used
+             * until throttling timeout is over.
+             */
+            restriction_error.cause = 0;
+            restriction_error.validity = 0;
+
+            cgev_evt = strstr(cgev_evt, "RESTR ");
+            if (cgev_evt) {
+                restriction_error.cause = strtol(&cgev_evt[6], NULL, 0) & 0xf;
+            }
+            cgev_evt = strstr(cgev_evt, ", ");
+            if (cgev_evt) {
+                restriction_error.validity = strtol(&cgev_evt[2], NULL, 0) & 0xf;
             }
 
-            // Match CID with PDN socket context.
-            int cid = strtol(&cgev_evt[5], NULL, 0);
-            if (cid >= 0 && cid == cid_number)
-            {
-                cid_ipv6_link_up = true;
+        } else if (strncmp(cgev_evt, "IPV6 ", 5) == 0) {
+
+            if (strstr(&cgev_evt[5], "FAIL") == NULL) {
+                // IPv6 link is up
+
+                int timeout_ms = 100; // 100 millisecond timeout.
+                while (cid_number == -1 && timeout_ms > 0) {
+                    // Wait for nrf_getsockopt() to set cid_number.
+                    lwm2m_os_sleep(10);
+                    timeout_ms -= 10;
+                }
+
+                // Match CID with PDN socket context.
+                int cid = strtol(&cgev_evt[5], NULL, 0);
+                if (cid >= 0 && cid == cid_number)
+                {
+                    cid_ipv6_link_up = IPv6_LINK_UP;
+                }
+
+            } else {
+                // IPv6 setup failed
+                cid_ipv6_link_up = IPv6_FAIL;
             }
         }
 
@@ -326,7 +378,23 @@ static int at_cnec_handler(const char *notif)
     int length = strlen(notif);
     if (length >= 12 && strncmp(notif, "+CNEC_ESM: ", 11) == 0)
     {
-        esm_error_code = strtol(&notif[11], NULL, 0);
+        /* AT event: +CNEC_ESM: <cause>,<cid> */
+        char * sub_str = strchr(notif, ':');
+
+        if (sub_str != NULL) {
+            int context_id = -1;
+            int nw_error = strtol(sub_str + 1, NULL, 0);
+
+            sub_str = strchr(sub_str, ',');
+            if (sub_str != NULL) {
+                context_id = strtol(sub_str + 1, NULL, 0);
+
+                if (context_id >= 0 && context_id < MAX_NUM_OF_PDN_CONTEXTS) {
+                    esm_error_code[context_id].esm_code = nw_error;
+                }
+            }
+            LWM2M_INF("ESM: %d, CID: %d", nw_error, context_id);
+        }
 
         // CNEC event parsed.
         return 0;
@@ -385,10 +453,15 @@ int at_if_init(void)
 {
     int err;
 
+    // Make sure the ESM error code storage is zero
+    memset((void*)esm_error_code, 0, sizeof(esm_error_code));
+    restriction_error.cause = 0;
+    restriction_error.validity = 0;
+
     err = lwm2m_os_at_init();
     if (err) {
-            LWM2M_ERR("Failed to initialize AT interface");
-            return -1;
+        LWM2M_ERR("Failed to initialize AT interface");
+        return -1;
     }
 
     // Set handler for AT notifications and events (SMS, CESQ, etc.).
@@ -398,43 +471,71 @@ int at_if_init(void)
         return -1;
     }
 
+    // Register for packet domain event reporting +CGEREP.
+    // The unsolicited result code is +CGEV: XXX.
+    err = lwm2m_os_at_cmd_write("AT+CGEREP=1", NULL, 0);
+    if (err != 0)
+    {
+        LWM2M_ERR("Unable to register CGEV events");
+        return -1;
+    }
+
+    /* Register for EPS Session Management (ESM)
+     * cause information reporting.
+     * */
+    err = lwm2m_os_at_cmd_write("AT+CNEC=16", NULL, 0);
+    if (err != 0) {
+        LWM2M_ERR("Unable to register for CNEC_ESM events");
+        return -1;
+    }
+
     // Subscribe ODIS notifications
     at_subscribe_odis();
 
     return 0;
 }
 
-uint32_t at_esm_error_code_get(void)
+int at_esm_error_code_get(uint8_t cid)
 {
-    return esm_error_code;
+    if (cid < MAX_NUM_OF_PDN_CONTEXTS)
+        return esm_error_code[cid].esm_code;
+    return -1;
+}
+
+int at_esm_error_code_reset(uint8_t cid)
+{
+    if (cid < MAX_NUM_OF_PDN_CONTEXTS) {
+        esm_error_code[cid].esm_code = 0;
+        esm_error_code[cid].deactive = 0;
+        return 0;
+    }
+    return -1;
+}
+
+int8_t at_cid_active_state(uint8_t const cid) {
+    if (cid < MAX_NUM_OF_PDN_CONTEXTS)
+        return esm_error_code[cid].deactive;
+    return -1;
+}
+
+struct at_restriction at_restriction_error_code_get(void)
+{
+    return restriction_error;
 }
 
 int at_apn_register_for_packet_events(void)
 {
     // Clear previous state before registering for packet domain events.
     cid_number = -1;
-    cid_ipv6_link_up = false;
-    esm_error_code = 0;
-
-    // Register for packet domain event reporting +CGEREP.
-    // The unsolicited result code is +CGEV: XXX.
-    int err = lwm2m_os_at_cmd_write("AT+CGEREP=1", NULL, 0);
-
-    if (err != 0)
-    {
-        // Check if subscription went OK.
-        LWM2M_ERR("Unable to register to CGEV events for IPv6 APN");
-        return -1;
-    }
+    cid_ipv6_link_up = IPv6_WAIT;
+    restriction_error.cause = 0;
+    restriction_error.validity = 0;
 
     return 0;
 }
 
 int at_apn_unregister_from_packet_events(void)
 {
-    // Unregister from packet domain events.
-    (void)lwm2m_os_at_cmd_write("AT+CGEREP=0", NULL, 0);
-
     return 0;
 }
 
@@ -471,7 +572,7 @@ int at_write_apn_status(int status, const uint8_t *p_apn, uint32_t apn_len)
 int at_apn_setup_wait_for_ipv6(int *fd)
 {
     int err;
-    int cid;
+    int8_t cid = -1;
     int timeout_ms = K_MINUTES(1);
     nrf_socklen_t len = sizeof(cid);
 
@@ -485,8 +586,8 @@ int at_apn_setup_wait_for_ipv6(int *fd)
                   *fd, lwm2m_os_errno());
 
         nrf_close(*fd);
-        *fd = -1;
-        return -1;
+        *fd = DEFAULT_PDN_FD;
+        return -2;
     }
 
     LWM2M_INF("PDN cid %d found. Wait for IPv6 link...", cid);
@@ -495,16 +596,16 @@ int at_apn_setup_wait_for_ipv6(int *fd)
     cid_number = cid;
 
      // Wait until IPv6 link is up or timeout.
-    while (cid_ipv6_link_up == false && timeout_ms > 0) {
+    while (cid_ipv6_link_up == IPv6_WAIT && timeout_ms > 0) {
         lwm2m_os_sleep(100);
         timeout_ms -= 100;
     }
 
-    if (timeout_ms <= 0) {
-        LWM2M_ERR("Timeout while waiting for IPv6 (cid=%u)", cid);
+    if (timeout_ms <= 0 || cid_ipv6_link_up != IPv6_LINK_UP) {
+        LWM2M_ERR("Timeout/fail while waiting for IPv6 (cid=%u)", cid);
         nrf_close(*fd);
-        *fd = -1;
-        return -1;
+        *fd = DEFAULT_PDN_FD;
+        return -3;
     }
     else {
         LWM2M_INF("IPv6 link ready for cid %d", cid);
@@ -788,17 +889,6 @@ void at_subscribe_net_reg_stat(at_net_reg_stat_cb_t net_reg_stat_cb)
 
     if (retval != 0) {
         LWM2M_ERR("AT+CEREG=2 failed: %d", (int)retval);
-    }
-}
-
-void at_subscribe_esm(void)
-{
-    int retval = 0;
-
-    retval = lwm2m_os_at_cmd_write("AT+CNEC=16", NULL, 0);
-
-    if (retval != 0) {
-        LWM2M_ERR("AT+CNEC=16 failed: %d", retval);
     }
 }
 

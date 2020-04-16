@@ -81,7 +81,8 @@ static char m_bootstrap_object_alias_name[] = "bs";                             
 
 static coap_transport_handle_t             m_lwm2m_transport[1+LWM2M_MAX_SERVERS];            /**< CoAP transport handles for the secure servers. Obtained on @coap_security_setup. */
 
-static int      m_pdn_handle = -1;                                                            /**< PDN connection handle. */
+static int      m_pdn_handle = DEFAULT_PDN_FD;                                                /**< PDN connection handle. */
+static int      m_pdn_cid = -1;                                                               /**< PDN Context Identifier. */
 static uint16_t m_apn_instance;                                                               /**< Current APN index. */
 static bool     m_connection_use_pdn;                                                         /**< Use PDN for connection. */
 
@@ -621,12 +622,12 @@ bool lwm2m_carrier_pdn_activate(uint16_t security_instance, int32_t *retry_delay
     /* Register for packet domain events before activating PDN */
     at_apn_register_for_packet_events();
 
-    int rc = lwm2m_pdn_activate(&m_pdn_handle, m_current_apn);
+    int esm_error_code = 0;
+    int rc = lwm2m_pdn_activate(&m_pdn_handle, m_current_apn, &esm_error_code);
     if (rc < 0) {
         if (lwm2m_retry_count_pdn_get() == 0) {
             /* Only report first activate reject when doing retries */
             /* TODO: Check how to handle this properly */
-            uint32_t esm_error_code = at_esm_error_code_get();
             if (esm_error_code == 0) {
                 esm_error_code = 34; // Service option temporarily out of order
             }
@@ -638,6 +639,9 @@ bool lwm2m_carrier_pdn_activate(uint16_t security_instance, int32_t *retry_delay
         return false;
     }
 
+    /* Store used PDN Context ID for later use */
+    m_pdn_cid = lwm2m_pdn_cid_get(m_pdn_handle);
+
     /* PDN was active */
     if (rc == 0) {
         at_apn_unregister_from_packet_events();
@@ -648,7 +652,7 @@ bool lwm2m_carrier_pdn_activate(uint16_t security_instance, int32_t *retry_delay
     LWM2M_INF("Activating %s", lwm2m_os_log_strdup(m_current_apn));
     lwm2m_apn_conn_prof_activate(m_apn_instance, 0);
 
-    if (at_esm_error_code_get() != 50) // 50 == PDN type IPv4 only allowed
+    if (lwm2m_pdn_esm_error_code_get(m_pdn_handle) != 50) // 50 == PDN type IPv4 only allowed
     {
         /* PDN was reactived, wait for IPv6 */
         rc = at_apn_setup_wait_for_ipv6(&m_pdn_handle);
@@ -670,11 +674,12 @@ bool lwm2m_carrier_pdn_activate(uint16_t security_instance, int32_t *retry_delay
 /**@brief Disconnect carrier PDN connection. */
 static void lwm2m_carrier_pdn_deactivate(void)
 {
-    if (m_pdn_handle != -1)
+    if (m_pdn_handle != DEFAULT_PDN_FD)
     {
-        lwm2m_apn_conn_prof_deactivate(m_apn_instance);
+        if (m_apn_instance != lwm2m_apn_conn_prof_default_instance())
+            lwm2m_apn_conn_prof_deactivate(m_apn_instance);
         nrf_close(m_pdn_handle);
-        m_pdn_handle = -1;
+        m_pdn_handle = DEFAULT_PDN_FD;
     }
 }
 
@@ -1970,7 +1975,7 @@ static void app_bootstrap_connect(void)
             .protocol     = NRF_SPROTO_DTLS1v2
         };
 
-        if (m_connection_use_pdn && m_pdn_handle != -1)
+        if (m_connection_use_pdn && m_pdn_handle != DEFAULT_PDN_FD)
         {
             local_port.interface = m_current_apn;
         }
@@ -2142,7 +2147,7 @@ static void app_server_connect(uint16_t security_instance)
             .protocol     = NRF_SPROTO_DTLS1v2
         };
 
-        if (m_connection_use_pdn && m_pdn_handle != -1)
+        if (m_connection_use_pdn && m_pdn_handle != DEFAULT_PDN_FD)
         {
             local_port.interface = m_current_apn;
         }
@@ -2552,8 +2557,21 @@ static bool app_coap_socket_poll(void)
 }
 #endif
 
+static void app_check_closed_pdn(void)
+{
+    if ((m_pdn_handle != DEFAULT_PDN_FD) && (0 < m_pdn_cid)) {
+        /* PDN is used and CID is known, check if the PDN is deactivated */
+        if (0 < at_cid_active_state(m_pdn_cid)) {
+            /* PDN is deactivated, close it and retry later */
+            lwm2m_carrier_pdn_deactivate();
+        }
+    }
+}
+
 static void app_check_server_update(void)
 {
+    app_check_closed_pdn();
+
     if ((m_app_state == LWM2M_STATE_REQUEST_DISCONNECT) ||
         (m_app_state == LWM2M_STATE_DISCONNECTED)) {
         // Disconnect requested or disconnected, nothing to check
@@ -2917,9 +2935,6 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 
     // Register network registration status changes
     at_subscribe_net_reg_stat(lwm2m_net_reg_stat_cb);
-
-    // Subscribe ESM cause events
-    at_subscribe_esm();
 
     // Initialize debug settings from flash.
     app_debug_init();

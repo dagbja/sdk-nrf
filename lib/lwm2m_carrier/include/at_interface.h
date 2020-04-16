@@ -14,16 +14,51 @@
 
 typedef void (*at_net_reg_stat_cb_t)(uint32_t net_stat);
 
+struct at_restriction {
+    uint8_t cause:4;
+    uint8_t validity:4;
+};
+
+
 /* TODO: Move APIs to modem interface modem with data model. */
 
 int at_if_init(void);
 
 /**
- * @brief Get last ESM error_code reported
+ * @brief Returns ESM error code by the CID
  *
- * @return ESM error code.
+ * @param[in] cid  Context ID
+ *
+ * @return ESM error code on success, -1 otherwise.
  */
-uint32_t at_esm_error_code_get(void);
+int at_esm_error_code_get(uint8_t cid);
+
+/**
+ * @brief Reset ESM error code by the CID
+ *
+ * @param[in] cid  Context ID
+ *
+ * @return Zero on success, -1 otherwise.
+ */
+int at_esm_error_code_reset(uint8_t cid);
+
+/**
+ * @brief Get PDN active/deactive indication status
+ *
+ * @param[in] cid  PDN context ID
+ *
+ * @retval -1 CID is not valid
+ * @retval 0 CID is active
+ * @retval 1 CID is deactivated
+ */
+int8_t at_cid_active_state(uint8_t cid);
+
+/**
+ * @brief Returns restriction error code for given socket
+ *
+ * @return Restriction error
+ */
+struct at_restriction at_restriction_error_code_get(void);
 
 /**
  * @brief Register for packet domain events
@@ -45,7 +80,10 @@ int at_apn_unregister_from_packet_events(void);
  *
  * @param[in,out] fd PDN socket handle.
  *
- * @return Zero on success, -1 otherwise.
+ * @return  0  success
+ * @return -1  invalid socket.
+ * @return -2  invalid CID
+ * @return -3  IPv6 failed
  */
 int at_apn_setup_wait_for_ipv6(int *fd);
 
@@ -260,8 +298,6 @@ int at_read_ipaddr(lwm2m_list_t * p_ipaddr_list);
  * @param[in] net_reg_stat_cb       Callback function to be called on changes
  */
 void at_subscribe_net_reg_stat(at_net_reg_stat_cb_t net_reg_stat_cb);
-
-void at_subscribe_esm(void);
 
 int at_read_connstat(lwm2m_connectivity_statistics_t * p_conn_stat);
 int at_start_connstat(void);
