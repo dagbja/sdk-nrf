@@ -540,6 +540,23 @@ uint16_t lwm2m_apn_instance(void)
     return m_apn_instance;
 }
 
+static bool lwm2m_first_enabled_apn_instance(void)
+{
+    lwm2m_instance_t * p_instance;
+
+    for (m_apn_instance = 0; m_apn_instance < LWM2M_MAX_APN_COUNT; m_apn_instance++) {
+        if (lwm2m_lookup_instance(&p_instance, LWM2M_OBJ_APN_CONNECTION_PROFILE, m_apn_instance) != 0) {
+            continue;
+        }
+
+        if (lwm2m_apn_conn_prof_is_enabled(m_apn_instance)) {
+            break;
+        }
+    }
+
+    return (m_apn_instance == LWM2M_MAX_APN_COUNT) ? false : true;
+}
+
 static bool lwm2m_next_enabled_apn_instance(void)
 {
     lwm2m_apn_conn_prof_t * p_apn_conn_prof;
@@ -1804,6 +1821,10 @@ static void app_lwm2m_create_objects(void)
 
     // Initialize security, server and acl from flash.
     app_load_flash_objects();
+
+    if (operator_is_att(true)) {
+        lwm2m_first_enabled_apn_instance();
+    }
 }
 
 /**@brief LWM2M initialization.
