@@ -28,10 +28,13 @@ int32_t lwm2m_instance_storage_deinit(void);
 
 int lwm2m_storage_security_load(void);
 int lwm2m_storage_security_store(void);
+int lwm2m_storage_security_delete(void);
 int lwm2m_storage_server_load(void);
 int lwm2m_storage_server_store(void);
+int lwm2m_storage_server_delete(void);
 int lwm2m_storage_acl_load(void);
 int lwm2m_storage_acl_store(void);
+int lwm2m_storage_acl_delete(void);
 int lwm2m_storage_location_load(void);
 int lwm2m_storage_location_store(void);
 int lwm2m_storage_location_delete(void);

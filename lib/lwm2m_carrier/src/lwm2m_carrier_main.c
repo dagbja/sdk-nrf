@@ -1726,17 +1726,15 @@ void lwm2m_factory_reset(void)
     lwm2m_last_used_msisdn_set("", 0);
     lwm2m_last_used_operator_id_set(OPERATOR_ID_UNSET);
 
-    // Delete the observers from the storage
-    lwm2m_observer_storage_delete_all();
-
-    // Delete the notification attributes from the storage
-    lwm2m_notif_attr_storage_delete_all();
-
     // Delete all Security and Server instances
     delete_security_and_server_instances(true);
 
-    lwm2m_storage_security_store();
-    lwm2m_storage_server_store();
+    // Delete data from flash
+    lwm2m_storage_security_delete();
+    lwm2m_storage_server_delete();
+    lwm2m_storage_acl_delete();
+    lwm2m_observer_storage_delete_all();
+    lwm2m_notif_attr_storage_delete_all();
 }
 
 /**@brief Initialize server ACLs in a specific order. */

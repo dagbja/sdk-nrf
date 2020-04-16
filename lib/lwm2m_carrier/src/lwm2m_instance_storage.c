@@ -352,7 +352,7 @@ static int lwm2m_storage_obj_instances_store(uint16_t obj)
     }
 
     if (err == 0) {
-        LWM2M_WRN("Storing %s instances, no change", obj_str[obj]);
+        LWM2M_WRN("Storing %s instances (len %d), no change", obj_str[obj], len);
     }
 
     return 0;
@@ -381,6 +381,22 @@ static int lwm2m_storage_obj_instances_load(uint16_t obj)
     return obj_instances_decode(obj, buf, &read);
 }
 
+static int lwm2m_storage_obj_instances_delete(uint16_t obj)
+{
+    int err;
+    uint16_t storage_id;
+
+    storage_id = storage_id_get(obj);
+    err = lwm2m_os_storage_delete(storage_id);
+    if (err) {
+        LWM2M_WRN("Failed to delete %s instances from flash, err %d",
+                   obj_str[obj], err);
+        return err;
+    }
+
+    return 0;
+}
+
 int lwm2m_storage_security_load(void)
 {
     return lwm2m_storage_obj_instances_load(LWM2M_OBJ_SECURITY);
@@ -391,6 +407,11 @@ int lwm2m_storage_security_store(void)
     return lwm2m_storage_obj_instances_store(LWM2M_OBJ_SECURITY);
 }
 
+int lwm2m_storage_security_delete(void)
+{
+    return lwm2m_storage_obj_instances_delete(LWM2M_OBJ_SECURITY);
+}
+
 int lwm2m_storage_server_load(void)
 {
     return lwm2m_storage_obj_instances_load(LWM2M_OBJ_SERVER);
@@ -399,6 +420,11 @@ int lwm2m_storage_server_load(void)
 int lwm2m_storage_server_store(void)
 {
     return lwm2m_storage_obj_instances_store(LWM2M_OBJ_SERVER);
+}
+
+int lwm2m_storage_server_delete(void)
+{
+    return lwm2m_storage_obj_instances_delete(LWM2M_OBJ_SERVER);
 }
 
 int lwm2m_storage_acl_load(void)
@@ -465,6 +491,11 @@ int lwm2m_storage_acl_store(void)
     }
 
     return 0;
+}
+
+int lwm2m_storage_acl_delete(void)
+{
+    return lwm2m_storage_obj_instances_delete(LWM2M_OBJ_ACL);
 }
 
 int lwm2m_storage_location_load(void)

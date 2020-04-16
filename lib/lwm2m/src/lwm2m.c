@@ -1488,6 +1488,8 @@ uint32_t lwm2m_coap_handler_instance_add(lwm2m_instance_t * p_instance)
     m_instances[m_num_instances] = p_instance;
     ++m_num_instances;
 
+    LWM2M_TRC("Adding /%d/%d", p_instance->object_id, p_instance->instance_id);
+
     LWM2M_MUTEX_UNLOCK();
 
     return 0;

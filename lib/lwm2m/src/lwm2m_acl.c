@@ -321,6 +321,7 @@ uint32_t lwm2m_acl_deserialize_tlv(uint8_t          * buffer,
         err_code = lwm2m_lookup_instance(&p_instance, object_id, instance_id);
         if (err_code)
         {
+            LWM2M_WRN("Could not find instance /%d/%d", object_id, instance_id);
             return err_code;
         }
     }
