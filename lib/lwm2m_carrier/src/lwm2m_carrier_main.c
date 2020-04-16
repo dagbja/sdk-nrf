@@ -925,21 +925,19 @@ static int app_generate_client_id(void)
  *
  * @param[in]  delete_bootstrap  Set if deleting bootstrap instances.
  */
-static void delete_security_and_server_instances(bool delete_bootstrap)
+static void delete_security_and_server_instances(void)
 {
     uint16_t bootstrap_ssid = lwm2m_security_short_server_id_get(LWM2M_BOOTSTRAP_INSTANCE_ID);
 
     // Delete all instances except Bootstrap server
     for (uint32_t i = 0; i < 1 + LWM2M_MAX_SERVERS; i++)
     {
-        if (delete_bootstrap ||
-            (i != LWM2M_BOOTSTRAP_INSTANCE_ID))
+        if (i != LWM2M_BOOTSTRAP_INSTANCE_ID)
         {
             (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_security_get_instance(i));
         }
 
-        if (delete_bootstrap ||
-            (lwm2m_server_short_server_id_get(i) != bootstrap_ssid))
+        if (lwm2m_server_short_server_id_get(i) != bootstrap_ssid)
         {
             (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_server_get_instance(i));
         }
@@ -954,7 +952,7 @@ static void delete_security_and_server_instances(bool delete_bootstrap)
  */
 uint32_t lwm2m_coap_handler_root(uint8_t op_code, coap_message_t * p_request)
 {
-    delete_security_and_server_instances(false);
+    delete_security_and_server_instances();
 
     (void)lwm2m_respond_with_code(COAP_CODE_202_DELETED, p_request);
 
@@ -1699,7 +1697,7 @@ void lwm2m_bootstrap_reset(void)
     }
 
     app_misc_data_set_bootstrapped(false);
-    delete_security_and_server_instances(false);
+    delete_security_and_server_instances();
     lwm2m_factory_bootstrap_init();
 
     lwm2m_device_init_acl();
@@ -1725,9 +1723,6 @@ void lwm2m_factory_reset(void)
     // Provision bootstrap PSK and diagnostic PSK at next startup
     lwm2m_last_used_msisdn_set("", 0);
     lwm2m_last_used_operator_id_set(OPERATOR_ID_UNSET);
-
-    // Delete all Security and Server instances
-    delete_security_and_server_instances(true);
 
     // Delete data from flash
     lwm2m_storage_security_delete();
