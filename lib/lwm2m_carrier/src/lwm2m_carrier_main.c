@@ -1638,6 +1638,30 @@ static void app_misc_data_set_bootstrapped(bool bootstrapped)
     lwm2m_storage_misc_data_store(&misc_data);
 }
 
+static void update_object_acls(void)
+{
+    if (!operator_is_att(true)) {
+        return;
+    }
+
+    uint16_t short_server_id = 0;
+
+    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+    {
+        // Find short server id for the first instance which is not bootstrap.
+        uint16_t ssid = lwm2m_server_short_server_id_get(i);
+        if (ssid != 0 && ssid != LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID) {
+            short_server_id = ssid;
+            break;
+        }
+    }
+
+    // If short_server_id does not match what we have in the factory bootstrap
+    // update all ACL objects with new owner and server settings.
+    if (short_server_id != 0 && short_server_id != 1) {
+        lwm2m_update_acl_ssid(1, short_server_id);
+    }
+}
 /**@brief Callback function for the named bootstrap complete object. */
 uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
                                    uint16_t         instance_id,
@@ -1671,6 +1695,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     lwm2m_storage_security_store();
     lwm2m_storage_acl_store();
 
+    update_object_acls();
     server_instance_update_map();
 
     (void)app_event_notify(LWM2M_CARRIER_EVENT_BOOTSTRAPPED, NULL);

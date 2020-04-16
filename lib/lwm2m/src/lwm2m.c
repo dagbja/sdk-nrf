@@ -1990,3 +1990,24 @@ const char * lwm2m_path_to_string(const uint16_t *p_path, uint8_t path_len)
 
     return uri_path;
 }
+
+uint32_t lwm2m_update_acl_ssid(uint16_t old_ssid, uint16_t new_ssid)
+{
+    for (int i = 0; i < m_num_instances; ++i)
+    {
+        if (m_instances[i]->acl.owner == old_ssid)
+        {
+            m_instances[i]->acl.owner = new_ssid;
+        }
+
+        for (int j = 1; j < (1+LWM2M_MAX_SERVERS); ++j)
+        {
+            if (m_instances[i]->acl.server[j] == old_ssid)
+            {
+                m_instances[i]->acl.server[j] = new_ssid;
+            }
+        }
+    }
+
+    return 0;
+}

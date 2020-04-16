@@ -1162,6 +1162,13 @@ const char * lwm2m_path_to_string(const uint16_t *p_path, uint8_t path_len);
  */
 void lwm2m_observable_resource_value_changed(uint16_t object_id, uint16_t instance_id, uint16_t resource_id);
 
+/**@brief Update ACL owner and server short server id in all objects.
+ *
+ * @param[in] old_ssid  Old short server id
+ * @param[in] new_ssid  New short server id
+ */
+uint32_t lwm2m_update_acl_ssid(uint16_t old_ssid, uint16_t new_ssid);
+
 #ifdef __cplusplus
 }
 #endif
