@@ -213,6 +213,13 @@ uint32_t lwm2m_remote_location_save(char   * p_location,
 }
 
 
+uint32_t lwm2m_remote_location_clear(void)
+{
+    memset(m_location, 0, sizeof(m_location));
+
+    return 0;
+}
+
 
 uint32_t lwm2m_remote_location_find(char    ** pp_location,
                                     uint16_t * p_location_len,

@@ -826,6 +826,8 @@ static int app_generate_client_id(void)
         }
 
         lwm2m_last_used_operator_id_set(operator_id(true));
+        lwm2m_remote_location_clear();
+        lwm2m_storage_location_delete();
     }
 
     if (!app_bootstrap_keys_exists()) {

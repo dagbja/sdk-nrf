@@ -36,6 +36,13 @@ uint32_t lwm2m_remote_init(void);
 void lwm2m_remote_location_get(void **p_loc, size_t *p_len);
 
 /**
+ * @brief Clear all location data.
+ *
+ * @return NRF_SUCCESS Success.
+ */
+uint32_t lwm2m_remote_location_clear(void);
+
+/**
  * @brief      Register a new short server id. Must be used before lwm2m_remote_remote_save.
  *
  * @param[in]  short_server_id  Short server id associated with Server and Security instances. The value MUST correspond

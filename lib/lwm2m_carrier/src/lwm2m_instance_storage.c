@@ -501,6 +501,17 @@ int lwm2m_storage_location_store(void)
     return 0;
 }
 
+int lwm2m_storage_location_delete(void)
+{
+    int err = lwm2m_os_storage_delete(LWM2M_STORAGE_ID_LOCATION);
+    if (err < 0) {
+        LWM2M_ERR("Failed to delete location data, err %d", err);
+        return -1;
+    }
+
+    return 0;
+}
+
 int32_t lwm2m_last_used_msisdn_get(char * p_msisdn, uint8_t max_len)
 {
     return lwm2m_os_storage_read(LWM2M_STORAGE_ID_MSISDN, p_msisdn, max_len);
