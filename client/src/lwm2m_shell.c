@@ -1774,16 +1774,18 @@ static int cmd_attribute_print(const struct shell *shell, size_t argc, char **ar
 static int cmd_portfolio_print(const struct shell *shell, size_t argc, char **argv)
 {
     lwm2m_list_t *p_list;
+    lwm2m_instance_t *p_instance;
 
     for (int i = 0; i < LWM2M_PORTFOLIO_MAX_INSTANCES; i++)
     {
-        lwm2m_portfolio_t *p_instance = lwm2m_portfolio_get_instance(i);
-        if (!p_instance)
+        if (lwm2m_lookup_instance(&p_instance, LWM2M_OBJ_PORTFOLIO, i) != 0)
         {
             continue;
         }
 
-        p_list = &p_instance->identity;
+        lwm2m_portfolio_t *p_portfolio = (lwm2m_portfolio_t *)p_instance;
+
+        p_list = &p_portfolio->identity;
 
         shell_print(shell, "Portfolio Instance /16/%d", i);
         shell_print(shell, "  Host Device ID                %s", lwm2m_string_get(lwm2m_list_string_get(p_list, 0)));
