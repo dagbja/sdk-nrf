@@ -256,6 +256,10 @@ void lwm2m_factory_bootstrap_init(void)
     {
         factory_server_default();
     }
+
+    lwm2m_storage_security_store();
+    lwm2m_storage_server_store();
+    lwm2m_storage_acl_store();
 }
 
 bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config)
@@ -322,6 +326,9 @@ bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config)
         factory_bootstrap_bootstrap();
 
         lwm2m_security_server_uri_set(LWM2M_BOOTSTRAP_INSTANCE_ID, bootstrap_uri, strlen(bootstrap_uri));
+
+        lwm2m_storage_server_store();
+        lwm2m_storage_security_store();
 
         settings_changed = true;
     }
