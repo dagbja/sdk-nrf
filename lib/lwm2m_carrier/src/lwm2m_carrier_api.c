@@ -377,5 +377,10 @@ int lwm2m_carrier_identity_write(uint16_t instance_id, uint16_t identity_type, c
 
 int lwm2m_carrier_portfolio_instance_create(uint16_t instance_id)
 {
-    return lwm2m_portfolio_instance_create(instance_id);
+    int ret;
+
+    ret = lwm2m_portfolio_instance_create(instance_id);
+    lwm2m_storage_portfolio_store();
+
+    return ret;
 }

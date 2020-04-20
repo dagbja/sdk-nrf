@@ -488,6 +488,8 @@ static void on_object_create(coap_message_t *p_req)
         }
     }
 
+    lwm2m_storage_portfolio_store();
+
     lwm2m_respond_with_code(COAP_CODE_201_CREATED, p_req);
 }
 

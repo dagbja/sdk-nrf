@@ -313,7 +313,7 @@ static void obj_instance_add_to_handler(uint16_t obj, uint16_t inst)
         p_instance = (lwm2m_instance_t *)lwm2m_apn_conn_prof_get_instance(inst);
         break;
     case LWM2M_OBJ_PORTFOLIO:
-        p_instance = (lwm2m_instance_t *)lwm2m_portfolio_get_instance(inst);
+        lwm2m_portfolio_instance_create(inst);
         break;
     default:
         break;
