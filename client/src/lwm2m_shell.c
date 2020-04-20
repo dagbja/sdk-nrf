@@ -33,6 +33,8 @@
 #include <lwm2m_observer.h>
 #include <lwm2m_os.h>
 
+#define PLURALIZE(n) (n == 1 ? "" : "s")
+
 static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
 {
     if (argc != 2) {
@@ -678,7 +680,7 @@ static int cmd_flash_list(const struct shell *shell, size_t argc, char **argv)
     for (int i = LWM2M_OS_STORAGE_BASE; i < LWM2M_OS_STORAGE_END; i++) {
         read = lwm2m_os_storage_read(i, buf, 1);
         if (read > 0) {
-            shell_print(shell, "  Record %d (%d bytes)", i - LWM2M_OS_STORAGE_BASE, read);
+            shell_print(shell, "  Record %d (%d byte%s)", i - LWM2M_OS_STORAGE_BASE, read, PLURALIZE(read));
         }
     }
 
@@ -750,7 +752,7 @@ static bool dump_record(const struct shell *shell, uint16_t id)
         return false;
     }
 
-    shell_print(shell, "Record %d - %d bytes", id - LWM2M_OS_STORAGE_BASE, read);
+    shell_print(shell, "Record %d - %d byte%s", id - LWM2M_OS_STORAGE_BASE, read, PLURALIZE(read));
 
     char * data = lwm2m_os_malloc(read);
     lwm2m_os_storage_read(id, data, read);
@@ -777,6 +779,109 @@ static int cmd_flash_print(const struct shell *shell, size_t argc, char **argv)
             (void)dump_record(shell, i);
         }
     }
+
+    return 0;
+}
+
+static int cmd_flash_read(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc < 2 || argc > 4) {
+        shell_print(shell, "%s <record> [offset] [length]", argv[0]);
+        return 0;
+    }
+
+    uint16_t id = strtol(argv[1], NULL, 10);
+    if (id > 255) {
+        shell_print(shell, "Record %d is not a LwM2M record", id);
+        return 0;
+    }
+
+    char buf[1];
+    int read = lwm2m_os_storage_read(LWM2M_OS_STORAGE_BASE + id, buf, 1);
+
+    if (read < 0) {
+        shell_print(shell, "Error reading record %d: %d", id, read);
+        return 0;
+    }
+
+    uint16_t offset = 0;
+    if (argc > 2) {
+        offset = strtol(argv[2], NULL, 10);
+        if (offset >= read) {
+            shell_print(shell, "Offset bigger than record length (%d >= %d)", offset, read);
+            return 0;
+        }
+    }
+
+    int length = read - offset;
+    if (argc > 3) {
+        length = strtol(argv[3], NULL, 10);
+        if (length > (read - offset)) {
+            shell_print(shell, "Length longer than record size (%d > %d)", length, read - offset);
+            return 0;
+        }
+    }
+
+    char * data = lwm2m_os_malloc(read);
+    int hex_size = (read * 2) + 1;
+    char * hex_str = lwm2m_os_malloc(hex_size);
+    lwm2m_os_storage_read(LWM2M_OS_STORAGE_BASE + id, data, read);
+
+    int hex_off = 0;
+    for (int i = offset; i < offset + length; i++) {
+        hex_off += snprintf(&hex_str[hex_off], hex_size - hex_off, "%02x", data[i]);
+    }
+    hex_str[hex_off] = '\0';
+
+    shell_print(shell, "%s", hex_str);
+
+    lwm2m_os_free(data);
+    lwm2m_os_free(hex_str);
+
+    return 0;
+}
+
+static int cmd_flash_write(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 4) {
+        shell_print(shell, "%s <record> <offset> <hex>", argv[0]);
+        return 0;
+    }
+
+    uint16_t id = strtol(argv[1], NULL, 10);
+    if (id > 255) {
+        shell_print(shell, "Record %d is not a LwM2M record", id);
+        return 0;
+    }
+
+    char buf[1];
+    int read = lwm2m_os_storage_read(LWM2M_OS_STORAGE_BASE + id, buf, 1);
+
+    if (read < 0) {
+        shell_print(shell, "Error reading record %d: %d", id, read);
+        return 0;
+    }
+
+    uint16_t offset = strtol(argv[2], NULL, 10);
+    if (offset > read) {
+        shell_print(shell, "Offset bigger than record length (%d > %d)", offset, read);
+        return 0;
+    }
+
+    int hex_length = strlen(argv[3]);
+    if (((hex_length % 2) != 0) || !string_is_hex(argv[3])) {
+        shell_print(shell, "Incorrect hex format: %s", argv[3]);
+        return 0;
+    }
+
+    int write = offset + (hex_length / 2);
+    char * data = lwm2m_os_malloc(offset + write);
+    lwm2m_os_storage_read(LWM2M_OS_STORAGE_BASE + id, data, read);
+
+    (void) string_to_hex(argv[3], &data[offset], hex_length / 2);
+
+    lwm2m_os_storage_write(LWM2M_OS_STORAGE_BASE + id, data, write);
+    lwm2m_os_free(data);
 
     return 0;
 }
@@ -1972,6 +2077,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_flash,
     SHELL_CMD(delete, NULL, "Delete record", cmd_flash_delete),
     SHELL_CMD(list, NULL, "List records", cmd_flash_list),
     SHELL_CMD(print, NULL, "Print record content", cmd_flash_print),
+    SHELL_CMD(read, NULL, "Read a record", cmd_flash_read),
+    SHELL_CMD(write, NULL, "Write to a record", cmd_flash_write),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );
 
