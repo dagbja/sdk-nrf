@@ -12,6 +12,8 @@
 #include <lwm2m_tlv.h>
 #include <lwm2m_access_control.h>
 #include <lwm2m_api.h>
+#include <lwm2m_observer.h>
+#include <lwm2m_observer_storage.h>
 #include <lwm2m_carrier.h>
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_conn_stat.h>
@@ -1124,19 +1126,19 @@ static void lwm2m_notif_attribute_default_value_set(uint8_t type, void * p_value
 
     switch (type)
     {
-    case LWM2M_ATTRIBUTE_TYPE_MIN_PERIOD:
+    case LWM2M_ATTR_TYPE_MIN_PERIOD:
         *(int32_t *)p_value = lwm2m_server_get_instance(server_instance)->default_minimum_period;
         break;
-    case LWM2M_ATTRIBUTE_TYPE_MAX_PERIOD:
+    case LWM2M_ATTR_TYPE_MAX_PERIOD:
         *(int32_t *)p_value = lwm2m_server_get_instance(server_instance)->default_maximum_period;
         break;
-    case LWM2M_ATTRIBUTE_TYPE_GREATER_THAN:
+    case LWM2M_ATTR_TYPE_GREATER_THAN:
         *(int32_t *)p_value = INT32_MAX;
         break;
-    case LWM2M_ATTRIBUTE_TYPE_LESS_THAN:
+    case LWM2M_ATTR_TYPE_LESS_THAN:
         *(int32_t *)p_value = -INT32_MAX;
         break;
-    case LWM2M_ATTRIBUTE_TYPE_STEP:
+    case LWM2M_ATTR_TYPE_STEP:
         *(int32_t *)p_value = INT32_MAX;
         break;
     default:
@@ -2009,13 +2011,13 @@ static void app_lwm2m_setup(void)
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_conn_ext_get_object());
 
     // Add callback to set default notification attribute values.
-    lwm2m_notif_attr_default_cb_set(lwm2m_notif_attribute_default_value_set);
+    lwm2m_observer_notif_attr_default_cb_set(lwm2m_notif_attribute_default_value_set);
 
     // Add callback to get pointers to observables.
-    lwm2m_observable_reference_get_cb_set(observable_reference_get);
+    lwm2m_observer_observable_get_cb_set(observable_reference_get);
 
     // Add callback to get the uptime in milliseconds and initialize the timer.
-    lwm2m_observable_uptime_cb_initialize(lwm2m_os_uptime_get);
+    lwm2m_observer_uptime_cb_init(lwm2m_os_uptime_get);
 
     // Add callback to request remote server reconnection.
     lwm2m_request_remote_reconnect_cb_set(lwm2m_request_remote_reconnect);

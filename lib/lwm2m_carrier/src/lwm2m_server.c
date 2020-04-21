@@ -11,6 +11,7 @@
 #include <lwm2m_access_control.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
+#include <lwm2m_observer.h>
 #include <lwm2m_remote.h>
 #include <lwm2m_server.h>
 #include <lwm2m_instance_storage.h>
@@ -319,7 +320,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                             return err_code;
                         }
 
-                        lwm2m_observable_metadata_init(p_request->remote, path, path_len);
+                        lwm2m_observer_observable_init(p_request->remote, path, path_len);
 
                         break;
                     }
@@ -340,9 +341,9 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                     LWM2M_INF("Observe cancel on instance %s, no  match", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
                 } else {
                     LWM2M_INF("Observe cancel on resource %s", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
-                    const void * p_observable = lwm2m_observable_reference_get(path, path_len);
+                    const void * p_observable = lwm2m_observer_observable_get(path, path_len);
                     lwm2m_observe_unregister(p_request->remote, p_observable);
-                    lwm2m_notif_attr_storage_update(path, path_len, p_request->remote);
+                    lwm2m_observer_notif_attr_storage_update(path, path_len, p_request->remote);
                 }
 
                 // Process the GET request as usual.
@@ -453,7 +454,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
     }
     else if (op_code == LWM2M_OPERATION_CODE_WRITE_ATTR)
     {
-        err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
+        err_code = lwm2m_observer_write_attribute_handler(path, path_len, p_request);
 
         if (err_code == 0)
         {
@@ -620,7 +621,7 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
         uint16_t path[] = { p_object->object_id };
         uint8_t path_len = ARRAY_SIZE(path);
 
-        err_code = lwm2m_write_attribute_handler(path, path_len, p_request);
+        err_code = lwm2m_observer_write_attribute_handler(path, path_len, p_request);
 
         if (err_code == 0)
         {

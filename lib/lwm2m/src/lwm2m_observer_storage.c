@@ -7,6 +7,7 @@
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_observer.h>
+#include <lwm2m_observer_storage.h>
 #include <lwm2m_remote.h>
 #include <coap_api.h>
 #include <coap_observe_api.h>
@@ -15,7 +16,7 @@
 #define OBSERVER_ENTRY_SIZE_EXCEPT_TOKEN (OBSERVER_ENTRY_SIZE - (COAP_MESSAGE_TOKEN_MAX_LEN + sizeof(uint8_t)))
 
 #define NOTIF_ATTR_ENTRY_SIZE            sizeof(lwm2m_notif_attr_storage_entry_t)
-#define NOTIF_ATTR_ENTRY_SIZE_CONSTANT   (NOTIF_ATTR_ENTRY_SIZE - (LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE * sizeof(lwm2m_notif_attribute_t)))
+#define NOTIF_ATTR_ENTRY_SIZE_CONSTANT   (NOTIF_ATTR_ENTRY_SIZE - (LWM2M_MAX_NOTIF_ATTR_TYPE * sizeof(lwm2m_notif_attr_t)))
 
 typedef struct __attribute__((__packed__))
 {
@@ -32,7 +33,7 @@ typedef struct __attribute__((__packed__))
     uint16_t                short_server_id;
     uint16_t                path[LWM2M_URI_PATH_MAX_LEN];
     uint8_t                 path_len;
-    lwm2m_notif_attribute_t attributes[LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE];
+    lwm2m_notif_attr_t      attributes[LWM2M_MAX_NOTIF_ATTR_TYPE];
 } lwm2m_notif_attr_storage_entry_t;
 
 static lwm2m_store_observer_cb_t observer_store_cb;
@@ -136,7 +137,7 @@ static uint32_t lwm2m_observer_storage_entry_get(const coap_observer_t          
     {
         if (observer_load_cb(i, (void *)&entry, OBSERVER_ENTRY_SIZE) == 0)
         {
-            p_observable = lwm2m_observable_reference_get(entry.path, entry.path_len);
+            p_observable = lwm2m_observer_observable_get(entry.path, entry.path_len);
             if (p_observable == p_observer->resource_of_interest)
             {
                 *p_entry = entry;
@@ -184,7 +185,7 @@ static int lwm2m_notif_attr_storage_create_entry(const lwm2m_observable_metadata
     NULL_PARAM_CHECK(p_metadata->observable);
     NULL_PARAM_CHECK(p_entry);
 
-    memcpy(p_entry->attributes, p_metadata->attributes, sizeof(lwm2m_notif_attribute_t) * LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE);
+    memcpy(p_entry->attributes, p_metadata->attributes, sizeof(lwm2m_notif_attr_t) * LWM2M_MAX_NOTIF_ATTR_TYPE);
     memcpy(p_entry->path, p_metadata->path, LWM2M_URI_PATH_MAX_LEN * sizeof(uint16_t));
     p_entry->path_len = p_metadata->path_len;
     p_entry->short_server_id = p_metadata->ssid;
@@ -388,7 +389,7 @@ void lwm2m_notif_attr_storage_delete_all(void)
 {
     uint32_t err_code;
     uint16_t len;
-    lwm2m_observable_metadata_t **observables = (lwm2m_observable_metadata_t **)lwm2m_observables_get(&len);
+    lwm2m_observable_metadata_t **observables = (lwm2m_observable_metadata_t **)lwm2m_observer_observables_get(&len);
 
     if (!observables)
     {
@@ -442,7 +443,7 @@ uint32_t lwm2m_observer_storage_restore(uint16_t                short_server_id,
                 continue;
             }
 
-            p_observable = lwm2m_observable_reference_get(entry.path, entry.path_len);
+            p_observable = lwm2m_observer_observable_get(entry.path, entry.path_len);
             if (!p_observable)
             {
                 LWM2M_ERR("Locating observer (%s; ssid=%d) failed: %s (%ld), %s (%d)",
@@ -474,7 +475,7 @@ uint32_t lwm2m_observer_storage_restore(uint16_t                short_server_id,
                       lwm2m_os_log_strdup(lwm2m_path_to_string(entry.path, entry.path_len)),
                       entry.short_server_id);
 
-            lwm2m_observable_metadata_init(p_remote, entry.path, entry.path_len);
+            lwm2m_observer_observable_init(p_remote, entry.path, entry.path_len);
 
             observer_count++;
         }
@@ -510,7 +511,7 @@ uint32_t lwm2m_notif_attr_storage_restore(uint16_t short_server_id)
             continue;
         }
 
-        err_code = lwm2m_observable_notif_attributes_restore(entry.attributes, entry.path, entry.path_len, entry.short_server_id);
+        err_code = lwm2m_observer_notif_attr_restore(entry.attributes, entry.path, entry.path_len, entry.short_server_id);
         if (err_code != 0)
         {
             LWM2M_ERR("Loading notification attributes (%s; ssid=%d) failed: %s (%ld), %s (%d)",

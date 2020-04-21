@@ -1835,11 +1835,11 @@ static int cmd_attribute_print(const struct shell *shell, size_t argc, char **ar
     char buf[255];
     uint16_t len;
     int offset;
-    const lwm2m_observable_metadata_t * const * observables = lwm2m_observables_get(&len);
+    const lwm2m_observable_metadata_t * const * observables = lwm2m_observer_observables_get(&len);
     lwm2m_observable_metadata_t *observables_srt[len];
     lwm2m_observable_metadata_t *obs;
-    const char *lwm2m_notif_attribute_name[] = { "pmin", "pmax", "gt",
-                                                "lt", "st" };
+    const char *notif_attr_name[] = { "pmin", "pmax", "gt",
+                                      "lt", "st" };
 
     if (!observables)
     {
@@ -1881,7 +1881,7 @@ static int cmd_attribute_print(const struct shell *shell, size_t argc, char **ar
 
         offset += snprintf(&buf[offset], sizeof(buf) - offset, ">; ssid=%d;", observables_srt[i]->ssid);
 
-        for (int k = 0; k < LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE; k++)
+        for (int k = 0; k < LWM2M_MAX_NOTIF_ATTR_TYPE; k++)
         {
             if (observables_srt[i]->attributes[k].assignment_level != LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL)
             {
@@ -1890,7 +1890,7 @@ static int cmd_attribute_print(const struct shell *shell, size_t argc, char **ar
                     offset += snprintf(&buf[offset], sizeof(buf) - offset, " [%d", observables_srt[i]->attributes[k].assignment_level);
                 }
 
-                offset += snprintf(&buf[offset], sizeof(buf) - offset, " %s=%d;", lwm2m_notif_attribute_name[k], observables_srt[i]->attributes[k].value.i);
+                offset += snprintf(&buf[offset], sizeof(buf) - offset, " %s=%d;", notif_attr_name[k], observables_srt[i]->attributes[k].value.i);
 
                 if (observables_srt[i]->path_len != observables_srt[i]->attributes[k].assignment_level)
                 {

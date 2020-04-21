@@ -10,6 +10,7 @@
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
 #include <lwm2m_objects_tlv.h>
+#include <lwm2m_observer.h>
 #include <lwm2m_conn_ext.h>
 #include <coap_message.h>
 #include <lwm2m_carrier_main.h>

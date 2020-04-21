@@ -14,6 +14,7 @@
 #include <lwm2m_remote.h>
 #include <lwm2m_access_control.h>
 #include <lwm2m_observer.h>
+#include <lwm2m_observer_storage.h>
 
 static void observer_con_message_callback(uint32_t status, void * arg, coap_message_t * p_response);
 
@@ -170,7 +171,7 @@ uint32_t lwm2m_observe_register(const uint16_t   * p_path,
     uint16_t obs_opt_num[] = { COAP_OPT_OBSERVE, COAP_OPT_CONTENT_FORMAT, COAP_OPT_MAX_AGE };
     uint32_t obs_opt_val[] = { m_observer_sequence_num++, COAP_CT_APP_LWM2M_TLV, 60 };
 
-    p_observable = lwm2m_observable_reference_get(p_path, path_len);
+    p_observable = lwm2m_observer_observable_get(p_path, path_len);
     if (!p_observable)
     {
         return ENOENT;

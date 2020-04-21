@@ -13,23 +13,24 @@
 #include <lwm2m_remote.h>
 #include <lwm2m_observer.h>
 #include <lwm2m_objects_tlv.h>
+#include <lwm2m_observer_storage.h>
 #include <nrf_socket.h>
 
-static lwm2m_observable_metadata_t       * m_observables[LWM2M_MAX_OBSERVABLES_WITH_ATTRIBUTES];
-static lwm2m_notif_attr_default_cb_t       notif_attr_default_set_cb;
-static lwm2m_observable_reference_get_cb_t observable_reference_get_cb;
-static lwm2m_uptime_get_cb_t               uptime_get_cb;
-static lwm2m_request_remote_reconnect_cb_t request_remote_reconnect_cb;
-static int64_t                             m_time_base;
-static int64_t                             m_coap_con_interval = COAP_CON_NOTIFICATION_INTERVAL;
-// lwm2m_notif_attribute_name and lwm2m_notif_attribute_type need to match the attributes
-static const char * const lwm2m_notif_attribute_name[] = { "pmin", "pmax", "gt",
-                                                        "lt", "st" };
-static const uint8_t lwm2m_notif_attribute_type[] = { LWM2M_ATTRIBUTE_TYPE_MIN_PERIOD,
-                                                      LWM2M_ATTRIBUTE_TYPE_MAX_PERIOD,
-                                                      LWM2M_ATTRIBUTE_TYPE_GREATER_THAN,
-                                                      LWM2M_ATTRIBUTE_TYPE_LESS_THAN,
-                                                      LWM2M_ATTRIBUTE_TYPE_STEP };
+static lwm2m_observable_metadata_t          * m_observables[LWM2M_MAX_OBSERVABLES_WITH_ATTRIBUTES];
+static lwm2m_observer_notif_attr_default_cb_t notif_attr_default_set_cb;
+static lwm2m_observer_observable_get_cb_t     observable_get_cb;
+static lwm2m_observer_uptime_get_cb_t         uptime_get_cb;
+static lwm2m_request_remote_reconnect_cb_t    request_remote_reconnect_cb;
+static int64_t                                m_time_base;
+static int64_t                                m_coap_con_interval = COAP_CON_NOTIFICATION_INTERVAL;
+// notif_attr_name and notif_attr_type need to match the attributes
+static const char * const notif_attr_name[] = { "pmin", "pmax", "gt",
+                                                "lt", "st" };
+static const uint8_t notif_attr_type[] = { LWM2M_ATTR_TYPE_MIN_PERIOD,
+                                           LWM2M_ATTR_TYPE_MAX_PERIOD,
+                                           LWM2M_ATTR_TYPE_GREATER_THAN,
+                                           LWM2M_ATTR_TYPE_LESS_THAN,
+                                           LWM2M_ATTR_TYPE_STEP };
 
 static int observable_index_find(const void *p_observable, uint16_t ssid)
 {
@@ -66,29 +67,17 @@ static int observable_empty_index_find(void)
     return -1;
 }
 
-static void lwm2m_observer_update_after_notification(int index)
-{
-    if (!(m_observables[index]->type & LWM2M_OBSERVABLE_TYPE_NO_CHECK))
-    {
-        m_observables[index]->prev_value = *(int32_t *)m_observables[index]->observable;
-    }
-
-    m_observables[index]->last_notification = 0;
-    m_observables[index]->flags = 0;
-    m_observables[index]->changed = 0;
-}
-
-void lwm2m_notif_attr_default_cb_set(lwm2m_notif_attr_default_cb_t callback)
+void lwm2m_observer_notif_attr_default_cb_set(lwm2m_observer_notif_attr_default_cb_t callback)
 {
     notif_attr_default_set_cb = callback;
 }
 
-void lwm2m_observable_reference_get_cb_set(lwm2m_observable_reference_get_cb_t callback)
+void lwm2m_observer_observable_get_cb_set(lwm2m_observer_observable_get_cb_t callback)
 {
-    observable_reference_get_cb = callback;
+    observable_get_cb = callback;
 }
 
-void lwm2m_observable_uptime_cb_initialize(lwm2m_uptime_get_cb_t callback)
+void lwm2m_observer_uptime_cb_init(lwm2m_observer_uptime_get_cb_t callback)
 {
     uptime_get_cb = callback;
     m_time_base = uptime_get_cb();
@@ -109,11 +98,23 @@ void lwm2m_coap_con_interval_set(int64_t con_interval)
     m_coap_con_interval = con_interval;
 }
 
-static int lwm2m_notif_attribute_set(int index, uint8_t type, const void *p_value, int8_t assignment_level)
+static void update_after_notification(int index)
 {
-    lwm2m_notif_attribute_t *attr;
+    if (!(m_observables[index]->type & LWM2M_OBSERVABLE_TYPE_NO_CHECK))
+    {
+        m_observables[index]->prev_value = *(int32_t *)m_observables[index]->observable;
+    }
 
-    if (index < 0 || !p_value || type >= LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE || type < 0)
+    m_observables[index]->last_notification = 0;
+    m_observables[index]->flags = 0;
+    m_observables[index]->changed = 0;
+}
+
+static int notif_attr_set(int index, uint8_t type, const void *p_value, int8_t assignment_level)
+{
+    lwm2m_notif_attr_t *attr;
+
+    if (index < 0 || !p_value || type >= LWM2M_MAX_NOTIF_ATTR_TYPE || type < 0)
     {
         return -EINVAL;
     }
@@ -131,11 +132,11 @@ static int lwm2m_notif_attribute_set(int index, uint8_t type, const void *p_valu
            If float was to be supported, then let attr->value.f = *(float *)p_value; for st, gt and lt. */
         switch (type)
         {
-        case LWM2M_ATTRIBUTE_TYPE_MIN_PERIOD:
-        case LWM2M_ATTRIBUTE_TYPE_MAX_PERIOD:
-        case LWM2M_ATTRIBUTE_TYPE_GREATER_THAN:
-        case LWM2M_ATTRIBUTE_TYPE_LESS_THAN:
-        case LWM2M_ATTRIBUTE_TYPE_STEP:
+        case LWM2M_ATTR_TYPE_MIN_PERIOD:
+        case LWM2M_ATTR_TYPE_MAX_PERIOD:
+        case LWM2M_ATTR_TYPE_GREATER_THAN:
+        case LWM2M_ATTR_TYPE_LESS_THAN:
+        case LWM2M_ATTR_TYPE_STEP:
             attr->value.i = *(int32_t *)p_value;
             break;
         default:
@@ -147,9 +148,9 @@ static int lwm2m_notif_attribute_set(int index, uint8_t type, const void *p_valu
     return 0;
 }
 
-static int lwm2m_observable_notif_attribute_init(int obs_index, uint8_t type)
+static int notif_attr_init(int obs_index, uint8_t type)
 {
-    lwm2m_notif_attribute_t attribute;
+    lwm2m_notif_attr_t attribute;
     struct nrf_sockaddr *p_remote;
     uint8_t obs_type;
     int index = -1;
@@ -157,20 +158,20 @@ static int lwm2m_observable_notif_attribute_init(int obs_index, uint8_t type)
 
     // TODO: Assert m_observables[obs_index] != NULL
 
-    if ((type == LWM2M_ATTRIBUTE_TYPE_GREATER_THAN) ||
-        (type == LWM2M_ATTRIBUTE_TYPE_LESS_THAN) ||
-        (type == LWM2M_ATTRIBUTE_TYPE_STEP))
+    if ((type == LWM2M_ATTR_TYPE_GREATER_THAN) ||
+        (type == LWM2M_ATTR_TYPE_LESS_THAN) ||
+        (type == LWM2M_ATTR_TYPE_STEP))
     {
         // TODO: Figure out if Change Value Condition attributes can be also inherited.
         return -EINVAL;
     }
 
     // Find potential attributes set at a higher assignment level than the default.
-    if (observable_reference_get_cb)
+    if (observable_get_cb)
     {
         for (int level = m_observables[obs_index]->path_len - 1; level >= 0; level--)
         {
-            observable = observable_reference_get_cb(m_observables[obs_index]->path, level, &obs_type);
+            observable = observable_get_cb(m_observables[obs_index]->path, level, &obs_type);
             index = observable_index_find(observable, m_observables[obs_index]->ssid);
 
             if (index >= 0)
@@ -193,11 +194,11 @@ static int lwm2m_observable_notif_attribute_init(int obs_index, uint8_t type)
         lwm2m_short_server_id_remote_find(&p_remote, m_observables[obs_index]->ssid);
 
         // Set default p_min or p_max attribute dictated by the server requesting the observation.
-        notif_attr_default_set_cb(lwm2m_notif_attribute_type[type], (void *)&attribute.value.i, p_remote);
+        notif_attr_default_set_cb(notif_attr_type[type], (void *)&attribute.value.i, p_remote);
         attribute.assignment_level = LWM2M_ATTR_DEFAULT_ASSIGNMENT_LEVEL;
 
         // If default pmax value is 0, it must be ignored.
-        if (type == LWM2M_ATTRIBUTE_TYPE_MAX_PERIOD && attribute.value.i == 0)
+        if (type == LWM2M_ATTR_TYPE_MAX_PERIOD && attribute.value.i == 0)
         {
             attribute.assignment_level = LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL;
         }
@@ -209,10 +210,10 @@ static int lwm2m_observable_notif_attribute_init(int obs_index, uint8_t type)
         attribute = m_observables[index]->attributes[type];
     }
 
-    return lwm2m_notif_attribute_set(obs_index, type, (void *)&attribute.value.i, attribute.assignment_level);
+    return notif_attr_set(obs_index, type, (void *)&attribute.value.i, attribute.assignment_level);
 }
 
-int lwm2m_observable_metadata_init(struct nrf_sockaddr *p_remote, const uint16_t *p_path, uint8_t path_len)
+int lwm2m_observer_observable_init(struct nrf_sockaddr *p_remote, const uint16_t *p_path, uint8_t path_len)
 {
     int index;
     uint32_t ret;
@@ -233,13 +234,13 @@ int lwm2m_observable_metadata_init(struct nrf_sockaddr *p_remote, const uint16_t
         return -ret;
     }
 
-    if (!observable_reference_get_cb)
+    if (!observable_get_cb)
     {
         LWM2M_WRN("Failed to initialize observable metadata: no callback set to reference the observable");
         return -ENOENT;
     }
 
-    observable = observable_reference_get_cb(p_path, path_len, &observable_type);
+    observable = observable_get_cb(p_path, path_len, &observable_type);
     if (!observable)
     {
         LWM2M_WRN("Failed to initialize observable metadata: structure is not observable");
@@ -250,7 +251,7 @@ int lwm2m_observable_metadata_init(struct nrf_sockaddr *p_remote, const uint16_t
     if (index >= 0)
     {
         // Observable metadata structure already exists; reset the notification timers.
-        lwm2m_observer_update_after_notification(index);
+        update_after_notification(index);
         m_observables[index]->con_notification = 0;
         return index;
     }
@@ -279,7 +280,7 @@ int lwm2m_observable_metadata_init(struct nrf_sockaddr *p_remote, const uint16_t
         m_observables[index]->path[i] = p_path[i];
     }
 
-    for (int i = 0; i < LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE; i++)
+    for (int i = 0; i < LWM2M_MAX_NOTIF_ATTR_TYPE; i++)
     {
         m_observables[index]->attributes[i].assignment_level = LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL;
     }
@@ -289,8 +290,8 @@ int lwm2m_observable_metadata_init(struct nrf_sockaddr *p_remote, const uint16_t
     m_observables[index]->type = observable_type;
     m_observables[index]->ssid = short_server_id;
 
-    lwm2m_observable_notif_attribute_init(index, LWM2M_ATTRIBUTE_TYPE_MIN_PERIOD);
-    lwm2m_observable_notif_attribute_init(index, LWM2M_ATTRIBUTE_TYPE_MAX_PERIOD);
+    notif_attr_init(index, LWM2M_ATTR_TYPE_MIN_PERIOD);
+    notif_attr_init(index, LWM2M_ATTR_TYPE_MAX_PERIOD);
 
     return index;
 }
@@ -298,7 +299,7 @@ int lwm2m_observable_metadata_init(struct nrf_sockaddr *p_remote, const uint16_t
 static uint8_t pmin_attribute_check(int index)
 {
     // Assert m_observables[index] != NULL && index >= 0.
-    lwm2m_notif_attribute_t attr = m_observables[index]->attributes[LWM2M_ATTRIBUTE_TYPE_MIN_PERIOD];
+    lwm2m_notif_attr_t attr = m_observables[index]->attributes[LWM2M_ATTR_TYPE_MIN_PERIOD];
 
     // Ignore uninitialized attributes.
     if (attr.assignment_level == LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL)
@@ -308,7 +309,7 @@ static uint8_t pmin_attribute_check(int index)
 
     if (m_observables[index]->last_notification >= attr.value.i)
     {
-        return LWM2M_ATTRIBUTE_MIN_PERIOD_CODE;
+        return LWM2M_ATTR_MIN_PERIOD_CODE;
     }
 
     return 0;
@@ -317,7 +318,7 @@ static uint8_t pmin_attribute_check(int index)
 static uint8_t pmax_attribute_check(int index)
 {
     // Assert m_observables[index] != NULL && index >= 0.
-    lwm2m_notif_attribute_t attr = m_observables[index]->attributes[LWM2M_ATTRIBUTE_TYPE_MAX_PERIOD];
+    lwm2m_notif_attr_t attr = m_observables[index]->attributes[LWM2M_ATTR_TYPE_MAX_PERIOD];
 
     // Ignore uninitialized attributes.
     if (attr.assignment_level == LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL)
@@ -327,7 +328,7 @@ static uint8_t pmax_attribute_check(int index)
 
     if (m_observables[index]->last_notification >= attr.value.i)
     {
-        return LWM2M_ATTRIBUTE_MAX_PERIOD_CODE;
+        return LWM2M_ATTR_MAX_PERIOD_CODE;
     }
 
     return 0;
@@ -337,7 +338,7 @@ static uint8_t gt_attribute_check(int index)
 {
     // Assert m_observables[index] != NULL && index >= 0.
     int32_t curr_value;
-    lwm2m_notif_attribute_t attr = m_observables[index]->attributes[LWM2M_ATTRIBUTE_TYPE_GREATER_THAN];
+    lwm2m_notif_attr_t attr = m_observables[index]->attributes[LWM2M_ATTR_TYPE_GREATER_THAN];
 
     // Ignore uninitialized attributes.
     if (attr.assignment_level == LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL)
@@ -351,7 +352,7 @@ static uint8_t gt_attribute_check(int index)
     if (((curr_value > attr.value.i) && (m_observables[index]->prev_value < attr.value.i)) ||
         ((curr_value < attr.value.i) && (m_observables[index]->prev_value > attr.value.i)))
     {
-        return LWM2M_ATTRIBUTE_GREATER_THAN_CODE;
+        return LWM2M_ATTR_GREATER_THAN_CODE;
     }
 
     return 0;
@@ -361,7 +362,7 @@ static uint8_t lt_attribute_check(int index)
 {
     // Assert m_observables[index] != NULL && index >= 0.
     int32_t curr_value;
-    lwm2m_notif_attribute_t attr = m_observables[index]->attributes[LWM2M_ATTRIBUTE_TYPE_LESS_THAN];
+    lwm2m_notif_attr_t attr = m_observables[index]->attributes[LWM2M_ATTR_TYPE_LESS_THAN];
 
     // Ignore uninitialized attributes.
     if (attr.assignment_level == LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL)
@@ -375,7 +376,7 @@ static uint8_t lt_attribute_check(int index)
     if (((curr_value > attr.value.i) && (m_observables[index]->prev_value < attr.value.i)) ||
         ((curr_value < attr.value.i) && (m_observables[index]->prev_value > attr.value.i)))
     {
-        return LWM2M_ATTRIBUTE_LESS_THAN_CODE;
+        return LWM2M_ATTR_LESS_THAN_CODE;
     }
 
     return 0;
@@ -385,7 +386,7 @@ static uint8_t st_attribute_check(int index)
 {
     // Assert m_observables[index] != NULL && index >= 0.
     int32_t curr_value;
-    lwm2m_notif_attribute_t attr = m_observables[index]->attributes[LWM2M_ATTRIBUTE_TYPE_STEP];
+    lwm2m_notif_attr_t attr = m_observables[index]->attributes[LWM2M_ATTR_TYPE_STEP];
 
     // Ignore uninitialized attributes.
     if (attr.assignment_level == LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL)
@@ -397,7 +398,7 @@ static uint8_t st_attribute_check(int index)
 
     if (abs(curr_value - m_observables[index]->prev_value) >= attr.value.i)
     {
-        return LWM2M_ATTRIBUTE_STEP_CODE;
+        return LWM2M_ATTR_STEP_CODE;
     }
 
     return 0;
@@ -427,7 +428,7 @@ static bool value_changed(int index)
     return false;
 }
 
-static void lwm2m_notif_attributes_check(int index)
+static void notif_attr_check(int index)
 {
     // Assert m_observables[index] != NULL && index >= 0.
     m_observables[index]->flags |= pmin_attribute_check(index);
@@ -448,7 +449,7 @@ static void lwm2m_notif_attributes_check(int index)
     }
 }
 
-static lwm2m_time_t lwm2m_observer_uptime_delta_get(void)
+static lwm2m_time_t uptime_delta_get(void)
 {
     int64_t delta, current_time;
 
@@ -466,9 +467,9 @@ static lwm2m_time_t lwm2m_observer_uptime_delta_get(void)
 static bool change_value_conditions_all_unset(int index)
 {
     // Assert m_observables[index] != NULL && index >= 0.
-    if ((m_observables[index]->attributes[LWM2M_ATTRIBUTE_TYPE_GREATER_THAN].assignment_level == LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL) &&
-        (m_observables[index]->attributes[LWM2M_ATTRIBUTE_TYPE_LESS_THAN].assignment_level == LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL) &&
-        (m_observables[index]->attributes[LWM2M_ATTRIBUTE_TYPE_STEP].assignment_level == LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL))
+    if ((m_observables[index]->attributes[LWM2M_ATTR_TYPE_GREATER_THAN].assignment_level == LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL) &&
+        (m_observables[index]->attributes[LWM2M_ATTR_TYPE_LESS_THAN].assignment_level == LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL) &&
+        (m_observables[index]->attributes[LWM2M_ATTR_TYPE_STEP].assignment_level == LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL))
     {
         return true;
     }
@@ -476,12 +477,12 @@ static bool change_value_conditions_all_unset(int index)
     return false;
 }
 
-static bool notification_send_check(int index)
+static bool notification_condition_check(int index)
 {
     // Assert m_observables[index] != NULL && index >= 0.
     uint8_t flags = m_observables[index]->flags;
 
-    if (flags & LWM2M_ATTRIBUTE_MAX_PERIOD_CODE)
+    if (flags & LWM2M_ATTR_MAX_PERIOD_CODE)
     {
         return true;
     }
@@ -495,17 +496,17 @@ static bool notification_send_check(int index)
        has expired and the resource value has changed. */
     if (change_value_conditions_all_unset(index))
     {
-        if (flags & LWM2M_ATTRIBUTE_MIN_PERIOD_CODE)
+        if (flags & LWM2M_ATTR_MIN_PERIOD_CODE)
         {
             return true;
         }
     }
     else
     {
-        if ((flags & LWM2M_ATTRIBUTE_MIN_PERIOD_CODE)   &&
-            ((flags & LWM2M_ATTRIBUTE_GREATER_THAN_CODE) ||
-             (flags & LWM2M_ATTRIBUTE_LESS_THAN_CODE) ||
-             (flags & LWM2M_ATTRIBUTE_STEP_CODE)))
+        if ((flags & LWM2M_ATTR_MIN_PERIOD_CODE)   &&
+            ((flags & LWM2M_ATTR_GREATER_THAN_CODE) ||
+             (flags & LWM2M_ATTR_LESS_THAN_CODE) ||
+             (flags & LWM2M_ATTR_STEP_CODE)))
         {
             return true;
         }
@@ -514,7 +515,7 @@ static bool notification_send_check(int index)
     return false;
 }
 
-bool lwm2m_observer_notification_is_con(const void *p_observable, uint16_t ssid)
+static bool notification_is_con(const void *p_observable, uint16_t ssid)
 {
     if (!p_observable)
     {
@@ -546,7 +547,7 @@ static void observer_notify_path(const uint16_t *p_path, uint8_t path_len, struc
     coap_observer_t * p_observer = NULL;
     const void * p_observable;
 
-    p_observable = lwm2m_observable_reference_get(p_path, path_len);
+    p_observable = lwm2m_observer_observable_get(p_path, path_len);
 
     if (!p_observable)
     {
@@ -583,7 +584,7 @@ static void observer_notify_path(const uint16_t *p_path, uint8_t path_len, struc
             continue;
         }
 
-        coap_msg_type_t type = (lwm2m_observer_notification_is_con(p_observable, short_server_id)) ? COAP_TYPE_CON : COAP_TYPE_NON;
+        coap_msg_type_t type = (notification_is_con(p_observable, short_server_id)) ? COAP_TYPE_CON : COAP_TYPE_NON;
 
         LWM2M_INF("Notify %s", lwm2m_os_log_strdup(lwm2m_path_to_string(p_path, path_len)));
 
@@ -605,7 +606,7 @@ static void observer_notify_path(const uint16_t *p_path, uint8_t path_len, struc
 void lwm2m_observer_process(bool reconnect)
 {
     struct nrf_sockaddr *remote;
-    lwm2m_time_t delta = lwm2m_observer_uptime_delta_get();
+    lwm2m_time_t delta = uptime_delta_get();
     m_time_base = uptime_get_cb();
 
     if (delta < 0)
@@ -622,19 +623,19 @@ void lwm2m_observer_process(bool reconnect)
         }
 
         m_observables[i]->last_notification += delta;
-        lwm2m_notif_attributes_check(i);
+        notif_attr_check(i);
 
-        if (notification_send_check(i))
+        if (notification_condition_check(i))
         {
             // Finding remote should not fail at this stage.
             lwm2m_short_server_id_remote_find(&remote, m_observables[i]->ssid);
             observer_notify_path(m_observables[i]->path, m_observables[i]->path_len, remote);
-            lwm2m_observer_update_after_notification(i);
+            update_after_notification(i);
         }
     }
 }
 
-int lwm2m_observable_notif_attributes_restore(const lwm2m_notif_attribute_t *p_attributes, const uint16_t *p_path, uint8_t path_len, uint16_t ssid)
+int lwm2m_observer_notif_attr_restore(const lwm2m_notif_attr_t *p_attributes, const uint16_t *p_path, uint8_t path_len, uint16_t ssid)
 {
     const void *observable;
     uint8_t observable_type;
@@ -646,13 +647,13 @@ int lwm2m_observable_notif_attributes_restore(const lwm2m_notif_attribute_t *p_a
         return -EINVAL;
     }
 
-    if (!observable_reference_get_cb)
+    if (!observable_get_cb)
     {
         LWM2M_WRN("Failed to restore notification attributes: no callback set to reference the observable");
         return -EIO;
     }
 
-    observable = observable_reference_get_cb(p_path, path_len, &observable_type);
+    observable = observable_get_cb(p_path, path_len, &observable_type);
     if (!observable)
     {
         return -ENOENT;
@@ -666,12 +667,12 @@ int lwm2m_observable_notif_attributes_restore(const lwm2m_notif_attribute_t *p_a
             return -EINVAL;
         }
 
-        index = lwm2m_observable_metadata_init(p_remote, p_path, path_len);
+        index = lwm2m_observer_observable_init(p_remote, p_path, path_len);
     }
 
-    for (int i = 0; i < LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE; i++)
+    for (int i = 0; i < LWM2M_MAX_NOTIF_ATTR_TYPE; i++)
     {
-        ret = lwm2m_notif_attribute_set(index, lwm2m_notif_attribute_type[i], &p_attributes[i].value.i, p_attributes[i].assignment_level);
+        ret = notif_attr_set(index, notif_attr_type[i], &p_attributes[i].value.i, p_attributes[i].assignment_level);
         if (ret != 0)
         {
             return ret;
@@ -681,7 +682,7 @@ int lwm2m_observable_notif_attributes_restore(const lwm2m_notif_attribute_t *p_a
     return 0;
 }
 
-static bool lwm2m_notif_attribute_period_validate(const lwm2m_notif_attribute_t *p_pmin, const lwm2m_notif_attribute_t *p_pmax)
+static bool notif_attr_period_validate(const lwm2m_notif_attr_t *p_pmin, const lwm2m_notif_attr_t *p_pmax)
 {
     if ((p_pmin->assignment_level != LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL) && (p_pmax->assignment_level != LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL))
     {
@@ -694,7 +695,7 @@ static bool lwm2m_notif_attribute_period_validate(const lwm2m_notif_attribute_t 
     return true;
 }
 
-static bool lwm2m_notif_attribute_change_value_validate(const lwm2m_notif_attribute_t *p_gt, const lwm2m_notif_attribute_t *p_lt, const lwm2m_notif_attribute_t *p_st)
+static bool notif_attr_change_value_validate(const lwm2m_notif_attr_t *p_gt, const lwm2m_notif_attr_t *p_lt, const lwm2m_notif_attr_t *p_st)
 {
     if ((p_lt->assignment_level != LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL) && (p_gt->assignment_level != LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL))
     {
@@ -715,12 +716,12 @@ static bool lwm2m_notif_attribute_change_value_validate(const lwm2m_notif_attrib
     return true;
 }
 
-static int lwm2m_notif_attribute_period_update(lwm2m_notif_attribute_t **pp_attributes, int index, int8_t level)
+static int notif_attr_period_update(lwm2m_notif_attr_t **pp_attributes, int index, int8_t level)
 {
     // TODO: Assert m_observables[index] != NULL && pp_attributes != NULL
-    uint8_t attribute_type[] = { LWM2M_ATTRIBUTE_TYPE_MIN_PERIOD,
-                                 LWM2M_ATTRIBUTE_TYPE_MAX_PERIOD };
-    lwm2m_notif_attribute_t *attributes_new[ARRAY_SIZE(attribute_type)];
+    uint8_t attribute_type[] = { LWM2M_ATTR_TYPE_MIN_PERIOD,
+                                 LWM2M_ATTR_TYPE_MAX_PERIOD };
+    lwm2m_notif_attr_t *attributes_new[ARRAY_SIZE(attribute_type)];
     int ret = 0;
 
     // Nothing to update.
@@ -743,7 +744,7 @@ static int lwm2m_notif_attribute_period_update(lwm2m_notif_attribute_t **pp_attr
         attributes_new[type] = &m_observables[index]->attributes[attribute_type[type]];
     }
 
-    if (lwm2m_notif_attribute_period_validate(attributes_new[0], attributes_new[1]))
+    if (notif_attr_period_validate(attributes_new[0], attributes_new[1]))
     {
         for (int type = 0; type < ARRAY_SIZE(attribute_type); type++)
         {
@@ -752,7 +753,7 @@ static int lwm2m_notif_attribute_period_update(lwm2m_notif_attribute_t **pp_attr
                 continue;
             }
 
-            ret = lwm2m_notif_attribute_set(index, attribute_type[type], &attributes_new[type]->value.i,
+            ret = notif_attr_set(index, attribute_type[type], &attributes_new[type]->value.i,
                                             attributes_new[type]->assignment_level);
             if (ret != 0)
             {
@@ -768,13 +769,13 @@ static int lwm2m_notif_attribute_period_update(lwm2m_notif_attribute_t **pp_attr
     return ret;
 }
 
-static int lwm2m_notif_attribute_change_value_update(lwm2m_notif_attribute_t **pp_attributes, int index, int8_t level)
+static int notif_attr_change_value_update(lwm2m_notif_attr_t **pp_attributes, int index, int8_t level)
 {
     // TODO: Assert m_observables[index] != NULL && pp_attributes != NULL
-    uint8_t attribute_type[] = { LWM2M_ATTRIBUTE_TYPE_GREATER_THAN,
-                                 LWM2M_ATTRIBUTE_TYPE_LESS_THAN,
-                                 LWM2M_ATTRIBUTE_TYPE_STEP };
-    lwm2m_notif_attribute_t *attributes_new[ARRAY_SIZE(attribute_type)];
+    uint8_t attribute_type[] = { LWM2M_ATTR_TYPE_GREATER_THAN,
+                                 LWM2M_ATTR_TYPE_LESS_THAN,
+                                 LWM2M_ATTR_TYPE_STEP };
+    lwm2m_notif_attr_t *attributes_new[ARRAY_SIZE(attribute_type)];
     int ret = 0;
 
     // Nothing to update.
@@ -803,7 +804,7 @@ static int lwm2m_notif_attribute_change_value_update(lwm2m_notif_attribute_t **p
         attributes_new[type] = &m_observables[index]->attributes[attribute_type[type]];
     }
 
-    if (lwm2m_notif_attribute_change_value_validate(attributes_new[0], attributes_new[1], attributes_new[2]))
+    if (notif_attr_change_value_validate(attributes_new[0], attributes_new[1], attributes_new[2]))
     {
         for (int type = 0; type < ARRAY_SIZE(attribute_type); type++)
         {
@@ -812,7 +813,7 @@ static int lwm2m_notif_attribute_change_value_update(lwm2m_notif_attribute_t **p
                 continue;
             }
 
-            ret = lwm2m_notif_attribute_set(index, attribute_type[type], &attributes_new[type]->value.i,
+            ret = notif_attr_set(index, attribute_type[type], &attributes_new[type]->value.i,
                                             attributes_new[type]->assignment_level);
             if (ret != 0)
             {
@@ -828,7 +829,7 @@ static int lwm2m_notif_attribute_change_value_update(lwm2m_notif_attribute_t **p
     return ret;
 }
 
-static bool lwm2m_observable_is_init(int index)
+static bool observable_is_init(int index)
 {
     // Assert index >= 0 && !m_observables[index]
     if (m_observables[index]->path_len == 3)
@@ -839,7 +840,7 @@ static bool lwm2m_observable_is_init(int index)
 
         short_server_id = m_observables[index]->ssid;
         resource_id = m_observables[index]->path[2];
-        p_observable = observable_reference_get_cb(m_observables[index]->path, m_observables[index]->path_len, &type);
+        p_observable = observable_get_cb(m_observables[index]->path, m_observables[index]->path_len, &type);
 
         if (lwm2m_is_observed(short_server_id, p_observable))
         {
@@ -847,7 +848,7 @@ static bool lwm2m_observable_is_init(int index)
         }
     }
 
-    for (int i = 0; i < LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE; i++)
+    for (int i = 0; i < LWM2M_MAX_NOTIF_ATTR_TYPE; i++)
     {
         if (m_observables[index]->attributes[i].assignment_level == m_observables[index]->path_len)
         {
@@ -858,7 +859,7 @@ static bool lwm2m_observable_is_init(int index)
     return false;
 }
 
-static void lwm2m_observable_metadata_free(int index)
+static void observable_free(int index)
 {
     // Assert index >= 0
     if (m_observables[index])
@@ -868,7 +869,7 @@ static void lwm2m_observable_metadata_free(int index)
     }
 }
 
-void lwm2m_notif_attr_storage_update(const uint16_t *p_path, uint16_t path_len, struct nrf_sockaddr *p_remote)
+void lwm2m_observer_notif_attr_storage_update(const uint16_t *p_path, uint16_t path_len, struct nrf_sockaddr *p_remote)
 {
     uint16_t short_server_id;
     uint32_t err_code;
@@ -887,7 +888,7 @@ void lwm2m_notif_attr_storage_update(const uint16_t *p_path, uint16_t path_len, 
         return;
     }
 
-    p_observable = observable_reference_get_cb(p_path, path_len, &type);
+    p_observable = observable_get_cb(p_path, path_len, &type);
     if (!p_observable)
     {
         return;
@@ -899,13 +900,13 @@ void lwm2m_notif_attr_storage_update(const uint16_t *p_path, uint16_t path_len, 
         return;
     }
 
-    if (!lwm2m_observable_is_init(index))
+    if (!observable_is_init(index))
     {
         /* Free the memory allocated for the observable and delete its corresponding
            entry in the non-volatile storage, if all of its attributes have been unset
            and it is not currently being observed. */
         lwm2m_notif_attr_storage_delete(m_observables[index]);
-        lwm2m_observable_metadata_free(index);
+        observable_free(index);
     }
     else
     {
@@ -914,24 +915,24 @@ void lwm2m_notif_attr_storage_update(const uint16_t *p_path, uint16_t path_len, 
     }
 }
 
-static int lwm2m_notif_attributes_update(int index, lwm2m_notif_attribute_t **pp_attributes, int8_t level)
+static int notif_attributes_update(int index, lwm2m_notif_attr_t **pp_attributes, int8_t level)
 {
-    // pp_attributes MUST be of size LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE
+    // pp_attributes MUST be of size LWM2M_MAX_NOTIF_ATTR_TYPE
     // Assert !pp_attributes && index >= 0
-    lwm2m_notif_attribute_t *timing_condition[] = { pp_attributes[LWM2M_ATTRIBUTE_TYPE_MIN_PERIOD],
-                                                    pp_attributes[LWM2M_ATTRIBUTE_TYPE_MAX_PERIOD] };
-    lwm2m_notif_attribute_t *change_value_condition[] = { pp_attributes[LWM2M_ATTRIBUTE_TYPE_GREATER_THAN],
-                                                          pp_attributes[LWM2M_ATTRIBUTE_TYPE_LESS_THAN],
-                                                          pp_attributes[LWM2M_ATTRIBUTE_TYPE_STEP] };
+    lwm2m_notif_attr_t *timing_condition[] = { pp_attributes[LWM2M_ATTR_TYPE_MIN_PERIOD],
+                                                    pp_attributes[LWM2M_ATTR_TYPE_MAX_PERIOD] };
+    lwm2m_notif_attr_t *change_value_condition[] = { pp_attributes[LWM2M_ATTR_TYPE_GREATER_THAN],
+                                                          pp_attributes[LWM2M_ATTR_TYPE_LESS_THAN],
+                                                          pp_attributes[LWM2M_ATTR_TYPE_STEP] };
     int ret;
 
-    ret = lwm2m_notif_attribute_period_update(timing_condition, index, level);
+    ret = notif_attr_period_update(timing_condition, index, level);
     if (ret != 0)
     {
         return ret;
     }
 
-    ret = lwm2m_notif_attribute_change_value_update(change_value_condition, index, level);
+    ret = notif_attr_change_value_update(change_value_condition, index, level);
     if (ret != 0)
     {
         return ret;
@@ -940,7 +941,7 @@ static int lwm2m_notif_attributes_update(int index, lwm2m_notif_attribute_t **pp
     return ret;
 }
 
-static void lwm2m_notif_attributes_normalize(void)
+static void notif_attributes_normalize(void)
 {
     // Start the post-processing at the lowest precedence level, as it might affect the observables at higher levels.
     for (int level = 1; level <= LWM2M_ATTR_RESOURCE_LEVEL; level++)
@@ -957,13 +958,13 @@ static void lwm2m_notif_attributes_normalize(void)
                 continue;
             }
 
-            for (int type = 0; type < ARRAY_SIZE(lwm2m_notif_attribute_type); type++)
+            for (int type = 0; type < ARRAY_SIZE(notif_attr_type); type++)
             {
                 /* If any of the attribute have been unset, check whether there are values set at with lower procedence status or
                 default values specified by the server. */
-                if (m_observables[j]->attributes[lwm2m_notif_attribute_type[type]].assignment_level == LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL)
+                if (m_observables[j]->attributes[notif_attr_type[type]].assignment_level == LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL)
                 {
-                    int ret = lwm2m_observable_notif_attribute_init(j, lwm2m_notif_attribute_type[type]);
+                    int ret = notif_attr_init(j, notif_attr_type[type]);
                     if (ret == 0)
                     {
                         // If the attribute has been modified, update the corresponding entry in NVS.
@@ -988,13 +989,13 @@ static bool is_query(const coap_message_t *p_request)
     return false;
 }
 
-int lwm2m_write_attribute_handler(const uint16_t *p_path, uint8_t path_len, const coap_message_t *p_request)
+int lwm2m_observer_write_attribute_handler(const uint16_t *p_path, uint8_t path_len, const coap_message_t *p_request)
 {
     NULL_PARAM_CHECK(p_path);
     NULL_PARAM_CHECK(p_request);
 
-    lwm2m_notif_attribute_t *attributes_new[LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE];
-    lwm2m_notif_attribute_t attributes_in[LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE];
+    lwm2m_notif_attr_t *attributes_new[LWM2M_MAX_NOTIF_ATTR_TYPE];
+    lwm2m_notif_attr_t attributes_in[LWM2M_MAX_NOTIF_ATTR_TYPE];
     uint32_t value;
     char option[1024], *endptr;
     int ret = 0;
@@ -1013,7 +1014,7 @@ int lwm2m_write_attribute_handler(const uint16_t *p_path, uint8_t path_len, cons
     }
 
     // Parse the incoming write-attribute request and store the parameters.
-    for (int i = 0; i < LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE; i++)
+    for (int i = 0; i < LWM2M_MAX_NOTIF_ATTR_TYPE; i++)
     {
         for (int j = 0; j < p_request->options_count; j++)
         {
@@ -1026,12 +1027,12 @@ int lwm2m_write_attribute_handler(const uint16_t *p_path, uint8_t path_len, cons
             memcpy(option, p_request->options[j].data, p_request->options[j].length);
             option[p_request->options[j].length] = 0;
 
-            if (strncmp(option, lwm2m_notif_attribute_name[i], strlen(lwm2m_notif_attribute_name[i])) == 0)
+            if (strncmp(option, notif_attr_name[i], strlen(notif_attr_name[i])) == 0)
             {
                 // If attribute present in the request, assign a pointer to it.
                 attributes_new[i] = &attributes_in[i];
                 // Check if the provided parameter value is empty; if so, the attribute is to be unset.
-                if (p_request->options[j].length > strlen(lwm2m_notif_attribute_name[i]))
+                if (p_request->options[j].length > strlen(notif_attr_name[i]))
                 {
                     attributes_in[i].assignment_level = path_len;
                 }
@@ -1040,15 +1041,15 @@ int lwm2m_write_attribute_handler(const uint16_t *p_path, uint8_t path_len, cons
                     attributes_in[i].assignment_level = LWM2M_ATTR_UNINIT_ASSIGNMENT_LEVEL;
                 }
                 // p_min and p_max are specified as integers, while gt, lt and st are specified as floats.
-                if (lwm2m_notif_attribute_type[i] == LWM2M_ATTRIBUTE_TYPE_MIN_PERIOD ||
-                    lwm2m_notif_attribute_type[i] == LWM2M_ATTRIBUTE_TYPE_MAX_PERIOD)
+                if (notif_attr_type[i] == LWM2M_ATTR_TYPE_MIN_PERIOD ||
+                    notif_attr_type[i] == LWM2M_ATTR_TYPE_MAX_PERIOD)
                 {
-                    value = strtol(&option[strlen(lwm2m_notif_attribute_name[i]) + 1], &endptr, 10);
+                    value = strtol(&option[strlen(notif_attr_name[i]) + 1], &endptr, 10);
                 }
                 else
                 {
                     // TODO: Remove the cast if it is decided to use float type.
-                    value = (int)strtof(&option[strlen(lwm2m_notif_attribute_name[i]) + 1], &endptr);
+                    value = (int)strtof(&option[strlen(notif_attr_name[i]) + 1], &endptr);
                 }
                 attributes_in[i].value.i = value;
                 break;
@@ -1063,7 +1064,7 @@ int lwm2m_write_attribute_handler(const uint16_t *p_path, uint8_t path_len, cons
     }
 
     // Initialize the observable if it does not exist yet.
-    lwm2m_observable_metadata_init(p_request->remote, p_path, path_len);
+    lwm2m_observer_observable_init(p_request->remote, p_path, path_len);
 
     /* Iterate the registered observables and match their corresponding URI to the one specified
        in the request. */
@@ -1092,13 +1093,13 @@ int lwm2m_write_attribute_handler(const uint16_t *p_path, uint8_t path_len, cons
                 {
                     /* After reaching the assignment level, update the attributes of the observable
                        if the coherence check is successful and the precedence rules are respected. */
-                    ret = lwm2m_notif_attributes_update(index, attributes_new, path_len);
+                    ret = notif_attributes_update(index, attributes_new, path_len);
                     if (ret != 0)
                     {
                         return ret;
                     }
 
-                    lwm2m_notif_attr_storage_update(m_observables[index]->path, m_observables[index]->path_len, p_request->remote);
+                    lwm2m_observer_notif_attr_storage_update(m_observables[index]->path, m_observables[index]->path_len, p_request->remote);
                 }
                 continue;
             }
@@ -1107,12 +1108,12 @@ int lwm2m_write_attribute_handler(const uint16_t *p_path, uint8_t path_len, cons
         }
     }
 
-    lwm2m_notif_attributes_normalize();
+    notif_attributes_normalize();
 
     return ret;
 }
 
-const lwm2m_observable_metadata_t * const * lwm2m_observables_get(uint16_t *p_len)
+const lwm2m_observable_metadata_t * const * lwm2m_observer_observables_get(uint16_t *p_len)
 {
     *p_len = LWM2M_MAX_OBSERVABLES_WITH_ATTRIBUTES;
     return (const lwm2m_observable_metadata_t * const * )m_observables;
@@ -1134,13 +1135,13 @@ uint32_t lwm2m_coap_handler_gen_attr_link(uint16_t const *p_path, uint16_t path_
         return EINVAL;
     }
 
-    if (!observable_reference_get_cb)
+    if (!observable_get_cb)
     {
         *p_buffer_len = 0;
         return 0;
     }
 
-    observable = observable_reference_get_cb(p_path, path_len, &type);
+    observable = observable_get_cb(p_path, path_len, &type);
     if (!observable)
     {
         *p_buffer_len = 0;
@@ -1154,7 +1155,7 @@ uint32_t lwm2m_coap_handler_gen_attr_link(uint16_t const *p_path, uint16_t path_
         return 0;
     }
 
-    for (int i = 0; i < LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE; i++)
+    for (int i = 0; i < LWM2M_MAX_NOTIF_ATTR_TYPE; i++)
     {
         if ((m_observables[index]->attributes[i].assignment_level >= path_len) ||
             (inherit && (m_observables[index]->attributes[i].assignment_level > LWM2M_ATTR_DEFAULT_ASSIGNMENT_LEVEL)))
@@ -1167,7 +1168,7 @@ uint32_t lwm2m_coap_handler_gen_attr_link(uint16_t const *p_path, uint16_t path_
 
             len += snprintf((char *)&dry_run_buffer[buffer_index],
                             sizeof(dry_run_buffer) - len,
-                            ";%s=%d", lwm2m_notif_attribute_name[i],
+                            ";%s=%d", notif_attr_name[i],
                             m_observables[index]->attributes[i].value.i);
             buffer_index = len;
         }
@@ -1187,17 +1188,17 @@ uint32_t lwm2m_coap_handler_gen_attr_link(uint16_t const *p_path, uint16_t path_
     return 0;
 }
 
-const void * lwm2m_observable_reference_get(const uint16_t *p_path, uint8_t path_len)
+const void * lwm2m_observer_observable_get(const uint16_t *p_path, uint8_t path_len)
 {
     if (!p_path)
     {
         return NULL;
     }
 
-    return observable_reference_get_cb(p_path, path_len, NULL);
+    return observable_get_cb(p_path, path_len, NULL);
 }
 
-static void observable_object_value_changed(uint16_t object_id)
+static void object_value_changed(uint16_t object_id)
 {
     for (int index = 0; index < LWM2M_MAX_OBSERVABLES_WITH_ATTRIBUTES; index++)
     {
@@ -1212,7 +1213,7 @@ static void observable_object_value_changed(uint16_t object_id)
     }
 }
 
-static void observable_object_instance_value_changed(uint16_t object_id, uint16_t instance_id)
+static void object_instance_value_changed(uint16_t object_id, uint16_t instance_id)
 {
     for (int index = 0; index < LWM2M_MAX_OBSERVABLES_WITH_ATTRIBUTES; index++)
     {
@@ -1227,10 +1228,10 @@ static void observable_object_instance_value_changed(uint16_t object_id, uint16_
         m_observables[index]->changed = true;
     }
 
-    observable_object_value_changed(object_id);
+    object_value_changed(object_id);
 }
 
-void lwm2m_observable_resource_value_changed(uint16_t object_id, uint16_t instance_id, uint16_t resource_id)
+void lwm2m_observer_resource_value_changed(uint16_t object_id, uint16_t instance_id, uint16_t resource_id)
 {
     /* Iterate the registered observables and match their corresponding URI to the one specified
        in the request. */
@@ -1248,5 +1249,5 @@ void lwm2m_observable_resource_value_changed(uint16_t object_id, uint16_t instan
         m_observables[index]->changed = true;
     }
 
-    observable_object_instance_value_changed(object_id, instance_id);
+    object_instance_value_changed(object_id, instance_id);
 }

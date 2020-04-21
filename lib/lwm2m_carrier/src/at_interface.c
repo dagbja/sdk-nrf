@@ -11,6 +11,7 @@
 #include <lwm2m.h>
 #include <lwm2m_os.h>
 #include <lwm2m_api.h>
+#include <lwm2m_observer.h>
 #include <lwm2m_pdn.h>
 #include <nrf_socket.h>
 #include <sms_receive.h>
@@ -315,7 +316,7 @@ static int at_odis_handler(const char *notif)
 
     lwm2m_os_at_params_list_free(&odis_params);
 
-    lwm2m_observable_resource_value_changed(LWM2M_OBJ_PORTFOLIO, 0, LWM2M_PORTFOLIO_IDENTITY);
+    lwm2m_observer_resource_value_changed(LWM2M_OBJ_PORTFOLIO, 0, LWM2M_PORTFOLIO_IDENTITY);
 
     return 0;
 }

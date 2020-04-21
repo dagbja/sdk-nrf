@@ -3,6 +3,7 @@
 
 #include <lwm2m.h>
 #include <lwm2m_api.h>
+#include <lwm2m_observer_storage.h>
 #include <lwm2m_remote.h>
 #include <lwm2m_instance_storage.h>
 #include <operator_check.h>

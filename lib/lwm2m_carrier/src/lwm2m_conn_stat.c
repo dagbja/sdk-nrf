@@ -11,6 +11,7 @@
 #include <lwm2m_objects.h>
 #include <lwm2m_access_control.h>
 #include <lwm2m_objects_tlv.h>
+#include <lwm2m_observer.h>
 #include <lwm2m_conn_stat.h>
 #include <coap_message.h>
 #include <lwm2m_carrier_main.h>
@@ -146,7 +147,7 @@ uint32_t conn_stat_instance_callback(lwm2m_instance_t * p_instance,
                     LWM2M_INF("Observe cancel on instance %s, no match", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
                 } else {
                     LWM2M_INF("Observe cancel on resource %s", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
-                    const void * p_observable = lwm2m_observable_reference_get(path, path_len);
+                    const void * p_observable = lwm2m_observer_observable_get(path, path_len);
                     lwm2m_observe_unregister(p_request->remote, p_observable);
                 }
 

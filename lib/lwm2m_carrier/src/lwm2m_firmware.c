@@ -12,6 +12,7 @@
 #include <lwm2m_firmware.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
+#include <lwm2m_observer.h>
 #include <lwm2m_carrier_main.h>
 #include <lwm2m_remote.h>
 #include <operator_check.h>
@@ -197,7 +198,7 @@ static void on_observe_start(const uint16_t path[3], uint8_t path_len,
         return;
     }
 
-    err = lwm2m_observable_metadata_init(p_req->remote, path, path_len);
+    err = lwm2m_observer_observable_init(p_req->remote, path, path_len);
     if (err) {
         /* Already logged */
     }
@@ -208,7 +209,7 @@ static void on_observe_stop(const uint16_t path[3], uint8_t path_len,
 {
     uint32_t err;
 
-    const void * p_observable = lwm2m_observable_reference_get(path, path_len);
+    const void * p_observable = lwm2m_observer_observable_get(path, path_len);
 
     LWM2M_INF("Observe deregister %s",
               lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
@@ -218,7 +219,7 @@ static void on_observe_stop(const uint16_t path[3], uint8_t path_len,
         /* TODO */
     }
 
-    lwm2m_notif_attr_storage_update(path,  path_len, p_req->remote);
+    lwm2m_observer_notif_attr_storage_update(path,  path_len, p_req->remote);
 
     /* Process as a read */
     on_read(path, path_len, p_req);
@@ -263,7 +264,7 @@ static void on_write_attribute(const uint16_t path[3], uint8_t path_len,
 {
     int err;
 
-    err = lwm2m_write_attribute_handler(path, path_len, p_req);
+    err = lwm2m_observer_write_attribute_handler(path, path_len, p_req);
     if (err) {
         const coap_msg_code_t code =
             (err == -EINVAL) ? COAP_CODE_400_BAD_REQUEST :
@@ -486,7 +487,7 @@ static void on_object_write_attribute(coap_message_t *p_req)
     int err;
     uint16_t path[] = { LWM2M_OBJ_FIRMWARE };
 
-    err = lwm2m_write_attribute_handler(path, ARRAY_SIZE(path), p_req);
+    err = lwm2m_observer_write_attribute_handler(path, ARRAY_SIZE(path), p_req);
     if (err) {
         const coap_msg_code_t code =
             (err == -EINVAL) ? COAP_CODE_400_BAD_REQUEST :
