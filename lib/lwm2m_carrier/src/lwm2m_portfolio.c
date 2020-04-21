@@ -356,6 +356,7 @@ uint32_t portfolio_instance_callback(lwm2m_instance_t * p_instance,
         break;
     case LWM2M_OPERATION_CODE_WRITE_ATTR:
         on_write_attribute(path, path_len, p_request);
+        break;
     default:
         lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_request);
         break;
