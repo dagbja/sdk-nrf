@@ -558,6 +558,8 @@ static void on_object_read(coap_message_t *p_req)
     uint8_t buf[256];
     size_t len;
 
+    lwm2m_conn_mon_update_resource(LWM2M_NAMED_OBJECT);
+
     len = sizeof(buf);
 
     err = lwm2m_tlv_connectivity_monitoring_encode(buf + 3, &len, LWM2M_NAMED_OBJECT,
@@ -673,6 +675,11 @@ static void lwm2m_conn_mon_update_resource(uint16_t resource_id)
         at_read_cell_id(&m_instance_conn_mon.cell_id);
         at_read_smnc_smcc(&m_instance_conn_mon.smnc, &m_instance_conn_mon.smcc);
         at_read_ipaddr(&m_instance_conn_mon.ip_addresses);
+        if (!operator_is_vzw(true)) {
+            uint8_t apn_len = 0;
+            uint8_t *p_apn = lwm2m_apn_conn_prof_apn_get(lwm2m_apn_instance(), &apn_len);
+            lwm2m_list_string_set(&m_instance_conn_mon.apn, 0, p_apn, apn_len);
+        }
         break;
     default:
         break;
