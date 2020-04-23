@@ -8,7 +8,7 @@
 #include <lwm2m.h>
 
 #if CONFIG_DK_LIBRARY
-#include <buttons_and_leds.h>
+#include <client_leds.h>
 #endif
 
 #include <lwm2m_carrier.h>
@@ -76,7 +76,7 @@ int main(void)
 {
 #if CONFIG_DK_LIBRARY
     // Initialize LEDs and Buttons.
-    buttons_and_leds_init();
+    client_leds_init();
 #endif
 
     return 0;

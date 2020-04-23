@@ -17,47 +17,6 @@
 /* Structures for delayed work */
 static struct k_delayed_work leds_update_work;
 
-
-/**@brief Callback for button events from the DK buttons and LEDs library. */
-static void app_button_handler(u32_t buttons, u32_t has_changed)
-{
-    lwm2m_state_t app_state = lwm2m_state_get();
-
-    if (buttons & 0x01) // Button 1 has changed
-    {
-        if (!(buttons & 0x08)) // Switch 2 in right position
-        {
-            printk("Reset bootstrap!\n");
-            lwm2m_bootstrap_clear();
-            lwm2m_request_reset();
-        }
-        else if (app_state == LWM2M_STATE_DISCONNECTED)
-        {
-            lwm2m_request_connect();
-        }
-        else if (app_state == LWM2M_STATE_IDLE)
-        {
-            lwm2m_request_server_update(1, true);
-        }
-    }
-    else if (buttons & 0x02) // Button 2 has changed
-    {
-        if (!(buttons & 0x08)) // Switch 2 in right position
-        {
-            printk("System shutdown!\n");
-            lwm2m_system_shutdown();
-        }
-        else if (app_state == LWM2M_STATE_IDLE)
-        {
-            app_state = LWM2M_STATE_SERVER_DEREGISTER;
-        }
-        else if (app_state == LWM2M_STATE_DISCONNECTED)
-        {
-            lwm2m_request_reset();
-        }
-    }
-}
-
 static void app_leds_get_state(u8_t *on, u8_t *blink)
 {
     *on = 0;
@@ -186,40 +145,6 @@ static void app_leds_update(struct k_work *work)
         k_delayed_work_submit(&leds_update_work, APP_LEDS_UPDATE_INTERVAL);
 }
 
-/**@brief Check buttons pressed at startup. */
-static void check_buttons_pressed(void)
-{
-    u32_t button_state = 0;
-    dk_read_buttons(&button_state, NULL);
-
-    // Check if button 1 pressed during startup
-    if (button_state & 0x01) {
-        lwm2m_factory_reset();
-
-        printk("Factory reset!\n");
-        k_delayed_work_cancel(&leds_update_work);
-        while (true) { // Blink all LEDs
-            dk_set_leds_state(DK_LED1_MSK | DK_LED2_MSK | DK_LED3_MSK | DK_LED4_MSK, 0);
-            k_sleep(250);
-            dk_set_leds_state(0, DK_LED1_MSK | DK_LED2_MSK | DK_LED3_MSK | DK_LED4_MSK);
-            k_sleep(250);
-        }
-    }
-}
-
-void leds_error_loop(void)
-{
-    k_delayed_work_cancel(&leds_update_work);
-
-    /* Blinking all LEDs ON/OFF in pairs (1 and 2, 3 and 4) if there is an error. */
-    while (true) {
-        dk_set_leds_state(DK_LED1_MSK | DK_LED2_MSK, DK_LED3_MSK | DK_LED4_MSK);
-        k_sleep(250);
-        dk_set_leds_state(DK_LED3_MSK | DK_LED4_MSK, DK_LED1_MSK | DK_LED2_MSK);
-        k_sleep(250);
-    }
-}
-
 void leds_recoverable_error_loop(void)
 {
     k_delayed_work_cancel(&leds_update_work);
@@ -233,22 +158,14 @@ void leds_recoverable_error_loop(void)
     }
 }
 
-/**@brief Initializes buttons and LEDs, using the DK buttons and LEDs library. */
-void buttons_and_leds_init(void)
+/**@brief Initializes LEDs, using the DK LEDs library. */
+void client_leds_init(void)
 {
-    dk_buttons_init(app_button_handler);
     dk_leds_init();
     dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
 
     k_delayed_work_init(&leds_update_work, app_leds_update);
     k_delayed_work_submit(&leds_update_work, APP_LEDS_UPDATE_INTERVAL);
-
-    check_buttons_pressed();
-}
-
-void buttons_and_leds_uninit(void)
-{
-     k_delayed_work_cancel(&leds_update_work);
 }
 
 #endif // CONFIG_DK_LIBRARY

@@ -20,8 +20,8 @@ set(spm_CONF_FILE
 include($ENV{ZEPHYR_BASE}/cmake/app/boilerplate.cmake NO_POLICY_SCOPE)
 project(NONE)
 
-target_sources(app PRIVATE src/buttons_and_leds.c)
-target_sources(app PRIVATE src/lwm2m_shell.c)
+target_sources(app PRIVATE src/client_leds.c)
+target_sources(app PRIVATE src/client_shell.c)
 target_sources(app PRIVATE src/main.c)
 target_sources(app PRIVATE src/modem_logging.c)
 
