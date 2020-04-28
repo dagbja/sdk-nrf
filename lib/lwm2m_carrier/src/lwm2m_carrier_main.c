@@ -10,10 +10,9 @@
 
 #include <lwm2m.h>
 #include <lwm2m_tlv.h>
-#include <lwm2m_acl.h>
+#include <lwm2m_access_control.h>
 #include <lwm2m_api.h>
 #include <lwm2m_carrier.h>
-#include <lwm2m_common.h>
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_conn_stat.h>
 #include <lwm2m_apn_conn_prof.h>
@@ -43,7 +42,6 @@
 #include <sha256.h>
 
 #define APP_USE_SOCKET_POLL             0 // Use socket poll() to check status
-#define APP_ACL_DM_SERVER_HACK          1
 
 #define LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT     9998                                            /**< Local port to connect to the LWM2M bootstrap server. */
 #define LWM2M_LOCAL_CLIENT_PORT_OFFSET        9999                                            /**< Local port to connect to the LWM2M server. */
@@ -259,6 +257,7 @@ static uint16_t server_instance_get(uint16_t security_instance)
 static void server_instance_update_map(void)
 {
     uint16_t short_server_id;
+    uint16_t accesss_control;
 
     for (int i = 0; i < 1+LWM2M_MAX_SERVERS; i++) {
         short_server_id = lwm2m_security_short_server_id_get(i);
@@ -270,11 +269,11 @@ static void server_instance_update_map(void)
 
         for (int j = 0; j < 1+LWM2M_MAX_SERVERS; j++) {
             if (short_server_id == lwm2m_server_short_server_id_get(j)) {
-                lwm2m_instance_t *p_instance;
-                p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(j);
-                /* Suppress warnings */
-                (void) p_instance;
-                LWM2M_INF("  </0/%u>,</1/%u>,</2/%u>;ssid=%u", i, j, p_instance->acl.id, short_server_id);
+                if (lwm2m_access_control_find(LWM2M_OBJ_SERVER, j, &accesss_control) == 0) {
+                    LWM2M_INF("  </0/%u>,</1/%u>,</2/%u>;ssid=%u", i, j, accesss_control, short_server_id);
+                } else {
+                    LWM2M_INF("  </0/%u>,</1/%u>;ssid=%u", i, j, short_server_id);
+                }
                 m_server_instance_map[i] = j;
             }
         }
@@ -969,12 +968,13 @@ static int app_generate_client_id(void)
     return ret;
 }
 
-/**@brief Delete all Security and Server instances.
+/**@brief Delete all Security, Server and Access Control instances.
  *
  * @param[in]  delete_bootstrap  Set if deleting bootstrap instances.
  */
-static void delete_security_and_server_instances(void)
+static void delete_bootstrapped_object_instances(void)
 {
+    lwm2m_instance_t *p_instance;
     uint16_t bootstrap_ssid = lwm2m_security_short_server_id_get(LWM2M_BOOTSTRAP_INSTANCE_ID);
 
     // Delete all instances except Bootstrap server
@@ -982,14 +982,19 @@ static void delete_security_and_server_instances(void)
     {
         if (i != LWM2M_BOOTSTRAP_INSTANCE_ID)
         {
-            (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_security_get_instance(i));
+            p_instance = (lwm2m_instance_t *)lwm2m_security_get_instance(i);
+            (void)lwm2m_coap_handler_instance_delete(p_instance);
         }
 
         if (lwm2m_server_short_server_id_get(i) != bootstrap_ssid)
         {
-            (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)lwm2m_server_get_instance(i));
+            p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(i);
+            (void)lwm2m_coap_handler_instance_delete(p_instance);
         }
     }
+
+    // Delete all Access Control instances
+    lwm2m_access_control_delete_instances();
 }
 
 /**@brief Application implementation of the root handler interface.
@@ -1000,7 +1005,7 @@ static void delete_security_and_server_instances(void)
  */
 uint32_t lwm2m_coap_handler_root(uint8_t op_code, coap_message_t * p_request)
 {
-    delete_security_and_server_instances();
+    delete_bootstrapped_object_instances();
 
     (void)lwm2m_respond_with_code(COAP_CODE_202_DELETED, p_request);
 
@@ -1068,7 +1073,7 @@ const void * observable_reference_get(const uint16_t *p_path, uint8_t path_len, 
         value = lwm2m_portfolio_resource_reference_get(p_path[1], p_path[2], p_type);
         break;
     case LWM2M_OBJ_SECURITY:
-    case LWM2M_OBJ_ACL:
+    case LWM2M_OBJ_ACCESS_CONTROL:
     case LWM2M_OBJ_LOCATION:
     case LWM2M_OBJ_CONN_STAT:
     default:
@@ -1726,30 +1731,6 @@ static void app_misc_data_set_bootstrapped(bool bootstrapped)
     lwm2m_storage_misc_data_store(&misc_data);
 }
 
-static void update_object_acls(void)
-{
-    if (!operator_is_att(true)) {
-        return;
-    }
-
-    uint16_t short_server_id = 0;
-
-    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
-    {
-        // Find short server id for the first instance which is not bootstrap.
-        uint16_t ssid = lwm2m_server_short_server_id_get(i);
-        if (ssid != 0 && ssid != LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID) {
-            short_server_id = ssid;
-            break;
-        }
-    }
-
-    // If short_server_id does not match what we have in the factory bootstrap
-    // update all ACL objects with new owner and server settings.
-    if (short_server_id != 0 && short_server_id != 1) {
-        lwm2m_update_acl_ssid(1, short_server_id);
-    }
-}
 /**@brief Callback function for the named bootstrap complete object. */
 uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
                                    uint16_t         instance_id,
@@ -1778,11 +1759,11 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 
     LWM2M_INF("Store bootstrap settings");
 
-    update_object_acls();
-
     lwm2m_storage_server_store();
     lwm2m_storage_security_store();
-    lwm2m_storage_acl_store();
+
+    lwm2m_access_control_acl_init();
+    lwm2m_storage_access_control_store();
 
     server_instance_update_map();
 
@@ -1810,16 +1791,8 @@ void lwm2m_bootstrap_reset(void)
     }
 
     app_misc_data_set_bootstrapped(false);
-    delete_security_and_server_instances();
+    delete_bootstrapped_object_instances();
     lwm2m_factory_bootstrap_init(&m_app_config);
-
-    lwm2m_device_init_acl();
-    lwm2m_conn_mon_init_acl();
-    lwm2m_firmware_init_acl();
-    lwm2m_conn_stat_init_acl();
-    lwm2m_apn_conn_prof_init_acl();
-    lwm2m_portfolio_init_acl();
-    lwm2m_conn_ext_init_acl();
 
     lwm2m_device_update_carrier_specific_settings();
 
@@ -1840,34 +1813,12 @@ void lwm2m_factory_reset(void)
     // Delete data from flash
     lwm2m_storage_security_delete();
     lwm2m_storage_server_delete();
-    lwm2m_storage_acl_delete();
+    lwm2m_storage_access_control_delete();
     lwm2m_storage_apn_conn_prof_delete();
     lwm2m_storage_portfolio_delete();
     lwm2m_storage_conn_ext_delete();
     lwm2m_observer_storage_delete_all();
     lwm2m_notif_attr_storage_delete_all();
-}
-
-/**@brief Initialize server ACLs in a specific order. */
-static void app_server_acl_init(void)
-{
-#if APP_ACL_DM_SERVER_HACK
-    // FIXME: Init ACL for DM server[1] first to get ACL /2/0 which is according to Verizon spec
-    uint32_t acl_init_order[] = { 1, 0, 2, 3 };
-    for (uint32_t k = 0; k < ARRAY_SIZE(acl_init_order); k++)
-    {
-        uint32_t i = acl_init_order[k];
-#else
-    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
-    {
-#endif
-        lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(i);
-
-        // Initialize ACL on the instance.
-        // The owner (second parameter) is set to LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID.
-        // This will grant the Bootstrap server full permission to this instance.
-        (void)lwm2m_acl_permissions_init(p_instance, LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-    }
 }
 
 static void app_load_flash_objects(void)
@@ -1890,8 +1841,6 @@ static void app_load_flash_objects(void)
         }
     }
 
-    // Load ACLs after adding the Security and Server instances.
-    lwm2m_storage_acl_load();
     // Load location
     lwm2m_storage_location_load();
 
@@ -1899,19 +1848,20 @@ static void app_load_flash_objects(void)
     lwm2m_storage_portfolio_load();
     lwm2m_storage_conn_ext_load();
 
-    server_instance_update_map();
-
     lwm2m_storage_misc_data_t misc_data;
     int32_t result = lwm2m_storage_misc_data_load(&misc_data);
     if (result == 0 && misc_data.bootstrapped)
     {
         lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, true);
+        lwm2m_storage_access_control_load();
     }
     else
     {
         // storage reports that bootstrap has not been done, continue with bootstrap.
         lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
     }
+
+    server_instance_update_map();
 }
 
 static void app_lwm2m_create_objects(void)
@@ -1921,8 +1871,7 @@ static void app_lwm2m_create_objects(void)
 
     lwm2m_security_init();
     lwm2m_server_init();
-    app_server_acl_init();
-
+    lwm2m_access_control_init();
     lwm2m_device_init();
     lwm2m_conn_mon_init();
     lwm2m_firmware_init();
@@ -1962,7 +1911,6 @@ static void app_lwm2m_setup(void)
 {
     (void)lwm2m_init(lwm2m_os_malloc, lwm2m_os_free);
     (void)lwm2m_remote_init();
-    (void)lwm2m_acl_init();
 
     m_bootstrap_server.object_id    = LWM2M_NAMED_OBJECT;
     m_bootstrap_server.callback     = bootstrap_object_callback;
@@ -1974,6 +1922,9 @@ static void app_lwm2m_setup(void)
 
     // Add server support.
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_server_get_object());
+
+    // Add access control support.
+    (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_access_control_get_object());
 
     // Add device support.
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_device_get_object());

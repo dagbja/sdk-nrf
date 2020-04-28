@@ -9,15 +9,14 @@
 #include <string.h>
 
 #include <lwm2m.h>
-#include <lwm2m_acl.h>
 #include <lwm2m_api.h>
 #include <lwm2m_carrier.h>
-#include <lwm2m_common.h>
 #include <lwm2m_security.h>
 #include <lwm2m_server.h>
 #include <lwm2m_instance_storage.h>
 #include <lwm2m_os.h>
 #include <lwm2m_factory_bootstrap.h>
+#include <lwm2m_access_control.h>
 
 #include <app_debug.h>
 #include <operator_check.h>
@@ -47,20 +46,6 @@ static void factory_security_bootstrap_default(void)
 
     lwm2m_coap_handler_instance_delete(p_instance);
     lwm2m_coap_handler_instance_add(p_instance);
-}
-
-static void factory_server_default(void)
-{
-    const uint16_t instance_id = 0;
-    lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
-
-    lwm2m_instance_acl_t acl = {
-        .owner = LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID,
-        .access = { rwde_access },
-        .server = { 123 }
-    };
-
-    lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
 }
 
 static void factory_security_bootstrap_vzw(void)
@@ -98,45 +83,57 @@ static void factory_server_bootstrap_vzw(void)
     const uint16_t instance_id = LWM2M_BOOTSTRAP_INSTANCE_ID;
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
 
-    lwm2m_instance_acl_t acl = {
-        .owner = 100,
-        .access = { rwde_access },
-        .server = { 102 }
-    };
-
     lwm2m_server_short_server_id_set(instance_id, 100);
     lwm2m_server_client_hold_off_timer_set(instance_id, 0);
-
-    lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
 
     lwm2m_coap_handler_instance_delete(p_instance);
     lwm2m_coap_handler_instance_add(p_instance);
 }
 
-static void factory_server_management_vzw(void)
+static void factory_server_management_acl_vzw(void)
 {
     const uint16_t instance_id = 1;
-    lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
+    uint16_t access[] = { rwde_access, rwde_access, rwde_access };
+    uint16_t servers[] = { 101, 102, 1000 };
+    uint16_t owner = 102;
 
-    lwm2m_instance_acl_t acl = {
-        .owner = 102,
-        .access = { rwde_access, rwde_access, rwde_access },
-        .server = { 101, 102, 1000 }
+    lwm2m_list_t acl = {
+        .p_id = servers,
+        .val.p_uint16 = access,
+        .len = ARRAY_SIZE(servers)
     };
 
-    lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
+    lwm2m_access_control_acl_set(LWM2M_OBJ_SERVER, instance_id, &acl);
+    lwm2m_access_control_owner_set(LWM2M_OBJ_SERVER, instance_id, owner);
+}
+
+static void factory_server_management_vzw(void)
+{
+    // Setup the ACL.
+    factory_server_management_acl_vzw();
+}
+
+static void factory_server_diagnostics_acl_vzw(void)
+{
+    const uint16_t instance_id = 2;
+    uint16_t access[] = { rwde_access };
+    uint16_t servers[] = { 102 };
+    uint16_t owner = 101;
+
+    lwm2m_list_t acl = {
+        .p_id = servers,
+        .val.p_uint16 = access,
+        .len = ARRAY_SIZE(servers)
+    };
+
+    lwm2m_access_control_acl_set(LWM2M_OBJ_SERVER, instance_id, &acl);
+    lwm2m_access_control_owner_set(LWM2M_OBJ_SERVER, instance_id, owner);
 }
 
 static void factory_server_diagnostics_vzw(void)
 {
     const uint16_t instance_id = 2;
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
-
-    lwm2m_instance_acl_t acl = {
-        .owner = 101,
-        .access = { rwde_access },
-        .server = { 102 }
-    };
 
     lwm2m_server_short_server_id_set(instance_id, 101);
     lwm2m_server_client_hold_off_timer_set(instance_id, 30);
@@ -146,52 +143,34 @@ static void factory_server_diagnostics_vzw(void)
     lwm2m_server_notif_storing_set(instance_id, 1);
     lwm2m_server_binding_set(instance_id, "UQS", 3);
 
-    lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
+    // Setup the ACL.
+    factory_server_diagnostics_acl_vzw();
 
     lwm2m_coap_handler_instance_delete(p_instance);
     lwm2m_coap_handler_instance_add(p_instance);
 }
 
-static void factory_server_repository_vzw(void)
+static void factory_server_repository_acl_vzw(void)
 {
     const uint16_t instance_id = 3;
-    lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
+    uint16_t access[] = { rwde_access, rwde_access, rwde_access };
+    uint16_t servers[] = { 101, 102, 1000 };
+    uint16_t owner = 1000;
 
-    lwm2m_instance_acl_t acl = {
-        .owner = 1000,
-        .access = { rwde_access, rwde_access, rwde_access },
-        .server = { 101, 102, 1000 }
+    lwm2m_list_t acl = {
+        .p_id = servers,
+        .val.p_uint16 = access,
+        .len = ARRAY_SIZE(servers)
     };
 
-    lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
+    lwm2m_access_control_acl_set(LWM2M_OBJ_SERVER, instance_id, &acl);
+    lwm2m_access_control_owner_set(LWM2M_OBJ_SERVER, instance_id, owner);
 }
 
-static void factory_server_att(void)
+static void factory_server_repository_vzw(void)
 {
-    const uint16_t instance_id = 0;
-    lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
-
-    lwm2m_instance_acl_t acl = {
-        .owner = 1,
-        .access = { rwde_access },
-        .server = { 1 }
-    };
-
-    lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
-}
-
-static void factory_server_test_att(void)
-{
-    const uint16_t instance_id = 2;
-    lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
-
-    lwm2m_instance_acl_t acl = {
-        .owner = 1,
-        .access = { rwde_access },
-        .server = { 1 }
-    };
-
-    lwm2m_set_instance_acl(p_instance, LWM2M_PERMISSION_READ, &acl);
+    // Setup the ACL.
+    factory_server_repository_acl_vzw();
 }
 
 /**@brief Reset factory bootstrapped objects. */
@@ -237,19 +216,10 @@ void lwm2m_factory_bootstrap_init(lwm2m_carrier_config_t * p_carrier_config)
         factory_server_diagnostics_vzw();
         factory_server_repository_vzw();
     }
-    else if (operator_is_att(true))
-    {
-        factory_server_att();
-        factory_server_test_att();
-    }
-    else
-    {
-        factory_server_default();
-    }
 
     lwm2m_storage_security_store();
     lwm2m_storage_server_store();
-    lwm2m_storage_acl_store();
+    lwm2m_storage_access_control_store();
 }
 
 bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config, bool application_psk_set)

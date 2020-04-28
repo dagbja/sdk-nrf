@@ -46,6 +46,15 @@ static uint32_t lwm2m_tlv_resource_encode(uint8_t          * p_buffer,
             break;
         }
 
+        case LWM2M_OBJ_ACCESS_CONTROL:
+        {
+            err_code = lwm2m_tlv_access_control_encode(p_buffer,
+                                                       p_buffer_len,
+                                                       resource_id,
+                                                       (lwm2m_access_control_t *)p_instance);
+            break;
+        }
+
         case LWM2M_OBJ_DEVICE:
         {
             err_code = lwm2m_tlv_device_encode(p_buffer,
@@ -792,6 +801,156 @@ uint32_t lwm2m_tlv_server_encode(uint8_t        * p_buffer,
                                                  true);
             break;
         }
+
+        default:
+        {
+            err_code = ENOTSUP;
+            break;
+        }
+    }
+
+    return err_code;
+}
+
+
+uint32_t lwm2m_tlv_access_control_decode(lwm2m_access_control_t * p_access_control,
+                                         uint8_t                * p_buffer,
+                                         uint32_t                 buffer_len,
+                                         lwm2m_tlv_callback_t     resource_callback)
+{
+    NULL_PARAM_CHECK(p_access_control);
+    NULL_PARAM_CHECK(p_buffer);
+
+    uint32_t    err_code;
+    uint32_t    index = 0;
+    lwm2m_tlv_t tlv;
+
+    while (index < buffer_len)
+    {
+        err_code = lwm2m_tlv_decode(&tlv, &index, p_buffer, buffer_len);
+
+        if (err_code != 0)
+        {
+            return err_code;
+        }
+
+        switch (tlv.id)
+        {
+            case LWM2M_ACCESS_CONTROL_OBJECT_ID:
+            {
+                err_code = lwm2m_tlv_bytebuffer_to_uint16(tlv.value,
+                                                          tlv.length,
+                                                          &p_access_control->object_id);
+                break;
+            }
+
+            case LWM2M_ACCESS_CONTROL_INSTANCE_ID:
+            {
+                err_code = lwm2m_tlv_bytebuffer_to_uint16(tlv.value,
+                                                          tlv.length,
+                                                          &p_access_control->instance_id);
+                break;
+            }
+
+            case LWM2M_ACCESS_CONTROL_ACL:
+            {
+                err_code = lwm2m_tlv_list_decode(tlv, &p_access_control->acl);
+                break;
+            }
+
+            case LWM2M_ACCESS_CONTROL_CONTROL_OWNER:
+            {
+                err_code = lwm2m_tlv_bytebuffer_to_uint16(tlv.value,
+                                                          tlv.length,
+                                                          &p_access_control->control_owner);
+                break;
+            }
+
+            default:
+            {
+                err_code = 0;
+                break;
+            }
+        }
+
+        if (err_code != 0)
+        {
+            return err_code;
+        }
+
+        if (resource_callback)
+        {
+            err_code = resource_callback(p_access_control->proto.instance_id, &tlv);
+            if (err_code != 0)
+            {
+                return err_code;
+            }
+        }
+    }
+
+    return 0;
+}
+
+
+uint32_t lwm2m_tlv_access_control_encode(uint8_t                * p_buffer,
+                                         uint32_t               * p_buffer_len,
+                                         uint16_t                 resource_id,
+                                         lwm2m_access_control_t * p_access_control)
+{
+    NULL_PARAM_CHECK(p_buffer);
+    NULL_PARAM_CHECK(p_buffer_len);
+    NULL_PARAM_CHECK(p_access_control);
+
+    uint32_t err_code;
+
+    switch (resource_id)
+    {
+        case LWM2M_ACCESS_CONTROL_OBJECT_ID:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                LWM2M_ACCESS_CONTROL_OBJECT_ID,
+                                                p_access_control->object_id);
+            break;
+        }
+
+        case LWM2M_ACCESS_CONTROL_INSTANCE_ID:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                LWM2M_ACCESS_CONTROL_INSTANCE_ID,
+                                                p_access_control->instance_id);
+            break;
+        }
+
+        case LWM2M_ACCESS_CONTROL_ACL:
+        {
+            err_code = lwm2m_tlv_list_encode(p_buffer,
+                                             p_buffer_len,
+                                             LWM2M_ACCESS_CONTROL_ACL,
+                                             &p_access_control->acl);
+            break;
+        }
+
+        case LWM2M_ACCESS_CONTROL_CONTROL_OWNER:
+        {
+            err_code = lwm2m_tlv_integer_encode(p_buffer,
+                                                p_buffer_len,
+                                                LWM2M_ACCESS_CONTROL_CONTROL_OWNER,
+                                                p_access_control->control_owner);
+            break;
+        }
+
+        case LWM2M_NAMED_OBJECT:
+        {
+            // This is a callback to the instance, not a specific resource.
+            err_code = lwm2m_tlv_instance_encode(p_buffer,
+                                                 p_buffer_len,
+                                                 (lwm2m_instance_t *)p_access_control,
+                                                 true);
+            break;
+        }
+
 
         default:
         {

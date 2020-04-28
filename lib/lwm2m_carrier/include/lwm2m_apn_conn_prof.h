@@ -36,8 +36,6 @@ uint32_t lwm2m_apn_conn_prof_object_callback(lwm2m_object_t * p_object,
                                              uint8_t          op_code,
                                              coap_message_t * p_request);
 
-void lwm2m_apn_conn_prof_init_acl(void);
-
 void lwm2m_apn_conn_prof_apn_status_update(void);
 
 uint32_t lwm2m_apn_conn_prof_custom_apn_set(const char * p_apn);

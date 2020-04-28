@@ -11,7 +11,7 @@
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_security.h>
 #include <lwm2m_server.h>
-#include <lwm2m_acl.h>
+#include <lwm2m_access_control.h>
 #include <lwm2m_apn_conn_prof.h>
 #include <lwm2m_portfolio.h>
 #include <lwm2m_conn_ext.h>
@@ -169,8 +169,8 @@ static const char *obj_str_get(uint16_t id)
         return "security";
     case LWM2M_OBJ_SERVER:
         return "server";
-    case LWM2M_OBJ_ACL:
-        return "ACL";
+    case LWM2M_OBJ_ACCESS_CONTROL:
+        return "access control";
     case LWM2M_OBJ_APN_CONNECTION_PROFILE:
         return "apn connection profile";
     case LWM2M_OBJ_PORTFOLIO:
@@ -310,13 +310,21 @@ static int obj_instances_encode(uint16_t obj, uint8_t *buf, size_t *len)
 static void obj_instance_add_to_handler(uint16_t obj, uint16_t inst)
 {
     lwm2m_instance_t *p_instance = NULL;
+    lwm2m_access_control_t *p_access_control;
 
     switch (obj) {
+    case LWM2M_OBJ_ACCESS_CONTROL:
+        p_access_control = lwm2m_access_control_get_instance(inst);
+        if (p_access_control && p_access_control->object_id != LWM2M_INVALID_INSTANCE) {
+            p_instance = (lwm2m_instance_t *)p_access_control;
+        }
+        break;
     case LWM2M_OBJ_APN_CONNECTION_PROFILE:
         p_instance = (lwm2m_instance_t *)lwm2m_apn_conn_prof_get_instance(inst);
         break;
     case LWM2M_OBJ_PORTFOLIO:
-        lwm2m_portfolio_instance_create(inst);
+        p_instance = (lwm2m_instance_t *)lwm2m_portfolio_get_instance(LWM2M_PORTFOLIO_CARRIER_INSTANCE);
+        p_instance->instance_id = inst;
         break;
     default:
         break;
@@ -346,13 +354,6 @@ static int obj_instances_decode(uint16_t obj, uint8_t *buf, size_t *size)
 
         LWM2M_TRC("Decoded /%d/%d (%d bytes)", obj, tlv.id, tlv.length);
 
-        /* Some instances might have not been added to the handler during the
-           initialization, such as the ones that can be created at runtime. */
-        if (lwm2m_lookup_instance(&p_instance, obj, tlv.id) != 0)
-        {
-            obj_instance_add_to_handler(obj, tlv.id);
-        }
-
         switch (obj) {
         case LWM2M_OBJ_SECURITY:
             err = lwm2m_tlv_security_decode(
@@ -364,8 +365,10 @@ static int obj_instances_decode(uint16_t obj, uint8_t *buf, size_t *size)
                 lwm2m_server_get_instance(tlv.id),
                 tlv.value, tlv.length, tlv_server_carrier_decode);
             break;
-        case LWM2M_OBJ_ACL:
-            err = lwm2m_acl_deserialize_tlv(tlv.value, tlv.length, NULL);
+        case LWM2M_OBJ_ACCESS_CONTROL:
+            err = lwm2m_tlv_access_control_decode(
+                lwm2m_access_control_get_instance(tlv.id),
+                tlv.value, tlv.length, NULL);
             break;
         case LWM2M_OBJ_APN_CONNECTION_PROFILE:
             err = lwm2m_tlv_apn_connection_profile_decode(
@@ -388,6 +391,13 @@ static int obj_instances_decode(uint16_t obj, uint8_t *buf, size_t *size)
             LWM2M_ERR("Failed to decode /%d/%d, err %d", obj, tlv.id, err);
             return err;
         }
+
+        /* Some instances might have not been added to the handler during the
+           initialization, such as the ones that can be created at runtime. */
+        if (lwm2m_lookup_instance(&p_instance, obj, tlv.id) != 0)
+        {
+            obj_instance_add_to_handler(obj, tlv.id);
+        }
     }
 
     return 0;
@@ -400,7 +410,7 @@ static uint16_t storage_id_get(uint16_t obj)
         return LWM2M_STORAGE_ID_SECURITY;
     case LWM2M_OBJ_SERVER:
         return LWM2M_STORAGE_ID_SERVER;
-    case LWM2M_OBJ_ACL:
+    case LWM2M_OBJ_ACCESS_CONTROL:
         return LWM2M_STORAGE_ID_ACL;
     case LWM2M_OBJ_APN_CONNECTION_PROFILE:
         return LWM2M_STORAGE_APN_CONN_PROFILE;
@@ -422,6 +432,7 @@ static int lwm2m_storage_obj_instances_store(uint16_t obj)
 
     __ASSERT(obj == LWM2M_OBJ_SECURITY ||
              obj == LWM2M_OBJ_SERVER ||
+             obj == LWM2M_OBJ_ACCESS_CONTROL ||
              obj == LWM2M_OBJ_APN_CONNECTION_PROFILE ||
              obj == LWM2M_OBJ_PORTFOLIO ||
              obj == LWM2M_OBJ_CONN_EXT,
@@ -457,7 +468,7 @@ static int lwm2m_storage_obj_instances_load(uint16_t obj)
 
     __ASSERT(obj == LWM2M_OBJ_SECURITY ||
              obj == LWM2M_OBJ_SERVER ||
-             obj == LWM2M_OBJ_ACL ||
+             obj == LWM2M_OBJ_ACCESS_CONTROL ||
              obj == LWM2M_OBJ_APN_CONNECTION_PROFILE ||
              obj == LWM2M_OBJ_PORTFOLIO ||
              obj == LWM2M_OBJ_CONN_EXT,
@@ -566,75 +577,19 @@ int lwm2m_storage_conn_ext_delete(void)
     return lwm2m_storage_obj_instances_delete(LWM2M_OBJ_CONN_EXT);
 }
 
-int lwm2m_storage_acl_load(void)
+int lwm2m_storage_access_control_load(void)
 {
-    return lwm2m_storage_obj_instances_load(LWM2M_OBJ_ACL);
+    return lwm2m_storage_obj_instances_load(LWM2M_OBJ_ACCESS_CONTROL);
 }
 
-int lwm2m_storage_acl_store(void)
+int lwm2m_storage_access_control_store(void)
 {
-    int err;
-    size_t len;
-    size_t off;
-    size_t progress;
-    size_t tlv_off;
-    uint8_t tlv_buf[32];
-    lwm2m_instance_t *inst;
-
-    off = 0;
-    inst = NULL;
-
-    while (lwm2m_instance_next(&inst, &progress)) {
-        if (inst->object_id == LWM2M_OBJ_SECURITY) {
-            continue;
-        }
-
-        tlv_off = sizeof(tlv_buf);
-        err = lwm2m_acl_serialize_tlv(tlv_buf, &tlv_off, inst);
-        if (err) {
-            __ASSERT(false, "Encoding /2/%d failed (len %d), err %d",
-                    inst->acl.id, tlv_off, err);
-            return err;
-        }
-
-        lwm2m_tlv_t tlv = {
-            .id_type = TLV_TYPE_OBJECT,
-            .id = inst->acl.id,
-            .length = tlv_off,
-            .value = tlv_buf,
-        };
-
-        len = sizeof(buf) - off;
-        err = lwm2m_tlv_encode(&buf[off], &len, &tlv);
-        if (err) {
-            __ASSERT(false, "Encoding /2/%d failed (len %d), err %d",
-                    inst->acl.id, tlv.length, err);
-            return err;
-        }
-
-        off += len;
-
-        LWM2M_TRC("Encoded /2/%d for /%d/%d in %d bytes, off %d",
-                  inst->acl.id, inst->object_id, inst->instance_id, len, off);
-    }
-
-    err = lwm2m_os_storage_write(LWM2M_STORAGE_ID_ACL, buf, off);
-    if (err < 0) {
-        LWM2M_ERR("Failed to write ACL for /%d/%d, err %d",
-                  inst->object_id, inst->instance_id, err);
-        return -1;
-    }
-
-    if (err == 0) {
-        LWM2M_WRN("Storing ACL instances, no change");
-    }
-
-    return 0;
+    return lwm2m_storage_obj_instances_store(LWM2M_OBJ_ACCESS_CONTROL);
 }
 
-int lwm2m_storage_acl_delete(void)
+int lwm2m_storage_access_control_delete(void)
 {
-    return lwm2m_storage_obj_instances_delete(LWM2M_OBJ_ACL);
+    return lwm2m_storage_obj_instances_delete(LWM2M_OBJ_ACCESS_CONTROL);
 }
 
 int lwm2m_storage_location_load(void)

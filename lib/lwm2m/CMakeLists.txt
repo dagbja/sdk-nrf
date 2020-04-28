@@ -25,7 +25,6 @@ zephyr_include_directories(include)
 
 zephyr_library_sources(
     src/lwm2m.c
-    src/lwm2m_acl.c
     src/lwm2m_bootstrap.c
     src/lwm2m_coap_util.c
     src/lwm2m_objects.c

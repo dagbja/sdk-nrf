@@ -9,14 +9,14 @@
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
-#include <lwm2m_acl.h>
+#include <lwm2m_access_control.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_portfolio.h>
 #include <coap_message.h>
-#include <lwm2m_common.h>
 #include <lwm2m_carrier_main.h>
 #include <at_interface.h>
 #include <lwm2m_instance_storage.h>
+#include <lwm2m_portfolio.h>
 
 #define HOST_DEVICE_ID_0           "HUID0"
 #define HOST_DEVICE_MANUFACTURER_0 "HMAN0"
@@ -29,7 +29,6 @@
 #define HOST_DEVICE_SW_VERSION_1   "HSW1"
 
 #define LWM2M_PORTFOLIO_MAX_INSTANCES    3
-#define LWM2M_PORTFOLIO_CARRIER_INSTANCE 2
 
 static lwm2m_object_t    m_object_portfolio;                                  /**< Portfolio base object. */
 static lwm2m_portfolio_t m_instance_portfolio[LWM2M_PORTFOLIO_MAX_INSTANCES]; /**< Portfolio object instance. */
@@ -315,7 +314,10 @@ uint32_t portfolio_instance_callback(lwm2m_instance_t * p_instance,
         resource_id
     };
 
-    err_code = lwm2m_access_remote_get(&access, p_instance, p_request->remote);
+    err_code = lwm2m_access_control_access_remote_get(&access,
+                                                      p_instance->object_id,
+                                                      p_instance->instance_id,
+                                                      p_request->remote);
     if (err_code != 0) {
         return err_code;
     }
@@ -427,6 +429,8 @@ int lwm2m_portfolio_instance_create(uint16_t instance_id)
     *p_instance_id = instance_id;
 
     lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_portfolio[LWM2M_PORTFOLIO_CARRIER_INSTANCE]);
+    lwm2m_access_control_carrier_acl_set(LWM2M_OBJ_PORTFOLIO, m_instance_portfolio[LWM2M_PORTFOLIO_CARRIER_INSTANCE].proto.instance_id);
+    lwm2m_storage_access_control_store();
 
     return 0;
 }
@@ -526,14 +530,6 @@ uint32_t lwm2m_portfolio_object_callback(lwm2m_object_t * p_object,
     return 0;
 }
 
-void lwm2m_portfolio_init_acl(void)
-{
-    for (int i = 0; i < ARRAY_SIZE(m_instance_portfolio); i++)
-    {
-        lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_portfolio[i]);
-    }
-}
-
 void lwm2m_portfolio_init(void)
 {
     //
@@ -551,10 +547,6 @@ void lwm2m_portfolio_init(void)
 
         m_instance_portfolio[i].identity.val.p_string = m_portfolio_identity[i];
         m_instance_portfolio[i].identity.len = ARRAY_SIZE(m_portfolio_identity_val[i]);
-
-        // Set bootstrap server as owner.
-        (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_portfolio[i],
-                                        LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
 
         /* The last instance is reserved for the carrier and will be added to the
            handler upon a CREATE request. */
@@ -578,9 +570,6 @@ void lwm2m_portfolio_init(void)
             (void)lwm2m_bytebuffer_to_string(m_portfolio_identity_val[i][j], strlen(m_portfolio_identity_val[i][j]), &m_portfolio_identity[i][j]);
         }
     }
-
-    // Initialize ACL
-    lwm2m_portfolio_init_acl();
 }
 
 const void * lwm2m_portfolio_resource_reference_get(uint16_t instance_id, uint16_t resource_id, uint8_t *p_type)

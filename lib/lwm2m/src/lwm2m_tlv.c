@@ -315,6 +315,11 @@ uint32_t lwm2m_tlv_list_decode(lwm2m_tlv_t    tlv_range,
             return err_code;
         }
 
+        if (p_list->p_id)
+        {
+            p_list->p_id[p_list->len] = tlv.id;
+        }
+
         switch (p_list->type)
         {
             case LWM2M_LIST_TYPE_UINT8:
@@ -350,11 +355,6 @@ uint32_t lwm2m_tlv_list_decode(lwm2m_tlv_t    tlv_range,
 
             default:
                 return EINVAL;
-        }
-
-        if (p_list->p_id)
-        {
-            p_list->p_id[p_list->len] = tlv.id;
         }
     }
 

@@ -123,6 +123,40 @@ uint32_t lwm2m_tlv_server_encode(uint8_t        * p_buffer,
                                  uint16_t         resource_id,
                                  lwm2m_server_t * p_server);
 
+/**@brief Decode a LWM2M access control object from a TLV byte buffer.
+ *
+ * @note    Resource values NOT found in the TLV will not be altered.
+ *
+ * @warning lwm2m_string_t and lwm2m_opaque_t values will point to the byte buffer and needs
+ *          to be copied by the application before the byte buffer is freed.
+ *
+ * @param[out] p_access_control  Pointer to a LWM2M access control object to be filled by the decoded TLVs.
+ * @param[in]  p_buffer          Pointer to the TLV byte buffer to be decoded.
+ * @param[in]  buffer_len        Size of the buffer to be decoded.
+ * @param[in]  resource_callback Callback function to handle vendor specific TLV resources.
+ *
+ * @retval NRF_SUCCESS If decoding was successful.
+ */
+uint32_t lwm2m_tlv_access_control_decode(lwm2m_access_control_t * p_access_control,
+                                         uint8_t                * p_buffer,
+                                         uint32_t                 buffer_len,
+                                         lwm2m_tlv_callback_t     resource_callback);
+
+/**@brief Encode a LWM2M access control object to a TLV byte buffer.
+ *
+ * @param[out]   p_buffer          Pointer to a byte buffer to be used to fill the encoded TLVs.
+ * @param[inout] p_buffer_len      Value by reference indicating the size of the buffer provided.
+ *                                 Will return the number of used bytes on return.
+ * @param[in]    resource_id       Resource identifier to encode. LWM2M_NAMED_OBJECT to encode all.
+ * @param[in]    p_access_control  Pointer to the LWM2M access control object to be encoded into TLVs.
+ *
+ * @retval NRF_SUCCESS If the encoded was successful.
+ */
+uint32_t lwm2m_tlv_access_control_encode(uint8_t                * p_buffer,
+                                         uint32_t               * p_buffer_len,
+                                         uint16_t                 resource_id,
+                                         lwm2m_access_control_t * p_access_control);
+
 /**@brief Decode a LWM2M connectivity monitoring object from a TLV byte buffer.
  *
  * @note    Resource values NOT found in the TLV will not be altered.

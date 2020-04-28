@@ -10,6 +10,10 @@
 #include <lwm2m.h>
 #include <lwm2m_objects.h>
 
+// Access Control object
+static uint16_t       m_servers[LWM2M_ACCESS_CONTROL_MAX_INSTANCES][LWM2M_MAX_SERVERS + 1];
+static uint16_t       m_acl[LWM2M_ACCESS_CONTROL_MAX_INSTANCES][LWM2M_MAX_SERVERS + 1];
+
 // Connectivity Monitoring object
 static int32_t        m_available_network_bearer[LWM2M_CONNECTIVITY_MONITORING_MAX_NETWORK_BEARERS];
 static lwm2m_string_t m_ip_addresses[LWM2M_CONNECTIVITY_MONITORING_MAX_IP_ADDRESSES];
@@ -130,9 +134,6 @@ void lwm2m_instance_security_init(lwm2m_security_t * p_instance)
     p_instance->proto.instance_id   = 0;
     p_instance->proto.num_resources = sizeof(((lwm2m_security_t *)0)->operations);
 
-    // Clear ACL.
-    memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
-
     // Set access types.
     p_instance->operations[0]  = NONE;
     p_instance->operations[1]  = NONE;
@@ -172,9 +173,6 @@ void lwm2m_instance_server_init(lwm2m_server_t * p_instance)
     p_instance->proto.instance_id   = 0;
     p_instance->proto.num_resources = sizeof(((lwm2m_server_t *)0)->operations);
 
-    // Clear ACL.
-    memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
-
     // Set access types.
     p_instance->operations[0] = READ | WRATT;
     p_instance->operations[1] = READ | WRATT | WRITE;
@@ -201,6 +199,36 @@ void lwm2m_instance_server_init(lwm2m_server_t * p_instance)
 }
 
 
+void lwm2m_instance_access_control_init(lwm2m_access_control_t * p_instance, uint16_t instance_id)
+{
+    // Set prototype variables.
+    LWM2M_INSTANCE_OFFSET_SET(p_instance, lwm2m_access_control_t);
+
+    p_instance->proto.object_id     = LWM2M_OBJ_ACCESS_CONTROL;
+    p_instance->proto.instance_id   = instance_id;
+    p_instance->proto.num_resources = sizeof(((lwm2m_access_control_t *)0)->operations);
+
+    // Set access types.
+    p_instance->operations[0]  = READ | DISC;
+    p_instance->operations[1]  = READ | DISC;
+    p_instance->operations[2]  = READ | DISC | WRITE;
+    p_instance->operations[3]  = READ | DISC | WRITE;
+
+    // Set resource IDs.
+    p_instance->resource_ids[0]  = LWM2M_ACCESS_CONTROL_OBJECT_ID;
+    p_instance->resource_ids[1]  = LWM2M_ACCESS_CONTROL_INSTANCE_ID;
+    p_instance->resource_ids[2]  = LWM2M_ACCESS_CONTROL_ACL;
+    p_instance->resource_ids[3]  = LWM2M_ACCESS_CONTROL_CONTROL_OWNER;
+
+    // ACL per server plus default
+    p_instance->acl.type = LWM2M_LIST_TYPE_UINT16;
+    p_instance->acl.max_len = LWM2M_MAX_SERVERS + 1;
+    p_instance->acl.len = 0;
+    p_instance->acl.p_id = m_servers[instance_id];
+    p_instance->acl.val.p_uint16 = m_acl[instance_id];
+}
+
+
 void lwm2m_instance_firmware_init(lwm2m_firmware_t * p_instance)
 {
     // Set prototype variables.
@@ -209,9 +237,6 @@ void lwm2m_instance_firmware_init(lwm2m_firmware_t * p_instance)
     p_instance->proto.object_id     = LWM2M_OBJ_FIRMWARE;
     p_instance->proto.instance_id   = 0;
     p_instance->proto.num_resources = sizeof(((lwm2m_firmware_t *)0)->operations);
-
-    // Clear ACL.
-    memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
     p_instance->operations[0] = WRITE;
@@ -255,9 +280,6 @@ void lwm2m_instance_connectivity_monitoring_init(lwm2m_connectivity_monitoring_t
     p_instance->proto.object_id     = LWM2M_OBJ_CONN_MON;
     p_instance->proto.instance_id   = 0;
     p_instance->proto.num_resources = sizeof(((lwm2m_connectivity_monitoring_t *)0)->operations);
-
-    // Clear ACL.
-    memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
     p_instance->operations[0]  = READ | WRATT | DISC | OBSV;
@@ -317,9 +339,6 @@ void lwm2m_instance_connectivity_statistics_init(lwm2m_connectivity_statistics_t
     p_instance->proto.instance_id   = 0;
     p_instance->proto.num_resources = sizeof(((lwm2m_connectivity_statistics_t *)0)->operations);
 
-    // Clear ACL.
-    memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
-
     // Set access types.
     p_instance->operations[0] = READ | WRATT;
     p_instance->operations[1] = READ | WRATT;
@@ -352,9 +371,6 @@ void lwm2m_instance_device_init(lwm2m_device_t * p_instance)
     p_instance->proto.object_id     = LWM2M_OBJ_DEVICE;
     p_instance->proto.instance_id   = 0;
     p_instance->proto.num_resources = sizeof(((lwm2m_device_t *)0)->operations);
-
-    // Clear ACL.
-    memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
     p_instance->operations[0]  = READ | WRATT | DISC;
@@ -436,9 +452,6 @@ void lwm2m_instance_location_init(lwm2m_location_t * p_instance)
     p_instance->proto.instance_id   = 0;
     p_instance->proto.num_resources = sizeof(((lwm2m_location_t *)0)->operations);
 
-    // Clear ACL.
-    memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
-
     // Set access types.
     p_instance->operations[0] = READ | WRATT;
     p_instance->operations[1] = READ | WRATT;
@@ -465,9 +478,6 @@ void lwm2m_instance_software_update_init(lwm2m_software_update_t * p_instance)
     p_instance->proto.object_id     = LWM2M_OBJ_SOFTWARE_UPDATE;
     p_instance->proto.instance_id   = 0;
     p_instance->proto.num_resources = sizeof(((lwm2m_software_update_t *)0)->operations);
-
-    // Clear ACL.
-    memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
     p_instance->operations[0] = READ | WRATT;
@@ -500,9 +510,6 @@ void lwm2m_instance_apn_connection_profile_init(lwm2m_apn_conn_prof_t * p_instan
     p_instance->proto.object_id     = LWM2M_OBJ_APN_CONNECTION_PROFILE;
     p_instance->proto.instance_id   = instance_id;
     p_instance->proto.num_resources = sizeof(((lwm2m_apn_conn_prof_t *)0)->operations);
-
-    // Clear ACL.
-    memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
     p_instance->operations[0] = READ | WRATT | WRITE;
@@ -555,9 +562,6 @@ void lwm2m_instance_portfolio_init(lwm2m_portfolio_t * p_instance)
     p_instance->proto.instance_id   = 0;
     p_instance->proto.num_resources = sizeof(((lwm2m_portfolio_t *)0)->operations);
 
-    // Clear ACL.
-    memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
-
     // Set access types.
     p_instance->operations[0] = READ | WRATT | WRITE | DISC | OBSV;
 
@@ -579,9 +583,6 @@ void lwm2m_instance_connectivity_extension_init(lwm2m_connectivity_extension_t *
     p_instance->proto.object_id     = LWM2M_OBJ_CONN_EXT;
     p_instance->proto.instance_id   = 0;
     p_instance->proto.num_resources = sizeof(((lwm2m_connectivity_extension_t *)0)->operations);
-
-    // Clear ACL.
-    memset(&p_instance->proto.acl, 0, sizeof(lwm2m_instance_acl_t));
 
     // Set access types.
     p_instance->operations[0] = READ | WRATT;

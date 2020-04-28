@@ -9,11 +9,10 @@
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
-#include <lwm2m_acl.h>
+#include <lwm2m_access_control.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_conn_stat.h>
 #include <coap_message.h>
-#include <lwm2m_common.h>
 #include <lwm2m_carrier_main.h>
 #include <at_interface.h>
 
@@ -52,9 +51,10 @@ uint32_t conn_stat_instance_callback(lwm2m_instance_t * p_instance,
     LWM2M_TRC("conn_stat_instance_callback");
 
     uint16_t access = 0;
-    uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                       p_instance,
-                                                       p_request->remote);
+    uint32_t err_code = lwm2m_access_control_access_remote_get(&access,
+                                                               p_instance->object_id,
+                                                               p_instance->instance_id,
+                                                               p_request->remote);
     if (err_code != 0)
     {
         return err_code;
@@ -313,11 +313,6 @@ uint32_t lwm2m_conn_stat_object_callback(lwm2m_object_t * p_object,
     return err_code;
 }
 
-void lwm2m_conn_stat_init_acl(void)
-{
-    lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_conn_stat);
-}
-
 void lwm2m_conn_stat_init(void)
 {
     //
@@ -340,12 +335,6 @@ void lwm2m_conn_stat_init(void)
 
     // Collection period timer.
     collection_period_timer = lwm2m_os_timer_get(lwm2m_conn_stat_collection_period);
-
-    // Set bootstrap server as owner.
-    (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_conn_stat,
-                                     LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-
-    lwm2m_conn_stat_init_acl();
 
     (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_conn_stat);
 }

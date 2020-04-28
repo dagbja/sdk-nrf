@@ -8,7 +8,6 @@
 #include <lwm2m_objects.h>
 
 void lwm2m_device_update_carrier_specific_settings(void);
-void lwm2m_device_init_acl(void);
 void lwm2m_device_init(void);
 
 lwm2m_device_t * lwm2m_device_get_instance(uint16_t instance_id);

@@ -12,6 +12,7 @@
 #include <lwm2m_objects.h>
 
 #define LWM2M_PRIMARY_HOST_DEVICE_PORTFOLIO 0
+#define LWM2M_PORTFOLIO_CARRIER_INSTANCE 2
 
 void lwm2m_portfolio_init(void);
 
@@ -25,8 +26,6 @@ uint32_t lwm2m_portfolio_object_callback(lwm2m_object_t * p_object,
                                          uint16_t         instance_id,
                                          uint8_t          op_code,
                                          coap_message_t * p_request);
-
-void lwm2m_portfolio_init_acl(void);
 
 const void * lwm2m_portfolio_resource_reference_get(uint16_t instance_id, uint16_t resource_id, uint8_t *p_type);
 

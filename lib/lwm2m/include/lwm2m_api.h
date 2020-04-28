@@ -179,6 +179,9 @@ typedef struct
 
 #define LWM2M_URI_PATH_MAX_LEN            4 /**< Maximum supported length of the URI path to identify an LwM2M resource. */
 #define LWM2M_MAX_APN_COUNT               3 /**< Maximum supported APNs. */
+
+#define LWM2M_ACL_DEFAULT_SHORT_SERVER_ID    0
+#define LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID  65535
 /**@} */
 
 /**@cond */
@@ -367,21 +370,6 @@ struct lwm2m_object_t
     char                  * p_alias_name; /**< Alternative name of the resource, used when LWM2M_NAMED_OBJECT is set. */
 };
 
-
-/**@brief LWM2M access control list structure
- *
- * @details Used to represent the access to one instance. One instance can only have one owner, the owner always have full access rights.
- *          The other servers can have no access or more. This only applies on the instance level, resources are handled by static rights.
- *
- */
-typedef struct
-{
-    uint16_t access[1+LWM2M_MAX_SERVERS];      /**< ACL array. */
-    uint16_t server[1+LWM2M_MAX_SERVERS];      /**< Short server id to ACL array index. */
-    uint16_t id;                               /**< The id of this ACL instance, has to be unique for each instance. */
-    uint16_t owner;                            /**< Owner of this ACL entry. Short server id */
-} lwm2m_instance_acl_t;
-
 /**@brief LWM2M instance structure.
  *
  * @details Prototype for the instance object, this enables us to search through the instances
@@ -396,7 +384,6 @@ struct lwm2m_instance_t
     uint8_t                   resource_ids_offset; /**< Internal use. */
     uint16_t                  expire_time;         /**< Timeout value on instance level to track when to send observable notifications. */
     lwm2m_instance_callback_t callback;            /**< Called when an operation is done on this instance. */
-    lwm2m_instance_acl_t      acl;                 /**< ACL entry. */
 };
 
 /**@brief LWM2M notification attribute structure. */
@@ -1161,13 +1148,6 @@ const char * lwm2m_path_to_string(const uint16_t *p_path, uint8_t path_len);
  * @param[in] resource_id  Resource identifier of the element.
  */
 void lwm2m_observable_resource_value_changed(uint16_t object_id, uint16_t instance_id, uint16_t resource_id);
-
-/**@brief Update ACL owner and server short server id in all objects.
- *
- * @param[in] old_ssid  Old short server id
- * @param[in] new_ssid  New short server id
- */
-uint32_t lwm2m_update_acl_ssid(uint16_t old_ssid, uint16_t new_ssid);
 
 #ifdef __cplusplus
 }

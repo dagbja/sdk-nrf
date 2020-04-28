@@ -12,7 +12,7 @@
 #include <lwm2m_api.h>
 #include <coap_api.h>
 #include <lwm2m_remote.h>
-#include <lwm2m_acl.h>
+#include <lwm2m_access_control.h>
 #include <lwm2m_observer.h>
 
 static void observer_con_message_callback(uint32_t status, void * arg, coap_message_t * p_response);
@@ -426,7 +426,7 @@ uint32_t lwm2m_respond_with_bs_discover_link(uint16_t object_id, coap_message_t 
 
 uint32_t lwm2m_respond_with_object_link(uint16_t object_id, coap_message_t * p_request)
 {
-    uint8_t  buffer[512];
+    uint8_t  buffer[600];
     uint32_t buffer_len = sizeof(buffer);
 
     uint16_t short_server_id = 0;

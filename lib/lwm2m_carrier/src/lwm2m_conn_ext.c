@@ -9,14 +9,13 @@
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
-#include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_conn_ext.h>
 #include <coap_message.h>
-#include <lwm2m_common.h>
 #include <lwm2m_carrier_main.h>
 #include <lwm2m_instance_storage.h>
 #include <at_interface.h>
+#include <lwm2m_access_control.h>
 
 #define DEFAULT_APN_RETRIES               2
 #define DEFAULT_APN_RETRY_PERIOD          0
@@ -90,9 +89,10 @@ uint32_t conn_ext_instance_callback(lwm2m_instance_t * p_instance,
     LWM2M_TRC("conn_ext_instance_callback");
 
     uint16_t access = 0;
-    uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                p_instance,
-                                                p_request->remote);
+    uint32_t err_code = lwm2m_access_control_access_remote_get(&access,
+                                                               p_instance->object_id,
+                                                               p_instance->instance_id,
+                                                               p_request->remote);
     if (err_code != 0)
     {
         return err_code;
@@ -249,11 +249,6 @@ uint32_t lwm2m_conn_ext_object_callback(lwm2m_object_t * p_object,
     return err_code;
 }
 
-void lwm2m_conn_ext_init_acl(void)
-{
-    lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_conn_ext);
-}
-
 static int lwm2m_conn_ext_iccid_update(void)
 {
     int ret;
@@ -347,12 +342,6 @@ void lwm2m_conn_ext_init(void)
     lwm2m_conn_ext_sinr_and_srxlev_update();
     // The only CE levels supported currently are 0 and 1 (Mode A)
     lwm2m_bytebuffer_to_string("Mode A", strlen("Mode A"), &m_instance_conn_ext.ce_mode);
-
-    // Set bootstrap server as owner.
-    (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_conn_ext,
-                                     LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-
-    lwm2m_conn_ext_init_acl();
 
     (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_conn_ext);
 }

@@ -11,15 +11,14 @@
 #include <lwm2m_api.h>
 #include <lwm2m_time.h>
 #include <lwm2m_objects.h>
-#include <lwm2m_acl.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_apn_conn_prof.h>
 #include <coap_message.h>
-#include <lwm2m_common.h>
 #include <lwm2m_carrier_main.h>
 #include <at_interface.h>
 #include <lwm2m_instance_storage.h>
 #include <operator_check.h>
+#include <lwm2m_access_control.h>
 
 #define LWM2M_APN_CONN_PROF_CUSTOM_INSTANCE  1
 #define LWM2M_APN_CONN_PROF_DEFAULT_INSTANCE 2
@@ -192,6 +191,7 @@ uint32_t lwm2m_apn_conn_prof_custom_apn_set(const char * p_apn)
     if (err_code == ENOENT)
     {
         err_code = lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_apn_conn_prof[LWM2M_APN_CONN_PROF_CUSTOM_INSTANCE]);
+        lwm2m_access_control_carrier_acl_set(LWM2M_OBJ_APN_CONNECTION_PROFILE, m_instance_apn_conn_prof[LWM2M_APN_CONN_PROF_CUSTOM_INSTANCE].proto.instance_id);
     }
 
     if (at_read_apn_status(apn_status, sizeof(apn_status)) != 0)
@@ -204,6 +204,7 @@ uint32_t lwm2m_apn_conn_prof_custom_apn_set(const char * p_apn)
     m_instance_apn_conn_prof[LWM2M_APN_CONN_PROF_CUSTOM_INSTANCE].enable_status = (strstr(apn_status, apn_quoted) == NULL) ? true : false;
 
     lwm2m_storage_apn_conn_prof_store();
+    lwm2m_storage_access_control_store();
 
     return err_code;
 }
@@ -217,9 +218,10 @@ uint32_t apn_conn_prof_instance_callback(lwm2m_instance_t * p_instance,
     LWM2M_TRC("apn_conn_prof_instance_callback");
 
     uint16_t access = 0;
-    uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                p_instance,
-                                                p_request->remote);
+    uint32_t err_code = lwm2m_access_control_access_remote_get(&access,
+                                                               p_instance->object_id,
+                                                               p_instance->instance_id,
+                                                               p_request->remote);
     if (err_code != 0)
     {
         return err_code;
@@ -360,9 +362,10 @@ uint32_t lwm2m_apn_conn_prof_object_callback(lwm2m_object_t * p_object,
                 continue;
             }
 
-            err_code = lwm2m_access_remote_get(&access,
-                                               p_instance,
-                                               p_request->remote);
+            err_code = lwm2m_access_control_access_remote_get(&access,
+                                                              p_instance->object_id,
+                                                              p_instance->instance_id,
+                                                              p_request->remote);
 
             if (err_code != 0 || (access & op_code) == 0)
             {
@@ -410,14 +413,6 @@ uint32_t lwm2m_apn_conn_prof_object_callback(lwm2m_object_t * p_object,
     }
 
     return err_code;
-}
-
-void lwm2m_apn_conn_prof_init_acl(void)
-{
-    for (int i = 0; i < ARRAY_SIZE(m_instance_apn_conn_prof); i++)
-    {
-        lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_apn_conn_prof[i]);
-    }
 }
 
 void lwm2m_apn_conn_prof_apn_status_update(void)
@@ -489,10 +484,5 @@ void lwm2m_apn_conn_prof_init(void)
 
             lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_apn_conn_prof[i]);
         }
-
-        lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_apn_conn_prof[i],
-                                    LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
     }
-
-    lwm2m_apn_conn_prof_init_acl();
 }

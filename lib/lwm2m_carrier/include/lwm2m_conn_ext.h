@@ -34,6 +34,4 @@ uint32_t lwm2m_conn_ext_object_callback(lwm2m_object_t * p_object,
                                         uint8_t          op_code,
                                         coap_message_t * p_request);
 
-void lwm2m_conn_ext_init_acl(void);
-
 #endif /* LWM2M_CONN_EXT_H__ */

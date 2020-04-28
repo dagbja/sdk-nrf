@@ -10,12 +10,11 @@
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
-#include <lwm2m_acl.h>
+#include <lwm2m_access_control.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_conn_mon.h>
 #include <lwm2m_apn_conn_prof.h>
 #include <coap_message.h>
-#include <lwm2m_common.h>
 #include <lwm2m_carrier_main.h>
 #include <operator_check.h>
 #include <at_interface.h>
@@ -503,7 +502,10 @@ uint32_t conn_mon_instance_callback(lwm2m_instance_t * p_instance,
         resource_id
     };
 
-    err_code = lwm2m_access_remote_get(&access, p_instance, p_request->remote);
+    err_code = lwm2m_access_control_access_remote_get(&access,
+                                                      p_instance->object_id,
+                                                      p_instance->instance_id,
+                                                      p_request->remote);
     if (err_code != 0) {
         return err_code;
     }
@@ -721,11 +723,6 @@ const void * lwm2m_conn_mon_resource_reference_get(uint16_t resource_id, uint8_t
     return p_observable;
 }
 
-void lwm2m_conn_mon_init_acl(void)
-{
-    lwm2m_set_carrier_acl((lwm2m_instance_t *)&m_instance_conn_mon);
-}
-
 void lwm2m_conn_mon_init(void)
 {
     //
@@ -747,12 +744,6 @@ void lwm2m_conn_mon_init(void)
     (void)at_read_smnc_smcc(&m_instance_conn_mon.smnc, &m_instance_conn_mon.smcc);
 
     m_instance_conn_mon.proto.callback = conn_mon_instance_callback;
-
-    // Set bootstrap server as owner.
-    (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_conn_mon,
-                                     LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-
-    lwm2m_conn_mon_init_acl();
 
     (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_conn_mon);
 }

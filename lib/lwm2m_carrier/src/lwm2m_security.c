@@ -8,9 +8,8 @@
 #include <stdio.h>
 #include <lwm2m.h>
 #include <lwm2m_api.h>
-#include <lwm2m_common.h>
 #include <lwm2m_objects.h>
-#include <lwm2m_acl.h>
+#include <lwm2m_access_control.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
 #include <lwm2m_remote.h>
@@ -233,9 +232,10 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
     LWM2M_TRC("security_instance_callback");
 
     uint16_t access = 0;
-    uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                       p_instance,
-                                                       p_request->remote);
+    uint32_t err_code = lwm2m_access_control_access_remote_get(&access,
+                                                               p_instance->object_id,
+                                                               p_instance->instance_id,
+                                                               p_request->remote);
     if (err_code != 0)
     {
         return err_code;

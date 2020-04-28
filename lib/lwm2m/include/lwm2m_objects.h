@@ -30,7 +30,7 @@ extern "C" {
 /* @brief LWM2M Enabler Object IDs Appendix E  */
 #define LWM2M_OBJ_SECURITY                    0
 #define LWM2M_OBJ_SERVER                      1
-#define LWM2M_OBJ_ACL                         2
+#define LWM2M_OBJ_ACCESS_CONTROL              2
 #define LWM2M_OBJ_DEVICE                      3
 #define LWM2M_OBJ_CONN_MON                    4
 #define LWM2M_OBJ_FIRMWARE                    5
@@ -122,11 +122,16 @@ extern "C" {
 
 
 
-/* LWM2M ACL Resources */
-#define LWM2M_ACL_OBJECT_ID                     0
-#define LWM2M_ACL_INSTANCE_ID                   1
-#define LWM2M_ACL_ACL                           2
-#define LWM2M_ACL_CONTROL_OWNER                 3
+/* LWM2M Access Control Resources */
+#define LWM2M_ACCESS_CONTROL_OBJECT_ID          0
+#define LWM2M_ACCESS_CONTROL_INSTANCE_ID        1
+#define LWM2M_ACCESS_CONTROL_ACL                2
+#define LWM2M_ACCESS_CONTROL_CONTROL_OWNER      3
+
+/* One Access Control instance per any object instance registered in the
+   request handler, excluding Security instances and the Bootstrap Server
+   instance. */
+#define LWM2M_ACCESS_CONTROL_MAX_INSTANCES      14
 
 /* LWM2M Connectivity Monitoring Resources */
 #define LWM2M_CONN_MON_NETWORK_BEARER           0
@@ -278,6 +283,20 @@ typedef struct
     void *                     bootstrap_request_trigger;    // Function pointer.
 
 } lwm2m_server_t;
+
+typedef struct
+{
+    lwm2m_instance_t           proto;            /* Internal. MUST be first. */
+    uint8_t                    operations[4];    /* Internal. MUST be second. */
+    uint16_t                   resource_ids[4];  /* Internal. MUST be third. */
+
+    /* Public members. */
+    uint16_t                   object_id;
+    uint16_t                   instance_id;
+    lwm2m_list_t               acl;
+    uint16_t                   control_owner;
+
+} lwm2m_access_control_t;
 
 typedef struct
 {
@@ -517,6 +536,14 @@ void lwm2m_instance_security_init(lwm2m_security_t * p_instance);
  * @param[in] p_instance Pointer to instance structure to initialize.
  */
 void lwm2m_instance_server_init(lwm2m_server_t * p_instance);
+
+/**@brief Initialize a LWM2M access control object instance
+ *
+ * @details Must be called before any use of the instance.
+ *
+ * @param[in] p_instance Pointer to instance structure to initialize.
+ */
+void lwm2m_instance_access_control_init(lwm2m_access_control_t * p_instance, uint16_t instance_id);
 
 /**@brief Initialize a LWM2M firmware object instance.
  *

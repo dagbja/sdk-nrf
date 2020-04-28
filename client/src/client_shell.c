@@ -213,7 +213,6 @@ static int cmd_server_print(const struct shell *shell, size_t argc, char **argv)
 
     for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++) {
         if (lwm2m_server_short_server_id_get(i) != 0) {
-            lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(i);
             char * p_binding = lwm2m_server_binding_get(i, &binding_len);
             if (binding_len > sizeof(binding) - 1) {
                 binding_len = sizeof(binding) - 1;
@@ -234,8 +233,6 @@ static int cmd_server_print(const struct shell *shell, size_t argc, char **argv)
                 shell_print(shell, "  Is Registered    %s", lwm2m_server_registered_get(i) ? "Yes" : "No");
                 shell_print(shell, "  Client Holdoff   %ld", lwm2m_server_client_hold_off_timer_get(i));
             }
-
-            shell_print(shell, "  Owner            %d", p_instance->acl.owner);
         }
     }
 

@@ -8,8 +8,7 @@
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
-#include <lwm2m_acl.h>
-#include <lwm2m_common.h>
+#include <lwm2m_access_control.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
 #include <lwm2m_remote.h>
@@ -17,6 +16,9 @@
 #include <lwm2m_instance_storage.h>
 #include <lwm2m_carrier_main.h>
 #include <operator_check.h>
+#include <lwm2m_carrier.h>
+#include <lwm2m_factory_bootstrap.h>
+#include <lwm2m_security.h>
 
 #include <coap_option.h>
 #include <coap_observe_api.h>
@@ -232,9 +234,10 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
     LWM2M_TRC("server_instance_callback");
 
     uint16_t access = 0;
-    uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                       p_instance,
-                                                       p_request->remote);
+    uint32_t err_code = lwm2m_access_control_access_remote_get(&access,
+                                                               p_instance->object_id,
+                                                               p_instance->instance_id,
+                                                               p_request->remote);
 
     if (err_code != 0)
     {
@@ -546,9 +549,10 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
 
             uint16_t access = 0;
             lwm2m_instance_t * p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(i);
-            uint32_t err_code = lwm2m_access_remote_get(&access,
-                                                               p_instance,
-                                                               p_request->remote);
+            uint32_t err_code = lwm2m_access_control_access_remote_get(&access,
+                                                                       p_instance->object_id,
+                                                                       p_instance->instance_id,
+                                                                       p_request->remote);
             if (err_code != 0 || (access & op_code) == 0)
             {
                 continue;
@@ -602,6 +606,7 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
             // Cast the instance to its prototype and add it.
             (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_server[instance_id]);
             (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_server[instance_id]);
+            lwm2m_access_control_instance_bind(LWM2M_OBJ_SERVER, instance_id, NULL);
 
             (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
         }
@@ -630,10 +635,17 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
     {
         if (instance_id == LWM2M_INVALID_INSTANCE)
         {
+            uint16_t bootstrap_ssid = lwm2m_security_short_server_id_get(LWM2M_BOOTSTRAP_INSTANCE_ID); 
             // Delete all instances except Bootstrap server
-            for (uint32_t i = 1; i < 1 + LWM2M_MAX_SERVERS; i++)
+            for (uint32_t i = 0; i < 1 + LWM2M_MAX_SERVERS; i++)
             {
+                if (m_instance_server[i].short_server_id == bootstrap_ssid)
+                {
+                    continue;
+                }
+
                 (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_server[i]);
+                lwm2m_access_control_instance_unbind(m_instance_server[i].proto.object_id, m_instance_server[i].proto.instance_id);
             }
         }
         else
@@ -646,6 +658,7 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
             }
 
             (void)lwm2m_coap_handler_instance_delete((lwm2m_instance_t *)&m_instance_server[instance_id]);
+            lwm2m_access_control_instance_unbind(m_instance_server[instance_id].proto.object_id, m_instance_server[instance_id].proto.instance_id);
         }
 
         (void)lwm2m_respond_with_code(COAP_CODE_202_DELETED, p_request);
@@ -739,4 +752,26 @@ const void * lwm2m_server_resource_reference_get(uint16_t instance_id, uint16_t 
     }
 
     return p_observable;
+}
+
+uint32_t lwm2m_server_first_non_bootstrap_ssid_get(uint16_t *p_ssid)
+{
+    if (!p_ssid)
+    {
+        return EINVAL;
+    }
+
+    uint16_t bootstrap_ssid = lwm2m_security_short_server_id_get(LWM2M_BOOTSTRAP_INSTANCE_ID);
+
+    for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
+    {
+        // Find short server id for the first instance which is not bootstrap.
+        uint16_t ssid = lwm2m_server_short_server_id_get(i);
+        if (ssid != 0 && ssid != bootstrap_ssid) {
+            *p_ssid = ssid;
+            return 0;
+        }
+    }
+
+    return ENOENT;
 }

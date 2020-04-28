@@ -13,7 +13,6 @@
 #include <lwm2m_api.h>
 #include <lwm2m_register.h>
 #include <lwm2m_bootstrap.h>
-#include <lwm2m_acl.h>
 #include <lwm2m_tlv.h>
 #include <lwm2m_objects.h>
 #include <lwm2m_remote.h>
@@ -119,42 +118,6 @@ static bool numbers_only(const char * p_str, uint16_t str_len)
     return true;
 }
 
-
-static uint16_t internal_get_allowed_operations(lwm2m_instance_t * p_instance,
-                                                uint16_t           short_server_id)
-{
-    uint16_t acl_access;
-    uint32_t err_code;
-
-    // Find access for the short_server_id.
-    err_code = lwm2m_acl_permissions_check(&acl_access,
-                                           p_instance,
-                                           short_server_id);
-
-    if (err_code != 0)
-    {
-        err_code = lwm2m_acl_permissions_check(&acl_access,
-                                               p_instance,
-                                               LWM2M_ACL_DEFAULT_SHORT_SERVER_ID);
-
-        if (err_code != 0)
-        {
-             // Should not happen as p_instance should not be NULL
-        }
-    }
-
-
-    if ((acl_access &  LWM2M_PERMISSION_READ) > 0)
-    {
-        // Observe and discover is allowed if READ is allowed.
-        acl_access = (acl_access | LWM2M_OPERATION_CODE_DISCOVER | LWM2M_OPERATION_CODE_OBSERVE | LWM2M_OPERATION_CODE_WRITE_ATTR);
-    }
-
-
-    return acl_access;
-}
-
-
 uint32_t lwm2m_lookup_instance(lwm2m_instance_t  ** pp_instance,
                                uint16_t             object_id,
                                uint16_t             instance_id)
@@ -238,493 +201,6 @@ static uint32_t op_code_resolve(lwm2m_instance_t * p_instance,
     return ENOENT;
 }
 
-
-static uint32_t internal_gen_acl_link(uint8_t * p_buffer, uint32_t * p_len, uint16_t short_server_id)
-{
-    uint32_t buffer_index    = 0;
-    uint32_t buffer_max_size = *p_len;
-    uint32_t buffer_len;
-
-    uint8_t  dry_run_buffer[16]; // Maximum: "</65535/65535>,"
-    bool     dry_run      = false;
-    uint16_t dry_run_size = 0;
-
-    if (p_buffer == NULL)
-    {
-        // Dry-run only, in order to calculate the size of the needed buffer.
-        dry_run         = true;
-        p_buffer        = dry_run_buffer;
-        buffer_max_size = sizeof(dry_run_buffer);
-    }
-
-    for (int i = 0; i < m_num_instances; ++i)
-    {
-        if (m_instances[i]->object_id == LWM2M_OBJ_SECURITY)
-        {
-            // Skip ACL for Security objects.
-            continue;
-        }
-
-        uint16_t allowed_ops = internal_get_allowed_operations(m_instances[i], short_server_id);
-        if (allowed_ops == 0)
-        {
-            // No access.
-            continue;
-        }
-
-        buffer_len = snprintf((char *)dry_run_buffer,
-                              sizeof(dry_run_buffer),
-                              ",</2/%u>",
-                              m_instances[i]->acl.id);
-
-        if (dry_run == true)
-        {
-            dry_run_size += buffer_len;
-        }
-        else if (buffer_index + buffer_len <= buffer_max_size)
-        {
-            memcpy(&p_buffer[buffer_index], dry_run_buffer, buffer_len);
-            buffer_index += buffer_len;
-        }
-        else
-        {
-            return ENOMEM;
-        }
-    }
-
-    if (dry_run == true)
-    {
-        *p_len = dry_run_size;
-    }
-    else
-    {
-        *p_len = buffer_index;
-    }
-
-
-    return 0;
-}
-
-static uint32_t internal_request_handle_acl(coap_message_t * p_request,
-                                            uint16_t       * p_path,
-                                            uint8_t          path_len,
-                                            uint8_t          operation,
-                                            uint16_t         short_server_id)
-{
-    uint32_t           err_code        = ENOENT;
-    uint32_t           index           = 0;
-    uint32_t           buffer_max_size = LWM2M_COAP_HANDLER_MAX_INSTANCES * LWM2M_ACL_TLV_SIZE;
-    uint32_t           buffer_len      = buffer_max_size;
-    bool               owner           = false;
-    uint8_t            buffer[buffer_max_size];
-    lwm2m_instance_t * current_instance = NULL;
-
-    if (path_len == 1)
-    {
-        LWM2M_TRC(">> %s object /%u/ SSID: %u",
-                  m_operation_desc[op_desc_idx_lookup(operation)],
-                  p_path[0],
-                  short_server_id);
-
-
-        switch(operation)
-        {
-            case LWM2M_OPERATION_CODE_READ:
-            {
-                uint32_t acl_buffer_len;
-                uint8_t  acl_buffer[64];
-
-                for(int i = 0; i < m_num_instances; ++i)
-                {
-                    if (m_instances[i]->object_id == LWM2M_OBJ_SECURITY)
-                    {
-                        // Skip ACL for Security objects.
-                        continue;
-                    }
-
-                    uint16_t allowed_ops = internal_get_allowed_operations(m_instances[i], short_server_id);
-                    if (allowed_ops == 0)
-                    {
-                        // No access.
-                        continue;
-                    }
-
-                    acl_buffer_len = 64;
-                    err_code = lwm2m_acl_serialize_tlv(acl_buffer, &acl_buffer_len, m_instances[i]);
-                    if (err_code != 0)
-                    {
-                        // ENOMEM should not happen. Then it is a bug.
-                        break;
-                    }
-
-                    lwm2m_tlv_t tlv = {
-                        .id_type = TLV_TYPE_OBJECT,
-                        .id      = m_instances[i]->acl.id,
-                        .length  = acl_buffer_len
-                    };
-                    err_code = lwm2m_tlv_header_encode(buffer + index, &buffer_len, &tlv);
-
-                    index += buffer_len;
-                    buffer_len = buffer_max_size - index;
-
-                    memcpy(buffer + index, acl_buffer, acl_buffer_len);
-
-                    index += acl_buffer_len;
-                    buffer_len = buffer_max_size - index;
-                }
-
-                err_code = lwm2m_respond_with_payload(buffer, index, COAP_CT_APP_LWM2M_TLV, p_request);
-                break;
-            }
-
-            case LWM2M_OPERATION_CODE_DISCOVER:
-            {
-                uint32_t preamble_len = snprintf(buffer, sizeof(buffer), "</2>");
-                buffer_len -= preamble_len;
-
-                err_code = internal_gen_acl_link(&buffer[preamble_len], &buffer_len, short_server_id);
-                if (err_code != 0)
-                {
-                    // This should not happen, it is a bug if the buffer is too small.
-                    break;
-                }
-
-                err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LINK_FORMAT, p_request);
-                break;
-            }
-
-            case LWM2M_OPERATION_CODE_WRITE:
-            case LWM2M_OPERATION_CODE_EXECUTE:
-            case LWM2M_OPERATION_CODE_DELETE:
-            case LWM2M_OPERATION_CODE_CREATE:
-                break;
-
-            default:
-                break;
-        }
-
-        LWM2M_TRC("<< %s object /%u/",
-                  m_operation_desc[op_desc_idx_lookup(operation)],
-                  p_path[0]);
-    }
-
-    if (path_len == 2)
-    {
-        LWM2M_TRC(">> %s instance /%u/%u/ SSID: %u",
-                  m_operation_desc[op_desc_idx_lookup(operation)],
-                  p_path[0],
-                  p_path[1],
-                  short_server_id);
-
-        // Check if short_server_id is owner.
-        for(int i = 0; i < m_num_instances; ++i)
-        {
-            if (m_instances[i]->object_id == LWM2M_OBJ_SECURITY)
-            {
-                // Skip ACL for Security objects.
-                continue;
-            }
-
-            if (m_instances[i]->acl.id == p_path[1])
-            {
-                current_instance = m_instances[i];
-                if (m_instances[i]->acl.owner == short_server_id)
-                {
-                    owner = true;
-                }
-            }
-        }
-
-        if (current_instance == NULL)
-        {
-            return ENOENT;
-        }
-
-        switch (operation)
-        {
-            case LWM2M_OPERATION_CODE_READ:
-            {
-                bool found = false;
-                for(int i = 0; i < m_num_instances; ++i)
-                {
-                    if (m_instances[i]->acl.id == p_path[1])
-                    {
-                        err_code = lwm2m_acl_serialize_tlv(buffer, &buffer_len, m_instances[i]);
-                        if (err_code != 0)
-                        {
-                             // This should not happen, it is a bug if the buffer is too small.
-                             break;
-                        }
-
-                        err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LWM2M_TLV, p_request);
-                        found = true;
-
-                        break;
-                    }
-                }
-
-                if (!found)
-                {
-                    err_code = ENOENT;
-                }
-
-                break;
-            }
-
-            case LWM2M_OPERATION_CODE_WRITE:
-            {
-                if ((short_server_id != LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID) &&
-                    (!owner))
-                {
-                    LWM2M_MUTEX_UNLOCK();
-
-                    err_code = lwm2m_handler_error(short_server_id,
-                                                   current_instance,
-                                                   p_request,
-                                                   EACCES);
-
-                    LWM2M_MUTEX_LOCK();
-
-                    if (err_code != 0)
-                    {
-                        err_code = lwm2m_respond_with_code(COAP_CODE_401_UNAUTHORIZED, p_request);
-                        break;
-                    }
-                }
-
-
-                err_code = lwm2m_acl_deserialize_tlv(p_request->payload, p_request->payload_len, current_instance);
-                if (err_code != 0)
-                {
-                    LWM2M_MUTEX_UNLOCK();
-
-                    err_code = lwm2m_handler_error(short_server_id,
-                                                   current_instance,
-                                                   p_request,
-                                                   err_code);
-
-                    LWM2M_MUTEX_LOCK();
-
-                    if (err_code != 0)
-                    {
-                        err_code = lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
-                    }
-                }
-                else
-                {
-                    err_code = lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
-                }
-
-                break;
-            }
-
-            case LWM2M_OPERATION_CODE_DISCOVER:
-            {
-                bool found = false;
-                for(int i = 0; i < m_num_instances; ++i)
-                {
-                    if (m_instances[i]->acl.id == p_path[1])
-                    {
-                        // We always have the same resources.
-                        buffer_len = snprintf((char *)buffer,
-                                              buffer_max_size,
-                                              "</2/%u>,</2/%u/0>,</2/%u/1>,</2/%u/2>,</2/%u/3>",
-                                              m_instances[i]->acl.id,
-                                              m_instances[i]->acl.id,
-                                              m_instances[i]->acl.id,
-                                              m_instances[i]->acl.id,
-                                              m_instances[i]->acl.id);
-
-                        err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LINK_FORMAT, p_request);
-                        found = true;
-                        break;
-                    }
-                }
-
-                if (!found)
-                {
-                    err_code = ENOENT;
-                }
-                break;
-            }
-
-            case LWM2M_OPERATION_CODE_EXECUTE:
-            case LWM2M_OPERATION_CODE_DELETE:
-            case LWM2M_OPERATION_CODE_CREATE:
-            case LWM2M_OPERATION_CODE_OBSERVE:
-                break;
-
-            default:
-                break;
-        }
-
-        LWM2M_TRC("<< %s instance /%u/%u/",
-                  m_operation_desc[op_desc_idx_lookup(operation)],
-                  p_path[0],
-                  p_path[1]);
-    }
-
-    if (path_len == 3)
-    {
-        LWM2M_TRC(">> %s instance /%u/%u/%u/ SSID: %u",
-                  m_operation_desc[op_desc_idx_lookup(operation)],
-                  p_path[0],
-                  p_path[1],
-                  p_path[2],
-                  short_server_id);
-
-        // Check if owner
-        for (int i = 0; i < m_num_instances; ++i)
-        {
-            if (m_instances[i]->object_id == LWM2M_OBJ_SECURITY)
-            {
-                // Skip ACL for Security objects.
-                continue;
-            }
-
-            if (m_instances[i]->acl.id == p_path[1])
-            {
-                current_instance = m_instances[i];
-            }
-        }
-
-        if (current_instance == NULL)
-        {
-            return ENOENT;
-        }
-
-        if (operation == LWM2M_OPERATION_CODE_DISCOVER)
-        {
-            buffer_len = snprintf((char *)buffer,
-                                    buffer_max_size,
-                                    "</2/%u/%u>",
-                                    current_instance->acl.id,
-                                    p_path[2]);
-
-            err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LINK_FORMAT, p_request);
-
-            return err_code;
-        }
-
-        switch (p_path[2])
-        {
-            /**
-             * Writing a new object / instance id is not defined in our implementation.
-             * That would be the same as moving ACL between instances. (which can be done, but seems unnecessary)
-             */
-
-            case LWM2M_ACL_OBJECT_ID:
-            {
-                if (operation == LWM2M_OPERATION_CODE_READ)
-                {
-                    err_code = lwm2m_tlv_integer_encode(buffer, &buffer_len,
-                                                        LWM2M_ACL_OBJECT_ID,
-                                                        current_instance->object_id);
-
-                    if (err_code != 0)
-                    {
-                        return err_code;
-                    }
-
-                    err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LWM2M_TLV, p_request);
-
-                }
-
-                break;
-            }
-            case LWM2M_ACL_INSTANCE_ID:
-            {
-                if (operation == LWM2M_OPERATION_CODE_READ)
-                {
-                    err_code = lwm2m_tlv_integer_encode(buffer, &buffer_len,
-                                                        LWM2M_ACL_INSTANCE_ID,
-                                                        current_instance->instance_id);
-
-                    if (err_code != 0)
-                    {
-                        return err_code;
-                    }
-
-                    err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LWM2M_TLV, p_request);
-
-                }
-
-                break;
-            }
-            case LWM2M_ACL_ACL:
-            {
-                if (operation == LWM2M_OPERATION_CODE_READ)
-                {
-                    // Encode the ACLs.
-                    lwm2m_list_t list;
-                    uint16_t list_identifiers[LWM2M_MAX_SERVERS];
-                    uint16_t list_values[LWM2M_MAX_SERVERS];
-
-                    list.type         = LWM2M_LIST_TYPE_UINT16;
-                    list.p_id         = list_identifiers;
-                    list.val.p_uint16 = list_values;
-                    list.len          = 0;
-
-                    for (int i = 1; i < (1+LWM2M_MAX_SERVERS); ++i)
-                    {
-                        if (current_instance->acl.server[i] != 0)
-                        {
-                            list_identifiers[list.len] = current_instance->acl.server[i];
-                            list_values[list.len]      = current_instance->acl.access[i];
-                            list.len++;
-                        }
-                    }
-
-                    err_code = lwm2m_tlv_list_encode(buffer, &buffer_len, LWM2M_ACL_ACL, &list);
-
-                    if (err_code != 0)
-                    {
-                        return err_code;
-                    }
-
-                    err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LWM2M_TLV, p_request);
-                }
-
-                break;
-            }
-            case LWM2M_ACL_CONTROL_OWNER:
-            {
-                if (operation == LWM2M_OPERATION_CODE_READ)
-                {
-                    err_code = lwm2m_tlv_integer_encode(buffer, &buffer_len,
-                                                       LWM2M_ACL_CONTROL_OWNER,
-                                                       current_instance->acl.owner);
-
-                    if (err_code != 0)
-                    {
-                        return err_code;
-                    }
-
-                    err_code = lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LWM2M_TLV, p_request);
-
-                }
-
-                break;
-            }
-            default:
-                err_code = lwm2m_respond_with_code(COAP_CODE_501_NOT_IMPLEMENTED, p_request);
-                break;
-
-        }
-
-        LWM2M_TRC("<< %s instance /%u/%u/%u/",
-                  m_operation_desc[op_desc_idx_lookup(operation)],
-                  p_path[0],
-                  p_path[1],
-                  p_path[2]);
-
-
-    }
-
-    return err_code;
-}
-
-
 uint32_t lwm2m_coap_handler_gen_object_link(uint16_t   object_id,
                                             uint16_t   short_server_id,
                                             uint8_t  * p_buffer,
@@ -765,13 +241,6 @@ uint32_t lwm2m_coap_handler_gen_object_link(uint16_t   object_id,
     {
         if (m_instances[i]->object_id == object_id)
         {
-            uint16_t allowed_ops = internal_get_allowed_operations(m_instances[i], short_server_id);
-            if (allowed_ops == 0)
-            {
-                // No access.
-                continue;
-            }
-
             if (buffer_index + 1 <= buffer_max_size)
             {
                 memcpy(&p_buffer[buffer_index], ",", 1);
@@ -975,21 +444,7 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
             return err_code;
         }
-
-
     }
-
-    /**
-     * Jump out if the first path element is LWM2M_OBJ_ACL.
-     *
-     * This means that the object type is ACL, this is handled as an exception to avoid creating 2x instance_prototypes
-     * per actual instance added.
-     */
-    if (path_len > 0 && p_path[0] == LWM2M_OBJ_ACL)
-    {
-        return internal_request_handle_acl(p_request, p_path, path_len, operation, short_server_id);
-    }
-
 
     err_code = ENOENT;
 
@@ -997,7 +452,6 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
     {
         case 0:
         {
-
             if (operation == LWM2M_OPERATION_CODE_DELETE)
             {
                 LWM2M_TRC(">> %s root /",
@@ -1119,16 +573,11 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
 
             if (err_code == 0)
             {
-
-                // Lookup ACL.
-                uint16_t allowed_ops = internal_get_allowed_operations(p_instance,
-                                                                       short_server_id);
-
                 LWM2M_MUTEX_UNLOCK();
 
                 err_code = p_instance->callback(p_instance,
                                                 LWM2M_INVALID_RESOURCE,
-                                                (operation & allowed_ops),
+                                                operation,
                                                 p_request);
 
                 LWM2M_MUTEX_LOCK();
@@ -1279,15 +728,11 @@ static uint32_t internal_request_handle(coap_message_t * p_request,
                         p_path[1],
                         p_path[2]);
 
-            // Lookup ACL.
-            uint16_t allowed_ops = internal_get_allowed_operations(p_instance,
-                                                                   short_server_id);
-
             LWM2M_MUTEX_UNLOCK();
 
             err_code = p_instance->callback(p_instance,
                                             p_path[2],
-                                            (operation & allowed_ops),
+                                            operation,
                                             p_request);
 
             LWM2M_MUTEX_LOCK();
@@ -1595,7 +1040,6 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint16_t object_id, uint16_t short_s
     uint16_t  buffer_len;
     uint8_t * p_string_buffer;
     uint16_t  buffer_max_size;
-    uint32_t  acl_link_size = 0;
     uint32_t  err_code = 0;
     bool      first_entry = true;
 
@@ -1663,22 +1107,18 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint16_t object_id, uint16_t short_s
             continue;
         }
 
+        if (short_server_id == LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID && curr_object == LWM2M_OBJ_ACCESS_CONTROL)
+        {
+            // Skip Access Control objects in Bootstrap Discover.
+            continue;
+        }
+
         bool instance_present = false;
 
         for (int j = 0; j < m_num_instances; ++j)
         {
             if (m_instances[j]->object_id == curr_object)
             {
-                if (short_server_id != LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID)
-                {
-                    uint16_t allowed_ops = internal_get_allowed_operations(m_instances[j], short_server_id);
-                    if (allowed_ops == 0)
-                    {
-                        // No access.
-                        continue;
-                    }
-                }
-
                 instance_present = true;
 
                 buffer_len = snprintf((char *)dry_run_buffer,
@@ -1771,29 +1211,13 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint16_t object_id, uint16_t short_s
         }
     }
 
-    // Do not add ACL for Bootstrap DISCOVER
-    if (short_server_id != LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID)
-    {
-        // Write ACL object
-        if (dry_run == true)
-        {
-            acl_link_size = 0;
-            err_code = internal_gen_acl_link(NULL, &acl_link_size, short_server_id);
-        }
-        else
-        {
-            acl_link_size = buffer_max_size - buffer_index;
-            err_code = internal_gen_acl_link(&p_string_buffer[buffer_index], &acl_link_size, short_server_id);
-        }
-    }
-
     if (dry_run == true)
     {
-        *p_buffer_len = dry_run_size + acl_link_size;
+        *p_buffer_len = dry_run_size;
     }
     else
     {
-        *p_buffer_len = buffer_index + acl_link_size;
+        *p_buffer_len = buffer_index;
     }
 
     LWM2M_MUTEX_UNLOCK();
@@ -1990,25 +1414,4 @@ const char * lwm2m_path_to_string(const uint16_t *p_path, uint8_t path_len)
     uri_path[index] = '\0';
 
     return uri_path;
-}
-
-uint32_t lwm2m_update_acl_ssid(uint16_t old_ssid, uint16_t new_ssid)
-{
-    for (int i = 0; i < m_num_instances; ++i)
-    {
-        if (m_instances[i]->acl.owner == old_ssid)
-        {
-            m_instances[i]->acl.owner = new_ssid;
-        }
-
-        for (int j = 1; j < (1+LWM2M_MAX_SERVERS); ++j)
-        {
-            if (m_instances[i]->acl.server[j] == old_ssid)
-            {
-                m_instances[i]->acl.server[j] = new_ssid;
-            }
-        }
-    }
-
-    return 0;
 }

@@ -71,3 +71,5 @@ const void * lwm2m_server_resource_reference_get(uint16_t instance_id, uint16_t 
 
 uint32_t tlv_server_carrier_decode(uint16_t instance_id, lwm2m_tlv_t * p_tlv);
 uint32_t tlv_server_carrier_encode(uint16_t instance_id, uint8_t * p_buffer, uint32_t * p_buffer_len);
+
+uint32_t lwm2m_server_first_non_bootstrap_ssid_get(uint16_t *p_ssid);

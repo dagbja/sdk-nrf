@@ -8,19 +8,19 @@
 #include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_objects.h>
-#include <lwm2m_acl.h>
+#include <lwm2m_access_control.h>
 #include <lwm2m_firmware.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
 #include <lwm2m_carrier_main.h>
 #include <lwm2m_remote.h>
 #include <operator_check.h>
+#include <lwm2m_server.h>
 
 #include <coap_option.h>
 #include <coap_observe_api.h>
 #include <coap_message.h>
 
-#include <lwm2m_common.h>
 #include <lwm2m_firmware_download.h>
 #include <app_debug.h>
 
@@ -394,7 +394,10 @@ uint32_t firmware_instance_callback(lwm2m_instance_t *p_instance,
         resource_id
     };
 
-    err_code = lwm2m_access_remote_get(&access, p_instance, p_request->remote);
+    err_code = lwm2m_access_control_access_remote_get(&access, 
+                                                      p_instance->object_id,
+                                                      p_instance->instance_id,
+                                                      p_request->remote);
     if (err_code != 0) {
         return err_code;
     }
@@ -533,30 +536,22 @@ void lwm2m_firmware_init_acl(void)
 {
     uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
                             LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE);
+    uint16_t access[] = { rwde_access };
+    uint16_t servers[ARRAY_SIZE(access)];
+    lwm2m_list_t acl = { .len = ARRAY_SIZE(servers) };
+    uint16_t owner;
 
-    lwm2m_instance_acl_t acl = { 0 };
-
-    if (operator_is_vzw(true))
-    {
-        acl.access[0] = rwde_access;
-        acl.server[0] = 102;
-        acl.owner = 102;
-    }
-    else if (operator_is_att(true))
-    {
-        acl.access[0] = rwde_access;
-        acl.server[0] = 1;
-        acl.owner = 1;
-    }
-    else
-    {
-        // TODO: Remove when fixing ACL
-        acl.access[0] = rwde_access;
-        acl.server[0] = 123;
-        acl.owner = 123;
+    if (lwm2m_server_first_non_bootstrap_ssid_get(&owner) != 0) {
+        LWM2M_WRN("Failed to find control owner");
+        return;
     }
 
-    lwm2m_set_instance_acl((lwm2m_instance_t *)&m_instance_firmware, LWM2M_PERMISSION_READ, &acl);
+    servers[0] = owner;
+    acl.val.p_uint16 = access;
+    acl.p_id = servers;
+
+    lwm2m_access_control_acl_set(LWM2M_OBJ_FIRMWARE, m_instance_firmware.proto.instance_id, &acl);
+    lwm2m_access_control_owner_set(LWM2M_OBJ_FIRMWARE, m_instance_firmware.proto.instance_id, owner);
 }
 
 void lwm2m_firmware_init(void)
@@ -582,17 +577,7 @@ void lwm2m_firmware_init(void)
     // Setup default delivery method.
     lwm2m_firmware_firmware_delivery_method_set(0, LWM2M_FIRMWARE_FIRMWARE_UPDATE_DELIVERY_METHOD_PULL_ONLY);
 
-    // Set bootstrap server as owner.
-    (void)lwm2m_acl_permissions_init((lwm2m_instance_t *)&m_instance_firmware,
-                                     LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
-
-    lwm2m_firmware_init_acl();
-
-    uint32_t errcode = lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_firmware);
-    if (errcode == ENOMEM)
-    {
-        LWM2M_ERR("No more space for firmware object to be added.");
-    }
+    (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_firmware);
 }
 
 const void * lwm2m_firmware_resource_reference_get(uint16_t resource_id, uint8_t *p_type)
