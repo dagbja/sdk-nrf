@@ -9,17 +9,8 @@
 @Library("CI_LIB") _
 
 HashMap CI_STATE = lib_State.getConfig(JOB_NAME)
+properties(lib_State.getTriggers())
 def ciUtils = null
-
-properties([
-  pipelineTriggers([
-    parameterizedCron( [
-        ((JOB_NAME =~ /latest\/night\/.*\/master/).find() ? CI_STATE.CFG.CRON.NIGHTLY : ''),
-        ((JOB_NAME =~ /latest\/week\/.*\/master/).find() ? CI_STATE.CFG.CRON.WEEKLY : '')
-    ].join('    \n') )
-  ]),
-  ( JOB_NAME.contains('sub/') ? disableResume() :  disableConcurrentBuilds() )
-])
 
 pipeline
 {
@@ -215,37 +206,26 @@ pipeline
       when { expression { CI_STATE.SELF.RUN_DOWNSTREAM } }
       steps { script { lib_Stage.runDownstream(JOB_NAME, CI_STATE) } }
     }
-
   }
 
   post {
     // This is the order that the methods are run. {always->success/abort/failure/unstable->cleanup}
-    always {
-      /* Store custom output log file. */
-      script { if ( CI_STATE.SELF.RUN_BUILD && CI_STATE.SELF.RUN_TESTS ) {
+    always { script {
+      lib_Status.set( "${currentBuild.currentResult}", 'LWM2M', CI_STATE)
+      if ( CI_STATE.SELF.RUN_BUILD && CI_STATE.SELF.RUN_TESTS ) {
         archiveArtifacts artifacts: '*.log'
       } else {
         currentBuild.result = "UNSTABLE"
-      }}
-    }
-    success {
-      echo "Pipeline Post: success"
-      script { lib_Status.set("SUCCESS", 'LWM2M', CI_STATE) }
-    }
-    aborted {
-      echo "Pipeline Post: aborted"
-      script { lib_Status.set("ABORTED", 'LWM2M', CI_STATE) }
-    }
-    unstable {
-      echo "Pipeline Post: unstable"
-    }
-    failure {
-      echo "Pipeline Post: failure"
-      script { lib_Status.set("FAILURE", 'LWM2M', CI_STATE) }
-    }
+      }
+    }}
+    // Add if needed
+    // success {}
+    // aborted {}
+    // unstable {}
+    // failure {}
     cleanup {
         echo "Pipeline Post: cleanup"
-        cleanWs()
+        cleanWs disableDeferredWipeout: true, deleteDirs: true
     }
   }
 }
