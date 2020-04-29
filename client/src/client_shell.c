@@ -33,6 +33,7 @@
 #include <lwm2m_objects.h>
 #include <lwm2m_observer.h>
 #include <lwm2m_os.h>
+#include <lwm2m_access_control.h>
 
 #define PLURALIZE(n) (n == 1 ? "" : "s")
 
@@ -2014,6 +2015,73 @@ static int cmd_portfolio_write(const struct shell *shell, size_t argc, char **ar
 }
 
 
+static char *acl_access(uint16_t access)
+{
+    static char access_str[10];
+    int offset = 0;
+
+    if (access & LWM2M_PERMISSION_READ) {
+        access_str[offset++] = 'R';
+    }
+    if (access & LWM2M_PERMISSION_WRITE) {
+        access_str[offset++] = 'W';
+    }
+    if (access & LWM2M_PERMISSION_EXECUTE) {
+        access_str[offset++] = 'E';
+    }
+    if (access & LWM2M_PERMISSION_DELETE) {
+        access_str[offset++] = 'D';
+    }
+    if (access & LWM2M_PERMISSION_CREATE) {
+        access_str[offset++] = 'C';
+    }
+
+    access_str[offset] = '\0';
+
+    return access_str;
+}
+
+
+static int cmd_access_control_print(const struct shell *shell, size_t argc, char **argv)
+{
+    for (int i = 0; i < LWM2M_ACCESS_CONTROL_MAX_INSTANCES; i++)
+    {
+        lwm2m_instance_t *p_instance;
+        lwm2m_list_t *p_acl;
+
+        if (lwm2m_lookup_instance(&p_instance, LWM2M_OBJ_ACCESS_CONTROL, i) != 0)
+        {
+            continue;
+        }
+
+        lwm2m_access_control_t *p_access_control = (lwm2m_access_control_t *)p_instance;
+
+        p_acl = &p_access_control->acl;
+
+        shell_print(shell, "Access Control Instance /2/%d", i);
+        shell_print(shell, "  Object ID     %d", p_access_control->object_id);
+        shell_print(shell, "  Instance ID   %d", p_access_control->instance_id);
+        for (int j = 0; j < p_acl->len; ++j)
+        {
+            if (p_acl->p_id[j] == 0) {
+                shell_print(shell, "  ACL           default access: %s", acl_access(p_acl->val.p_uint16[j]));
+            } else {
+                shell_print(shell, "  ACL           ssid: %d; access: %s", p_acl->p_id[j], acl_access(p_acl->val.p_uint16[j]));
+            }
+        }
+        shell_print(shell, "  Control Owner %d", p_access_control->control_owner);
+    }
+
+    return 0;
+}
+
+
+SHELL_STATIC_SUBCMD_SET_CREATE(sub_access_control,
+    SHELL_CMD(print, NULL, "Print access control object instances", cmd_access_control_print),
+    SHELL_SUBCMD_SET_END
+);
+
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_security,
     SHELL_CMD(print, NULL, "Print security objects", cmd_security_print),
     SHELL_CMD(uri, NULL, "Set URI", cmd_security_uri),
@@ -2109,6 +2177,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_portfolio,
 );
 
 
+SHELL_CMD_REGISTER(access_control, &sub_access_control, "Access Control information", NULL);
 SHELL_CMD_REGISTER(apn, &sub_apn, "APN Table", NULL);
 SHELL_CMD_REGISTER(at, NULL, "Send AT command", cmd_at_command);
 SHELL_CMD_REGISTER(attribute, &sub_attribute, "Notification attributes operations", NULL);
