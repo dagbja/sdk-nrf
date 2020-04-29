@@ -90,7 +90,7 @@ static int cmd_nslookup(const struct shell *shell, size_t argc, char **argv)
         }
     }
 
-    struct nrf_addrinfo *result;
+    struct nrf_addrinfo *result, *top_result;
     int ret_val = nrf_getaddrinfo(hostname, NULL, p_hints, &result);
 
     if (ret_val != 0) {
@@ -100,6 +100,8 @@ static int cmd_nslookup(const struct shell *shell, size_t argc, char **argv)
 
     char ip_buffer[64];
     void *p_addr;
+
+    top_result = result;
     while (result) {
         switch (result->ai_family) {
         case NRF_AF_INET:
@@ -122,7 +124,7 @@ static int cmd_nslookup(const struct shell *shell, size_t argc, char **argv)
         result = result->ai_next;
     }
 
-    nrf_freeaddrinfo(result);
+    nrf_freeaddrinfo(top_result);
 
     return 0;
 }
