@@ -2951,23 +2951,42 @@ void lwm2m_non_rst_message_cb(void *data)
     lwm2m_observer_storage_delete((coap_observer_t*)data);
 }
 
+
+/** @brief Initializes m_app_config and copies a given config.
+ *
+ * Memory pointed to by pointers is not copied.
+ *
+ * @param[in] p_config Pointer to the config that should be copied.
+ */
+static void init_config_set(const lwm2m_carrier_config_t * const p_config)
+{
+    if (p_config == NULL){
+        return;
+    }
+
+    if (p_config->bootstrap_uri != NULL) {
+        m_app_config.bootstrap_uri = p_config->bootstrap_uri;
+    }
+
+    if (p_config->psk != NULL) {
+        m_app_config.psk        = p_config->psk;
+        m_app_config.psk_length = p_config->psk_length;
+    }
+
+    if (p_config->apn != NULL) {
+        m_app_config.apn = p_config->apn;
+    }
+
+    m_app_config.certification_mode = p_config->certification_mode;
+}
+
 int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 {
     int err;
     enum lwm2m_firmware_update_state mdfu;
 
-    if ((config != NULL) && (config->bootstrap_uri != NULL)) {
-        m_app_config.bootstrap_uri = config->bootstrap_uri;
-    }
-
-    if ((config != NULL) && (config->psk != NULL)) {
-        m_app_config.psk        = config->psk;
-        m_app_config.psk_length = config->psk_length;
-    }
-
-    if ((config != NULL) && (config->apn != NULL)) {
-        m_app_config.apn = config->apn;
-    }
+    // Check for configuration from the application.
+    init_config_set(config);
 
     // Initialize OS abstraction layer.
     // This will initialize the NVS subsystem as well.

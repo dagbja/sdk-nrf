@@ -275,7 +275,7 @@ bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config)
     else if (operator_is_vzw(true))
     {
         LWM2M_INF("Setting VzW bootstrap");
-        if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
+        if (p_carrier_config->certification_mode || lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
             // Carrier check is disabled, connect to test servers
             bootstrap_uri = BOOTSTRAP_URI_VZW_TEST;
         } else {
@@ -288,7 +288,7 @@ bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config)
     else if (operator_is_att(true))
     {
         LWM2M_INF("Setting AT&T bootstrap");
-        if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
+        if (p_carrier_config->certification_mode || lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
             // Carrier check is disabled, connect to test servers
             bootstrap_uri = BOOTSTRAP_URI_ATT_TEST;
         } else {

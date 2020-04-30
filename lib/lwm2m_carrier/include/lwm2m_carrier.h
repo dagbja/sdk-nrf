@@ -118,6 +118,8 @@ typedef struct {
 	size_t psk_length;
 	/** Optional custom APN, null-terminated. */
 	char *apn;
+	/** Connect to certification servers if true, else connect to production servers. */
+	bool certification_mode;
 } lwm2m_carrier_config_t;
 
 /**
@@ -125,10 +127,10 @@ typedef struct {
  *
  * @param[in] config Configuration parameters for the library.
  *
- * @note The library does not create a copy of the config parameters, hence the
- *       application has to make sure that the parameters provided are valid
- *       throughout the application lifetime (i. e. placed in static memory
- *       or in flash).
+ * @note The library does not copy the contents of pointers in the config
+ *       parameters. The application has to make sure that the provided
+ *       parameters are valid throughout the application lifetime
+ *       (i. e. placed in static memory or in flash).
  *
  * @return 0 on success, negative error code on error.
  */
