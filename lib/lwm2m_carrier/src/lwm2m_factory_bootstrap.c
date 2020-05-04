@@ -306,13 +306,16 @@ bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config)
     }
 
     // If there is a debug PSK available in flash, apply it instead of the PSK above.
-    lwm2m_string_t debug_psk;
-    int32_t ret = lwm2m_debug_bootstrap_psk_get(&debug_psk);
-    if (ret == 0)
+    if (!operator_is_vzw(true))
     {
-        LWM2M_INF("Using debug bootstrap PSK");
-        p_carrier_config->psk = debug_psk.p_val;
-        p_carrier_config->psk_length = (size_t)debug_psk.len;
+        lwm2m_string_t debug_psk;
+        int32_t ret = lwm2m_debug_bootstrap_psk_get(&debug_psk);
+        if (ret == 0)
+        {
+            LWM2M_INF("Using debug bootstrap PSK");
+            p_carrier_config->psk = debug_psk.p_val;
+            p_carrier_config->psk_length = (size_t)debug_psk.len;
+        }
     }
 
     uint8_t p_len = 0;
