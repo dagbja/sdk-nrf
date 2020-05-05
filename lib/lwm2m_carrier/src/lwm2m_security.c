@@ -29,26 +29,26 @@ static lwm2m_object_t    m_object_security;                                 /**<
 static lwm2m_security_t  m_instance_security[1+LWM2M_MAX_SERVERS];          /**< Security object instances. Index 0 is always bootstrap instance. */
 
 // Verizon specific resources.
-static vzw_bootstrap_security_settings_t vzw_boostrap_security_settings;
+static vzw_bootstrap_security_settings_t vzw_bootstrap_security_settings;
 
 bool lwm2m_security_bootstrapped_get(uint16_t instance_id)
 {
-    return vzw_boostrap_security_settings.is_bootstrapped;
+    return vzw_bootstrap_security_settings.is_bootstrapped;
 }
 
 void lwm2m_security_bootstrapped_set(uint16_t instance_id, bool value)
 {
-    vzw_boostrap_security_settings.is_bootstrapped = value;
+    vzw_bootstrap_security_settings.is_bootstrapped = value;
 }
 
 int32_t lwm2m_security_hold_off_timer_get(uint16_t instance_id)
 {
-    return vzw_boostrap_security_settings.hold_off_timer;
+    return vzw_bootstrap_security_settings.hold_off_timer;
 }
 
 void lwm2m_security_hold_off_timer_set(uint16_t instance_id, int32_t value)
 {
-    vzw_boostrap_security_settings.hold_off_timer = value;
+    vzw_bootstrap_security_settings.hold_off_timer = value;
 }
 
 // LWM2M core resources.
@@ -142,8 +142,8 @@ static uint32_t tlv_security_vzw_encode(uint16_t instance_id, uint8_t * p_buffer
 {
     int32_t list_values[2] =
     {
-        vzw_boostrap_security_settings.is_bootstrapped,
-        vzw_boostrap_security_settings.hold_off_timer
+        vzw_bootstrap_security_settings.is_bootstrapped,
+        vzw_bootstrap_security_settings.hold_off_timer
     };
 
     lwm2m_list_t list =
@@ -191,7 +191,7 @@ static uint32_t tlv_security_vzw_decode(uint16_t instance_id, lwm2m_tlv_t * p_tl
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
                                                          tlv.length,
-                                                         &vzw_boostrap_security_settings.hold_off_timer);
+                                                         &vzw_bootstrap_security_settings.hold_off_timer);
                 break;
             }
 
@@ -199,7 +199,7 @@ static uint32_t tlv_security_vzw_decode(uint16_t instance_id, lwm2m_tlv_t * p_tl
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
                                                          tlv.length,
-                                                         &vzw_boostrap_security_settings.is_bootstrapped);
+                                                         &vzw_bootstrap_security_settings.is_bootstrapped);
                 break;
             }
 

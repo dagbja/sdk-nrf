@@ -434,7 +434,7 @@ typedef struct
  * @warning This is an interface function. MUST BE IMPLEMENTED BY APPLICATION.
  *
  * @details This interface enables the app to act on different types of notification. When a response from the
- *          boostrap / register / update / deregister function is received this function will be called to let
+ *          bootstrap / register / update / deregister function is received this function will be called to let
  *          the application know the type \ref lwm2m_notification_type_t, remote address of replying server,
  *          the CoAP response code and an error code. The application should check the error code and handle
  *          errors appropriately.
