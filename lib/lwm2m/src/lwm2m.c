@@ -62,7 +62,7 @@ static uint8_t op_desc_idx_lookup(uint8_t bitmask)
 }
 
 
-static const char m_operation_desc[8][9] = {
+static const char *m_operation_desc[] = {
     "NONE",
     "READ",
     "WRITE",
@@ -70,7 +70,8 @@ static const char m_operation_desc[8][9] = {
     "DELETE",
     "CREATE",
     "DISCOVER",
-    "OBSERVE"
+    "OBSERVE",
+    "WRITE ATTR"
 };
 
 #endif // defined(CONFIG_NRF_LWM2M_ENABLE_LOGS)
