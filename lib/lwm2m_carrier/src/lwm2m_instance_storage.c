@@ -589,7 +589,7 @@ int lwm2m_storage_acl_store(void)
         tlv_off = sizeof(tlv_buf);
         err = lwm2m_acl_serialize_tlv(tlv_buf, &tlv_off, inst);
         if (err) {
-            __ASSERT(false, "Encoding 2/%d failed (len %d), err %d",
+            __ASSERT(false, "Encoding /2/%d failed (len %d), err %d",
                     inst->acl.id, tlv_off, err);
             return err;
         }
@@ -604,20 +604,20 @@ int lwm2m_storage_acl_store(void)
         len = sizeof(buf) - off;
         err = lwm2m_tlv_encode(&buf[off], &len, &tlv);
         if (err) {
-            __ASSERT(false, "Encoding 2/%d failed (len %d), err %d",
+            __ASSERT(false, "Encoding /2/%d failed (len %d), err %d",
                     inst->acl.id, tlv.length, err);
             return err;
         }
 
         off += len;
 
-        LWM2M_TRC("Encoded 2/%d for %d/%d in %d bytes, off %d",
+        LWM2M_TRC("Encoded /2/%d for /%d/%d in %d bytes, off %d",
                   inst->acl.id, inst->object_id, inst->instance_id, len, off);
     }
 
     err = lwm2m_os_storage_write(LWM2M_STORAGE_ID_ACL, buf, off);
     if (err < 0) {
-        LWM2M_ERR("Failed to write ACL for %d/%d, err %d",
+        LWM2M_ERR("Failed to write ACL for /%d/%d, err %d",
                   inst->object_id, inst->instance_id, err);
         return -1;
     }
