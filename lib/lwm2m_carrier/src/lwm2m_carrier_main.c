@@ -1698,11 +1698,12 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 
     LWM2M_INF("Store bootstrap settings");
 
+    update_object_acls();
+
     lwm2m_storage_server_store();
     lwm2m_storage_security_store();
     lwm2m_storage_acl_store();
 
-    update_object_acls();
     server_instance_update_map();
 
     (void)app_event_notify(LWM2M_CARRIER_EVENT_BOOTSTRAPPED, NULL);
