@@ -1482,7 +1482,7 @@ uint32_t lwm2m_coap_handler_instance_add(lwm2m_instance_t * p_instance)
     if (m_num_instances == LWM2M_COAP_HANDLER_MAX_INSTANCES)
     {
         LWM2M_MUTEX_UNLOCK();
-
+        LWM2M_WRN("Failed to register the instance /%d/%d, insufficient memory", p_instance->object_id, p_instance->instance_id);
         return ENOMEM;
     }
 
