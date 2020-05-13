@@ -70,6 +70,7 @@ static char m_current_apn[MAX_APN_LENGTH];                                      
 
 /* Initialize config with default values. */
 static lwm2m_carrier_config_t              m_app_config;
+static bool                                m_application_psk_set;
 
 static lwm2m_server_config_t               m_server_conf[1+LWM2M_MAX_SERVERS];                /**< Server configuration structure. */
 static lwm2m_client_identity_t             m_client_id;                                       /**< Client ID structure to hold the client's UUID. */
@@ -861,7 +862,7 @@ static int app_generate_client_id(void)
                       lwm2m_os_log_strdup(operator_id_string(last_used_operator_id)),
                       lwm2m_os_log_strdup(operator_id_string(operator_id(true))));
         }
-        if (lwm2m_factory_bootstrap_update(&m_app_config)) {
+        if (lwm2m_factory_bootstrap_update(&m_app_config, m_application_psk_set)) {
             lwm2m_last_used_msisdn_set("", 0);
             clear_bootstrap = true;
         }
@@ -3054,6 +3055,7 @@ static void init_config_set(const lwm2m_carrier_config_t * const p_config)
     if (p_config->psk != NULL) {
         m_app_config.psk        = p_config->psk;
         m_app_config.psk_length = p_config->psk_length;
+        m_application_psk_set   = true;
     }
 
     if (p_config->apn != NULL) {

@@ -257,7 +257,7 @@ void lwm2m_factory_bootstrap_init(void)
     lwm2m_storage_acl_store();
 }
 
-bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config)
+bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config, bool application_psk_set)
 {
     char * bootstrap_uri = NULL;
     bool   settings_changed = false;
@@ -277,8 +277,6 @@ bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config)
             // Carrier check is enabled, connect to live servers
             bootstrap_uri = BOOTSTRAP_URI_VZW;
         }
-        p_carrier_config->psk = m_bootstrap_psk_vzw;
-        p_carrier_config->psk_length = sizeof(m_bootstrap_psk_vzw);
     }
     else if (operator_is_att(true))
     {
@@ -294,20 +292,37 @@ bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config)
     else
     {
         bootstrap_uri = CONFIG_NRF_LWM2M_CARRIER_BOOTSTRAP_URI;
-        p_carrier_config->psk = CONFIG_NRF_LWM2M_CARRIER_BOOTSTRAP_PSK;
-        p_carrier_config->psk_length = sizeof(CONFIG_NRF_LWM2M_CARRIER_BOOTSTRAP_PSK) - 1;
     }
 
-    // If there is a debug PSK available in flash, apply it instead of the PSK above.
-    if (!operator_is_vzw(true))
+    // Never replace PSK set by application in lwm2m_carrier_init()
+    if (!application_psk_set)
     {
-        lwm2m_string_t debug_psk;
-        int32_t ret = lwm2m_debug_bootstrap_psk_get(&debug_psk);
-        if (ret == 0)
+        if (operator_is_vzw(true))
         {
-            LWM2M_INF("Using debug bootstrap PSK");
-            p_carrier_config->psk = debug_psk.p_val;
-            p_carrier_config->psk_length = (size_t)debug_psk.len;
+            LWM2M_INF("Using VzW bootstrap PSK");
+            p_carrier_config->psk = m_bootstrap_psk_vzw;
+            p_carrier_config->psk_length = sizeof(m_bootstrap_psk_vzw);
+        }
+        else
+        {
+            lwm2m_string_t debug_psk;
+            int32_t ret = lwm2m_debug_bootstrap_psk_get(&debug_psk);
+            if (ret == 0)
+            {
+                LWM2M_INF("Using debug bootstrap PSK");
+                p_carrier_config->psk = debug_psk.p_val;
+                p_carrier_config->psk_length = (size_t)debug_psk.len;
+            }
+            else if (!operator_is_att(true))
+            {
+                LWM2M_INF("Using Nordic bootstrap PSK");
+                p_carrier_config->psk = CONFIG_NRF_LWM2M_CARRIER_BOOTSTRAP_PSK;
+                p_carrier_config->psk_length = sizeof(CONFIG_NRF_LWM2M_CARRIER_BOOTSTRAP_PSK) - 1;
+            }
+            else
+            {
+                // AT&T Bootstrap PSK will be generated using AT%BSKGEN
+            }
         }
     }
 

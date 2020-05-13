@@ -13,6 +13,7 @@
 void lwm2m_factory_bootstrap_init(void);
 
 /**@brief Update factory bootstrapped objects. */
-bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config);
+bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config,
+                                    bool application_psk_set);
 
 #endif // LWM2M_FACTORY_BOOTSTRAP_H__
