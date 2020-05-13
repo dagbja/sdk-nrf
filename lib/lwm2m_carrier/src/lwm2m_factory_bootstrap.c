@@ -37,12 +37,7 @@
                                          0xa8, 0x72, 0x41, 0xb0, 0x46, 0x29, 0x76, 0xb9, \
                                          0x35, 0x34, 0x1d, 0x00, 0x0a, 0x91, 0xe7, 0x47 }    /**< Pre-shared key used for bootstrap server in hex format. */
 
-// PSK: ccb7e44cb5890c9095157506c650ee05
-#define BOOTSTRAP_SEC_PSK_ATT          { 0xcc, 0xb7, 0xe4, 0x4c, 0xb5, 0x89, 0x0c, 0x90, \
-                                         0x95, 0x15, 0x75, 0x06, 0xc6, 0x50, 0xee, 0x05 }    /**< Pre-shared key used for bootstrap server in hex format. */
-
 static char m_bootstrap_psk_vzw[] = BOOTSTRAP_SEC_PSK_VZW;
-static char m_bootstrap_psk_att[] = BOOTSTRAP_SEC_PSK_ATT;
 
 static const uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
                                      LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE);
@@ -295,8 +290,6 @@ bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config)
             // Carrier check is enabled, connect to live servers
             bootstrap_uri = BOOTSTRAP_URI_ATT;
         }
-        p_carrier_config->psk = m_bootstrap_psk_att;
-        p_carrier_config->psk_length = sizeof(m_bootstrap_psk_att);
     }
     else
     {

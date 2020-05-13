@@ -1527,3 +1527,27 @@ int at_write_host_device_info(lwm2m_list_t *p_list)
 
     return 0;
 }
+
+int at_bootstrap_psk_generate(int sec_tag)
+{
+    int retval = 0;
+
+    int len = snprintf(m_at_buffer, sizeof(m_at_buffer), "AT%%BSKGEN=%d,3,0", sec_tag);
+
+    if ((len < 0) || (len > sizeof(m_at_buffer)))
+    {
+        retval = -ENOMEM;
+    }
+    else
+    {
+        retval = lwm2m_os_at_cmd_write(m_at_buffer, NULL, 0);
+
+        if (retval != 0)
+        {
+            LWM2M_ERR("Generating bootstrap PSK failed: %d", retval);
+            retval = -EIO;
+        }
+    }
+
+    return retval;
+}

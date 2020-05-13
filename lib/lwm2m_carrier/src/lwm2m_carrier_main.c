@@ -920,11 +920,17 @@ static int app_generate_client_id(void)
             return err;
         }
 
-        if (provision_bs_psk) {
-            ret = app_provision_psk(APP_BOOTSTRAP_SEC_TAG, client_id, strlen(client_id),
-                                    m_app_config.psk, m_app_config.psk_length);
+        ret = app_provision_psk(APP_BOOTSTRAP_SEC_TAG, client_id, strlen(client_id),
+                                m_app_config.psk, m_app_config.psk_length);
+
+        if ((ret == 0) && operator_is_att(true) && (m_app_config.psk == NULL)) {
+            // Generate AT&T Bootstrap PSK in Modem
+            LWM2M_INF("Generating bootstrap PSK");
+            (void)lwm2m_os_sec_psk_delete(APP_BOOTSTRAP_SEC_TAG);
+            ret = at_bootstrap_psk_generate(APP_BOOTSTRAP_SEC_TAG);
         }
-        if (operator_is_vzw(true)) {
+
+        if ((ret == 0) && operator_is_vzw(true)) {
             char app_diagnostics_psk[SHA256_BLOCK_SIZE];
             app_vzw_sha256_psk(m_imei, 101, app_diagnostics_psk);
             ret = app_provision_psk(APP_DIAGNOSTICS_SEC_TAG, m_imei, strlen(m_imei),
@@ -2886,19 +2892,20 @@ static int app_provision_psk(int sec_tag, char * identity, uint8_t identity_len,
         return err_code;
     }
 
-    size_t secret_key_nrf9160_style_len = psk_len * 2;
-    uint8_t * p_secret_key_nrf9160_style = lwm2m_os_malloc(secret_key_nrf9160_style_len);
-    for (int i = 0; i < psk_len; i++)
-    {
-        sprintf(&p_secret_key_nrf9160_style[i * 2], "%02x", psk[i]);
-    }
-    err_code = lwm2m_os_sec_psk_write(sec_tag, p_secret_key_nrf9160_style,
-                                      secret_key_nrf9160_style_len);
-    lwm2m_os_free(p_secret_key_nrf9160_style);
+    if (psk && psk_len > 0) {
+        size_t secret_key_nrf9160_style_len = psk_len * 2;
+        uint8_t * p_secret_key_nrf9160_style = lwm2m_os_malloc(secret_key_nrf9160_style_len);
+        for (int i = 0; i < psk_len; i++) {
+            sprintf(&p_secret_key_nrf9160_style[i * 2], "%02x", psk[i]);
+        }
+        err_code = lwm2m_os_sec_psk_write(sec_tag, p_secret_key_nrf9160_style,
+                                          secret_key_nrf9160_style_len);
+        lwm2m_os_free(p_secret_key_nrf9160_style);
 
-    if (err_code != 0) {
-        LWM2M_ERR("Unable to write PSK %d (%d)", sec_tag, err_code);
-        return err_code;
+        if (err_code != 0) {
+            LWM2M_ERR("Unable to write PSK %d (%d)", sec_tag, err_code);
+            return err_code;
+        }
     }
 
     return 0;

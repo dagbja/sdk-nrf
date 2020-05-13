@@ -348,4 +348,15 @@ int at_read_host_device_info(lwm2m_list_t *p_list);
  */
 int at_write_host_device_info(lwm2m_list_t *p_list);
 
+/**
+ * @brief Generate AT&T Bootstrap PSK.
+ *
+ * @param[in] sec_tag Security tag for the generated PSK.
+ *
+ * @retval -ENOMEM Send buffer was not large enough for the generated AT command.
+ * @retval -EIO    AT command error.
+ * @retval 0       Success.
+ */
+int at_bootstrap_psk_generate(int sec_tag);
+
 #endif // AT_INTERFACE_H__

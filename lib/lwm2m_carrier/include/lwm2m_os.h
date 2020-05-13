@@ -407,6 +407,23 @@ int lwm2m_os_sec_psk_exists(uint32_t sec_tag, bool *exists,
 int lwm2m_os_sec_psk_write(uint32_t sec_tag, const void *buf, uint16_t len);
 
 /**
+ * @brief Delete pre-shared key.
+ *
+ * @note If used when the LTE link is active, the function will return
+ *	 an error and the key will not be deleted.
+ *
+ * @param[in] sec_tag	Security tag for this credential.
+ *
+ * @retval 0            On success.
+ * @retval -ENOBUFS     Internal buffer is too small.
+ * @retval -EACCES      The operation failed because the LTE link is active.
+ * @retval -ENOENT      No credential associated with the given
+ *                      @p sec_tag and @p cred_type.
+ * @retval -EPERM       Insufficient permissions.
+ */
+int lwm2m_os_sec_psk_delete(uint32_t sec_tag);
+
+/**
  * @brief Check if an identity credential exists in persistent storage.
  *
  * @param[in]  sec_tag		The tag to search for.
@@ -446,6 +463,23 @@ int lwm2m_os_sec_identity_exists(uint32_t sec_tag, bool *exists,
  */
 int lwm2m_os_sec_identity_write(uint32_t sec_tag, const void *buf,
 				uint16_t len);
+
+/**
+ * @brief Delete identity credential.
+ *
+ * @note If used when the LTE link is active, the function will return
+ *	 an error and the key will not be deleted.
+ *
+ * @param[in] sec_tag	Security tag for this credential.
+ *
+ * @retval 0            On success.
+ * @retval -ENOBUFS     Internal buffer is too small.
+ * @retval -EACCES      The operation failed because the LTE link is active.
+ * @retval -ENOENT      No credential associated with the given
+ *                      @p sec_tag and @p cred_type.
+ * @retval -EPERM       Insufficient permissions.
+ */
+int lwm2m_os_sec_identity_delete(uint32_t sec_tag);
 
 /**@} */
 
