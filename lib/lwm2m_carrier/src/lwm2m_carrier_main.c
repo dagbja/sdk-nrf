@@ -155,6 +155,9 @@ static int app_event_notify(uint32_t type, void * data)
 
 static int app_event_error(uint32_t error_code, int32_t error_value)
 {
+    // Put library in ERROR state to exit lwm2m_carrier_run loop
+    m_app_state = LWM2M_STATE_ERROR;
+
     lwm2m_carrier_event_error_t error_event = {
         .code = error_code,
         .value = error_value
@@ -165,11 +168,12 @@ static int app_event_error(uint32_t error_code, int32_t error_value)
 
 static bool lwm2m_state_set(lwm2m_state_t app_state)
 {
-    // Do not allow state change if network state has changed.
+    // Do not allow state change if network state has changed, or on error.
     // This may have happened during a blocking socket operation, typically
     // connect(), and then we must abort any ongoing state changes.
     if ((m_app_state == LWM2M_STATE_REQUEST_CONNECT) ||
-        (m_app_state == LWM2M_STATE_REQUEST_DISCONNECT))
+        (m_app_state == LWM2M_STATE_REQUEST_DISCONNECT) ||
+        (m_app_state == LWM2M_STATE_ERROR))
     {
         return false;
     }
@@ -396,8 +400,10 @@ void lwm2m_request_server_disconnect(uint16_t security_instance)
 
 void lwm2m_request_disconnect(void)
 {
-    // Only request disconnect if not already disconnected
-    if (m_app_state != LWM2M_STATE_DISCONNECTED) {
+    // Only request disconnect if not already disconnected and not error
+    if ((m_app_state != LWM2M_STATE_DISCONNECTED) &&
+        (m_app_state != LWM2M_STATE_ERROR))
+    {
         m_app_state = LWM2M_STATE_REQUEST_DISCONNECT;
     }
 }
@@ -829,6 +835,7 @@ static int app_generate_client_id(void)
     int ret = app_read_sim_values();
 
     if (ret != 0) {
+        app_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, ret);
         return ret;
     }
 
@@ -1272,7 +1279,6 @@ static void app_handle_connect_retry(uint16_t security_instance, bool fallback)
 
         if (retry_delay == -1) {
             LWM2M_ERR("Bootstrap procedure failed");
-            m_app_state = LWM2M_STATE_DISCONNECTED;
             lwm2m_retry_delay_connect_reset(security_instance);
 
             app_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, 0);
@@ -1352,8 +1358,9 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
     LWM2M_INF("Got LWM2M notification %s  CoAP %d.%02d  err:%lu", str_type[type], coap_code >> 5, coap_code & 0x1f, err_code);
 
     if ((m_app_state == LWM2M_STATE_REQUEST_DISCONNECT) ||
-        (m_app_state == LWM2M_STATE_DISCONNECTED)) {
-        // Disconnect requested or disconnected, ignore the notification
+        (m_app_state == LWM2M_STATE_DISCONNECTED) ||
+        (m_app_state == LWM2M_STATE_ERROR)) {
+        // Disconnect requested, disconnected or error state, ignore the notification
         return;
     }
 
@@ -1376,7 +1383,6 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         else
         {
             LWM2M_ERR("Bootstrap procedure failed (%d.%02d)", coap_code >> 5, coap_code & 0x1f);
-            m_app_state = LWM2M_STATE_DISCONNECTED;
             app_server_disconnect(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
             lwm2m_retry_delay_connect_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
 
@@ -1686,7 +1692,6 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     lwm2m_retry_delay_connect_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
 
     if (app_provision_secret_keys() != 0) {
-        lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
         return 0;
     }
 
@@ -1946,7 +1951,7 @@ static void app_connect(void)
 
         // Generate a unique Client ID.
         if (app_generate_client_id() != 0) {
-            lwm2m_state_set(LWM2M_STATE_DISCONNECTED);
+            // Unrecoverable error occurred, unable to continue
         } else if (lwm2m_security_bootstrapped_get(LWM2M_BOOTSTRAP_INSTANCE_ID)) {
             lwm2m_state_set(LWM2M_STATE_IDLE);
             app_init_connection_update();
@@ -1989,7 +1994,6 @@ static void app_bootstrap_connect(void)
 
     if (uri_len == 0 || !p_server_uri) {
         LWM2M_ERR("No Bootstrap URI found");
-        m_app_state = LWM2M_STATE_DISCONNECTED;
         lwm2m_retry_delay_connect_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
 
         app_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, 0);
@@ -2780,6 +2784,16 @@ static int app_lwm2m_process(void)
             // Application has deferred the reset -> exit processing loop
             return -1;
         }
+        case LWM2M_STATE_ERROR:
+        {
+            app_disconnect();
+            lwm2m_carrier_pdn_deactivate();
+            lwm2m_sms_receiver_disable();
+
+            // Unrecoverable error, exit processing loop
+            m_app_state = LWM2M_STATE_ERROR;
+            return -1;
+        }
         default:
         {
             break;
@@ -2914,6 +2928,12 @@ uint32_t lwm2m_net_reg_stat_get(void)
 
 void lwm2m_net_reg_stat_cb(uint32_t net_stat)
 {
+    if (m_app_state == LWM2M_STATE_ERROR)
+    {
+        // Nothing to do
+        return;
+    }
+
     if (m_net_stat != net_stat)
     {
         if ((net_stat == APP_NET_REG_STAT_HOME) ||
@@ -3111,4 +3131,6 @@ void lwm2m_carrier_run(void)
             lwm2m_observer_process(false);
         }
     }
+
+    LWM2M_ERR("Exit");
 }

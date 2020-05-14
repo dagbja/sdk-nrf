@@ -1108,6 +1108,9 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         case LWM2M_STATE_SHUTDOWN:
             shell_print(shell, "Shutdown");
             break;
+        case LWM2M_STATE_ERROR:
+            shell_print(shell, "Error");
+            break;
         default:
             shell_print(shell, "Unknown state: %d", lwm2m_state_get());
             break;

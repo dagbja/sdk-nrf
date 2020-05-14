@@ -38,7 +38,8 @@ typedef enum
     LWM2M_STATE_DISCONNECTED,
     LWM2M_STATE_MODEM_FIRMWARE_UPDATE,
     LWM2M_STATE_SHUTDOWN,
-    LWM2M_STATE_RESET
+    LWM2M_STATE_RESET,
+    LWM2M_STATE_ERROR
 } lwm2m_state_t;
 
 lwm2m_state_t lwm2m_state_get(void);

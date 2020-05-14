@@ -104,6 +104,10 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
         case LWM2M_STATE_RESET:
             *blink = DK_LED4_MSK;
             break;
+
+        case LWM2M_STATE_ERROR:
+            *blink = DK_LED1_MSK | DK_LED2_MSK | DK_LED3_MSK | DK_LED4_MSK;
+            break;
     }
 }
 
