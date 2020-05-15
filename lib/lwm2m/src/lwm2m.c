@@ -1536,7 +1536,7 @@ uint32_t lwm2m_coap_handler_object_add(lwm2m_object_t * p_object)
 
     LWM2M_MUTEX_LOCK();
 
-    if (m_num_objects == LWM2M_COAP_HANDLER_MAX_INSTANCES)
+    if (m_num_objects == LWM2M_COAP_HANDLER_MAX_OBJECTS)
     {
         LWM2M_MUTEX_UNLOCK();
 
