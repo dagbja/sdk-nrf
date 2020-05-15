@@ -18,7 +18,7 @@ typedef struct {
 // Verizon specific resources.
 char * lwm2m_security_server_uri_get(uint16_t instance_id, uint8_t * p_len);
 
-void lwm2m_security_server_uri_set(uint16_t instance_id, char * p_value, uint8_t len);
+void lwm2m_security_server_uri_set(uint16_t instance_id, const char * p_value, uint8_t len);
 
 bool lwm2m_security_is_bootstrap_server_get(uint16_t instance_id);
 

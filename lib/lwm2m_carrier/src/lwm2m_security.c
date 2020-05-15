@@ -68,7 +68,7 @@ char * lwm2m_security_server_uri_get(uint16_t instance_id, uint8_t * p_len)
     return m_instance_security[instance_id].server_uri.p_val;
 }
 
-void lwm2m_security_server_uri_set(uint16_t instance_id, char * p_value, uint8_t len)
+void lwm2m_security_server_uri_set(uint16_t instance_id, const char * p_value, uint8_t len)
 {
     if (lwm2m_bytebuffer_to_string(p_value, len, &m_instance_security[instance_id].server_uri) != 0)
     {

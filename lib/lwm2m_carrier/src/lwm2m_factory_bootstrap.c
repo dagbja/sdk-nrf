@@ -31,13 +31,8 @@
 #define BOOTSTRAP_URI_ATT              "coaps://bootstrap.dm.iot.att.com:5694"               /**< Server URI to the bootstrap server when using security (DTLS). */
 #define BOOTSTRAP_URI_ATT_TEST         "coaps://InteropBootstrap.dm.iot.att.com:5694"        /**< Server URI to the bootstrap server when using security (DTLS). */
 
-// PSK: d6160c2e7c90399ee7d207a22611e3d3a87241b0462976b935341d000a91e747
-#define BOOTSTRAP_SEC_PSK_VZW          { 0xd6, 0x16, 0x0c, 0x2e, 0x7c, 0x90, 0x39, 0x9e, \
-                                         0xe7, 0xd2, 0x07, 0xa2, 0x26, 0x11, 0xe3, 0xd3, \
-                                         0xa8, 0x72, 0x41, 0xb0, 0x46, 0x29, 0x76, 0xb9, \
-                                         0x35, 0x34, 0x1d, 0x00, 0x0a, 0x91, 0xe7, 0x47 }    /**< Pre-shared key used for bootstrap server in hex format. */
-
-static char m_bootstrap_psk_vzw[] = BOOTSTRAP_SEC_PSK_VZW;
+/** Pre-shared key used for bootstrap server in hex format. */
+#define BOOTSTRAP_SEC_PSK_VZW          "d6160c2e7c90399ee7d207a22611e3d3a87241b0462976b935341d000a91e747"
 
 static const uint16_t rwde_access = (LWM2M_PERMISSION_READ | LWM2M_PERMISSION_WRITE |
                                      LWM2M_PERMISSION_DELETE | LWM2M_PERMISSION_EXECUTE);
@@ -259,7 +254,7 @@ void lwm2m_factory_bootstrap_init(void)
 
 bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config, bool application_psk_set)
 {
-    char * bootstrap_uri = NULL;
+    const char * bootstrap_uri = NULL;
     bool   settings_changed = false;
 
     if (p_carrier_config->bootstrap_uri)
@@ -300,24 +295,20 @@ bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config, b
         if (operator_is_vzw(true))
         {
             LWM2M_INF("Using VzW bootstrap PSK");
-            p_carrier_config->psk = m_bootstrap_psk_vzw;
-            p_carrier_config->psk_length = sizeof(m_bootstrap_psk_vzw);
+            p_carrier_config->psk = BOOTSTRAP_SEC_PSK_VZW;
         }
         else
         {
-            lwm2m_string_t debug_psk;
-            int32_t ret = lwm2m_debug_bootstrap_psk_get(&debug_psk);
-            if (ret == 0)
+            const char *p_debug_psk = lwm2m_debug_bootstrap_psk_get();
+            if (p_debug_psk)
             {
                 LWM2M_INF("Using debug bootstrap PSK");
-                p_carrier_config->psk = debug_psk.p_val;
-                p_carrier_config->psk_length = (size_t)debug_psk.len;
+                p_carrier_config->psk = p_debug_psk;
             }
             else if (!operator_is_att(true))
             {
                 LWM2M_INF("Using Nordic bootstrap PSK");
                 p_carrier_config->psk = CONFIG_NRF_LWM2M_CARRIER_BOOTSTRAP_PSK;
-                p_carrier_config->psk_length = sizeof(CONFIG_NRF_LWM2M_CARRIER_BOOTSTRAP_PSK) - 1;
             }
             else
             {

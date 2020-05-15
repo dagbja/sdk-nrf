@@ -40,6 +40,6 @@ void lwm2m_apn_conn_prof_init_acl(void);
 
 void lwm2m_apn_conn_prof_apn_status_update(void);
 
-uint32_t lwm2m_apn_conn_prof_custom_apn_set(char *p_apn);
+uint32_t lwm2m_apn_conn_prof_custom_apn_set(const char * p_apn);
 
 #endif /* LWM2M_APN_CONN_PROF_H__ */

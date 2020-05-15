@@ -135,8 +135,14 @@ static nrf_sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { NRF_AF_INET6, NRF_
 static struct nrf_sockaddr_in6 m_remote_server[1+LWM2M_MAX_SERVERS];                                  /**< Remote secure server address to connect to. */
 static volatile uint32_t tick_count = 0;
 
+typedef enum {
+    PSK_FORMAT_BINARY,
+    PSK_FORMAT_HEXSTRING
+} psk_format_t;
+
 static void app_server_disconnect(uint16_t security_instance, bool keep_lifetime_timer);
-static int app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len);
+static int app_provision_psk(int sec_tag, const char * p_identity, uint8_t identity_len,
+                             const char * p_psk, uint8_t psk_len, psk_format_t psk_format);
 static int app_provision_secret_keys(void);
 static void app_disconnect(void);
 static const char * app_uri_get(char * p_server_uri, uint16_t * p_port, bool * p_secure);
@@ -921,13 +927,13 @@ static int app_generate_client_id(void)
             return err;
         }
 
+        uint8_t psk_len = (m_app_config.psk ? strlen(m_app_config.psk) : 0);
         ret = app_provision_psk(APP_BOOTSTRAP_SEC_TAG, client_id, strlen(client_id),
-                                m_app_config.psk, m_app_config.psk_length);
+                                m_app_config.psk, psk_len, PSK_FORMAT_HEXSTRING);
 
         if ((ret == 0) && operator_is_att(true) && (m_app_config.psk == NULL)) {
             // Generate AT&T Bootstrap PSK in Modem
             LWM2M_INF("Generating bootstrap PSK");
-            (void)lwm2m_os_sec_psk_delete(APP_BOOTSTRAP_SEC_TAG);
             ret = at_bootstrap_psk_generate(APP_BOOTSTRAP_SEC_TAG);
         }
 
@@ -935,7 +941,7 @@ static int app_generate_client_id(void)
             char app_diagnostics_psk[SHA256_BLOCK_SIZE];
             app_vzw_sha256_psk(m_imei, 101, app_diagnostics_psk);
             ret = app_provision_psk(APP_DIAGNOSTICS_SEC_TAG, m_imei, strlen(m_imei),
-                                    app_diagnostics_psk, sizeof(app_diagnostics_psk));
+                                    app_diagnostics_psk, sizeof(app_diagnostics_psk), PSK_FORMAT_BINARY);
         }
 
         if (ret != 0) {
@@ -2882,34 +2888,53 @@ static uint32_t app_coap_init(void)
     return err_code;
 }
 
-static int app_provision_psk(int sec_tag, char * identity, uint8_t identity_len, char * psk, uint8_t psk_len)
+static int app_provision_psk(int sec_tag, const char * p_identity, uint8_t identity_len,
+                             const char * p_psk, uint8_t psk_len, psk_format_t psk_format)
 {
     int err_code;
 
-    err_code = lwm2m_os_sec_identity_write(sec_tag, identity, identity_len);
+    err_code = lwm2m_os_sec_identity_write(sec_tag, p_identity, identity_len);
 
     if (err_code != 0) {
         LWM2M_ERR("Unable to write Identity %d (%d)", sec_tag, err_code);
         return err_code;
     }
 
-    if (psk && psk_len > 0) {
-        size_t secret_key_nrf9160_style_len = psk_len * 2;
-        uint8_t * p_secret_key_nrf9160_style = lwm2m_os_malloc(secret_key_nrf9160_style_len);
-        for (int i = 0; i < psk_len; i++) {
-            sprintf(&p_secret_key_nrf9160_style[i * 2], "%02x", psk[i]);
-        }
-        err_code = lwm2m_os_sec_psk_write(sec_tag, p_secret_key_nrf9160_style,
-                                          secret_key_nrf9160_style_len);
-        lwm2m_os_free(p_secret_key_nrf9160_style);
+    if ((p_psk == NULL) || (psk_len == 0)) {
+        // No PSK to write
+        (void)lwm2m_os_sec_psk_delete(sec_tag);
+        return 0;
+    }
 
-        if (err_code != 0) {
-            LWM2M_ERR("Unable to write PSK %d (%d)", sec_tag, err_code);
-            return err_code;
+    switch (psk_format)
+    {
+        case PSK_FORMAT_BINARY:
+        {
+            // Convert PSK to null-terminated hex string
+            size_t hex_string_len = psk_len * 2;
+            uint8_t hex_string[hex_string_len];
+
+            for (int i = 0; i < psk_len; i++) {
+                sprintf(&hex_string[i * 2], "%02x", p_psk[i]);
+            }
+
+            err_code = lwm2m_os_sec_psk_write(sec_tag, hex_string, hex_string_len);
+            break;
+        }
+
+        case PSK_FORMAT_HEXSTRING:
+        {
+            // PSK is already null-terminated hex string
+            err_code = lwm2m_os_sec_psk_write(sec_tag, p_psk, psk_len);
+            break;
         }
     }
 
-    return 0;
+    if (err_code != 0) {
+        LWM2M_ERR("Unable to write PSK %d (%d)", sec_tag, err_code);
+    }
+
+    return err_code;
 }
 
 static int app_provision_secret_keys(void)
@@ -2943,7 +2968,8 @@ static int app_provision_secret_keys(void)
             ARG_UNUSED(hostname);
 
             if (secure) {
-                err = app_provision_psk(APP_SEC_TAG_OFFSET + i, p_identity, identity_len, p_psk, psk_len);
+                err = app_provision_psk(APP_SEC_TAG_OFFSET + i, p_identity, identity_len,
+                                        p_psk, psk_len, PSK_FORMAT_BINARY);
                 if (err == 0) {
                     LWM2M_TRC("Provisioning key for %s, short server id: %u",
                               lwm2m_os_log_strdup(p_server_uri_val),
@@ -3054,7 +3080,6 @@ static void init_config_set(const lwm2m_carrier_config_t * const p_config)
 
     if (p_config->psk != NULL) {
         m_app_config.psk        = p_config->psk;
-        m_app_config.psk_length = p_config->psk_length;
         m_application_psk_set   = true;
     }
 

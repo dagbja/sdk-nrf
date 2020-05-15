@@ -132,14 +132,12 @@ typedef struct {
  * @brief Structure holding LWM2M carrier library initialization parameters.
  */
 typedef struct {
-	/** URI of the bootstrap server, null-terminated. */
-	char *bootstrap_uri;
-	/** Pre-shared key that the device will use. */
-	char *psk;
-	/** Length of the pre-shared key. */
-	size_t psk_length;
-	/** Optional custom APN, null-terminated. */
-	char *apn;
+	/** URI of the bootstrap server, null-terminated string. */
+	const char *bootstrap_uri;
+	/** Pre-Shared Key for the bootstrap server, null-terminated hexadecimal string. */
+	const char *psk;
+	/** Optional custom APN, null-terminated string. */
+	const char *apn;
 	/** Connect to certification servers if true, else connect to production servers. */
 	bool certification_mode;
 } lwm2m_carrier_config_t;

@@ -55,44 +55,34 @@ uint32_t lwm2m_debug_operator_id_get(void)
     return m_debug_settings.operator_id;
 }
 
-int32_t lwm2m_debug_bootstrap_psk_set(const lwm2m_string_t * const p_psk)
+int32_t lwm2m_debug_bootstrap_psk_set(const char * p_psk)
 {
-    if((p_psk == NULL) || (p_psk->len > LWM2M_DEBUG_PSK_MAX_LEN ))
+    if (p_psk == NULL)
     {
         return -EINVAL;
     }
 
-    memcpy(m_debug_settings.bootstrap_psk, p_psk->p_val, p_psk->len);
-    m_debug_settings.bootstrap_psk_len = (size_t)p_psk->len;
+    size_t psk_len = strlen(p_psk);
+
+    if (psk_len > LWM2M_DEBUG_PSK_MAX_LEN)
+    {
+        return -EINVAL;
+    }
+
+    memcpy(m_debug_settings.bootstrap_psk, p_psk, psk_len);
+    m_debug_settings.bootstrap_psk[psk_len] = 0;
 
     return lwm2m_debug_settings_store(&m_debug_settings);
 }
 
-static bool lwm2m_debug_bootstrap_psk_is_set(void)
+const char * lwm2m_debug_bootstrap_psk_get(void)
 {
-    if(m_debug_settings.bootstrap_psk_len > 0)
+    if (m_debug_settings.bootstrap_psk[0] == '\0')
     {
-        return true;
-    }
-    return false;
-}
-
-int32_t lwm2m_debug_bootstrap_psk_get(lwm2m_string_t * p_psk)
-{
-    if(p_psk == NULL)
-    {
-        return -EINVAL;
+        return NULL;
     }
 
-    if (!lwm2m_debug_bootstrap_psk_is_set())
-    {
-        return -ENOENT;
-    }
-
-    p_psk->p_val = m_debug_settings.bootstrap_psk;
-    p_psk->len   = (uint32_t)m_debug_settings.bootstrap_psk_len;
-
-    return 0;
+    return m_debug_settings.bootstrap_psk;
 }
 
 bool lwm2m_debug_is_set(uint32_t flag)

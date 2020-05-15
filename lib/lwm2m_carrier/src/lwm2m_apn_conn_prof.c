@@ -159,7 +159,7 @@ bool lwm2m_apn_conn_prof_deactivate(uint16_t instance_id)
     return true;
 }
 
-uint32_t lwm2m_apn_conn_prof_custom_apn_set(char *p_apn)
+uint32_t lwm2m_apn_conn_prof_custom_apn_set(const char * p_apn)
 {
     lwm2m_instance_t *p_instance;
     uint32_t err_code;

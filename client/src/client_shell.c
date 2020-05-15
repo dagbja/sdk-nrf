@@ -130,6 +130,21 @@ static int cmd_nslookup(const struct shell *shell, size_t argc, char **argv)
 }
 
 
+static char *lwm2m_string_get(const lwm2m_string_t *string)
+{
+    static char string_buf[200];
+
+    if (string->len >= 200)
+    {
+        return "<error>";
+    }
+    memcpy(string_buf, string->p_val, string->len);
+    string_buf[string->len] = '\0';
+
+    return string_buf;
+}
+
+
 static int cmd_security_print(const struct shell *shell, size_t argc, char **argv)
 {
     uint8_t uri_len = 0;
@@ -300,23 +315,11 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "  SMS Counter    %u", lwm2m_sms_receive_counter());
     shell_print(shell, "  Network status %u", lwm2m_net_reg_stat_get());
 
-    lwm2m_string_t psk_str;
-    int32_t ret = lwm2m_debug_bootstrap_psk_get(&psk_str);
-    if(ret == 0)
-    {
-        // * 2 since a byte 0xAB must be represented by two characters "AB".
-        // + 1 for NUL termination at the end.
-        char psk[LWM2M_DEBUG_PSK_MAX_LEN * 2 + 1];
-
-        int offset = 0;
-        for(int i = 0; i < psk_str.len;i++)
-        {
-            offset += snprintf(&psk[offset], sizeof(psk) - offset, "%02x", psk_str.p_val[i]);
-        }
-        psk[offset] = '\0';
-
-        shell_print(shell, "  Bootstrap PSK  %s", psk);
+    const char * p_debug_psk = lwm2m_debug_bootstrap_psk_get();
+    if (p_debug_psk) {
+        shell_print(shell, "  Bootstrap PSK  %s", p_debug_psk);
     }
+
     return 0;
 }
 
@@ -585,29 +588,30 @@ static int cmd_debug_operator_id(const struct shell *shell, size_t argc, char **
  */
 static int string_to_hex(char *p_source_str, uint8_t *p_dest_buffer, uint16_t buf_len)
 {
-  char *p_data = p_source_str;
-  int offset;
-  int read_byte;
-  int data_len = 0;
-  bool read_was_hex = true;
+    char *p_data = p_source_str;
+    int offset;
+    int read_byte;
+    int data_len = 0;
+    bool read_was_hex = true;
 
-  // Stop at first non-hex character or if the buf_len is reached.
-  while (read_was_hex && (data_len < buf_len))
-  {
-    // read one hex number from data, put into read_byte,
-    // output number of characters read to offset.
-    if(sscanf(p_data, " %02x%n", &read_byte, &offset) == 1)
+    // Stop at first non-hex character or if the buf_len is reached.
+    while (read_was_hex && (data_len < buf_len))
     {
-        read_was_hex = true;
-        p_dest_buffer[data_len++] = read_byte;
-        p_data += offset;
+        // read one hex number from data, put into read_byte,
+        // output number of characters read to offset.
+        if (sscanf(p_data, " %02x%n", &read_byte, &offset) == 1)
+        {
+            read_was_hex = true;
+            p_dest_buffer[data_len++] = read_byte;
+            p_data += offset;
+        }
+        else
+        {
+            read_was_hex = false;
+        }
     }
-    else
-    {
-        read_was_hex = false;
-    }
-  }
-  return data_len;
+
+    return data_len;
 }
 
 
@@ -621,7 +625,7 @@ static bool string_is_hex(char * p_str)
 {
     for (int i = 0; i < strlen(p_str); i++)
     {
-        if(!isxdigit(p_str[i]))
+        if (!isxdigit(p_str[i]))
         {
             return false;
         }
@@ -641,34 +645,30 @@ static bool string_is_hex(char * p_str)
 static int cmd_debug_bootstrap_psk_nvm_set(const struct shell *shell, size_t argc, char **argv)
 {
     if (argc != 2) {
-        shell_print(shell, "Pre-shared key in hex format. Example: 3e48a2");
+        shell_print(shell, "Pre-shared-key in hex format. Example: 3e48a2");
         return 0;
     }
 
-    uint8_t psk[LWM2M_DEBUG_PSK_MAX_LEN];
+    size_t string_len = strlen(argv[1]);
 
-    if(!string_is_hex(argv[1]))
+    if (((string_len % 2) != 0) || !string_is_hex(argv[1]))
     {
-        shell_print(shell, "String is not correct hex format. Example: 3e48a2");
+        shell_print(shell, "String is not valid hex format. Example: 3e48a2");
         return 0;
     }
 
-    // Input string can be twice the length of out inernal PSK buffer.
-    // For example "AABB" will become {0xAA, 0xBB}.
-    if (strlen(argv[1]) > (ARRAY_SIZE(psk) * 2))
+    if (string_len > LWM2M_DEBUG_PSK_MAX_LEN)
     {
-        shell_print(shell, "String is too long. Max size %i", LWM2M_DEBUG_PSK_MAX_LEN*2);
+        shell_print(shell, "String is too long. Max size is %i", LWM2M_DEBUG_PSK_MAX_LEN);
+        return 0;
     }
 
-    lwm2m_string_t psk_str;
-    psk_str.p_val = psk;
-    psk_str.len = string_to_hex(argv[1], psk_str.p_val, LWM2M_DEBUG_PSK_MAX_LEN);
-
-    int32_t ret = lwm2m_debug_bootstrap_psk_set(&psk_str);
+    int32_t ret = lwm2m_debug_bootstrap_psk_set(argv[1]);
     if (ret < 0)
     {
         shell_print(shell, "Store operation failed, err %d", ret);
     }
+
     return 0;
 }
 
@@ -1519,21 +1519,6 @@ static int cmd_device_error_code_remove(const struct shell *shell, size_t argc, 
     }
 
     return 0;
-}
-
-
-static char *lwm2m_string_get(const lwm2m_string_t *string)
-{
-    static char string_buf[200];
-
-    if (string->len >= 200)
-    {
-        return "<error>";
-    }
-    memcpy(string_buf, string->p_val, string->len);
-    string_buf[string->len] = '\0';
-
-    return string_buf;
 }
 
 
