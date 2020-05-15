@@ -34,7 +34,7 @@ typedef struct {
 	/** Event type. */
 	uint32_t type;
 	/** Event data. Can be NULL, depending on event type. */
-	void *data;
+	const void *data;
 } lwm2m_carrier_event_t;
 
 /**
@@ -66,6 +66,11 @@ typedef struct {
 #define LWM2M_CARRIER_ERROR_CONNECT_FAIL    1 /**< Failed to connect to the LTE network. */
 #define LWM2M_CARRIER_ERROR_DISCONNECT_FAIL 2 /**< Failed to disconnect from the LTE network. */
 #define LWM2M_CARRIER_ERROR_BOOTSTRAP       3 /**< LWM2M carrier bootstrap failed. */
+#define LWM2M_CARRIER_ERROR_FOTA_PKG        4 /**< Update package rejected. */
+#define LWM2M_CARRIER_ERROR_FOTA_PROTO      5 /**< Protocol error. */
+#define LWM2M_CARRIER_ERROR_FOTA_CONN       6 /**< Connection error. */
+#define LWM2M_CARRIER_ERROR_FOTA_CONN_LOST  7 /**< Connection lost. */
+#define LWM2M_CARRIER_ERROR_FOTA_FAIL       8 /**< Update failed. */
 
 /**
  * @brief LWM2M carrier library error event structure.

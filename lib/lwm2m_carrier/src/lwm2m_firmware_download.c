@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include <dfusock.h>
 #include <nrf_socket.h>
 #include <nrf_errno.h>
 
@@ -19,8 +20,6 @@
 #include <lwm2m_carrier_main.h>
 #include <lwm2m_instance_storage.h>
 #include <lwm2m_device.h>
-
-#include <dfusock.h>
 
 #include <operator_check.h>
 
@@ -38,6 +37,8 @@
 #define OFFSET_POLL_INTERVAL K_SECONDS(2)
 /* Interval at which to poll for network availability */
 #define NETWORK_POLL_INTERVAL K_SECONDS(6)
+/* Number of times to retry a download */
+#define DOWNLOAD_RETRIES 16
 
 static char apn[64];
 static char file[256];
@@ -45,19 +46,81 @@ static char host[128];
 static uint32_t flash_size;
 static bool check_file_size;
 
+/* Number of times to retry a download on socket or HTTP errors.
+ * This excludes the HTTP server closing the connection, since
+ * that is retried automatically by the download_client.
+ */
+static u8_t download_retries = DOWNLOAD_RETRIES;
+
 static void *download_dwork;
 static void *reboot_dwork;
 static struct lwm2m_os_download_cfg config = {
 	.sec_tag = CONFIG_NRF_LWM2M_CARRIER_SEC_TAG,
 };
 
-static char *img_state_str[] = {
+static const char *img_state_str[] = {
 	[FIRMWARE_NONE] = "no image",
 	[FIRMWARE_DOWNLOADING] = "downloading",
 	[FIRMWARE_READY] = "complete image",
 };
 
 int lwm2m_firmware_download_uri(char *package_uri, size_t len);
+
+static void carrier_evt_send(uint32_t type, void *data)
+{
+	lwm2m_carrier_event_t evt = {
+		.type = type,
+		.data = data,
+	};
+
+	lwm2m_carrier_event_handler(&evt);
+}
+
+static void carrier_error_evt_send(uint32_t id, int32_t err)
+{
+	/* There are five FOTA errors:
+	 *
+	 * _FOTA_FAIL
+	 * The modem failed to update.
+	 * The error is always zero.
+	 *
+	 * _FOTA_PKG
+	 * The modem has rejected a package or refused to apply the update.
+	 * The error is the dfu_err from the modem.
+	 *
+	 * _FOTA_PROTO
+	 * The HTTP request failed (wrong URI, unexpected response).
+	 * The error is an NCS error from the download_client.
+	 *
+	 * _FOTA_CONN
+	 * Failed to connect the TCP socket.
+	 * We could have failed to resolve the host IP addr,
+	 * or it could have refused our connection (wrong cert).
+	 *
+	 * _FOTA_CONN_LOST
+	 * Connection lost.
+	 */
+	lwm2m_carrier_event_t evt = {
+		.type = LWM2M_CARRIER_EVENT_ERROR,
+		.data = &(lwm2m_carrier_event_error_t) {
+			.code = id,
+			.value = err,
+		}
+	};
+
+	lwm2m_carrier_event_handler(&evt);
+}
+
+static bool download_retry_and_update(void)
+{
+	if (download_retries == 0) {
+		download_retries = DOWNLOAD_RETRIES;
+		return false;
+	}
+
+	download_retries--;
+	return true;
+}
 
 static bool file_size_check_valid(void)
 {
@@ -74,15 +137,14 @@ static bool file_size_check_valid(void)
 static int on_fragment(const struct lwm2m_os_download_evt *event)
 {
 	int err;
-	nrf_dfu_err_t dfu_err;
+	nrf_dfu_err_t dfu_err = DFU_NO_ERROR;
 
 	if (check_file_size && !file_size_check_valid()) {
 		LWM2M_WRN("File size too large");
 		/* Do not attemp to download again */
 		lwm2m_firmware_image_state_set(FIRMWARE_NONE);
-		lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_IDLE);
-		lwm2m_firmware_update_result_set(
-			0, LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_STORAGE);
+		lwm2m_firmware_state_set(0, STATE_IDLE);
+		lwm2m_firmware_update_result_set(0, RESULT_ERROR_STORAGE);
 		/* Stop the download */
 		return -1;
 	}
@@ -102,7 +164,7 @@ static int on_fragment(const struct lwm2m_os_download_evt *event)
 
 	if (err == -NRF_ENOEXEC) {
 		/* Let's fetch the RPC error reason. */
-		err = dfusock_error_get(&dfu_err);
+		dfusock_error_get(&dfu_err);
 
 		/* It could happen, after a manual or specific firmware
 		 * update, that the scratch area is not erased even
@@ -111,22 +173,21 @@ static int on_fragment(const struct lwm2m_os_download_evt *event)
 		 * "dirty" offset, and the download task will erase
 		 * the scratch area before re-starting the download.
 		 */
-		if (!err) {
-			LWM2M_WRN("Reject reason %d", (int)dfu_err);
-			if  (dfu_err == DFU_AREA_NOT_BLANK) {
-				LWM2M_INF("Erasing flash area and retrying");
-				lwm2m_os_timer_start(download_dwork, K_NO_WAIT);
-				/* Stop the download, it will be restarted */
-				return -1;
-			}
+		LWM2M_WRN("Reject reason %d", (int)dfu_err);
+		if  (dfu_err == DFU_AREA_NOT_BLANK) {
+			LWM2M_INF("Erasing flash area and retrying");
+			lwm2m_os_timer_start(download_dwork, K_NO_WAIT);
+			/* Stop the download, it will be restarted */
+			return -1;
 		}
 	}
 
 	/* We can't recover from here, simply give up. */
 
-	lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_IDLE);
-	lwm2m_firmware_update_result_set(
-		0, LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_FIRMWARE_UPDATE_FAILED);
+	lwm2m_firmware_state_set(0, STATE_IDLE);
+	lwm2m_firmware_update_result_set(0, RESULT_ERROR_CRC);
+
+	carrier_error_evt_send(LWM2M_CARRIER_ERROR_FOTA_PKG, dfu_err);
 
 	/* Re-initialize the DFU socket to free up memory
 	 * that could be necessary for the TLS handshake.
@@ -146,7 +207,7 @@ static int on_done(const struct lwm2m_os_download_evt *event)
 
 	/* Save state and notify the server */
 	lwm2m_firmware_image_state_set(FIRMWARE_READY);
-	lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_DOWNLOADED);
+	lwm2m_firmware_state_set(0, STATE_DOWNLOADED);
 
 	/* Close the DFU socket to free up memory for TLS,
 	 * and re-open it in case a new download is started without
@@ -161,6 +222,22 @@ static int on_done(const struct lwm2m_os_download_evt *event)
 	return 0;
 }
 
+/* In case of error:
+ * for VzW, we retry on network and protocol errors
+ * for AT&T, we only retry protocol errors
+ *
+ * We retry on network errors with VzW because they can happen and
+ * we don't trust them to resend the firmware, they would just fail the test :)
+ * In case of AT&T they expect us to report an error instead.
+ *
+ * We retry on protocol errors (-EBADMSG) because
+ * I have seen Motive servers send a partial content after 3 attempts.
+ * This behavior could happen with other servers as well.
+
+ * -EBADMSG indicates an unexpected HTTP response.
+ * This could be due to the URI being wrong, or the server
+ * not sending "Content-Range" or the file size in the response.
+ */
 static int on_error(const struct lwm2m_os_download_evt *event)
 {
 	int err;
@@ -177,29 +254,39 @@ static int on_error(const struct lwm2m_os_download_evt *event)
 	(void) dfusock_close();
 	(void) dfusock_init();
 
+	if (operator_is_vzw(true) || event->error == -EBADMSG) {
+		if (download_retry_and_update()) {
+			/* Retry the download.
+			 * Do not restart the download via this handler.
+			 * We have closed the DFU socket and must re-set
+			 * the offset before we begin data to the modem again.
+			 * Let the download_task handle that.
+			 */
+			lwm2m_os_timer_start(download_dwork,
+				(event->error == -EBADMSG) ?
+				K_NO_WAIT :	/* proto err, retry now */
+				K_SECONDS(20)	/* net err, retry later */
+			);
+			return -1;
+		}
+	}
+
+	/* We have reached the maximum number of retries, give up */
+	lwm2m_firmware_state_set(0, STATE_IDLE);
+
 	if (event->error == -EBADMSG) {
-		/* We have a non-zero, non-dirty offset but the server won't
-		 * send any more bytes, so we can't continue the download.
-		 * We could have lost power after downloading the whole image
-		 * but before we could save that information in flash.
-		 * Manually override the image state to attempt to apply
-		 * the existing patch.
-		 */
-		lwm2m_firmware_image_state_set(FIRMWARE_READY);
-		lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_DOWNLOADED);
-		return -1;
+		/* Protocol error */
+		lwm2m_firmware_update_result_set(0, RESULT_ERROR_INVALID_URI);
+		carrier_error_evt_send(
+			LWM2M_CARRIER_ERROR_FOTA_PROTO, event->error);
+	} else {
+		/* Network error */
+		lwm2m_firmware_update_result_set(0, RESULT_ERROR_CONN_LOST);
+		carrier_error_evt_send(
+			LWM2M_CARRIER_ERROR_FOTA_CONN_LOST, event->error);
 	}
 
-	if (operator_is_vzw(true)) {
-		/* Attempt to download the fragment again */
-		return 0;
-	}
-
-	lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_IDLE);
-	lwm2m_firmware_update_result_set(0,
-		LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CONN_LOST);
-
-	/* Do not retry to download */
+	/* Give up */
 	return -1;
 }
 
@@ -294,8 +381,7 @@ static void download_task(void *w)
 		err = lwm2m_firmware_image_state_get(&state);
 		if (!err && state == FIRMWARE_READY) {
 			LWM2M_INF("Image already present");
-			lwm2m_firmware_state_set(
-				0, LWM2M_FIRMWARE_STATE_DOWNLOADED);
+			lwm2m_firmware_state_set(0, STATE_DOWNLOADED);
 			return;
 		}
 	}
@@ -339,15 +425,15 @@ static void download_task(void *w)
 			return;
 		}
 
-		lwm2m_firmware_update_result_set(
-			0, LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI);
+		lwm2m_firmware_update_result_set(0, RESULT_ERROR_INVALID_URI);
+		carrier_error_evt_send(LWM2M_CARRIER_ERROR_FOTA_CONN, 0);
 		return;
 	}
 
 	err = lwm2m_os_download_start(file, off);
 	if (err) {
-		lwm2m_firmware_update_result_set(
-			0, LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI);
+		lwm2m_firmware_update_result_set(0, RESULT_ERROR_CONN_LOST);
+		carrier_error_evt_send(LWM2M_CARRIER_ERROR_FOTA_CONN_LOST, 0);
 		return;
 	}
 }
@@ -423,12 +509,12 @@ int lwm2m_firmware_download_init(void)
 
 		if (memcmp(cur_ver, saved_ver, UUID_LEN)) {
 			LWM2M_INF("Firmware updated!");
-			lwm2m_firmware_update_result_set(
-				0, LWM2M_FIRMWARE_UPDATE_RESULT_SUCCESS);
+			lwm2m_firmware_update_result_set(0, RESULT_SUCCESS);
 		} else {
 			LWM2M_INF("Firmware NOT updated!");
 			lwm2m_firmware_update_result_set(
-				0, LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_FIRMWARE_UPDATE_FAILED);
+				0, RESULT_ERROR_UPDATE_FAILED);
+			carrier_error_evt_send(LWM2M_CARRIER_ERROR_FOTA_FAIL, 0);
 		}
 
 		/* Clear flag and save new modem firmware version */
@@ -484,9 +570,7 @@ int lwm2m_firmware_download_uri(char *package_uri, size_t len)
 	/* Find the start of the HTTP host */
 	p = strstr(package_uri, "https://");
 	if (!p) {
-		lwm2m_firmware_update_result_set(0,
-			LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_UNSUPPORTED_PROTOCOL);
-
+		lwm2m_firmware_update_result_set(0, RESULT_ERROR_UNSUP_PROTO);
 		return -EINVAL;
 	}
 
@@ -557,17 +641,13 @@ int lwm2m_firmware_download_uri(char *package_uri, size_t len)
 	/* Set state now, since the actual download might be delayed in case
 	 * there is a firmware image in flash that needs to be deleted.
 	 */
-	lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_DOWNLOADING);
-	lwm2m_firmware_update_result_set(0, LWM2M_FIRMWARE_UPDATE_RESULT_DEFAULT);
+	lwm2m_firmware_state_set(0, STATE_DOWNLOADING);
+	lwm2m_firmware_update_result_set(0, RESULT_DEFAULT);
 
 	/* Global flag to check file size */
 	check_file_size = true;
 
-	lwm2m_carrier_event_t event = {
-		.type = LWM2M_CARRIER_EVENT_FOTA_START
-	};
-	lwm2m_carrier_event_handler(&event);
-
+	carrier_evt_send(LWM2M_CARRIER_EVENT_FOTA_START, file);
 	lwm2m_os_timer_start(download_dwork, K_NO_WAIT);
 
 	return 0;
@@ -583,6 +663,7 @@ int lwm2m_firmware_download_apply(void)
 	int err;
 	uint8_t ver[UUID_LEN];
 	enum lwm2m_firmware_image_state state;
+	nrf_dfu_err_t dfu_err;
 
 	err = lwm2m_firmware_image_state_get(&state);
 
@@ -619,8 +700,12 @@ int lwm2m_firmware_download_apply(void)
 		 * since if the update fails, the offset will be flagged as
 		 * dirty by the modem itself and that overrides our own flag.
 		 */
-		lwm2m_firmware_update_result_set(
-			0, LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CRC);
+		lwm2m_firmware_update_result_set(0, RESULT_ERROR_CRC);
+
+		/* Notify application */
+		dfusock_error_get(&dfu_err);
+		carrier_error_evt_send(LWM2M_CARRIER_ERROR_FOTA_PKG, dfu_err);
+
 		return err;
 	}
 
