@@ -153,6 +153,16 @@ static int app_event_notify(uint32_t type, void * data)
     return lwm2m_carrier_event_handler(&event);
 }
 
+static int app_event_deferred(uint32_t reason, int32_t timeout)
+{
+    lwm2m_carrier_event_deferred_t deferred_event = {
+        .reason  = reason,
+        .timeout = timeout
+    };
+
+    return app_event_notify(LWM2M_CARRIER_EVENT_DEFERRED, &deferred_event);
+}
+
 static int app_event_error(uint32_t error_code, int32_t error_value)
 {
     // Put library in ERROR state to exit lwm2m_carrier_run loop
@@ -1242,6 +1252,46 @@ static uint32_t app_lwm2m_parse_uri_and_save_remote(uint16_t              short_
     return err_code;
 }
 
+static uint32_t app_event_deferred_reason(bool fallback)
+{
+    uint32_t reason;
+
+    switch (m_app_state)
+    {
+        case LWM2M_STATE_BS_CONNECT_RETRY_WAIT:
+            if (fallback) {
+                reason = LWM2M_CARRIER_DEFERRED_BOOTSTRAP_NO_ROUTE;
+            } else {
+                reason = LWM2M_CARRIER_DEFERRED_BOOTSTRAP_CONNECT;
+            }
+            break;
+
+        case LWM2M_STATE_BOOTSTRAP_WAIT:
+        case LWM2M_STATE_BOOTSTRAPPING:
+            reason = LWM2M_CARRIER_DEFERRED_BOOTSTRAP_SEQUENCE;
+            break;
+
+        case LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT:
+            if (fallback) {
+                reason = LWM2M_CARRIER_DEFERRED_SERVER_NO_ROUTE;
+            } else {
+                reason = LWM2M_CARRIER_DEFERRED_SERVER_CONNECT;
+            }
+            break;
+
+        case LWM2M_STATE_SERVER_REGISTER_WAIT:
+            reason = LWM2M_CARRIER_DEFERRED_SERVER_REGISTRATION;
+            break;
+
+        default:
+            LWM2M_WRN("Illegal deferred state: %d", m_app_state);
+            reason = LWM2M_CARRIER_DEFERRED_NO_REASON;
+            break;
+    }
+
+    return reason;
+}
+
 /**@brief Helper function to handle a connect retry. */
 static void app_handle_connect_retry(uint16_t security_instance, bool fallback)
 {
@@ -1291,9 +1341,10 @@ static void app_handle_connect_retry(uint16_t security_instance, bool fallback)
                 // Disconnect the session and retry on timeout.
                 app_server_disconnect(security_instance, false);
             }
-
-            app_event_notify(LWM2M_CARRIER_EVENT_DEFERRED, NULL);
         }
+
+        uint32_t reason = app_event_deferred_reason(fallback);
+        app_event_deferred(reason, retry_delay / K_SECONDS(1));
 
         LWM2M_INF("Retry delay for %ld minutes (server %u)", retry_delay / K_MINUTES(1), security_instance);
         lwm2m_os_timer_start(state_update_timer, retry_delay);
@@ -1982,6 +2033,8 @@ static void app_bootstrap_connect(void)
     if (!lwm2m_carrier_pdn_activate(LWM2M_BOOTSTRAP_INSTANCE_ID, &pdn_retry_delay)) {
         // Setup carrier PDN connection failed, try again
         if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT)) {
+            app_event_deferred(LWM2M_CARRIER_DEFERRED_PDN_ACTIVATE, pdn_retry_delay / K_SECONDS(1));
+
             LWM2M_INF("PDN retry delay for %ld seconds (server 0)", pdn_retry_delay / K_SECONDS(1));
             lwm2m_os_timer_start(state_update_timer, pdn_retry_delay);
         }
@@ -2140,6 +2193,8 @@ static void app_server_connect(uint16_t security_instance)
     if (!lwm2m_carrier_pdn_activate(security_instance, &pdn_retry_delay)) {
         // Setup carrier PDN connection failed, try again
         if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
+            app_event_deferred(LWM2M_CARRIER_DEFERRED_PDN_ACTIVATE, pdn_retry_delay / K_SECONDS(1));
+
             LWM2M_INF("PDN retry delay for %ld seconds (server %u)", pdn_retry_delay / K_SECONDS(1), security_instance);
             lwm2m_os_timer_start(state_update_timer, pdn_retry_delay);
         }

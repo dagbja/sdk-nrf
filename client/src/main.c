@@ -17,6 +17,7 @@
 int lwm2m_carrier_event_handler(const lwm2m_carrier_event_t * event)
 {
     lwm2m_carrier_event_error_t *error_event;
+    lwm2m_carrier_event_deferred_t *deferred_event;
 
     static const char *str[] = {
         [LWM2M_CARRIER_EVENT_BSDLIB_INIT] = "LWM2M_CARRIER_EVENT_BSDLIB_INIT",
@@ -40,10 +41,14 @@ int lwm2m_carrier_event_handler(const lwm2m_carrier_event_t * event)
     case LWM2M_CARRIER_EVENT_DISCONNECTED:
     case LWM2M_CARRIER_EVENT_BOOTSTRAPPED:
     case LWM2M_CARRIER_EVENT_READY:
-    case LWM2M_CARRIER_EVENT_DEFERRED:
     case LWM2M_CARRIER_EVENT_FOTA_START:
     case LWM2M_CARRIER_EVENT_REBOOT:
         LWM2M_INF("Sent event %s", lwm2m_os_log_strdup(str[event->type]));
+        break;
+    case LWM2M_CARRIER_EVENT_DEFERRED:
+        deferred_event = (lwm2m_carrier_event_deferred_t *)(event->data);
+        LWM2M_INF("Sent event %s: [%u] %ds", lwm2m_os_log_strdup(str[event->type]),
+                  deferred_event->reason, deferred_event->timeout);
         break;
     case LWM2M_CARRIER_EVENT_ERROR:
         error_event = (lwm2m_carrier_event_error_t *)(event->data);
