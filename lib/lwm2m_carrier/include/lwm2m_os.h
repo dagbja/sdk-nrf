@@ -439,7 +439,7 @@ int lwm2m_os_sec_identity_exists(uint32_t sec_tag, bool *exists,
  * @retval -EINVAL	Invalid parameters.
  * @retval -ENOBUFS	Internal buffer is too small.
  * @retval -ENOMEM	Not enough memory to store the credential.
- * @retval -EACCES	Th operation failed because the LTE link is active.
+ * @retval -EACCES	The operation failed because the LTE link is active.
  * @retval -ENOENT	The security tag could not be written.
  * @retval -EPERM	Insufficient permissions.
  * @retval -EIO		Internal error.
