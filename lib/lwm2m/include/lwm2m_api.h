@@ -700,6 +700,8 @@ uint32_t lwm2m_coap_handler_gen_instance_link(lwm2m_instance_t * p_instance,
  * @param[in]    short_server_id  Short server id of the requesting server.
  * @param[inout] p_buffer_len     As input used to indicate length of the buffer. It will return the
  *                                used amout of buffer length.
+ * @param[in]    inherit          Flag to indicate whether the inherited R-Attributes ought to be
+ *                                included.
  *
  * @retval NRF_SUCCESS If generation of link format string was successful.
  */
@@ -707,7 +709,8 @@ uint32_t lwm2m_coap_handler_gen_attr_link(uint16_t const * p_path,
                                           uint16_t         path_len,
                                           uint16_t         short_server_id,
                                           uint8_t        * p_buffer,
-                                          uint32_t       * p_buffer_len);
+                                          uint32_t       * p_buffer_len,
+                                          bool             inherit);
 
 /**@brief Send CoAP 2.05 Content response with the payload provided.
  *

@@ -1119,7 +1119,7 @@ const lwm2m_observable_metadata_t * const * lwm2m_observables_get(uint16_t *p_le
 }
 
 uint32_t lwm2m_coap_handler_gen_attr_link(uint16_t const *p_path, uint16_t path_len, uint16_t short_server_id,
-                uint8_t *p_buffer, uint32_t *p_buffer_len)
+                uint8_t *p_buffer, uint32_t *p_buffer_len, bool inherit)
 {
     int index;
     uint32_t buffer_index = 0;
@@ -1156,7 +1156,8 @@ uint32_t lwm2m_coap_handler_gen_attr_link(uint16_t const *p_path, uint16_t path_
 
     for (int i = 0; i < LWM2M_MAX_NOTIF_ATTRIBUTE_TYPE; i++)
     {
-        if (m_observables[index]->attributes[i].assignment_level >= path_len)
+        if ((m_observables[index]->attributes[i].assignment_level >= path_len) ||
+            (inherit && (m_observables[index]->attributes[i].assignment_level > LWM2M_ATTR_DEFAULT_ASSIGNMENT_LEVEL)))
         {
             if (buffer_index >= sizeof(dry_run_buffer))
             {

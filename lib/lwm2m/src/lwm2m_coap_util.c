@@ -488,7 +488,7 @@ uint32_t lwm2m_respond_with_instance_link(lwm2m_instance_t * p_instance,
                               resource_id);
 
         added_len = sizeof(buffer) - buffer_len;
-        err_code = lwm2m_coap_handler_gen_attr_link(path, 3, short_server_id, &buffer[buffer_len], &added_len);
+        err_code = lwm2m_coap_handler_gen_attr_link(path, 3, short_server_id, &buffer[buffer_len], &added_len, true);
 
         if (err_code != 0)
         {
