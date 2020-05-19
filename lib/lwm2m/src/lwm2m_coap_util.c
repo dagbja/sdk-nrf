@@ -495,6 +495,8 @@ uint32_t lwm2m_respond_with_instance_link(lwm2m_instance_t * p_instance,
             (void)lwm2m_respond_with_code(COAP_CODE_500_INTERNAL_SERVER_ERROR, p_request);
             return err_code;
         }
+
+        buffer_len += added_len;
     }
 
     return lwm2m_respond_with_payload(buffer, buffer_len, COAP_CT_APP_LINK_FORMAT, p_request);
