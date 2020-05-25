@@ -528,7 +528,7 @@ bool lwm2m_observer_notification_is_con(const void *p_observable, uint16_t ssid)
         return false;
     }
 
-    if ((m_observables[index]->con_notification + K_SECONDS(m_coap_con_interval)) < m_time_base)
+    if ((m_observables[index]->con_notification + SECONDS(m_coap_con_interval)) < m_time_base)
     {
         m_observables[index]->con_notification = m_time_base;
         return true;

@@ -71,6 +71,18 @@ extern "C" {
 
 #endif // LWM2M_DISABLE_API_PARAM_CHECK
 
+/* Defines replacing the old K_UNIT timeout macros e.g. K_MSEC */
+
+/* Null timeout */
+#define NO_WAIT 0
+/* Timeout in milliseconds */
+#define MSEC(ms) (ms)
+/* Timeout in seconds */
+#define SECONDS(s) MSEC((s) * 1000)
+/* Timeout in minutes */
+#define MINUTES(m) SECONDS((m) * 60)
+/* Timeout in hours */
+#define HOURS(h) MINUTES((h) * 60)
 
 /**@brief Memory allocator function.
  *

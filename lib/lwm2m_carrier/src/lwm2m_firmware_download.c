@@ -34,9 +34,9 @@
 /* Interval with which to poll the modem firmware offset to determine if the
  * erase operation has completed.
  */
-#define OFFSET_POLL_INTERVAL K_SECONDS(2)
+#define OFFSET_POLL_INTERVAL SECONDS(2)
 /* Interval at which to poll for network availability */
-#define NETWORK_POLL_INTERVAL K_SECONDS(6)
+#define NETWORK_POLL_INTERVAL SECONDS(6)
 /* Number of times to retry a download */
 #define DOWNLOAD_RETRIES 16
 
@@ -176,7 +176,7 @@ static int on_fragment(const struct lwm2m_os_download_evt *event)
 		LWM2M_WRN("Reject reason %d", (int)dfu_err);
 		if  (dfu_err == DFU_AREA_NOT_BLANK) {
 			LWM2M_INF("Erasing flash area and retrying");
-			lwm2m_os_timer_start(download_dwork, K_NO_WAIT);
+			lwm2m_os_timer_start(download_dwork, NO_WAIT);
 			/* Stop the download, it will be restarted */
 			return -1;
 		}
@@ -264,8 +264,8 @@ static int on_error(const struct lwm2m_os_download_evt *event)
 			 */
 			lwm2m_os_timer_start(download_dwork,
 				(event->error == -EBADMSG) ?
-				K_NO_WAIT :	/* proto err, retry now */
-				K_SECONDS(20)	/* net err, retry later */
+				NO_WAIT :	/* proto err, retry now */
+				SECONDS(20)	/* net err, retry later */
 			);
 			return -1;
 		}
@@ -310,7 +310,7 @@ static int erase_check_timeout(void)
 
 	erase_duration_ms += OFFSET_POLL_INTERVAL;
 	if (erase_duration_ms <
-	    K_SECONDS(CONFIG_NRF_LWM2M_CARRIER_ERASE_TIMEOUT_S)) {
+	    SECONDS(CONFIG_NRF_LWM2M_CARRIER_ERASE_TIMEOUT_S)) {
 		return 0;
 	}
 
@@ -421,7 +421,7 @@ static void download_task(void *w)
 			 */
 			int retry_delay = 0;
 			(void) lwm2m_carrier_pdn_activate(0, &retry_delay);
-			lwm2m_os_timer_start(download_dwork, retry_delay);
+			lwm2m_os_timer_start(download_dwork, MSEC(retry_delay));
 			return;
 		}
 
@@ -445,7 +445,7 @@ static void reboot_task(void *w)
 	battery = lwm2m_device_battery_status_get();
 	if (battery == LWM2M_CARRIER_BATTERY_STATUS_LOW_BATTERY) {
 		LWM2M_INF("Battery low - firmware update deferred by 5 minutes");
-		lwm2m_os_timer_start(reboot_dwork, K_MINUTES(5));
+		lwm2m_os_timer_start(reboot_dwork, MINUTES(5));
 		return;
 	}
 
@@ -648,14 +648,14 @@ int lwm2m_firmware_download_uri(char *package_uri, size_t len)
 	check_file_size = true;
 
 	carrier_evt_send(LWM2M_CARRIER_EVENT_FOTA_START, file);
-	lwm2m_os_timer_start(download_dwork, K_NO_WAIT);
+	lwm2m_os_timer_start(download_dwork, NO_WAIT);
 
 	return 0;
 }
 
 void lwm2m_firmware_download_reboot_schedule(void)
 {
-	lwm2m_os_timer_start(reboot_dwork, K_NO_WAIT);
+	lwm2m_os_timer_start(reboot_dwork, NO_WAIT);
 }
 
 int lwm2m_firmware_download_apply(void)

@@ -235,7 +235,7 @@ uint32_t conn_stat_instance_callback(lwm2m_instance_t * p_instance,
                 if (m_instance_conn_stat.collection_period > 0)
                 {
                     lwm2m_os_timer_start(collection_period_timer,
-                                         m_instance_conn_stat.collection_period * 1000);
+                                         SECONDS(m_instance_conn_stat.collection_period));
                 }
 
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);

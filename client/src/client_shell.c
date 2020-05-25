@@ -13,6 +13,7 @@
 #include <shell/shell.h>
 #include <fcntl.h>
 
+#include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_security.h>
 #include <lwm2m_server.h>
@@ -1035,9 +1036,9 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         case LWM2M_STATE_BS_CONNECT_RETRY_WAIT:
             retry_delay = lwm2m_retry_delay_connect_get(0, NULL);
             if (retry_delay != -1) {
-                int32_t delay = lwm2m_state_update_delay() / K_SECONDS(1);
+                int32_t delay = lwm2m_state_update_delay() / SECONDS(1);
                 shell_print(shell, "Bootstrap connect delay: %d minutes (%d seconds left) [%s]",
-                            retry_delay / K_MINUTES(1), delay, ip_version);
+                            retry_delay / MINUTES(1), delay, ip_version);
             } else {
                 shell_print(shell, "Bootstrap connect timed wait [%s]", ip_version);
             }
@@ -1051,9 +1052,9 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         case LWM2M_STATE_BOOTSTRAP_WAIT:
             retry_delay = lwm2m_retry_delay_connect_get(0, NULL);
             if (retry_delay != -1) {
-                int32_t delay = lwm2m_state_update_delay() / K_SECONDS(1);
+                int32_t delay = lwm2m_state_update_delay() / SECONDS(1);
                 shell_print(shell, "Bootstrap delay: %d minutes (%d seconds left) [%s]",
-                            retry_delay / K_MINUTES(1), delay, ip_version);
+                            retry_delay / MINUTES(1), delay, ip_version);
             } else {
                 shell_print(shell, "Bootstrap wait [%s]", ip_version);
             }
@@ -1073,9 +1074,9 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         case LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT:
             retry_delay = lwm2m_retry_delay_connect_get(lwm2m_security_instance(), NULL);
             if (retry_delay != -1) {
-                int32_t delay = lwm2m_state_update_delay() / K_SECONDS(1);
+                int32_t delay = lwm2m_state_update_delay() / SECONDS(1);
                 shell_print(shell, "Server %d connect delay: %d minutes (%d seconds left) [%s]",
-                            lwm2m_security_instance(), retry_delay / K_MINUTES(1), delay, ip_version);
+                            lwm2m_security_instance(), retry_delay / MINUTES(1), delay, ip_version);
             } else {
                 shell_print(shell, "Server %d connect timed wait [%s]", lwm2m_security_instance(), ip_version);
             }
@@ -1086,9 +1087,9 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         case LWM2M_STATE_SERVER_REGISTER_WAIT:
             retry_delay = lwm2m_retry_delay_connect_get(lwm2m_security_instance(), NULL);
             if (retry_delay != -1) {
-                int32_t delay = lwm2m_state_update_delay() / K_SECONDS(1);
+                int32_t delay = lwm2m_state_update_delay() / SECONDS(1);
                 shell_print(shell, "Server %d register delay: %d minutes (%d seconds left) [%s]",
-                            lwm2m_security_instance(), retry_delay / K_MINUTES(1), delay, ip_version);
+                            lwm2m_security_instance(), retry_delay / MINUTES(1), delay, ip_version);
             } else {
                 shell_print(shell, "Server %d register wait [%s]", lwm2m_security_instance(), ip_version);
             }

@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include <lwm2m.h>
 #include <lwm2m_api.h>
 #include <lwm2m_retry_delay.h>
 #include <lwm2m_conn_ext.h>
@@ -16,9 +17,9 @@
 /** Verizon specific PDN activation delays. */
 static int32_t m_pdn_retry_delay_vzw[] =
 {
-    K_SECONDS(2),
-    K_MINUTES(1),
-    K_MINUTES(30)
+    SECONDS(2),
+    MINUTES(1),
+    MINUTES(30)
 };
 
 /** PDN activation count. */
@@ -27,11 +28,11 @@ static int32_t m_retry_count_pdn;
 /** Verizon specific retry delays. */
 static int32_t m_retry_delay_vzw[] =
 {
-    K_MINUTES(2),
-    K_MINUTES(4),
-    K_MINUTES(6),
-    K_MINUTES(8),
-    K_HOURS(24)
+    MINUTES(2),
+    MINUTES(4),
+    MINUTES(6),
+    MINUTES(8),
+    HOURS(24)
 };
 
 /** Connection retry count. */
@@ -58,10 +59,10 @@ static int32_t lwm2m_retry_delay_pdn_att_get(uint16_t apn_instance, bool * p_is_
     if (m_retry_count_pdn == apn_retries) {
         // Retry counter wrap around.
         m_retry_count_pdn = 0;
-        retry_delay = K_SECONDS(lwm2m_conn_ext_apn_retry_back_off_period_get(0, apn_instance));
+        retry_delay = SECONDS(lwm2m_conn_ext_apn_retry_back_off_period_get(0, apn_instance));
     } else {
         m_retry_count_pdn++;
-        retry_delay = K_SECONDS(lwm2m_conn_ext_apn_retry_period_get(0, apn_instance));
+        retry_delay = SECONDS(lwm2m_conn_ext_apn_retry_period_get(0, apn_instance));
     }
 
     if (p_is_last) {
@@ -128,13 +129,13 @@ static int32_t lwm2m_retry_delay_vzw_next(uint16_t security_instance, bool * p_i
 static int32_t lwm2m_retry_delay_att_get(uint16_t security_instance, bool * p_is_last)
 {
     // TODO: Handle DTLS handshake retry delays for AT&T
-    return K_MINUTES(2);
+    return MINUTES(2);
 }
 
 static int32_t lwm2m_retry_delay_att_next(uint16_t security_instance, bool * p_is_last)
 {
     // TODO: Handle DTLS handshake retry delays for AT&T
-    return K_MINUTES(2);
+    return MINUTES(2);
 }
 
 int32_t lwm2m_retry_delay_pdn_get(uint16_t apn_instance, bool * p_is_last)

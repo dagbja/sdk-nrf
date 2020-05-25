@@ -270,7 +270,10 @@ static void server_instance_update_map(void)
 
         for (int j = 0; j < 1+LWM2M_MAX_SERVERS; j++) {
             if (short_server_id == lwm2m_server_short_server_id_get(j)) {
-                lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(j);
+                lwm2m_instance_t *p_instance;
+                p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(j);
+                /* Suppress warnings */
+                (void) p_instance;
                 LWM2M_INF("  </0/%u>,</1/%u>,</2/%u>;ssid=%u", i, j, p_instance->acl.id, short_server_id);
                 m_server_instance_map[i] = j;
             }
@@ -615,7 +618,7 @@ static int32_t pdn_retry_delay(uint16_t security_instance)
         if (lwm2m_next_enabled_apn_instance()) {
             // TODO: This handling should be moved to lwm2m_retry_delay when
             //       PDN and connection retry delays are combined.
-            retry_delay = K_SECONDS(lwm2m_conn_ext_apn_retry_back_off_period_get(0, m_apn_instance));
+            retry_delay = SECONDS(lwm2m_conn_ext_apn_retry_back_off_period_get(0, m_apn_instance));
         } else {
             retry_delay = 0;
         }
@@ -1357,12 +1360,12 @@ static void app_handle_connect_retry(uint16_t security_instance, bool fallback)
         }
 
         uint32_t reason = app_event_deferred_reason(fallback);
-        app_event_deferred(reason, retry_delay / K_SECONDS(1));
+        app_event_deferred(reason, retry_delay / SECONDS(1));
 
-        LWM2M_INF("Retry delay for %ld minutes (server %u)", retry_delay / K_MINUTES(1), security_instance);
-        lwm2m_os_timer_start(state_update_timer, retry_delay);
+        LWM2M_INF("Retry delay for %ld minutes (server %u)", retry_delay / MINUTES(1), security_instance);
+        lwm2m_os_timer_start(state_update_timer, MSEC(retry_delay));
     } else {
-        lwm2m_os_timer_start(state_update_timer, 0);
+        lwm2m_os_timer_start(state_update_timer, NO_WAIT);
     }
 }
 
@@ -1395,14 +1398,14 @@ static void app_restart_lifetime_timer(uint16_t security_instance)
         lifetime -= SECONDS_TO_UPDATE_EARLY;
     }
 
-    int32_t timeout = (int32_t)K_SECONDS(lifetime);
+    int32_t timeout = (int32_t)SECONDS(lifetime);
     if (timeout <= 0) {
         // FIXME: Lifetime timer too big for Zephyr, set to maximum possible value for now
         timeout = INT32_MAX;
     }
 
     m_connection_update[security_instance].reconnect = false;
-    lwm2m_os_timer_start(m_connection_update[security_instance].timer, timeout);
+    lwm2m_os_timer_start(m_connection_update[security_instance].timer, MSEC(timeout));
 }
 
 static void app_cancel_lifetime_timer(uint16_t security_instance)
@@ -1434,7 +1437,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
         {
             if (lwm2m_state_set(LWM2M_STATE_BOOTSTRAPPING)) {
                 LWM2M_INF("Bootstrap timeout set to 20 seconds");
-                lwm2m_os_timer_start(state_update_timer, K_SECONDS(20));
+                lwm2m_os_timer_start(state_update_timer, SECONDS(20));
             }
         }
         else if (coap_code == 0 || coap_code == COAP_CODE_403_FORBIDDEN)
@@ -1507,7 +1510,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
                     // VZW HACK: Loop until the current delay is 8 minutes. This will give the
                     // last retry delay (24 hours) in the next call to lwm2m_retry_delay_connect_get()
                     // in app_handle_connect_retry().
-                    while (retry_delay != K_MINUTES(8)) {
+                    while (retry_delay != MINUTES(8)) {
                         // If not second to last then fetch next.
                         retry_delay = lwm2m_retry_delay_connect_next(security_instance, NULL);
                     }
@@ -1605,7 +1608,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             app_server_disconnect(security_instance, false);
 
             m_connection_update[security_instance].reconnect = true;
-            lwm2m_os_timer_start(m_connection_update[security_instance].timer, K_SECONDS(delay));
+            lwm2m_os_timer_start(m_connection_update[security_instance].timer, SECONDS(delay));
         }
     }
 }
@@ -2024,7 +2027,7 @@ static void app_connect(void)
             if (hold_off_time > 0) {
                 if (lwm2m_state_set(LWM2M_STATE_BS_HOLD_OFF)) {
                     LWM2M_INF("Bootstrap hold off timer [%ld seconds]", hold_off_time);
-                    lwm2m_os_timer_start(state_update_timer, K_SECONDS(hold_off_time));
+                    lwm2m_os_timer_start(state_update_timer, SECONDS(hold_off_time));
                 }
             } else {
                 // No hold off timer
@@ -2046,10 +2049,10 @@ static void app_bootstrap_connect(void)
     if (!lwm2m_carrier_pdn_activate(LWM2M_BOOTSTRAP_INSTANCE_ID, &pdn_retry_delay)) {
         // Setup carrier PDN connection failed, try again
         if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT)) {
-            app_event_deferred(LWM2M_CARRIER_DEFERRED_PDN_ACTIVATE, pdn_retry_delay / K_SECONDS(1));
+            app_event_deferred(LWM2M_CARRIER_DEFERRED_PDN_ACTIVATE, pdn_retry_delay / SECONDS(1));
 
-            LWM2M_INF("PDN retry delay for %ld seconds (server 0)", pdn_retry_delay / K_SECONDS(1));
-            lwm2m_os_timer_start(state_update_timer, pdn_retry_delay);
+            LWM2M_INF("PDN retry delay for %ld seconds (server 0)", pdn_retry_delay / SECONDS(1));
+            lwm2m_os_timer_start(state_update_timer, MSEC(pdn_retry_delay));
         }
         return;
     }
@@ -2206,10 +2209,10 @@ static void app_server_connect(uint16_t security_instance)
     if (!lwm2m_carrier_pdn_activate(security_instance, &pdn_retry_delay)) {
         // Setup carrier PDN connection failed, try again
         if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
-            app_event_deferred(LWM2M_CARRIER_DEFERRED_PDN_ACTIVATE, pdn_retry_delay / K_SECONDS(1));
+            app_event_deferred(LWM2M_CARRIER_DEFERRED_PDN_ACTIVATE, pdn_retry_delay / SECONDS(1));
 
-            LWM2M_INF("PDN retry delay for %ld seconds (server %u)", pdn_retry_delay / K_SECONDS(1), security_instance);
-            lwm2m_os_timer_start(state_update_timer, pdn_retry_delay);
+            LWM2M_INF("PDN retry delay for %ld seconds (server %u)", pdn_retry_delay / SECONDS(1), security_instance);
+            lwm2m_os_timer_start(state_update_timer, MSEC(pdn_retry_delay));
         }
         return;
     }
@@ -2730,7 +2733,7 @@ static void app_check_server_update(void)
                     if (m_use_client_holdoff_timer && client_hold_off_time > 0) {
                         if (lwm2m_state_set(LWM2M_STATE_CLIENT_HOLD_OFF)) {
                             LWM2M_INF("Client hold off timer [%ld seconds] (server %u)", client_hold_off_time, i);
-                            lwm2m_os_timer_start(state_update_timer, K_SECONDS(client_hold_off_time));
+                            lwm2m_os_timer_start(state_update_timer, SECONDS(client_hold_off_time));
                         }
                     } else {
                         // No client hold off timer

@@ -49,7 +49,7 @@
 #define LWM2M_NOTIF_ATTR_BASE (LWM2M_OBSERVERS_BASE + \
                                CONFIG_NRF_COAP_OBSERVE_MAX_NUM_OBSERVERS)
 
-
+static const char *obj_str_get(uint16_t id);
 static int lwm2m_storage_version_load(struct lwm2m_storage_version *ver);
 static int lwm2m_storage_version_store(void);
 static void lwm2m_storage_version_update(uint8_t from_version);
@@ -79,6 +79,9 @@ int32_t lwm2m_instance_storage_init(void)
         lwm2m_storage_version_update(err ? 0 : ver.version);
         lwm2m_storage_version_store();
     }
+
+    /* Suppress warning */
+    (void) obj_str_get;
 
     return 0;
 }

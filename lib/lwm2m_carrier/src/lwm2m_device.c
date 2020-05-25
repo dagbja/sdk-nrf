@@ -531,7 +531,7 @@ static void on_exec(uint16_t res, coap_message_t *p_req)
          * This sleep is needed to ensure the response
          * is sent before closing the socket.
          */
-        lwm2m_os_sleep(K_SECONDS(1));
+        lwm2m_os_sleep(SECONDS(1));
 
         lwm2m_request_reset();
         break;

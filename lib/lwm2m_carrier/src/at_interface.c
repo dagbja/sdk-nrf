@@ -573,7 +573,7 @@ int at_apn_setup_wait_for_ipv6(int *fd)
 {
     int err;
     int8_t cid = -1;
-    int timeout_ms = K_MINUTES(1);
+    int timeout_ms = MINUTES(1);
     nrf_socklen_t len = sizeof(cid);
 
     if (fd == NULL) {

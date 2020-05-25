@@ -10,6 +10,11 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 /**@file lwm2m_carrier.h
  *
  * @defgroup lwm2m_carrier_event LWM2M carrier library events
@@ -543,5 +548,8 @@ int lwm2m_carrier_identity_write(uint16_t instance_id, uint16_t identity_type,
  */
 int lwm2m_carrier_portfolio_instance_create(uint16_t instance_id);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* LWM2M_CARRIER_H__ */

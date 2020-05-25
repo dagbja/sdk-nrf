@@ -17,7 +17,7 @@ static const char ca_chain[] = {
 	#include "../certs/DigiCertGlobalRootG2.pem" /* Motive */
 };
 
-BUILD_ASSERT_MSG(sizeof(ca_chain) < 4096, "CA chain is too large");
+BUILD_ASSERT(sizeof(ca_chain) < 4096, "CA chain is too large");
 
 int cert_provision(void)
 {

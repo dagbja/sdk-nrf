@@ -12,7 +12,7 @@
 #include <lwm2m_carrier_main.h>
 
 /**< Interval in milliseconds between each time status LEDs are updated. */
-#define APP_LEDS_UPDATE_INTERVAL 500
+#define APP_LEDS_UPDATE_INTERVAL K_MSEC(500)
 
 /* Structures for delayed work */
 static struct k_delayed_work leds_update_work;
@@ -156,9 +156,9 @@ void leds_recoverable_error_loop(void)
     /* Blinking all LEDs ON/OFF in pairs (1 and 3, 2 and 4) if there is an recoverable error. */
     while (true) {
         dk_set_leds_state(DK_LED1_MSK | DK_LED3_MSK, DK_LED2_MSK | DK_LED4_MSK);
-        k_sleep(250);
+        k_sleep(K_MSEC(250));
         dk_set_leds_state(DK_LED2_MSK | DK_LED4_MSK, DK_LED1_MSK | DK_LED3_MSK);
-        k_sleep(250);
+        k_sleep(K_MSEC(250));
     }
 }
 
