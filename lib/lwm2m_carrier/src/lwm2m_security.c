@@ -268,7 +268,7 @@ uint32_t security_instance_callback(lwm2m_instance_t * p_instance,
             err_code = lwm2m_tlv_security_decode(&m_instance_security[instance_id],
                                                  p_request->payload,
                                                  p_request->payload_len,
-                                                 NULL);
+                                                 tlv_security_carrier_decode);
         }
         else if ((mask & COAP_CT_MASK_PLAIN_TEXT) || (mask & COAP_CT_MASK_APP_OCTET_STREAM))
         {
