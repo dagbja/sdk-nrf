@@ -430,6 +430,14 @@ void lwm2m_request_disconnect(void)
 
 void lwm2m_request_reset(void)
 {
+    if (operator_is_vzw(true)) {
+        // Trigger full Register at next boot instead of doing Update
+        for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
+            lwm2m_server_registered_set(i, false);
+        }
+        lwm2m_storage_server_store();
+    }
+
     m_app_state = LWM2M_STATE_RESET;
 }
 
