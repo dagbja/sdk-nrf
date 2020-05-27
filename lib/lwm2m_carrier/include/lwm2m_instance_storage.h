@@ -97,6 +97,10 @@ int lwm2m_firmware_update_state_set(enum lwm2m_firmware_update_state);
 int lwm2m_firmware_uri_get(char *uri, size_t len);
 int lwm2m_firmware_uri_set(char *uri, size_t len);
 
+int lwm2m_stored_class3_apn_read(char *class3_apn, size_t len);
+int lwm2m_stored_class3_apn_write(char *class3_apn, size_t len);
+int lwm2m_stored_class3_apn_delete(void);
+
 int lwm2m_observer_store(uint32_t sid, void * data, size_t size);
 int lwm2m_observer_load(uint32_t sid, void * data, size_t size);
 int lwm2m_observer_delete(uint32_t sid);

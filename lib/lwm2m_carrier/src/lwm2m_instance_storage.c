@@ -38,6 +38,7 @@
 #define LWM2M_STORAGE_APN_CONN_PROFILE      (LWM2M_OS_STORAGE_END - 12)
 #define LWM2M_STORAGE_PORTFOLIO             (LWM2M_OS_STORAGE_END - 13)
 #define LWM2M_STORAGE_CONN_EXTENSION        (LWM2M_OS_STORAGE_END - 14)
+#define LWM2M_STORED_CLASS3_APN             (LWM2M_OS_STORAGE_END - 15)
 #define LWM2M_STORAGE_ID_VERSION            (LWM2M_OS_STORAGE_END - 16)
 
 #define LWM2M_OBSERVERS_BASE                (LWM2M_OS_STORAGE_BASE + 0)
@@ -156,6 +157,9 @@ static void lwm2m_storage_version_update(uint8_t from_version)
         for (uint32_t i = 0; i < 20; i++) {
             lwm2m_os_storage_delete(LWM2M_OS_STORAGE_BASE + i);
         }
+
+        /* Remove the old LWM2M_STORED_CLASS3_APN */
+        lwm2m_os_storage_delete(LWM2M_OS_STORAGE_END - 11);
 
         /* Need to bootstrap again */
         lwm2m_factory_reset();
@@ -780,6 +784,21 @@ int lwm2m_firmware_uri_set(char *uri, size_t len)
     }
 
     return 0;
+}
+
+int lwm2m_stored_class3_apn_read(char *class3_apn, size_t len)
+{
+    return lwm2m_os_storage_read(LWM2M_STORED_CLASS3_APN, class3_apn, len);
+}
+
+int lwm2m_stored_class3_apn_write(char *class3_apn, size_t len)
+{
+    return lwm2m_os_storage_write(LWM2M_STORED_CLASS3_APN, class3_apn, len);
+}
+
+int lwm2m_stored_class3_apn_delete(void)
+{
+    return lwm2m_os_storage_delete(LWM2M_STORED_CLASS3_APN);
 }
 
 int lwm2m_observer_store(uint32_t sid, void * data, size_t size)

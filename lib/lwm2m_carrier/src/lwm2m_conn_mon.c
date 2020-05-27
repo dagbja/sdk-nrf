@@ -14,6 +14,7 @@
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_observer.h>
 #include <lwm2m_conn_mon.h>
+#include <lwm2m_instance_storage.h>
 #include <lwm2m_apn_conn_prof.h>
 #include <coap_message.h>
 #include <lwm2m_carrier_main.h>
@@ -166,6 +167,10 @@ void lwm2m_conn_mon_class_apn_set(uint8_t apn_class, char * p_value, uint8_t len
                 // TODO: Value is different from previous value, shut down all sockets on the APN and attach the APN then create sockets again.
                 // TODO: Value is different from previous value, do a notification.
                 // lwm2m_conn_mon_notify_resource(apn_index);
+            }
+
+            if (apn_class == 3) {
+                lwm2m_stored_class3_apn_write(p_value, len);
             }
         }
     }

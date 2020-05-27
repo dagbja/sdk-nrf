@@ -576,6 +576,32 @@ void lwm2m_system_reset(bool force_reset)
     }
 }
 
+static void vzw_initialize_class3(void)
+{
+    char modem_class3_apn[64];
+    char stored_class3_apn[64];
+    int modem_class3_len;
+    int stored_class3_len;
+
+    stored_class3_len = lwm2m_stored_class3_apn_read(stored_class3_apn,
+                                                     sizeof(stored_class3_apn));
+
+    if (stored_class3_len > 0)
+    {
+        modem_class3_len = sizeof(modem_class3_apn);
+        int result = at_read_apn_class(3, modem_class3_apn, &modem_class3_len);
+
+        if ((result == 0) && (modem_class3_len > 0) &&
+            ((stored_class3_len != modem_class3_len) ||
+             (strncmp(modem_class3_apn, stored_class3_apn, stored_class3_len) != 0)))
+        {
+            // CLASS3 APN is different in Modem and local storage
+            LWM2M_INF("Updated APN table");
+            lwm2m_conn_mon_class_apn_set(3, stored_class3_apn, stored_class3_len);
+        }
+    }
+}
+
 /* Read the access point name into a buffer, and null-terminate it.
  * Returns the length of the access point name.
  */
@@ -1868,6 +1894,7 @@ void lwm2m_bootstrap_reset(void)
 void lwm2m_factory_reset(void)
 {
     app_misc_data_set_bootstrapped(false);
+    lwm2m_stored_class3_apn_delete();
 
     // Provision bootstrap PSK and diagnostic PSK at next startup
     lwm2m_last_used_msisdn_set("", 0);
@@ -2845,6 +2872,11 @@ static int app_lwm2m_process(void)
         {
             uint16_t short_server_id = lwm2m_security_short_server_id_get(m_security_instance);
             bool do_register = !lwm2m_remote_is_registered(short_server_id);
+
+            if (!m_registration_ready && operator_is_vzw(true) && m_security_instance == 1)
+            {
+                vzw_initialize_class3();
+            }
 
             if (do_register) {
                 // Remote is registered by the LwM2M core.
