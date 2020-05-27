@@ -38,7 +38,7 @@ zephyr_library_sources(
     src/lwm2m_common.c
     src/lwm2m_factory_bootstrap.c
     src/lwm2m_device.c
-    src/lwm2m_gsma_objects.c
+    #src/lwm2m_gsma_objects.c
     src/lwm2m_firmware.c
     src/lwm2m_firmware_download.c
     src/lwm2m_instance_storage.c
