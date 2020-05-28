@@ -749,7 +749,8 @@ const char *lwm2m_os_strerror(void)
 	return strerror(errno);
 }
 
-int lwm2m_os_sec_ca_chain_exists(uint32_t sec_tag, bool *exists, uint8_t *flags)
+int lwm2m_os_sec_ca_chain_exists(uint32_t sec_tag, bool *exists,
+				 uint8_t *flags)
 {
 	return modem_key_mgmt_exists(sec_tag,
 		MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN, exists, flags);
@@ -767,7 +768,8 @@ int lwm2m_os_sec_ca_chain_write(uint32_t sec_tag, const void *buf, size_t len)
 		MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN, buf, len);
 }
 
-int lwm2m_os_sec_psk_exists(uint32_t sec_tag, bool *exists, uint8_t *perm_flags)
+int lwm2m_os_sec_psk_exists(uint32_t sec_tag, bool *exists,
+			    uint8_t *perm_flags)
 {
 	return modem_key_mgmt_exists(sec_tag, MODEM_KEY_MGMT_CRED_TYPE_PSK,
 				     exists, perm_flags);
@@ -787,11 +789,12 @@ int lwm2m_os_sec_psk_delete(uint32_t sec_tag)
 int lwm2m_os_sec_identity_exists(uint32_t sec_tag, bool *exists,
 				 uint8_t *perm_flags)
 {
-	return modem_key_mgmt_exists(sec_tag, MODEM_KEY_MGMT_CRED_TYPE_IDENTITY,
-				     exists, perm_flags);
+	return modem_key_mgmt_exists(sec_tag,
+		MODEM_KEY_MGMT_CRED_TYPE_IDENTITY, exists, perm_flags);
 }
 
-int lwm2m_os_sec_identity_write(uint32_t sec_tag, const void *buf, uint16_t len)
+int lwm2m_os_sec_identity_write(uint32_t sec_tag, const void *buf,
+				uint16_t len)
 {
 	return modem_key_mgmt_write(sec_tag, MODEM_KEY_MGMT_CRED_TYPE_IDENTITY,
 				    buf, len);
@@ -799,5 +802,6 @@ int lwm2m_os_sec_identity_write(uint32_t sec_tag, const void *buf, uint16_t len)
 
 int lwm2m_os_sec_identity_delete(uint32_t sec_tag)
 {
-	return modem_key_mgmt_delete(sec_tag, MODEM_KEY_MGMT_CRED_TYPE_IDENTITY);
+	return modem_key_mgmt_delete(sec_tag,
+				     MODEM_KEY_MGMT_CRED_TYPE_IDENTITY);
 }

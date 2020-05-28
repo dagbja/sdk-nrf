@@ -322,27 +322,29 @@ const char *lwm2m_os_strerror(void);
 /**
  * @brief Check if a certificate chain credential exists in persistent storage.
  *
- * @param[in]  sec_tag	The tag to search for.
- * @param[out] exists	Whether the credential exists.
- *			Only valid if the operation is successful.
- * @param[out] perm	The permission flags of the credential.
- *			Not yet implemented.
+ * @param[in]  sec_tag  The tag to search for.
+ * @param[out] exists   Whether the credential exists.
+ *                      Only valid if the operation is successful.
+ * @param[out] perm     The permission flags of the credential.
+ *                      Not yet implemented.
  *
- * @retval 0		On success.
- * @retval -ENOBUFS	Insufficient memory.
- * @retval -EPERM	Insufficient permissions.
+ * @retval 0        On success.
+ * @retval -ENOBUFS Insufficient memory.
+ * @retval -EPERM   Insufficient permissions.
  */
-int lwm2m_os_sec_ca_chain_exists(uint32_t sec_tag, bool *exists, uint8_t *perm);
+int lwm2m_os_sec_ca_chain_exists(uint32_t sec_tag, bool *exists,
+				 uint8_t *perm);
 
 /**
  * @brief Compare a certificate chain.
  *
- * @param sec_tag	Security tag associated with the certificate chain.
- * @param buf		Buffer to compare the certificate chain to.
- * @param len		Length of the certificate chain.
- * @retval 0		If the certificate chain match.
- * @retval 1		If the certificate chain do not match.
- * @retval < 0		On error.
+ * @param[in] sec_tag Security tag associated with the certificate chain.
+ * @param[in] buf     Buffer to compare the certificate chain to.
+ * @param[in] len     Length of the certificate chain.
+ *
+ * @retval 0   If the certificate chain match.
+ * @retval 1   If the certificate chain do not match.
+ * @retval < 0 On error.
  */
 int lwm2m_os_sec_ca_chain_cmp(uint32_t sec_tag, const void *buf, size_t len);
 
@@ -350,37 +352,37 @@ int lwm2m_os_sec_ca_chain_cmp(uint32_t sec_tag, const void *buf, size_t len);
  * @brief Provision a certificate chain or update an existing one.
  *
  * @note If used when the LTE link is active, the function will return
- *	 an error and the key will not be written.
+ *       an error and the key will not be written.
  *
- * @param[in]  sec_tag	Security tag for this credential.
- * @param[in]  buf	Buffer containing the credential data.
- * @param[in]  len	Length of the buffer.
+ * @param[in]  sec_tag  Security tag for this credential.
+ * @param[in]  buf      Buffer containing the credential data.
+ * @param[in]  len      Length of the buffer.
  *
- * @retval 0		On success.
- * @retval -EINVAL	Invalid parameters.
- * @retval -ENOBUFS	Internal buffer is too small.
- * @retval -EACCES	The operation failed because the LTE link is active.
- * @retval -ENOMEM	Not enough memory to store the credential.
- * @retval -ENOENT	The security tag could not be written.
- * @retval -EPERM	Insufficient permissions.
+ * @retval 0 On success.
+ * @retval -EINVAL  Invalid parameters.
+ * @retval -ENOBUFS Internal buffer is too small.
+ * @retval -EACCES  The operation failed because the LTE link is active.
+ * @retval -ENOMEM  Not enough memory to store the credential.
+ * @retval -ENOENT  The security tag could not be written.
+ * @retval -EPERM   Insufficient permissions.
  */
 int lwm2m_os_sec_ca_chain_write(uint32_t sec_tag, const void *buf, size_t len);
 
 /**
  * @brief Check if a pre-shared key exists in persistent storage.
  *
- * @param[in]   sec_tag		The tag to search for.
- * @param[out]  exists		Whether the credential exists.
- *				Only valid if the operation is successful.
- * @param[out]  perm_flags	The permission flags of the credential.
- *				Only valid if the operation is successful
- *				and @param exists is @c true.
- *				Not yet implemented.
+ * @param[in]   sec_tag  The tag to search for.
+ * @param[out]  exists   Whether the credential exists.
+ *                       Only valid if the operation is successful.
+ * @param[out]  perm_flags  The permission flags of the credential.
+ *              Only valid if the operation is successful
+ *              and @param exists is @c true.
+ *              Not yet implemented.
  *
- * @retval 0		On success.
- * @retval -ENOBUFS	Internal buffer is too small.
- * @retval -EPERM	Insufficient permissions.
- * @retval -EIO		Internal error.
+ * @retval 0        On success.
+ * @retval -ENOBUFS Internal buffer is too small.
+ * @retval -EPERM   Insufficient permissions.
+ * @retval -EIO     Internal error.
  */
 int lwm2m_os_sec_psk_exists(uint32_t sec_tag, bool *exists,
 			    uint8_t *perm_flags);
@@ -389,20 +391,20 @@ int lwm2m_os_sec_psk_exists(uint32_t sec_tag, bool *exists,
  * @brief Provision a new pre-shared key or update an existing one.
  *
  * @note If used when the LTE link is active, the function will return
- *	 an error and the key will not be written.
+ *       an error and the key will not be written.
  *
- * @param[in] sec_tag	Security tag for this credential.
- * @param[in] buf	Buffer containing the credential data.
- * @param[in] len	Length of the buffer.
+ * @param[in] sec_tag Security tag for this credential.
+ * @param[in] buf     Buffer containing the credential data.
+ * @param[in] len     Length of the buffer.
  *
- * @retval 0		On success.
- * @retval -EINVAL	Invalid parameters.
- * @retval -ENOBUFS	Internal buffer is too small.
- * @retval -ENOMEM	Not enough memory to store the credential.
- * @retval -EACCES	The operation failed because the LTE link is active.
- * @retval -ENOENT	The security tag could not be written.
- * @retval -EPERM	Insufficient permissions.
- * @retval -EIO		Internal error.
+ * @retval 0        On success.
+ * @retval -EINVAL  Invalid parameters.
+ * @retval -ENOBUFS Internal buffer is too small.
+ * @retval -ENOMEM  Not enough memory to store the credential.
+ * @retval -EACCES  The operation failed because the LTE link is active.
+ * @retval -ENOENT  The security tag could not be written.
+ * @retval -EPERM   Insufficient permissions.
+ * @retval -EIO     Internal error.
  */
 int lwm2m_os_sec_psk_write(uint32_t sec_tag, const void *buf, uint16_t len);
 
@@ -410,9 +412,9 @@ int lwm2m_os_sec_psk_write(uint32_t sec_tag, const void *buf, uint16_t len);
  * @brief Delete pre-shared key.
  *
  * @note If used when the LTE link is active, the function will return
- *	 an error and the key will not be deleted.
+ *       an error and the key will not be deleted.
  *
- * @param[in] sec_tag	Security tag for this credential.
+ * @param[in] sec_tag  Security tag for this credential.
  *
  * @retval 0            On success.
  * @retval -ENOBUFS     Internal buffer is too small.
@@ -426,18 +428,18 @@ int lwm2m_os_sec_psk_delete(uint32_t sec_tag);
 /**
  * @brief Check if an identity credential exists in persistent storage.
  *
- * @param[in]  sec_tag		The tag to search for.
- * @param[out] exists		Whether the credential exists.
- *				Only valid if the operation is successful.
- * @param[out] perm_flags	The permission flags of the credential.
- *				Only valid if the operation is successful
- *				and @param exists is true.
- *				Not yet implemented.
+ * @param[in]  sec_tag The tag to search for.
+ * @param[out] exists  Whether the credential exists.
+ *                     Only valid if the operation is successful.
+ * @param[out] perm_flags The permission flags of the credential.
+ *                        Only valid if the operation is successful
+ *                        and @param exists is true.
+ *                        Not yet implemented.
  *
- * @retval 0		On success.
- * @retval -ENOBUFS	Internal buffer is too small.
- * @retval -EPERM	Insufficient permissions.
- * @retval -EIO		Internal error.
+ * @retval 0        On success.
+ * @retval -ENOBUFS Internal buffer is too small.
+ * @retval -EPERM   Insufficient permissions.
+ * @retval -EIO     Internal error.
  */
 int lwm2m_os_sec_identity_exists(uint32_t sec_tag, bool *exists,
 				 uint8_t *perm_flags);
@@ -446,20 +448,20 @@ int lwm2m_os_sec_identity_exists(uint32_t sec_tag, bool *exists,
  * @brief Provision a new identity credential or update an existing one.
  *
  * @note If used when the LTE link is active, the function will return
- *	 an error and the key will not be written.
+ *       an error and the key will not be written.
  *
- * @param[in] sec_tag	Security tag for this credential.
- * @param[in] buf	Buffer containing the credential data.
- * @param[in] len	Length of the buffer.
+ * @param[in] sec_tag  Security tag for this credential.
+ * @param[in] buf      Buffer containing the credential data.
+ * @param[in] len      Length of the buffer.
  *
- * @retval 0		On success.
- * @retval -EINVAL	Invalid parameters.
- * @retval -ENOBUFS	Internal buffer is too small.
- * @retval -ENOMEM	Not enough memory to store the credential.
- * @retval -EACCES	The operation failed because the LTE link is active.
- * @retval -ENOENT	The security tag could not be written.
- * @retval -EPERM	Insufficient permissions.
- * @retval -EIO		Internal error.
+ * @retval 0        On success.
+ * @retval -EINVAL  Invalid parameters.
+ * @retval -ENOBUFS Internal buffer is too small.
+ * @retval -ENOMEM  Not enough memory to store the credential.
+ * @retval -EACCES  The operation failed because the LTE link is active.
+ * @retval -ENOENT  The security tag could not be written.
+ * @retval -EPERM   Insufficient permissions.
+ * @retval -EIO     Internal error.
  */
 int lwm2m_os_sec_identity_write(uint32_t sec_tag, const void *buf,
 				uint16_t len);
@@ -468,16 +470,16 @@ int lwm2m_os_sec_identity_write(uint32_t sec_tag, const void *buf,
  * @brief Delete identity credential.
  *
  * @note If used when the LTE link is active, the function will return
- *	 an error and the key will not be deleted.
+ *       an error and the key will not be deleted.
  *
- * @param[in] sec_tag	Security tag for this credential.
+ * @param[in] sec_tag Security tag for this credential.
  *
- * @retval 0            On success.
- * @retval -ENOBUFS     Internal buffer is too small.
- * @retval -EACCES      The operation failed because the LTE link is active.
- * @retval -ENOENT      No credential associated with the given
- *                      @p sec_tag and @p cred_type.
- * @retval -EPERM       Insufficient permissions.
+ * @retval 0        On success.
+ * @retval -ENOBUFS Internal buffer is too small.
+ * @retval -EACCES  The operation failed because the LTE link is active.
+ * @retval -ENOENT  No credential associated with the given
+ *                  @p sec_tag and @p cred_type.
+ * @retval -EPERM   Insufficient permissions.
  */
 int lwm2m_os_sec_identity_delete(uint32_t sec_tag);
 
