@@ -750,6 +750,14 @@ void lwm2m_device_init(void)
     (void)at_read_manufacturer(&m_instance_device.manufacturer);
     (void)at_read_model_number(&m_instance_device.model_number);
 
+    // NRF91-676: Strip suffix from model number
+    char *p_sep = strchr(m_instance_device.model_number.p_val, '-');
+    if (p_sep != NULL)
+    {
+        *p_sep = '\0';
+        m_instance_device.model_number.len = strlen(m_instance_device.model_number.p_val);
+    }
+
     m_instance_device.serial_number.p_val = lwm2m_imei_get();
     m_instance_device.serial_number.len = strlen(m_instance_device.serial_number.p_val);
 
