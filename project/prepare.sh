@@ -54,26 +54,25 @@ function obfuscate {
 	# $1 library name
 	# $2 cpu variant
 	# $3 float variant
-	target_dir=$project_dir/$temp_dir/$1/lib/$2/$3
+	target_dir=$project_dir/$output_dir/lib/$2/$3
 	script_dir=$project_dir/obfuscate
-	name=lib$1.a
-	obfuscated_name=lib$1_obfuscated.a
-	relinked_name=lib$1_relinked.a
-	mapping_name=lib$1_mapping.txt
+	name=$1.a
+	relinked_name=$1_relinked.a
+	obfuscated_name=$1_obfuscated.a
+	mapping_name=$1_mapping.txt
 
 	python3 $script_dir/obfuscate_symbols.py \
 	--input_archive $target_dir/$name \
 	--output_archive $target_dir/$obfuscated_name \
 	--relinked_archive $target_dir/$relinked_name \
-	--mapping_file $target_dir/$mapping_name \
+	--mapping_file $project_dir/temp/$mapping_name \
 	--symbol_rename_regex_file $script_dir/symbol_filters_$1.txt \
 	--section_filter_file $script_dir/section_filters_$1.txt \
-	--temp_directory $target_dir/tmp
+	--temp_directory $project_dir/temp/obfuscate
 
 	# Cleanup
 	rm -rf $target_dir/$name
 	rm -rf $target_dir/$relinked_name
-	rm -rf $target_dir/tmp
 
 	mv $target_dir/$obfuscated_name $target_dir/$name
 }
@@ -81,7 +80,7 @@ function obfuscate {
 rm -rf $project_dir/$temp_dir
 rm -rf $project_dir/$output_dir
 
-# Build and copy libraries
+# Build and copy libraries into /temp
 
 for i in "${lib_variants[@]}"
 do
@@ -101,15 +100,6 @@ do
 	done
 done
 
-# Obfuscate the Verizon LWM2M library
-
-if [ "$debug" = false ] ; then
-	for i in "${lib_variants[@]}"
-	do
-		obfuscate "nrf_lwm2m_carrier" $cpu_variant $i
-	done
-fi
-
 # Merge the libraries into a single archive
 
 for i in "${lib_variants[@]}"
@@ -128,6 +118,15 @@ do
 
 	echo -e "$ar_script" | ar -M
 done
+
+# Obfuscate whole carrier library
+
+if [ "$debug" = false ] ; then
+	for i in "${lib_variants[@]}"
+	do
+		obfuscate "lib$output_lib" $cpu_variant $i
+	done
+fi
 
 # Copy headers
 

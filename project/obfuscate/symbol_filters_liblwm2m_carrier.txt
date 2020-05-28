@@ -1,0 +1,57 @@
+# Copyright (c) Nordic Semiconductor ASA. All Rights Reserved.
+#
+# The information contained herein is confidential property of Nordic Semiconductor ASA.
+# The use, copying, transfer or disclosure of such information is prohibited except by
+# express written agreement with Nordic Semiconductor ASA.
+
+################################################
+# Symbols in this file, will NOT be obfuscated #
+################################################
+
+# lwm2m_carrier.h
+# filter lwm2m_carrier prefixed
+^(lwm2m_carrier).*$
+
+# lwm2m_os.h
+#filter lwm2m_os prefixed
+^(lwm2m_os).*$
+
+# External symbols we should not modify
+
+# stdlib
+^__memcpy_chk$
+^__strncpy_chk$
+^__snprintf_chk$
+^__aeabi_ldivmod$
+^abs$
+^atoi$
+^memcmp$
+^memcpy$
+^memset$
+^snprintf$
+^sprintf$
+^strchr$
+^strcmp$
+^strcpy$
+^strlen$
+^strncmp$
+^strncpy$
+^strstr$
+^strtof$
+^strtok$
+^strtol$
+^strtoull$
+
+# sockets
+^nrf_connect$
+^nrf_close$
+^nrf_getsockopt$
+^nrf_setsockopt$
+^nrf_freeaddrinfo$
+^nrf_getaddrinfo$
+^nrf_poll$
+^nrf_recv$
+^nrf_send$
+^nrf_socket$
+^nrf_inet_ntop$
+^nrf_bind$
