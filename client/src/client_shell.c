@@ -626,7 +626,7 @@ static bool string_is_hex(char * p_str)
 {
     for (int i = 0; i < strlen(p_str); i++)
     {
-        if (!isxdigit(p_str[i]))
+        if (!isxdigit((int)p_str[i]))
         {
             return false;
         }
