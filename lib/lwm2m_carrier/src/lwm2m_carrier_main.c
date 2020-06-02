@@ -1800,7 +1800,7 @@ void lwm2m_bootstrap_reset(void)
 
     app_misc_data_set_bootstrapped(false);
     delete_security_and_server_instances();
-    lwm2m_factory_bootstrap_init();
+    lwm2m_factory_bootstrap_init(&m_app_config);
 
     lwm2m_device_init_acl();
     lwm2m_conn_mon_init_acl();

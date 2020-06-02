@@ -10,7 +10,7 @@
 #define LWM2M_BOOTSTRAP_INSTANCE_ID  0
 
 /**@brief Initialize factory bootstrapped objects. */
-void lwm2m_factory_bootstrap_init(void);
+void lwm2m_factory_bootstrap_init(lwm2m_carrier_config_t * p_carrier_config);
 
 /**@brief Update factory bootstrapped objects. */
 bool lwm2m_factory_bootstrap_update(lwm2m_carrier_config_t * p_carrier_config,

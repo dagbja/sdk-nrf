@@ -77,13 +77,13 @@ static void factory_security_bootstrap_vzw(void)
     lwm2m_coap_handler_instance_add(p_instance);
 }
 
-static void factory_security_diagnostics_vzw(void)
+static void factory_security_diagnostics_vzw(lwm2m_carrier_config_t * p_carrier_config)
 {
     const uint16_t instance_id = 2;
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_security_get_instance(instance_id);
 
     lwm2m_security_short_server_id_set(instance_id, 101);
-    if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
+    if (p_carrier_config->certification_mode || lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
         lwm2m_security_server_uri_set(instance_id, DIAGNOSTICS_URI_VZW_TEST, strlen(DIAGNOSTICS_URI_VZW_TEST));
     } else {
         lwm2m_security_server_uri_set(instance_id, DIAGNOSTICS_URI_VZW, strlen(DIAGNOSTICS_URI_VZW));
@@ -222,7 +222,7 @@ static void factory_bootstrap_bootstrap(void)
     }
 }
 
-void lwm2m_factory_bootstrap_init(void)
+void lwm2m_factory_bootstrap_init(lwm2m_carrier_config_t * p_carrier_config)
 {
     // Initialize all instances except Bootstrap server
     for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++)
@@ -232,7 +232,7 @@ void lwm2m_factory_bootstrap_init(void)
 
     if (operator_is_vzw(true))
     {
-        factory_security_diagnostics_vzw();
+        factory_security_diagnostics_vzw(p_carrier_config);
         factory_server_management_vzw();
         factory_server_diagnostics_vzw();
         factory_server_repository_vzw();
