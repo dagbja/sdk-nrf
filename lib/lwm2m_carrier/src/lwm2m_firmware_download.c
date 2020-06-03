@@ -426,6 +426,8 @@ static void download_task(void *w)
 		}
 
 		lwm2m_firmware_update_result_set(0, RESULT_ERROR_INVALID_URI);
+		lwm2m_firmware_state_set(0, STATE_IDLE);
+
 		carrier_error_evt_send(LWM2M_CARRIER_ERROR_FOTA_CONN, 0);
 		return;
 	}
@@ -433,6 +435,8 @@ static void download_task(void *w)
 	err = lwm2m_os_download_start(file, off);
 	if (err) {
 		lwm2m_firmware_update_result_set(0, RESULT_ERROR_CONN_LOST);
+		lwm2m_firmware_state_set(0, STATE_IDLE);
+
 		carrier_error_evt_send(LWM2M_CARRIER_ERROR_FOTA_CONN_LOST, 0);
 		return;
 	}
@@ -450,7 +454,7 @@ static void reboot_task(void *w)
 	}
 
 	LWM2M_INF("Firmware update scheduled at boot");
-	lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_UPDATING);
+	lwm2m_firmware_state_set(0, STATE_UPDATING);
 
 	/* Reset to continue FOTA update */
 	lwm2m_request_reset();
