@@ -183,17 +183,12 @@ static int on_fragment(const struct lwm2m_os_download_evt *event)
 	}
 
 	/* We can't recover from here, simply give up. */
+	dfusock_close();
 
 	lwm2m_firmware_state_set(0, STATE_IDLE);
 	lwm2m_firmware_update_result_set(0, RESULT_ERROR_CRC);
 
 	carrier_error_evt_send(LWM2M_CARRIER_ERROR_FOTA_PKG, dfu_err);
-
-	/* Re-initialize the DFU socket to free up memory
-	 * that could be necessary for the TLS handshake.
-	 */
-	dfusock_close();
-	dfusock_init();
 
 	/* Stop the download */
 	return -1;
@@ -209,15 +204,7 @@ static int on_done(const struct lwm2m_os_download_evt *event)
 	lwm2m_firmware_image_state_set(FIRMWARE_READY);
 	lwm2m_firmware_state_set(0, STATE_DOWNLOADED);
 
-	/* Close the DFU socket to free up memory for TLS,
-	 * and re-open it in case a new download is started without
-	 * this delta ever being applied. That shouldn't happen but we guard
-	 * ourselves against incorrect server behavior, which would otherwise
-	 * start the download with the DFU socket closed.
-	 */
-	LWM2M_INF("Closing DFU socket");
 	dfusock_close();
-	dfusock_init();
 
 	return 0;
 }
@@ -248,27 +235,22 @@ static int on_error(const struct lwm2m_os_download_evt *event)
 		/* error is already logged, keep on going */
 	}
 
-	/* Re-initialize the DFU socket to free up memory
-	 * that could be necessary for the TLS handshake.
-	 */
-	(void) dfusock_close();
-	(void) dfusock_init();
+	/* Close the DFU socket, we need memory for handshaking TLS again */
+	dfusock_close();
 
-	if (operator_is_vzw(true) || event->error == -EBADMSG) {
-		if (download_retry_and_update()) {
-			/* Retry the download.
-			 * Do not restart the download via this handler.
-			 * We have closed the DFU socket and must re-set
-			 * the offset before we begin data to the modem again.
-			 * Let the download_task handle that.
-			 */
-			lwm2m_os_timer_start(download_dwork,
-				(event->error == -EBADMSG) ?
-				NO_WAIT :	/* proto err, retry now */
-				SECONDS(20)	/* net err, retry later */
-			);
-			return -1;
-		}
+	if (download_retry_and_update()) {
+		/* Retry the download.
+		 * Do not restart the download via this handler.
+		 * We have closed the DFU socket and must re-set
+		 * the offset before we send data to the modem again.
+		 * Let the download_task handle that.
+		 */
+		lwm2m_os_timer_start(download_dwork,
+			(event->error == -EBADMSG) ?
+			NO_WAIT :	/* proto err, retry now */
+			SECONDS(20)	/* net err, retry later */
+		);
+		return -1;
 	}
 
 	/* We have reached the maximum number of retries, give up */
@@ -338,6 +320,13 @@ static void download_task(void *w)
 	uint32_t off;
 	static bool turn_link_on;
 	enum lwm2m_firmware_image_state state = FIRMWARE_NONE;
+
+	err = dfusock_init();
+	if (err) {
+		/* Error is already logged, reschedule in 1 minute */
+		lwm2m_os_timer_start(download_dwork, MINUTES(1));
+		return;
+	}
 
 	/* Fetch the offset to determine what to do next.
 	 * If the offset is zero we just follow through, otherwise
@@ -504,6 +493,9 @@ int lwm2m_firmware_download_init(void)
 	}
 
 	LWM2M_INF("Flash size: %d", flash_size);
+
+	/* Close the DFU socket so the application can use it */
+	dfusock_close();
 
 	/* Detect if a firmware update has just happened */
 	err = lwm2m_firmware_update_state_get(&update);
