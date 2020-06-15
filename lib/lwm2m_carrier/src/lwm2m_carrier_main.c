@@ -2017,7 +2017,9 @@ static void app_connect(void)
     // Read operator ID.
     operator_id_read();
 
-    if ((m_net_stat == APP_NET_REG_STAT_HOME) && operator_is_supported(true))
+    if (operator_is_supported(true) &&
+        ((m_net_stat == APP_NET_REG_STAT_HOME) ||
+         (lwm2m_debug_is_set(LWM2M_DEBUG_ROAM_AS_HOME) && (m_net_stat == APP_NET_REG_STAT_ROAM))))
     {
         LWM2M_INF("Registered to home network (%s)", lwm2m_os_log_strdup(operator_id_string(OPERATOR_ID_CURRENT)));
         if (operator_is_supported(false)) {
