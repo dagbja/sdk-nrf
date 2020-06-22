@@ -378,7 +378,6 @@ void lwm2m_request_bootstrap(void)
     if ((m_app_state == LWM2M_STATE_IDLE) ||
         (m_app_state == LWM2M_STATE_DISCONNECTED))
     {
-        app_disconnect();
         lwm2m_bootstrap_clear();
         lwm2m_request_connect();
     }
@@ -516,7 +515,7 @@ int32_t lwm2m_state_update_delay(void)
 
 void lwm2m_system_shutdown(void)
 {
-    app_disconnect();
+    // Do not close sockets on shutdown to keep the DTLS session cache
 
     lwm2m_os_lte_power_down();
     lwm2m_os_bsdlib_shutdown();
