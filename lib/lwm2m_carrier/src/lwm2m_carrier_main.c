@@ -2051,82 +2051,80 @@ static void app_bootstrap_connect(void)
         return;
     }
 
-    if (secure == true)
+    LWM2M_TRC("%sSECURE session (bootstrap)", secure ? "" : "NON-");
+
+    struct nrf_sockaddr_in6 local_addr;
+    app_init_sockaddr_in((struct nrf_sockaddr *)&local_addr, m_remote_server[LWM2M_BOOTSTRAP_INSTANCE_ID].sin6_family, LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT);
+
+    #define SEC_TAG_COUNT 1
+
+    nrf_sec_tag_t sec_tag_list[SEC_TAG_COUNT] = {APP_BOOTSTRAP_SEC_TAG};
+
+    coap_sec_config_t setting =
     {
-        LWM2M_TRC("SECURE session (bootstrap)");
+        .role          = 0,    // 0 -> Client role
+        .session_cache = 1,    // 1 -> Enable session cache
+        .sec_tag_count = SEC_TAG_COUNT,
+        .sec_tag_list  = sec_tag_list
+    };
 
-        struct nrf_sockaddr_in6 local_addr;
-        app_init_sockaddr_in((struct nrf_sockaddr *)&local_addr, m_remote_server[LWM2M_BOOTSTRAP_INSTANCE_ID].sin6_family, LWM2M_BOOTSTRAP_LOCAL_CLIENT_PORT);
+    coap_local_t local_port =
+    {
+        .addr         = (struct nrf_sockaddr *)&local_addr,
+        .setting      = &setting,
+        .protocol     = (secure ? NRF_SPROTO_DTLS1v2 : NRF_IPPROTO_UDP)
+    };
 
-        #define SEC_TAG_COUNT 1
+    if (m_connection_use_pdn && m_pdn_handle != DEFAULT_PDN_FD)
+    {
+        local_port.interface = m_current_apn;
+    }
 
-        nrf_sec_tag_t sec_tag_list[SEC_TAG_COUNT] = {APP_BOOTSTRAP_SEC_TAG};
+    LWM2M_INF("Setup %ssecure session (server 0) (APN %s)",
+              (secure ? "" : "non-"),
+              (local_port.interface) ? lwm2m_os_log_strdup(m_current_apn) :
+                                       lwm2m_os_log_strdup(m_default_apn));
 
-        coap_sec_config_t setting =
-        {
-            .role          = 0,    // 0 -> Client role
-            .session_cache = 1,    // 1 -> Enable session cache
-            .sec_tag_count = SEC_TAG_COUNT,
-            .sec_tag_list  = sec_tag_list
-        };
+    err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_remote_server[LWM2M_BOOTSTRAP_INSTANCE_ID]);
 
-        coap_local_t local_port =
-        {
-            .addr         = (struct nrf_sockaddr *)&local_addr,
-            .setting      = &setting,
-            .protocol     = NRF_SPROTO_DTLS1v2
-        };
+    if (err_code == 0)
+    {
+        LWM2M_INF("Connected");
+        lwm2m_state_set(LWM2M_STATE_BS_CONNECTED);
+        m_lwm2m_transport[LWM2M_BOOTSTRAP_INSTANCE_ID] = local_port.transport;
+    }
+    else if (err_code == EINPROGRESS)
+    {
+        lwm2m_state_set(LWM2M_STATE_BS_CONNECT_WAIT);
+        m_lwm2m_transport[LWM2M_BOOTSTRAP_INSTANCE_ID] = local_port.transport;
+    }
+    else if (err_code == EIO && (lwm2m_os_errno() == NRF_ENETDOWN))
+    {
+        LWM2M_INF("Connection failed (PDN down)");
 
-        if (m_connection_use_pdn && m_pdn_handle != DEFAULT_PDN_FD)
-        {
-            local_port.interface = m_current_apn;
-        }
-
-        LWM2M_INF("Setup secure DTLS session (server 0) (APN %s)",
-                  (local_port.interface) ? lwm2m_os_log_strdup(m_current_apn) :
-                                           lwm2m_os_log_strdup(m_default_apn));
-
-        err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_remote_server[LWM2M_BOOTSTRAP_INSTANCE_ID]);
-
-        if (err_code == 0)
-        {
-            LWM2M_INF("Connected");
-            lwm2m_state_set(LWM2M_STATE_BS_CONNECTED);
-            m_lwm2m_transport[LWM2M_BOOTSTRAP_INSTANCE_ID] = local_port.transport;
-        }
-        else if (err_code == EINPROGRESS)
-        {
-            lwm2m_state_set(LWM2M_STATE_BS_CONNECT_WAIT);
-            m_lwm2m_transport[LWM2M_BOOTSTRAP_INSTANCE_ID] = local_port.transport;
-        }
-        else if (err_code == EIO && (lwm2m_os_errno() == NRF_ENETDOWN)) {
-            LWM2M_INF("Connection failed (PDN down)");
-
-            // Just return, so we come back setup PDN again
-            return;
-        }
-        else
-        {
-            LWM2M_INF("Connection failed: %s (%ld), %s (%d)",
-                      lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                      lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
-
-            if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT)) {
-                // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
-                if (err_code == EIO && (lwm2m_os_errno() == NRF_EINVAL ||
-                                        lwm2m_os_errno() == NRF_EOPNOTSUPP ||
-                                        lwm2m_os_errno() == NRF_ENETUNREACH)) {
-                    app_handle_connect_retry(LWM2M_BOOTSTRAP_INSTANCE_ID, true);
-                 } else {
-                    app_handle_connect_retry(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
-                }
-            }
-        }
+        // Just return, so we come back setup PDN again
+        return;
     }
     else
     {
-        LWM2M_TRC("NON-SECURE session (bootstrap)");
-        lwm2m_state_set(LWM2M_STATE_BS_CONNECTED);
+        LWM2M_INF("Connection failed: %s (%ld), %s (%d)",
+                  lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                  lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
+
+        if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT))
+        {
+            // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
+            if (err_code == EIO && (lwm2m_os_errno() == NRF_EINVAL ||
+                                    lwm2m_os_errno() == NRF_EOPNOTSUPP ||
+                                    lwm2m_os_errno() == NRF_ENETUNREACH))
+            {
+                app_handle_connect_retry(LWM2M_BOOTSTRAP_INSTANCE_ID, true);
+            }
+            else
+            {
+                app_handle_connect_retry(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
+            }
+        }
     }
 }
 
@@ -2224,90 +2222,88 @@ static void app_server_connect(uint16_t security_instance)
         return;
     }
 
-    if (secure == true)
+    LWM2M_TRC("%sSECURE session (register)", secure ? "" : "NON-");
+
+    // TODO: Check if this has to be static.
+    struct nrf_sockaddr_in6 local_addr;
+    app_init_sockaddr_in((struct nrf_sockaddr *)&local_addr, m_remote_server[security_instance].sin6_family, LWM2M_LOCAL_CLIENT_PORT_OFFSET + security_instance);
+
+    #define SEC_TAG_COUNT 1
+
+    nrf_sec_tag_t sec_tag_list[SEC_TAG_COUNT] = { APP_SEC_TAG_OFFSET + security_instance };
+
+    coap_sec_config_t setting =
     {
-        LWM2M_TRC("SECURE session (register)");
+        .role          = 0,    // 0 -> Client role
+        .session_cache = 1,    // 1 -> Enable session cache
+        .sec_tag_count = SEC_TAG_COUNT,
+        .sec_tag_list  = sec_tag_list
+    };
 
-        // TODO: Check if this has to be static.
-        struct nrf_sockaddr_in6 local_addr;
-        app_init_sockaddr_in((struct nrf_sockaddr *)&local_addr, m_remote_server[security_instance].sin6_family, LWM2M_LOCAL_CLIENT_PORT_OFFSET + security_instance);
+    coap_local_t local_port =
+    {
+        .addr         = (struct nrf_sockaddr *)&local_addr,
+        .setting      = &setting,
+        .protocol     = (secure ? NRF_SPROTO_DTLS1v2 : NRF_IPPROTO_UDP)
+    };
 
-        #define SEC_TAG_COUNT 1
+    if (m_connection_use_pdn && m_pdn_handle != DEFAULT_PDN_FD)
+    {
+        local_port.interface = m_current_apn;
+    }
 
-        nrf_sec_tag_t sec_tag_list[SEC_TAG_COUNT] = { APP_SEC_TAG_OFFSET + security_instance };
+    LWM2M_INF("Setup %ssecure session (server %u) (APN %s)",
+              (secure ? "" : "non-"),
+              security_instance,
+              (local_port.interface) ? lwm2m_os_log_strdup(m_current_apn) :
+                                       lwm2m_os_log_strdup(m_default_apn));
 
-        coap_sec_config_t setting =
-        {
-            .role          = 0,    // 0 -> Client role
-            .session_cache = 1,    // 1 -> Enable session cache
-            .sec_tag_count = SEC_TAG_COUNT,
-            .sec_tag_list  = sec_tag_list
-        };
+    err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_remote_server[security_instance]);
 
-        coap_local_t local_port =
-        {
-            .addr         = (struct nrf_sockaddr *)&local_addr,
-            .setting      = &setting,
-            .protocol     = NRF_SPROTO_DTLS1v2
-        };
+    if (err_code == 0)
+    {
+        LWM2M_INF("Connected");
+        // Reset state to get back to registration.
+        lwm2m_state_set(LWM2M_STATE_SERVER_CONNECTED);
+        m_lwm2m_transport[security_instance] = local_port.transport;
+    }
+    else if (err_code == EINPROGRESS)
+    {
+        lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_WAIT);
+        m_lwm2m_transport[security_instance] = local_port.transport;
+    }
+    else if (err_code == EIO && (lwm2m_os_errno() == NRF_ENETDOWN))
+    {
+        LWM2M_INF("Connection failed (PDN down)");
 
-        if (m_connection_use_pdn && m_pdn_handle != DEFAULT_PDN_FD)
-        {
-            local_port.interface = m_current_apn;
-        }
-
-        LWM2M_INF("Setup secure DTLS session (server %u) (APN %s)",
-                  security_instance,
-                  (local_port.interface) ? lwm2m_os_log_strdup(m_current_apn) :
-                                           lwm2m_os_log_strdup(m_default_apn));
-
-        err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&m_remote_server[security_instance]);
-
-        if (err_code == 0)
-        {
-            LWM2M_INF("Connected");
-            // Reset state to get back to registration.
-            lwm2m_state_set(LWM2M_STATE_SERVER_CONNECTED);
-            m_lwm2m_transport[security_instance] = local_port.transport;
-        }
-        else if (err_code == EINPROGRESS)
-        {
-            lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_WAIT);
-            m_lwm2m_transport[security_instance] = local_port.transport;
-        }
-        else if (err_code == EIO && (lwm2m_os_errno() == NRF_ENETDOWN))
-        {
-            LWM2M_INF("Connection failed (PDN down)");
-
-            // Just return, so we come back setup PDN again
-            return;
-        }
-        else
-        {
-            LWM2M_INF("Connection failed: %s (%ld), %s (%d)",
-                      lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                      lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
-
-            if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
-                // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
-                if (err_code == EIO && (lwm2m_os_errno() == NRF_EINVAL ||
-                                        lwm2m_os_errno() == NRF_EOPNOTSUPP ||
-                                        lwm2m_os_errno() == NRF_ENETUNREACH)) {
-                    app_handle_connect_retry(security_instance, true);
-                } else {
-                    app_handle_connect_retry(security_instance, false);
-                }
-
-                if (lwm2m_os_errno() != NRF_ENETUNREACH) {
-                    app_set_bootstrap_if_last_retry_delay(security_instance);
-                }
-            }
-        }
+        // Just return, so we come back setup PDN again
+        return;
     }
     else
     {
-        LWM2M_TRC("NON-SECURE session (register)");
-        lwm2m_state_set(LWM2M_STATE_SERVER_CONNECTED);
+        LWM2M_INF("Connection failed: %s (%ld), %s (%d)",
+                  lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                  lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno());
+
+        if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT))
+        {
+            // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
+            if (err_code == EIO && (lwm2m_os_errno() == NRF_EINVAL ||
+                                    lwm2m_os_errno() == NRF_EOPNOTSUPP ||
+                                    lwm2m_os_errno() == NRF_ENETUNREACH))
+            {
+                app_handle_connect_retry(security_instance, true);
+            }
+            else
+            {
+                app_handle_connect_retry(security_instance, false);
+            }
+
+            if (lwm2m_os_errno() != NRF_ENETUNREACH)
+            {
+                app_set_bootstrap_if_last_retry_delay(security_instance);
+            }
+        }
     }
 }
 

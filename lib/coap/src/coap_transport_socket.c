@@ -382,7 +382,7 @@ uint32_t coap_security_setup(coap_local_t *local, struct nrf_sockaddr const *rem
 	NULL_PARAM_CHECK(local->addr);
 	NULL_PARAM_CHECK(local->setting);
 
-	if (local->protocol != NRF_SPROTO_DTLS1v2) {
+	if (local->protocol != NRF_IPPROTO_UDP && local->protocol != NRF_SPROTO_DTLS1v2) {
 		return EINVAL;
 	}
 	if ((remote->sa_family != NRF_AF_INET) && (remote->sa_family != NRF_AF_INET6)) {
