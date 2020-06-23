@@ -1320,6 +1320,29 @@ static uint32_t app_event_deferred_reason(bool fallback)
     return reason;
 }
 
+static bool app_change_ip_version(uint16_t security_instance)
+{
+    if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6) ||
+        lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_FALLBACK))
+    {
+        return false;
+    }
+
+    // TODO: check for both IPv6 and IPv4 support on PDN
+    bool ipv6_to_ipv4_fallback = false;
+
+    // Fallback to the other IP version
+    m_family_type[security_instance] = (m_family_type[security_instance] == NRF_AF_INET6) ? NRF_AF_INET : NRF_AF_INET6;
+
+    if (m_family_type[security_instance] == NRF_AF_INET)
+    {
+        LWM2M_INF("IPv6 to IPv4 fallback");
+        ipv6_to_ipv4_fallback = true;
+    }
+
+    return ipv6_to_ipv4_fallback;
+}
+
 /**@brief Helper function to handle a connect retry. */
 static void app_handle_connect_retry(uint16_t security_instance, bool fallback)
 {
@@ -1336,18 +1359,10 @@ static void app_handle_connect_retry(uint16_t security_instance, bool fallback)
     }
 
     // Check if doing IP fallback
-    // TODO: check for both IPv6 and IPv4 support on PDN
-    if (fallback && !lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6) && !lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_FALLBACK))
+    if (fallback && app_change_ip_version(security_instance))
     {
-        // Fallback to the other IP version
-        m_family_type[security_instance] = (m_family_type[security_instance] == NRF_AF_INET6) ? NRF_AF_INET : NRF_AF_INET6;
-
-        if (m_family_type[security_instance] == NRF_AF_INET)
-        {
-            // No retry delay when IPv6 to IPv4 fallback
-            LWM2M_INF("IPv6 to IPv4 fallback");
-            start_retry_delay = false;
-        }
+        // No retry delay when IPv6 to IPv4 fallback
+        start_retry_delay = false;
     }
 
     if (start_retry_delay)
@@ -1379,6 +1394,21 @@ static void app_handle_connect_retry(uint16_t security_instance, bool fallback)
     } else {
         lwm2m_os_timer_start(state_update_timer, NO_WAIT);
     }
+}
+
+static bool handle_as_fallback(uint32_t err_code, int os_errno)
+{
+    bool fallback = false;
+
+    // Check for no IPv4/IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
+    if (err_code == EIO && (os_errno == NRF_EINVAL ||
+                            os_errno == NRF_EOPNOTSUPP ||
+                            os_errno == NRF_ENETUNREACH))
+    {
+        fallback = true;
+    }
+
+    return fallback;
 }
 
 static void app_set_bootstrap_if_last_retry_delay(uint16_t security_instance)
@@ -2088,7 +2118,10 @@ static void app_bootstrap_connect(void)
 
     if (err_code == 0)
     {
-        LWM2M_INF("Connected");
+        if (secure) {
+            LWM2M_INF("Connected");
+        }
+
         lwm2m_state_set(LWM2M_STATE_BS_CONNECTED);
         m_lwm2m_transport[LWM2M_BOOTSTRAP_INSTANCE_ID] = local_port.transport;
     }
@@ -2112,17 +2145,8 @@ static void app_bootstrap_connect(void)
 
         if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT))
         {
-            // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
-            if (err_code == EIO && (lwm2m_os_errno() == NRF_EINVAL ||
-                                    lwm2m_os_errno() == NRF_EOPNOTSUPP ||
-                                    lwm2m_os_errno() == NRF_ENETUNREACH))
-            {
-                app_handle_connect_retry(LWM2M_BOOTSTRAP_INSTANCE_ID, true);
-            }
-            else
-            {
-                app_handle_connect_retry(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
-            }
+            app_handle_connect_retry(LWM2M_BOOTSTRAP_INSTANCE_ID,
+                                     handle_as_fallback(err_code, lwm2m_os_errno()));
         }
     }
 }
@@ -2139,6 +2163,21 @@ static void app_bootstrap(void)
     if (err_code == 0)
     {
         lwm2m_state_set(LWM2M_STATE_BOOTSTRAP_REQUESTED);
+    }
+    else
+    {
+        LWM2M_INF("Bootstrap failed: %s (%d), %s (%d), reconnect (server %d)",
+                  lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                  lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
+                  LWM2M_BOOTSTRAP_INSTANCE_ID);
+
+        app_server_disconnect(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
+
+        if (lwm2m_state_set(LWM2M_STATE_BS_CONNECT_RETRY_WAIT))
+        {
+            app_handle_connect_retry(LWM2M_BOOTSTRAP_INSTANCE_ID,
+                                     handle_as_fallback(err_code, lwm2m_os_errno()));
+        }
     }
 }
 
@@ -2261,7 +2300,10 @@ static void app_server_connect(uint16_t security_instance)
 
     if (err_code == 0)
     {
-        LWM2M_INF("Connected");
+        if (secure) {
+            LWM2M_INF("Connected");
+        }
+
         // Reset state to get back to registration.
         lwm2m_state_set(LWM2M_STATE_SERVER_CONNECTED);
         m_lwm2m_transport[security_instance] = local_port.transport;
@@ -2286,17 +2328,8 @@ static void app_server_connect(uint16_t security_instance)
 
         if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT))
         {
-            // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
-            if (err_code == EIO && (lwm2m_os_errno() == NRF_EINVAL ||
-                                    lwm2m_os_errno() == NRF_EOPNOTSUPP ||
-                                    lwm2m_os_errno() == NRF_ENETUNREACH))
-            {
-                app_handle_connect_retry(security_instance, true);
-            }
-            else
-            {
-                app_handle_connect_retry(security_instance, false);
-            }
+            app_handle_connect_retry(security_instance,
+                                     handle_as_fallback(err_code, lwm2m_os_errno()));
 
             if (lwm2m_os_errno() != NRF_ENETUNREACH)
             {
@@ -2354,8 +2387,10 @@ static void app_server_register(uint16_t security_instance)
 
         app_server_disconnect(security_instance, false);
 
-        if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT)) {
-            app_handle_connect_retry(security_instance, false);
+        if (lwm2m_state_set(LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT))
+        {
+            app_handle_connect_retry(security_instance,
+                                     handle_as_fallback(err_code, lwm2m_os_errno()));
         }
     }
 }
@@ -2382,6 +2417,11 @@ void app_server_update(uint16_t security_instance, bool connect_update)
                       security_instance);
 
             app_server_disconnect(security_instance, false);
+
+            if (handle_as_fallback(err_code, lwm2m_os_errno())) {
+                (void) app_change_ip_version(security_instance);
+            }
+
             lwm2m_request_server_update(security_instance, true);
 
             if (connect_update) {
@@ -2633,12 +2673,7 @@ static bool app_coap_socket_poll(void)
             }
 
             if (lwm2m_state_set(next_state)) {
-                // Check for no IPv6 support (EINVAL or EOPNOTSUPP) and no response (ENETUNREACH)
-                if (error == NRF_EINVAL || error == NRF_EOPNOTSUPP || error == NRF_ENETUNREACH) {
-                    app_handle_connect_retry(m_security_instance, true);
-                } else {
-                    app_handle_connect_retry(m_security_instance, false);
-                }
+                app_handle_connect_retry(m_security_instance, handle_as_fallback(EIO, error));
 
                 if (error != NRF_ENETUNREACH) {
                     app_set_bootstrap_if_last_retry_delay(security_instance);
