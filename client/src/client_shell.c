@@ -1003,10 +1003,8 @@ static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
         shell_print(shell, "Bootstrap completed [%s]", (lwm2m_family_type_get(0) == NRF_AF_INET6) ? "IPv6" : "IPv4");
     }
 
-    for (int i = 1; i < (1+LWM2M_MAX_SERVERS); i++) {
-        uint8_t uri_len = 0;
-        (void)lwm2m_security_server_uri_get(i, &uri_len);
-        if ((uri_len > 0) && lwm2m_server_registered_get(i)) {
+    for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++) {
+        if (lwm2m_server_registered_get(i)) {
             shell_print(shell, "Server %d registered [%s]", i, (lwm2m_family_type_get(i) == NRF_AF_INET6) ? "IPv6" : "IPv4");
         }
     }
