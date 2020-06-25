@@ -18,7 +18,9 @@
 #define OPERATOR_ID_CHINA_TELECOM      6        /**< Operator id for China Telecom SIM. */
 #define OPERATOR_ID_SOFTBANK           7        /**< Operator id for Softbank SIM. */
 #define OPERATOR_ID_TELSTRA            8        /**< Operator id for Telstra SIM. */
-#define OPERATOR_ID_MAX                8        /**< The highest operator id supported. */
+#define OPERATOR_ID_BELL               9        /**< Operator id for Bell CA SIM. */
+#define OPERATOR_ID_LGU               10        /**< Operator id for LGU+ SIM. */
+#define OPERATOR_ID_MAX               10        /**< The highest operator id supported. */
 /* Note: When adding operators also update operator_id_string() */
 
 /** @brief Operator id from last read. */
@@ -44,6 +46,11 @@ static bool is_att(uint32_t operator_id)
             (operator_id == OPERATOR_ID_ATT_JASPER));
 }
 
+static bool is_lgu(uint32_t operator_id)
+{
+    return (operator_id == OPERATOR_ID_LGU);
+}
+
 void operator_id_read(void)
 {
     at_read_operator_id(&m_operator_id);
@@ -51,7 +58,10 @@ void operator_id_read(void)
 
 bool operator_is_supported(bool allow_debug)
 {
-    return (operator_is_vzw(allow_debug) || operator_is_att(allow_debug) || operator_is_custom(allow_debug));
+    return (operator_is_vzw(allow_debug) ||
+            operator_is_att(allow_debug) ||
+            operator_is_lgu(allow_debug) ||
+            operator_is_custom(allow_debug));
 }
 
 static bool operator_is_custom(bool allow_debug)
@@ -86,6 +96,19 @@ bool operator_is_att(bool allow_debug)
 
     if (allow_debug && lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
         return is_not_identified(m_operator_id) && is_att(lwm2m_debug_operator_id_get());
+    }
+
+    return false;
+}
+
+bool operator_is_lgu(bool allow_debug)
+{
+    if (is_lgu(m_operator_id)) {
+        return true;
+    }
+
+    if (allow_debug && lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
+        return is_not_identified(m_operator_id) && is_lgu(lwm2m_debug_operator_id_get());
     }
 
     return false;
@@ -131,6 +154,10 @@ const char * operator_id_string(uint32_t operator_id)
             return "Softbank";
         case OPERATOR_ID_TELSTRA:
             return "Telstra";
+        case OPERATOR_ID_BELL:
+            return "Bell CA";
+        case OPERATOR_ID_LGU:
+            return "LG U+";
         default:
             break;
     }

@@ -43,6 +43,14 @@ bool operator_is_vzw(bool allow_debug);
  */
 bool operator_is_att(bool allow_debug);
 
+/**@brief Check if operator is LGU+.
+ *
+ * @param[in]  allow_debug  Set if allow debug operator.
+ *
+ * @return true if operator is LGU+.
+ */
+bool operator_is_lgu(bool allow_debug);
+
 /**@brief Get operator id.
  *
  * @param[in]  allow_debug  Set if allow debug operator.
