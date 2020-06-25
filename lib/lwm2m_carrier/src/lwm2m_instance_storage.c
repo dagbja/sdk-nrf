@@ -324,8 +324,16 @@ static void obj_instance_add_to_handler(uint16_t obj, uint16_t inst)
         p_instance = (lwm2m_instance_t *)lwm2m_apn_conn_prof_get_instance(inst);
         break;
     case LWM2M_OBJ_PORTFOLIO:
-        p_instance = (lwm2m_instance_t *)lwm2m_portfolio_get_instance(LWM2M_PORTFOLIO_CARRIER_INSTANCE);
-        p_instance->instance_id = inst;
+        /* A Portfolio instance created with a custom instance ID. */
+        if (inst >= LWM2M_PORTFOLIO_MAX_INSTANCES) {
+            p_instance = (lwm2m_instance_t *)lwm2m_portfolio_get_instance(LWM2M_PORTFOLIO_CARRIER_INSTANCE);
+            p_instance->instance_id = inst;
+        } else {
+            p_instance = (lwm2m_instance_t *)lwm2m_portfolio_get_instance(inst);
+        }
+        break;
+    case LWM2M_OBJ_CONN_EXT:
+        p_instance = (lwm2m_instance_t *)lwm2m_conn_ext_get_instance(inst);
         break;
     default:
         break;

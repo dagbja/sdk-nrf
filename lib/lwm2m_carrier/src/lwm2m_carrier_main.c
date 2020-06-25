@@ -1818,6 +1818,68 @@ static void app_init_connection_update(void)
     }
 }
 
+static void app_carrier_objects_init(void)
+{
+    if (operator_is_att(true))
+    {
+        lwm2m_apn_conn_prof_init();
+        lwm2m_portfolio_init();
+        lwm2m_conn_ext_init();
+    }
+}
+
+static void app_carrier_objects_add(void)
+{
+    if (operator_is_att(true))
+    {
+        // Add APN connection profile support.
+        (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_apn_conn_prof_get_object());
+
+        // Add portfolio support.
+        (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_portfolio_get_object());
+
+        // Add connectivity extension support.
+        (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_conn_ext_get_object());
+    }
+}
+
+static void app_carrier_objects_delete(void)
+{
+    if (!operator_is_att(true))
+    {
+        size_t progress;
+        lwm2m_instance_t *p_instance = NULL;
+
+        /* Remove all object instances from the request handler. */
+        while (lwm2m_instance_next(&p_instance, &progress))
+        {
+            if (p_instance->object_id == LWM2M_OBJ_APN_CONNECTION_PROFILE ||
+                p_instance->object_id == LWM2M_OBJ_PORTFOLIO ||
+                p_instance->object_id == LWM2M_OBJ_CONN_EXT)
+            {
+                lwm2m_coap_handler_instance_delete(p_instance);
+            }
+        }
+
+        /* Remove all objects from the request handler. */
+        (void)lwm2m_coap_handler_object_delete((lwm2m_object_t *)lwm2m_apn_conn_prof_get_object());
+        (void)lwm2m_coap_handler_object_delete((lwm2m_object_t *)lwm2m_portfolio_get_object());
+        (void)lwm2m_coap_handler_object_delete((lwm2m_object_t *)lwm2m_conn_ext_get_object());
+
+        /* Delete the corresponding NVS entries. */
+        (void)lwm2m_storage_portfolio_delete();
+        (void)lwm2m_storage_apn_conn_prof_delete();
+        (void)lwm2m_storage_conn_ext_delete();
+    }
+}
+
+static void app_carrier_objects_setup(void)
+{
+    app_carrier_objects_delete();
+    app_carrier_objects_init();
+    app_carrier_objects_add();
+}
+
 static void app_misc_data_set_bootstrapped(bool bootstrapped)
 {
     lwm2m_storage_misc_data_t misc_data = { 0 };
@@ -1917,6 +1979,16 @@ void lwm2m_factory_reset(void)
     lwm2m_notif_attr_storage_delete_all();
 }
 
+static void app_carrier_objects_load(void)
+{
+    if (operator_is_att(true))
+    {
+        lwm2m_storage_apn_conn_prof_load();
+        lwm2m_storage_portfolio_load();
+        lwm2m_storage_conn_ext_load();
+    }
+}
+
 static void app_load_flash_objects(void)
 {
     LWM2M_INF("Load bootstrap settings");
@@ -1940,9 +2012,8 @@ static void app_load_flash_objects(void)
     // Load location
     lwm2m_storage_location_load();
 
-    lwm2m_storage_apn_conn_prof_load();
-    lwm2m_storage_portfolio_load();
-    lwm2m_storage_conn_ext_load();
+    // Load carrier-specific objects
+    app_carrier_objects_load();
 
     lwm2m_storage_misc_data_t misc_data;
     int32_t result = lwm2m_storage_misc_data_load(&misc_data);
@@ -1962,9 +2033,7 @@ static void app_load_flash_objects(void)
 
 static void app_lwm2m_create_objects(void)
 {
-    // Init functions will check operator ID.
-    operator_id_read();
-
+    // Common objects.
     lwm2m_security_init();
     lwm2m_server_init();
     lwm2m_access_control_init();
@@ -1972,28 +2041,12 @@ static void app_lwm2m_create_objects(void)
     lwm2m_conn_mon_init();
     lwm2m_firmware_init();
     lwm2m_conn_stat_init();
-    lwm2m_apn_conn_prof_init();
-    lwm2m_portfolio_init();
-    lwm2m_conn_ext_init();
+
+    // Setup operator-specific objects.
+    app_carrier_objects_setup();
 
     // Initialize objects from flash, if they exist in NVS.
     app_load_flash_objects();
-
-    // Read APN status and reflect it in the APN Connection Profile object.
-    lwm2m_apn_conn_prof_apn_status_update();
-
-    // Register the custom APN if it has been provided.
-    if (m_app_config.apn)
-    {
-        int err = lwm2m_apn_conn_prof_custom_apn_set(m_app_config.apn);
-        if (err != 0 || err != EPERM) {
-            LWM2M_ERR("Unable to setup custom APN, err %d", err);
-        }
-    }
-
-    if (operator_is_att(true)) {
-        lwm2m_first_enabled_apn_instance();
-    }
 }
 
 /**@brief LWM2M initialization.
@@ -2032,15 +2085,6 @@ static void app_lwm2m_setup(void)
 
     // Add connectivity statistics support.
     (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_conn_stat_get_object());
-
-    // Add APN connection profile support.
-    (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_apn_conn_prof_get_object());
-
-    // Add portfolio support.
-    (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_portfolio_get_object());
-
-    // Add connectivity extension support.
-    (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_conn_ext_get_object());
 
     // Add callback to set default notification attribute values.
     lwm2m_observer_notif_attr_default_cb_set(lwm2m_notif_attribute_default_value_set);
@@ -3168,6 +3212,26 @@ static void init_config_set(const lwm2m_carrier_config_t * const p_config)
     m_app_config.certification_mode = p_config->certification_mode;
 }
 
+void app_carrier_apn_init(void)
+{
+    if (operator_is_att(true))
+    {
+        // Read APN status and reflect it in the APN Connection Profile object.
+        lwm2m_apn_conn_prof_apn_status_update();
+
+        // Register the custom APN if it has been provided.
+        if (m_app_config.apn)
+        {
+            int err = lwm2m_apn_conn_prof_custom_apn_set(m_app_config.apn);
+            if (err != 0) {
+                LWM2M_ERR("Unable to setup custom APN, err %d", err);
+            }
+        }
+
+        lwm2m_first_enabled_apn_instance();
+    }
+}
+
 int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 {
     int err;
@@ -3255,6 +3319,9 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
         return err;
     }
 
+    // Certain objects are used in specific networks.
+    operator_id_read();
+
     // Setup LWM2M endpoints.
     app_lwm2m_setup();
 
@@ -3266,6 +3333,9 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 
     // Create LwM2M factory bootstrapped objects.
     app_lwm2m_create_objects();
+
+    // Initialise carrier-specific APN handling.
+    app_carrier_apn_init();
 
     // Default APN is connected at startup.
     lwm2m_apn_conn_prof_activate(lwm2m_apn_conn_prof_default_instance(), 0);
