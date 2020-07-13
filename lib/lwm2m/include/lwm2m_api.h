@@ -827,6 +827,18 @@ uint32_t lwm2m_list_string_append(lwm2m_list_t * p_list, uint8_t * p_value, uint
  */
 const char * lwm2m_path_to_string(const uint16_t *p_path, uint8_t path_len);
 
+/**@brief Configure the Access Control context of the LwM2M client.
+ *
+ * @param[in] enable_status Flag to enable or disable Access Control.
+ */
+void lwm2m_ctx_access_control_enable_status_set(bool enable_status);
+
+/**@brief Retrieve the current Access Control context of the LwM2M client.
+ *
+ * @retval true if Access Control is enabled, false otherwise.
+ */
+bool lwm2m_ctx_access_control_enable_status_get(void);
+
 #ifdef __cplusplus
 }
 #endif

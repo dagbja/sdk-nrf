@@ -2150,6 +2150,12 @@ static char *acl_access(uint16_t access)
 
 static int cmd_access_control_print(const struct shell *shell, size_t argc, char **argv)
 {
+    if (!lwm2m_ctx_access_control_enable_status_get())
+    {
+        shell_print(shell, "Access Control Context: DISABLED");
+        return 0;
+    }
+
     for (int i = 0; i < LWM2M_ACCESS_CONTROL_MAX_INSTANCES; i++)
     {
         lwm2m_instance_t *p_instance;

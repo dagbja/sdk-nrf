@@ -21,6 +21,7 @@
 static lwm2m_alloc_t   m_alloc_fn = NULL;  /**< Memory allocator function, populated on @lwm2m_init. */
 static lwm2m_free_t    m_free_fn = NULL;   /**< Memory free function, populated on @lwm2m_init. */
 
+static bool m_access_control_enable_status = true;
 
 void * lwm2m_malloc(size_t size)
 {
@@ -122,6 +123,11 @@ uint32_t lwm2m_lookup_instance(lwm2m_instance_t  ** pp_instance,
                                uint16_t             object_id,
                                uint16_t             instance_id)
 {
+    if ((object_id == LWM2M_OBJ_ACCESS_CONTROL) && !m_access_control_enable_status)
+    {
+        return ENOENT;
+    }
+
     for (int i = 0; i < m_num_instances; ++i)
     {
         if (m_instances[i]->object_id == object_id &&
@@ -156,12 +162,23 @@ bool lwm2m_instance_next(lwm2m_instance_t ** p_instance, size_t *prog)
 
     *p_instance = m_instances[(*prog)++];
 
+    /* In Access Control-disabled context, skip any Access Control instances. */
+    if (((*p_instance)->object_id == LWM2M_OBJ_ACCESS_CONTROL) && !m_access_control_enable_status)
+    {
+        return lwm2m_instance_next(p_instance, prog);
+    }
+
     return true;
 }
 
 uint32_t lwm2m_lookup_object(lwm2m_object_t  ** pp_object,
                              uint16_t           object_id)
 {
+    if ((object_id == LWM2M_OBJ_ACCESS_CONTROL) && !m_access_control_enable_status)
+    {
+        return ENOENT;
+    }
+
     for (int i = 0; i < m_num_objects; ++i)
     {
         if (m_objects[i]->object_id == object_id)
@@ -199,6 +216,16 @@ static uint32_t op_code_resolve(lwm2m_instance_t * p_instance,
     }
 
     return ENOENT;
+}
+
+void lwm2m_ctx_access_control_enable_status_set(bool enable_status)
+{
+    m_access_control_enable_status = enable_status;
+}
+
+bool lwm2m_ctx_access_control_enable_status_get(void)
+{
+    return m_access_control_enable_status;
 }
 
 uint32_t lwm2m_coap_handler_gen_object_link(uint16_t   object_id,
@@ -1110,6 +1137,12 @@ uint32_t lwm2m_coap_handler_gen_link_format(uint16_t object_id, uint16_t short_s
         if (short_server_id == LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID && curr_object == LWM2M_OBJ_ACCESS_CONTROL)
         {
             // Skip Access Control objects in Bootstrap Discover.
+            continue;
+        }
+
+        if (curr_object == LWM2M_OBJ_ACCESS_CONTROL && !m_access_control_enable_status)
+        {
+            // Skip Access Control objects in Access Control-disabled context.
             continue;
         }
 

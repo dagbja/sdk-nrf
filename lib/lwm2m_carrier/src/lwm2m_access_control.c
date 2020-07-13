@@ -37,6 +37,11 @@ lwm2m_access_control_t * lwm2m_access_control_get_instance(uint16_t instance_id)
 {
     lwm2m_access_control_t *p_instance = NULL;
 
+    if (!lwm2m_ctx_access_control_enable_status_get())
+    {
+        return NULL;
+    }
+
     for (int i = 0; i < ARRAY_SIZE(m_instance_acc_control); i++)
     {
         if (m_instance_acc_control[i].proto.instance_id == instance_id)
@@ -335,11 +340,18 @@ uint32_t lwm2m_access_control_access_remote_get(uint16_t            * p_access,
 {
     uint16_t short_server_id;
     uint16_t inst;
-    uint32_t err_code;
+    uint32_t err_code = 0;
 
     if (!p_access || !p_remote)
     {
         return EINVAL;
+    }
+
+    if (!lwm2m_ctx_access_control_enable_status_get())
+    {
+        /* Give full access if in Access Control-disabled context. */
+        *p_access = LWM2M_ACL_FULL_PERM | LWM2M_OPERATION_CODE_DISCOVER | LWM2M_OPERATION_CODE_OBSERVE | LWM2M_OPERATION_CODE_WRITE_ATTR;
+        return 0;
     }
 
     err_code = lwm2m_access_control_find(object_id, instance_id, &inst);

@@ -1835,6 +1835,18 @@ static void app_init_connection_update(void)
     }
 }
 
+static void app_access_control_context_set(void)
+{
+    if (operator_is_lgu(true))
+    {
+        lwm2m_ctx_access_control_enable_status_set(false);
+    }
+    else
+    {
+        lwm2m_ctx_access_control_enable_status_set(true);
+    }
+}
+
 static void app_carrier_objects_setup(void)
 {
     lwm2m_object_t *p_object;
@@ -1908,6 +1920,9 @@ static void app_carrier_objects_setup(void)
             (void)lwm2m_storage_conn_ext_delete();
         }
     }
+
+    // Set corresponding access control context according to operator.
+    app_access_control_context_set();
 }
 
 static void app_misc_data_set_bootstrapped(bool bootstrapped)
