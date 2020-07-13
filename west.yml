@@ -22,18 +22,18 @@ manifest:
   projects:
     - name: sdk-nrf
       path: nrf
-      revision: d1c67072f571d9a69dda4d8fd0df0c1d4237077c
+      revision: 034eb2faa74c9435aeed41425b2ab017dd6240fe
     - name: sdk-zephyr
       path: zephyr
       west-commands: scripts/west-commands.yml
-      revision: 04f51e004c0f91f361727a55a765c32338f906c8
+      revision: 26216d1f7e09e9c43dbcfaf0a8565bb0f69d0130
     - name: sdk-nrfxlib
       path: nrfxlib
-      revision: 62bbf328f290d7db7b332a68ea7d491c6084f3c0
-    - name: sdk-hal_nordic
-      repo-path: sdk-hal_nordic
+      revision: 2f2aab4efc075d1a06a488e227a39acf4c55d84c
+    - name: hal_nordic
       path: modules/hal/nordic
-      revision: aa75b98585adef84987c00ba9918939c1d77e535
+      revision: cb9e75ebfea8a8312678b2359c6b41b051a95177
+      remote: zephyrproject
     - name: cmsis
       revision: 542b2296e6d515b265e25c6b7208e8fea3014f90
       path: modules/hal/cmsis

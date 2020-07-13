@@ -50,7 +50,7 @@ static bool check_file_size;
  * This excludes the HTTP server closing the connection, since
  * that is retried automatically by the download_client.
  */
-static u8_t download_retries = DOWNLOAD_RETRIES;
+static uint8_t download_retries = DOWNLOAD_RETRIES;
 
 static void *download_dwork;
 static void *reboot_dwork;

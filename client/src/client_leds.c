@@ -17,7 +17,7 @@
 /* Structures for delayed work */
 static struct k_delayed_work leds_update_work;
 
-static void app_leds_get_state(u8_t *on, u8_t *blink)
+static void app_leds_get_state(uint8_t *on, uint8_t *blink)
 {
     *on = 0;
     *blink = 0;
@@ -115,8 +115,8 @@ static void app_leds_get_state(u8_t *on, u8_t *blink)
 static void app_leds_update(struct k_work *work)
 {
         static bool led_on;
-        static u8_t current_led_on_mask;
-        u8_t led_on_mask, led_blink_mask;
+        static uint8_t current_led_on_mask;
+        uint8_t led_on_mask, led_blink_mask;
 
         ARG_UNUSED(work);
 
