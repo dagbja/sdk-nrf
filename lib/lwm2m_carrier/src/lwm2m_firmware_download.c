@@ -182,12 +182,14 @@ static int on_fragment(const struct lwm2m_os_download_evt *event)
 		}
 	}
 
-	/* We can't recover from here, simply give up. */
+	/* We can't recover from here, give up */
 	dfusock_close();
 
+	/* Do not attemp to download again */
+	lwm2m_firmware_image_state_set(FIRMWARE_NONE);
+	/* Report errors to server */
 	lwm2m_firmware_state_set(0, STATE_IDLE);
 	lwm2m_firmware_update_result_set(0, RESULT_ERROR_CRC);
-
 	carrier_error_evt_send(LWM2M_CARRIER_ERROR_FOTA_PKG, dfu_err);
 
 	/* Stop the download */
@@ -255,6 +257,8 @@ static int on_error(const struct lwm2m_os_download_evt *event)
 
 	/* We have reached the maximum number of retries, give up */
 	lwm2m_firmware_state_set(0, STATE_IDLE);
+	/* Do not attemp to download again */
+	lwm2m_firmware_image_state_set(FIRMWARE_NONE);
 
 	if (event->error == -EBADMSG) {
 		/* Protocol error */
