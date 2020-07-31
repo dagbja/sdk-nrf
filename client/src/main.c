@@ -84,6 +84,9 @@ int main(void)
     client_leds_init();
 #endif
 
+    printk("\n*** LwM2M client build %s (built on %s) ***",
+           STRINGIFY(LWM2M_CLIENT_VERSION), STRINGIFY(LWM2M_CLIENT_BUILD_HOST));
+
     return 0;
 }
 
