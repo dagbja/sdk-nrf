@@ -236,8 +236,6 @@ static void on_observe_stop(const uint16_t path[3], uint8_t path_len,
         /* TODO */
     }
 
-    lwm2m_observer_notif_attr_storage_update(path, path_len, p_req->remote);
-
     /* Process as a read */
     if (path_len == 1) {
         on_object_read(p_req);

@@ -343,7 +343,6 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                     LWM2M_INF("Observe cancel on resource %s", lwm2m_os_log_strdup(lwm2m_path_to_string(path, path_len)));
                     const void * p_observable = lwm2m_observer_observable_get(path, path_len);
                     lwm2m_observe_unregister(p_request->remote, p_observable);
-                    lwm2m_observer_notif_attr_storage_update(path, path_len, p_request->remote);
                 }
 
                 // Process the GET request as usual.

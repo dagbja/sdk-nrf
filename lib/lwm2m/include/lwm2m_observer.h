@@ -183,14 +183,10 @@ const lwm2m_observable_metadata_t * const * lwm2m_observer_observables_get(uint1
 /**@brief Update the storage of the notification attributes assigned to the given
  *        observable to reflect their current state.
  *
- * @details This function should be called whenever an observation is cancelled on
- *          a given observable.
- *
- * @param[in] p_path    URI path that identifies the observable item.
- * @param[in] path_len  Length of the URI path that identifies the observable item.
- * @param[in] p_remote  Structure containing address information and port number to the remote observer.
+ * @param[in] p_observable  Observable whose attributes are to be updated in the storage.
+ * @param[in] p_remote      Structure containing address information and port number to the remote observer.
  */
-void lwm2m_observer_notif_attr_storage_update(const uint16_t *p_path, uint16_t path_len, struct nrf_sockaddr *p_remote);
+void lwm2m_observer_notif_attr_storage_update(const void *p_observable, struct nrf_sockaddr *p_remote);
 
 /**@brief Retrieve a pointer to an observable LwM2M item identified by its URI path.
  *

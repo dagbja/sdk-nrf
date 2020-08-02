@@ -869,27 +869,19 @@ static void observable_free(int index)
     }
 }
 
-void lwm2m_observer_notif_attr_storage_update(const uint16_t *p_path, uint16_t path_len, struct nrf_sockaddr *p_remote)
+void lwm2m_observer_notif_attr_storage_update(const void *p_observable, struct nrf_sockaddr *p_remote)
 {
     uint16_t short_server_id;
     uint32_t err_code;
     int index;
-    const void *p_observable;
-    uint8_t type;
 
-    if (!p_path || !p_remote)
+    if (!p_observable || !p_remote)
     {
         return;
     }
 
     err_code = lwm2m_remote_short_server_id_find(&short_server_id, p_remote);
     if (err_code != 0)
-    {
-        return;
-    }
-
-    p_observable = observable_get_cb(p_path, path_len, &type);
-    if (!p_observable)
     {
         return;
     }
@@ -1099,7 +1091,7 @@ int lwm2m_observer_write_attribute_handler(const uint16_t *p_path, uint8_t path_
                         return ret;
                     }
 
-                    lwm2m_observer_notif_attr_storage_update(m_observables[index]->path, m_observables[index]->path_len, p_request->remote);
+                    lwm2m_observer_notif_attr_storage_update(m_observables[index]->observable, p_request->remote);
                 }
                 continue;
             }

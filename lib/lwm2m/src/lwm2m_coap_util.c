@@ -244,6 +244,8 @@ uint32_t lwm2m_observe_unregister(struct nrf_sockaddr * p_remote, const void * p
         err_code = coap_observe_server_unregister(handle);
     }
 
+    lwm2m_observer_notif_attr_storage_update(p_observable, p_remote);
+
     if (err_code != 0)
     {
         LWM2M_WRN("Observer unregister failed: %s (%ld), %s (%d)",
