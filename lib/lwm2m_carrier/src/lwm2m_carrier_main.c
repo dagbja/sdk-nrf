@@ -1592,6 +1592,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             // Update instead of register during connect
             LWM2M_INF("Updated after connect (server %d)", security_instance);
             lwm2m_retry_delay_connect_reset(security_instance);
+            lwm2m_server_registered_set(server_instance, true);
 
             if (!m_registration_ready) {
                 lwm2m_observer_storage_restore(short_server_id, m_lwm2m_transport[security_instance]);
