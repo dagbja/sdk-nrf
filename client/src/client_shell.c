@@ -37,12 +37,6 @@
 
 #define PLURALIZE(n) (n == 1 ? "" : "s")
 
-#if defined(CONFIG_BSD_LIBRARY_TRACE_ENABLED)
-    const char *mp_logging_type = "fidoless";
-#else
-    const char *mp_logging_type = "FIDO";
-#endif
-
 static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
 {
     if (argc != 2) {
@@ -306,7 +300,7 @@ static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
     shell_print(shell, "  SIM MSISDN     %s", lwm2m_msisdn_get());
     shell_print(shell, "  SIM ICCID      %s", iccid);
     shell_print(shell, "  Stored MSISDN  %s", last_used_msisdn);
-    shell_print(shell, "  Logging        %s (%s)", modem_logging_get(), mp_logging_type);
+    shell_print(shell, "  Logging        %s", modem_logging_get());
     shell_print(shell, "  Real carrier   %s", operator_id_string(OPERATOR_ID_CURRENT));
     shell_print(shell, "  Carrier check  %s", lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK) ? "No" : "Yes");
     if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
@@ -342,10 +336,11 @@ static int cmd_debug_logging(const struct shell *shell, size_t argc, char **argv
     if (argc != 2) {
         shell_print(shell, "%s <value>", argv[0]);
         shell_print(shell, " 0 = disable");
-        shell_print(shell, " 1 = fidoless generic");
-        shell_print(shell, " 2 = fido");
-        shell_print(shell, " 3 = fidoless \"lwm2m\"");
-        shell_print(shell, " 4 = fidoless IP only");
+        shell_print(shell, " 1 = coredump only");
+        shell_print(shell, " 2 = default");
+        shell_print(shell, " 3 = lwm2m only");
+        shell_print(shell, " 4 = IP only");
+        shell_print(shell, " 5 = lwm2m + default");
         return 0;
     }
 

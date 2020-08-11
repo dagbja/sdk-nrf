@@ -102,25 +102,33 @@ void modem_trace_enable(void)
 // fidoless modem trace options:
 //   1,0 = disable
 //   1,1 = coredump only
-//   1,2 = generic (and coredump)
+//   1,2 = default (and coredump)
 //   1,3 = lwm2m   (and coredump)
 //   1,4 = ip only (and coredump)
+//   1,5 = lwm2m + default (and coredump)
 void modem_logging_enable(void)
 {
-    if ((modem_logging[0] == 0) ||
-        (strcmp(modem_logging, "0") == 0)) {
-        modem_at_write("AT%XMODEMTRACE=1,0", false);
-    } else if (strcmp(modem_logging, "1") == 0) {
-        modem_at_write("AT%XMODEMTRACE=1,2", false);
-    } else if (strcmp(modem_logging, "2") == 0) {
-        modem_at_write("AT%XMODEMTRACE=1,1", false);
-    } else if (strcmp(modem_logging, "3") == 0) {
-        modem_at_write("AT%XMODEMTRACE=1,3", false);
-    } else if (strcmp(modem_logging, "4") == 0) {
-        modem_at_write("AT%XMODEMTRACE=1,4", false);
-    } else if (strlen(modem_logging) == 64) {
+    const char * const ptr = modem_logging;
+    uint32_t len = strlen(ptr);
+
+    if (len == 64) {
         static char at_command[128];
-        sprintf(at_command, "AT%%XMODEMTRACE=2,,3,%s", modem_logging);
+        sprintf(at_command, "AT%%XMODEMTRACE=2,,3,%s", ptr);
         modem_at_write(at_command, false);
+    } else if (len <= 1) {
+        len = ptr[0]; // reuse len for value
+        if ((len == 0) || (len == '0')) {
+            modem_at_write("AT%XMODEMTRACE=1,0", false);
+        } else if (len == '1') {
+            modem_at_write("AT%XMODEMTRACE=1,1", false);
+        } else if (len == '2') {
+            modem_at_write("AT%XMODEMTRACE=1,2", false);
+        } else if (len == '3') {
+            modem_at_write("AT%XMODEMTRACE=1,3", false);
+        } else if (len == '4') {
+            modem_at_write("AT%XMODEMTRACE=1,4", false);
+        } else if (len == '5') {
+            modem_at_write("AT%XMODEMTRACE=1,5", false);
+        }
     }
 }

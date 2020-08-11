@@ -99,10 +99,8 @@ int main(void)
 
 void lwm2m_carrier_thread_run(void)
 {
-#if !defined(CONFIG_BSD_LIBRARY_TRACE_ENABLED)
-    // Start FIDO trace first to ensure we capture lwm2m_carrier_init().
+    // Configure FIDO trace first to ensure we capture lwm2m_carrier_init().
     modem_trace_enable();
-#endif
 
     int err = lwm2m_carrier_init(NULL);
     if (err != 0) {
