@@ -335,12 +335,17 @@ static int cmd_debug_logging(const struct shell *shell, size_t argc, char **argv
 {
     if (argc != 2) {
         shell_print(shell, "%s <value>", argv[0]);
-        shell_print(shell, " 0 = disable");
-        shell_print(shell, " 1 = coredump only");
-        shell_print(shell, " 2 = default");
-        shell_print(shell, " 3 = lwm2m only");
-        shell_print(shell, " 4 = IP only");
-        shell_print(shell, " 5 = lwm2m + default");
+        shell_print(shell, " Valid values for FIDO:");
+        shell_print(shell, "   0 = disable");
+        shell_print(shell, "   1 = default");
+        shell_print(shell, "   2 = logging objects");
+        shell_print(shell, " Valid values for Fidoless:");
+        shell_print(shell, "   0 = disable");
+        shell_print(shell, "   1 = coredump only");
+        shell_print(shell, "   2 = default");
+        shell_print(shell, "   3 = logging objects only");
+        shell_print(shell, "   4 = IP only");
+        shell_print(shell, "   5 = logging objects + default");
         return 0;
     }
 
