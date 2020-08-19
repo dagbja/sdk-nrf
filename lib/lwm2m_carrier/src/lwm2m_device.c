@@ -18,6 +18,7 @@
 #include <lwm2m_observer.h>
 #include <lwm2m_remote.h>
 #include <lwm2m_os.h>
+#include <lwm2m_version.h>
 #include <coap_message.h>
 #include <at_interface.h>
 #include <lwm2m_carrier_main.h>
@@ -732,7 +733,7 @@ void lwm2m_device_update_carrier_specific_settings(void)
     else
     {
         (void)lwm2m_carrier_device_type_set("Smart Device");
-        (void)lwm2m_carrier_software_version_set("LwM2M 0.9");
+        (void)lwm2m_carrier_software_version_set(LWM2M_VERSION_STR);
     }
 }
 

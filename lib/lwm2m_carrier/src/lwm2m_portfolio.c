@@ -18,25 +18,31 @@
 #include <at_interface.h>
 #include <lwm2m_instance_storage.h>
 #include <lwm2m_portfolio.h>
+#include <lwm2m_version.h>
 
+// Modem firmware ODIS
 #define HOST_DEVICE_ID_0           "HUID0"
 #define HOST_DEVICE_MANUFACTURER_0 "HMAN0"
 #define HOST_DEVICE_MODEL_0        "HMOD0"
 #define HOST_DEVICE_SW_VERSION_0   "HSW0"
-
+// AT&T DM can set this
 #define HOST_DEVICE_ID_1           "HUID1"
 #define HOST_DEVICE_MANUFACTURER_1 "HMAN1"
 #define HOST_DEVICE_MODEL_1        "HMOD1"
 #define HOST_DEVICE_SW_VERSION_1   "HSW1"
-
-#define LWM2M_PORTFOLIO_MAX_INSTANCES    3
+// LwM2M client version information
+#define HOST_DEVICE_ID_2           "HUID2"
+#define HOST_DEVICE_MANUFACTURER_2 "Nordic Semiconductor"
+#define HOST_DEVICE_MODEL_2        "nRF9160"
+#define HOST_DEVICE_SW_VERSION_2   LWM2M_VERSION_STR
 
 static lwm2m_object_t    m_object_portfolio;                                  /**< Portfolio base object. */
 static lwm2m_portfolio_t m_instance_portfolio[LWM2M_PORTFOLIO_MAX_INSTANCES]; /**< Portfolio object instance. */
 static char *            m_portfolio_identity_val[][LWM2M_PORTFOLIO_IDENTITY_INSTANCES] =
 {
     { HOST_DEVICE_ID_0, HOST_DEVICE_MANUFACTURER_0, HOST_DEVICE_MODEL_0, HOST_DEVICE_SW_VERSION_0 },
-    { HOST_DEVICE_ID_1, HOST_DEVICE_MANUFACTURER_1, HOST_DEVICE_MODEL_1, HOST_DEVICE_SW_VERSION_1 }
+    { HOST_DEVICE_ID_1, HOST_DEVICE_MANUFACTURER_1, HOST_DEVICE_MODEL_1, HOST_DEVICE_SW_VERSION_1 },
+    { HOST_DEVICE_ID_2, HOST_DEVICE_MANUFACTURER_2, HOST_DEVICE_MODEL_2, HOST_DEVICE_SW_VERSION_2 },
 };
 static lwm2m_string_t    m_portfolio_identity[ARRAY_SIZE(m_instance_portfolio)][LWM2M_PORTFOLIO_IDENTITY_INSTANCES];
 
