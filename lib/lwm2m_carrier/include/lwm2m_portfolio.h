@@ -12,6 +12,7 @@
 #include <lwm2m_objects.h>
 
 #define LWM2M_PRIMARY_HOST_DEVICE_PORTFOLIO 0
+#define LWM2M_PORTFOLIO_LWM2M_VERSION_INSTANCE 2
 #define LWM2M_PORTFOLIO_CARRIER_INSTANCE 3
 
 void lwm2m_portfolio_init(void);

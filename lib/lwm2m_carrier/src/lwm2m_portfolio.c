@@ -32,8 +32,8 @@
 #define HOST_DEVICE_SW_VERSION_1   "HSW1"
 // LwM2M client version information
 #define HOST_DEVICE_ID_2           "HUID2"
-#define HOST_DEVICE_MANUFACTURER_2 "Nordic Semiconductor"
-#define HOST_DEVICE_MODEL_2        "nRF9160"
+#define HOST_DEVICE_MANUFACTURER_2 "HMAN2"
+#define HOST_DEVICE_MODEL_2        "HMOD2"
 #define HOST_DEVICE_SW_VERSION_2   LWM2M_VERSION_STR
 
 static lwm2m_object_t    m_object_portfolio;                                  /**< Portfolio base object. */
@@ -561,6 +561,7 @@ void lwm2m_portfolio_init(void)
         }
     }
 
+    int error;
     uint16_t instance_id = 0;
 
     if (at_read_host_device_info(&m_instance_portfolio[instance_id].identity) == 0)
@@ -572,7 +573,25 @@ void lwm2m_portfolio_init(void)
     {
         for (int j = 0; j < LWM2M_PORTFOLIO_IDENTITY_INSTANCES; j++)
         {
-            (void)lwm2m_bytebuffer_to_string(m_portfolio_identity_val[i][j], strlen(m_portfolio_identity_val[i][j]), &m_portfolio_identity[i][j]);
+            error = -1;
+            if (LWM2M_PORTFOLIO_LWM2M_VERSION_INSTANCE == i)
+            {
+                if (LWM2M_PORTFOLIO_HOST_DEVICE_MANUFACTURER == j)
+                {
+                    error = at_read_manufacturer(&m_portfolio_identity[i][j]);
+                }
+                else if (LWM2M_PORTFOLIO_HOST_DEVICE_MODEL == j)
+                {
+                    error = at_read_model_number(&m_portfolio_identity[i][j]);
+                }
+            }
+
+            if (0 > error)
+            {
+                (void)lwm2m_bytebuffer_to_string(m_portfolio_identity_val[i][j],
+                                                 strlen(m_portfolio_identity_val[i][j]),
+                                                 &m_portfolio_identity[i][j]);
+            }
         }
     }
 }
