@@ -265,7 +265,7 @@ static bool skip_instance(uint16_t obj, uint16_t inst)
 {
     switch (obj) {
     case LWM2M_OBJ_PORTFOLIO:
-        if (inst == LWM2M_PRIMARY_HOST_DEVICE_PORTFOLIO) {
+        if (inst == LWM2M_PORTFOLIO_HOST_DEVICE_INSTANCE) {
             return true;
         }
     default:

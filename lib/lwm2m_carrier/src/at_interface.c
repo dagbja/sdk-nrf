@@ -292,7 +292,7 @@ static int at_odis_handler(const char *notif)
         return 0;
     }
 
-    portfolio_inst = lwm2m_portfolio_get_instance(LWM2M_PRIMARY_HOST_DEVICE_PORTFOLIO);
+    portfolio_inst = lwm2m_portfolio_get_instance(LWM2M_PORTFOLIO_HOST_DEVICE_INSTANCE);
     if (!portfolio_inst)
     {
         LWM2M_ERR("Primary Host Device Portfolio instance not found");

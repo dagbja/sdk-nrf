@@ -346,7 +346,7 @@ int lwm2m_carrier_identity_write(uint16_t instance_id, uint16_t identity_type, c
     lwm2m_portfolio_t *portfolio_instance;
     int ret;
 
-    if (instance_id == LWM2M_PRIMARY_HOST_DEVICE_PORTFOLIO)
+    if (instance_id == LWM2M_PORTFOLIO_HOST_DEVICE_INSTANCE)
     {
         return -EPERM;
     }
