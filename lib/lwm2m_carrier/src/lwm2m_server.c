@@ -428,7 +428,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
 
         if (lwm2m_server_lifetime_get(instance_id) != previous_lifetime)
         {
-            lwm2m_request_server_update(instance_id, false);
+            lwm2m_request_server_instance_update(instance_id, false);
         }
 
         if (err_code == 0)
@@ -485,7 +485,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                     instance_id = 1;
                 }
 #endif
-                lwm2m_request_server_update(instance_id, true);
+                lwm2m_request_server_instance_update(instance_id, true);
                 break;
             }
 
@@ -635,7 +635,7 @@ uint32_t lwm2m_server_object_callback(lwm2m_object_t * p_object,
     {
         if (instance_id == LWM2M_INVALID_INSTANCE)
         {
-            uint16_t bootstrap_ssid = lwm2m_security_short_server_id_get(LWM2M_BOOTSTRAP_INSTANCE_ID); 
+            uint16_t bootstrap_ssid = lwm2m_security_short_server_id_get(LWM2M_BOOTSTRAP_INSTANCE_ID);
             // Delete all instances except Bootstrap server
             for (uint32_t i = 0; i < 1 + LWM2M_MAX_SERVERS; i++)
             {

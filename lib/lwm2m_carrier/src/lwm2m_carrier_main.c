@@ -254,6 +254,30 @@ static uint16_t server_instance_get(uint16_t security_instance)
     return m_server_instance_map[security_instance];
 }
 
+static uint16_t security_instance_get(uint16_t server_instance)
+{
+    if (server_instance >= 1+LWM2M_MAX_SERVERS)
+    {
+        LWM2M_ERR("Illegal server instance: %u", server_instance);
+        return 0;
+    }
+
+    uint16_t security_instance = UINT16_MAX;
+    for (int i = 0; i < ARRAY_SIZE(m_server_instance_map); i++) {
+        if (m_server_instance_map[i] == server_instance) {
+            security_instance = i;
+            break;
+        }
+    }
+
+    if (security_instance == UINT16_MAX) {
+        LWM2M_ERR("Missing security instance for server instance: %u", server_instance);
+        return 0;
+    }
+
+    return security_instance;
+}
+
 static void server_instance_update_map(void)
 {
     uint16_t short_server_id;
@@ -398,6 +422,13 @@ void lwm2m_request_server_update(uint16_t security_instance, bool reconnect)
     if (m_lwm2m_transport[security_instance] != -1 || reconnect) {
         m_connection_update[security_instance].requested = LWM2M_REQUEST_UPDATE;
     }
+}
+
+void lwm2m_request_server_instance_update(uint16_t server_instance, bool reconnect)
+{
+    uint16_t security_instance = security_instance_get(server_instance);
+
+    lwm2m_request_server_update(security_instance, reconnect);
 }
 
 void lwm2m_request_deregister(void)

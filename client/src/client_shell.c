@@ -259,7 +259,7 @@ static int cmd_server_lifetime(const struct shell *shell, size_t argc, char **ar
 
     if (lifetime != lwm2m_server_lifetime_get(instance_id)) {
         // Lifetime changed, send update server
-        lwm2m_request_server_update(instance_id, false);
+        lwm2m_request_server_instance_update(instance_id, false);
         lwm2m_server_lifetime_set(instance_id, lifetime);
         lwm2m_storage_server_store();
 
@@ -940,20 +940,26 @@ static int cmd_lwm2m_register(const struct shell *shell, size_t argc, char **arg
 
 static int cmd_lwm2m_update(const struct shell *shell, size_t argc, char **argv)
 {
-    uint16_t instance_id = 1;
+    if (argc != 2)
+    {
+        shell_print(shell, "%s <instance>", argv[0]);
+        return 0;
+    }
 
-    if (argc == 2) {
-        instance_id = atoi(argv[1]);
+    uint16_t instance_id = atoi(argv[1]);
 
-        if (instance_id < 1 || instance_id >= (1+LWM2M_MAX_SERVERS))
-        {
-            shell_print(shell, "instance must be between 1 and %d", LWM2M_MAX_SERVERS);
-            return 0;
-        }
+    if (instance_id < 1 || instance_id >= (1+LWM2M_MAX_SERVERS))
+    {
+        shell_print(shell, "instance must be between 1 and %d", LWM2M_MAX_SERVERS);
+        return 0;
     }
 
     if (lwm2m_state_get() == LWM2M_STATE_IDLE) {
-        lwm2m_request_server_update(instance_id, true);
+        if (lwm2m_server_registered_get(instance_id)) {
+            lwm2m_request_server_instance_update(instance_id, true);
+        } else {
+            shell_print(shell, "instance %u is not registered", instance_id);
+        }
     } else {
         shell_print(shell, "Not registered");
     }

@@ -79,21 +79,22 @@ char *lwm2m_default_apn_get(void);
  */
 int lwm2m_carrier_apn_get(char *buf, size_t len);
 
-bool lwm2m_carrier_pdn_activate(uint16_t instance_id, int32_t *retry_delay);
+bool lwm2m_carrier_pdn_activate(uint16_t security_instance, int32_t *retry_delay);
 
 void lwm2m_request_link_up(void);
 void lwm2m_request_link_down(void);
 void lwm2m_request_bootstrap(void);
 void lwm2m_request_connect(void);
-void lwm2m_request_server_update(uint16_t instance_id, bool reconnect);
+void lwm2m_request_server_update(uint16_t security_instance, bool reconnect);
+void lwm2m_request_server_instance_update(uint16_t server_instance, bool reconnect);
 bool lwm2m_request_remote_reconnect(struct nrf_sockaddr *p_remote);
 void lwm2m_request_deregister(void);
-void lwm2m_request_server_disconnect(uint16_t instance_id);
+void lwm2m_request_server_disconnect(uint16_t security_instance);
 void lwm2m_request_disconnect(void);
 void lwm2m_request_reset(void);
 bool lwm2m_did_bootstrap(void);
 uint16_t lwm2m_security_instance(void);
-nrf_sa_family_t lwm2m_family_type_get(uint16_t instance_id);
+nrf_sa_family_t lwm2m_family_type_get(uint16_t security_instance);
 int32_t lwm2m_state_update_delay(void);
 
 void lwm2m_bootstrap_clear(void);
