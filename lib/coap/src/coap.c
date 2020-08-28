@@ -602,8 +602,9 @@ uint32_t coap_transport_read(const coap_transport_handle_t transport,
 			uint8_t uri_path_count = 0;
 			uint16_t index;
 
-			for (index = 0; index < message->options_count;
-								index++) {
+			for (index = 0; (index < message->options_count)
+				&& (uri_path_count < COAP_RESOURCE_MAX_DEPTH); index++) {
+
 				if (message->options[index].number ==
 							COAP_OPT_URI_PATH) {
 					uri_pointers[uri_path_count++] =

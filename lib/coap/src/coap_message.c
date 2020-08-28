@@ -236,7 +236,8 @@ uint32_t coap_message_decode(coap_message_t *message, const uint8_t *raw_message
 
 	/* Parse the options if any. */
 	while ((byte_index < message_len) &&
-	       (raw_message[byte_index] != COAP_PAYLOAD_MARKER)) {
+	       (raw_message[byte_index] != COAP_PAYLOAD_MARKER) &&
+	       (message->options_count != COAP_MAX_NUMBER_OF_OPTIONS)) {
 		uint32_t err_code;
 		uint16_t byte_count = 0;
 
