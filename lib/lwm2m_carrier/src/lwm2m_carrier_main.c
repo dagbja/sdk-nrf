@@ -2160,7 +2160,9 @@ static void app_bootstrap(void)
 
     uint32_t err_code = lwm2m_bootstrap((struct nrf_sockaddr *)&m_remote_server[LWM2M_BOOTSTRAP_INSTANCE_ID],
                                         &m_client_id,
-                                        m_lwm2m_transport[LWM2M_BOOTSTRAP_INSTANCE_ID]);
+                                        m_lwm2m_transport[LWM2M_BOOTSTRAP_INSTANCE_ID],
+                                        NULL);
+
     if (err_code == 0)
     {
         lwm2m_state_set(LWM2M_STATE_BOOTSTRAP_REQUESTED);

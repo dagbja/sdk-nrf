@@ -501,13 +501,15 @@ uint32_t lwm2m_init(lwm2m_alloc_t alloc_fn, lwm2m_free_t free_fn);
  *                        LWM2M bootstrap server.
  * @param[in] p_id        Pointer to the structure holding the Id of the client.
  * @param[in] transport   Handle to the CoAP Transport Layer.
+ * @param[in] p_payload   Pointer to payload. Set to NULL when no payload.
  *
  * @retval NRF_SUCCESS    If bootstrap request to the LWM2M bootstrap server was sent successfully.
  * @retval NRF_ERROR_NULL If one of the parameters was a NULL pointer.
  */
 uint32_t lwm2m_bootstrap(struct nrf_sockaddr     * p_remote,
                          lwm2m_client_identity_t * p_id,
-                         coap_transport_handle_t   transport);
+                         coap_transport_handle_t   transport,
+                         lwm2m_string_t          * p_payload);
 
 /**@brief Register with a remote LWM2M server.
  *

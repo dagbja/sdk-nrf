@@ -70,10 +70,10 @@ uint32_t internal_lwm2m_bootstrap_init(void)
     return 0;
 }
 
-
 uint32_t lwm2m_bootstrap(struct nrf_sockaddr     * p_remote,
                          lwm2m_client_identity_t * p_id,
-                         coap_transport_handle_t   transport)
+                         coap_transport_handle_t   transport,
+                         lwm2m_string_t          * p_payload)
 {
     LWM2M_ENTRY();
 
@@ -110,6 +110,14 @@ uint32_t lwm2m_bootstrap(struct nrf_sockaddr     * p_remote,
                                             endpoint.len); // end_point length is always 2
     }
 
+    if (p_payload && (err_code == 0))
+    {
+        // Set content format.
+        err_code = coap_message_opt_uint_add(p_msg,
+                                             COAP_OPT_CONTENT_FORMAT,
+                                             COAP_CT_APP_OCTET_STREAM);
+    }
+
     if (err_code == 0)
     {
         char buffer[128];
@@ -122,6 +130,13 @@ uint32_t lwm2m_bootstrap(struct nrf_sockaddr     * p_remote,
                                             COAP_OPT_URI_QUERY,
                                             (uint8_t *)buffer,
                                             p_id->len + 3);
+    }
+
+    if (p_payload && (err_code == 0))
+    {
+        err_code = coap_message_payload_set(p_msg,
+                                            p_payload->p_val,
+                                            p_payload->len);
     }
 
     if (err_code == 0)
