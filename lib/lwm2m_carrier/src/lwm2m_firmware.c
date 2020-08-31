@@ -85,6 +85,16 @@ uint8_t lwm2m_firmware_state_get(uint16_t instance_id)
 
 void lwm2m_firmware_state_set(uint16_t instance_id, uint8_t value)
 {
+#ifdef CONFIG_NRF_LWM2M_ENABLE_LOGS
+    static const char * const state[] = {
+        [LWM2M_FIRMWARE_STATE_IDLE] = "idle",
+        [LWM2M_FIRMWARE_STATE_DOWNLOADING] = "downloading",
+        [LWM2M_FIRMWARE_STATE_DOWNLOADED] = "downloaded",
+        [LWM2M_FIRMWARE_STATE_UPDATING] = "updating",
+    };
+    LWM2M_INF("Firmware state: %s", state[value]);
+#endif
+
     if (m_instance_firmware.state != value)
     {
         m_instance_firmware.state  = value;
@@ -98,6 +108,22 @@ uint8_t lwm2m_firmware_update_result_get(uint16_t instance_id)
 
 void lwm2m_firmware_update_result_set(uint16_t instance_id, uint8_t value)
 {
+#ifdef CONFIG_NRF_LWM2M_ENABLE_LOGS
+    static const char * const result[] = {
+        [LWM2M_FIRMWARE_UPDATE_RESULT_DEFAULT] = "default",
+        [LWM2M_FIRMWARE_UPDATE_RESULT_SUCCESS] = "success",
+        [LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_STORAGE] = "error storage",
+        [LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_MEMORY] = "error memory",
+        [LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CONN_LOST] = "error conn lost",
+        [LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_CRC] = "error crc",
+        [LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_UNSUPPORTED_PKG_TYPE] = "error unsupported pkg type",
+        [LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_INVALID_URI] = "error invalid uri",
+        [LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_FIRMWARE_UPDATE_FAILED] = "error firmware update failed",
+        [LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_UNSUPPORTED_PROTOCOL] = "error unsupported protocol",
+    };
+    LWM2M_INF("Firmware update result: %s", result[value]);
+#endif
+
     if (m_instance_firmware.update_result != value)
     {
         m_instance_firmware.update_result  = value;
