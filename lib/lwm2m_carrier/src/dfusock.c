@@ -182,6 +182,8 @@ int dfusock_close(void)
 
 	dfusock = -1;
 
+	LWM2M_INF("DFU socket closed");
+
 	return err;
 }
 
@@ -199,6 +201,8 @@ int dfusock_init(void)
 			  -lwm2m_os_errno());
 		return -1;
 	}
+
+	LWM2M_INF("DFU socket open");
 
 	return 0;
 }
