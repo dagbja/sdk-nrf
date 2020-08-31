@@ -607,6 +607,32 @@ uint32_t lwm2m_respond_with_payload(uint8_t             * p_payload,
                                     coap_content_type_t   content_type,
                                     coap_message_t      * p_request);
 
+/**
+ * @brief Prepare a CoAP response to an incoming CoAP request.
+ *
+ * @param pp_rsp The response message.
+ * @param p_req  The request message.
+ * @return uint32_t 0 on success, an error code otherwise.
+ */
+uint32_t lwm2m_coap_rsp_new(coap_message_t **pp_rsp, coap_message_t *p_req);
+
+/**
+ * @brief Send a CoAP response message with a given response code.
+ *
+ * @param p_rsp The response message.
+ * @param code  The response code to use.
+ * @return uint32_t 0 on success, an error code otherwise.
+ */
+uint32_t lwm2m_coap_rsp_send_with_code(coap_message_t *p_rsp, coap_msg_code_t code);
+
+/**
+ * @brief Send a CoAP response message.
+ *
+ * @param p_rsp The response message to send.
+ * @return uint32_t 0 on success, an error code otherwise.
+ */
+uint32_t lwm2m_coap_rsp_send(coap_message_t *p_rsp);
+
 /**@brief Send CoAP response with a given CoAP message code.
  *
  * @param  [in] code      CoAP response code to send.

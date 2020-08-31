@@ -25,15 +25,6 @@ config NRF_LWM2M_CARRIER_INCLUDE_DEBUG_INFORMATION
 	bool "Include debug information in the output library"
 	depends on NRF_LWM2M_CARRIER_STANDALONE_LIBRARY
 
-config NRF_LWM2M_CARRIER_ERASE_TIMEOUT_S
-	int "Modem patch erase timeout [s]"
-	default 45
-	help
-	  Based on the level of activity on the network, the modem might be unable
-	  to erase the firmware patch in flash. This value is used as a timeout,
-	  after which the library will inform the application that
-	  the link will be turned off to continue.
-
 config NRF_LWM2M_CARRIER_SEC_TAG
 	int "TLS security tag for Firmware downloads"
 	default 11

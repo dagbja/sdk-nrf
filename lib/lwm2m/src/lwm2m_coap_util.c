@@ -129,29 +129,58 @@ uint32_t lwm2m_coap_message_send_to_remote(coap_message_t      * p_message,
     return 0;
 }
 
+uint32_t lwm2m_coap_rsp_new(coap_message_t **pp_rsp, coap_message_t *p_req)
+{
+    uint32_t err;
+    coap_message_conf_t config;
+
+    lwm2m_coap_message_config_set(p_req, true, &config);
+
+    err = coap_message_new(pp_rsp, &config);
+    if (err) {
+        return err;
+    }
+
+    coap_message_remote_addr_set(*pp_rsp, p_req->remote);
+
+    return 0;
+}
+
+uint32_t lwm2m_coap_rsp_send(coap_message_t *p_rsp)
+{
+    uint32_t err;
+    uint32_t msg_handle;
+
+    err = coap_message_send(&msg_handle, p_rsp);
+    if (err) {
+        return err;
+    }
+
+    coap_message_delete(p_rsp);
+
+    return 0;
+}
+
+uint32_t lwm2m_coap_rsp_send_with_code(coap_message_t *p_rsp, coap_msg_code_t code)
+{
+    p_rsp->header.code = code;
+
+    return lwm2m_coap_rsp_send(p_rsp);
+}
+
 uint32_t lwm2m_respond_with_code(coap_msg_code_t code, coap_message_t * p_request)
 {
     NULL_PARAM_CHECK(p_request);
 
-    // Application helper function, no need for mutex.
-    coap_message_conf_t config;
-    uint32_t err_code;
+    uint32_t err;
     coap_message_t *p_response;
 
-    err_code = lwm2m_coap_message_config_set(p_request, true, &config);
-
-    // Set the response code.
-    config.code = code;
-
-    err_code = coap_message_new(&p_response, &config);
-    if (err_code != 0)
-    {
-        return err_code;
+    err = lwm2m_coap_rsp_new(&p_response, p_request);
+    if (err) {
+        return err;
     }
 
-    err_code = lwm2m_coap_message_send_to_remote(p_response, p_request->remote, NULL, 0);
-
-    return err_code;
+    return lwm2m_coap_rsp_send_with_code(p_response, code);
 }
 
 uint32_t lwm2m_observe_register(const uint16_t   * p_path,

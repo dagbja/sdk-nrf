@@ -6,6 +6,8 @@
 
 #include <stddef.h>
 #include <lwm2m_objects.h>
+#include <coap_message.h>
+#include <coap_block.h>
 
 /* Shorter definitions for firmware resource values */
 
@@ -26,6 +28,10 @@
 #define RESULT_ERROR_UNSUP_PROTO	LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_UNSUPPORTED_PROTOCOL
 
 int lwm2m_firmware_download_init(void);
+int lwm2m_firmware_download_resume(void);
 int lwm2m_firmware_download_uri(char *uri, size_t len);
 int lwm2m_firmware_download_apply(void);
-void lwm2m_firmware_download_reboot_schedule(void);
+void lwm2m_firmware_download_reboot_schedule(int timeout);
+
+int lwm2m_firmware_download_inband(const coap_message_t *req, coap_message_t *rsp,
+				   coap_block_opt_block1_t *block1);

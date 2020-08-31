@@ -23,12 +23,13 @@ extern "C" {
 #endif
 
 #if defined(CONFIG_NRF_LWM2M_ENABLE_LOGS)
-#define LWM2M_DUMP(...) lwm2m_os_logdump(__VA_ARGS__)
+#define LWM2M_HEX(MSG, DATA, LEN) lwm2m_os_logdump(MSG, DATA, LEN)
 #define LWM2M_TRC(...) lwm2m_os_log(LWM2M_LOG_LEVEL_TRC, __VA_ARGS__) /**< Used for getting trace of execution in the module. */
 #define LWM2M_INF(...) lwm2m_os_log(LWM2M_LOG_LEVEL_INF, __VA_ARGS__) /**< Used for logging informations in the module. */
 #define LWM2M_WRN(...) lwm2m_os_log(LWM2M_LOG_LEVEL_WRN, __VA_ARGS__) /**< Used for logging warnings in the module. */
 #define LWM2M_ERR(...) lwm2m_os_log(LWM2M_LOG_LEVEL_ERR, __VA_ARGS__) /**< Used for logging errors in the module. */
 #else // defined(CONFIG_NRF_LWM2M_ENABLE_LOGS)
+#define LWM2M_HEX(...)
 #define LWM2M_TRC(...)
 #define LWM2M_INF(...)
 #define LWM2M_WRN(...)

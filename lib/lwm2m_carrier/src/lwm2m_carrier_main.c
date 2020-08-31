@@ -1971,7 +1971,6 @@ static void app_lwm2m_create_objects(void)
     lwm2m_device_init();
     lwm2m_conn_mon_init();
     lwm2m_firmware_init();
-    lwm2m_firmware_download_init();
     lwm2m_conn_stat_init();
     lwm2m_apn_conn_prof_init();
     lwm2m_portfolio_init();
@@ -3205,6 +3204,13 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
 
     (void)app_event_notify(LWM2M_CARRIER_EVENT_BSDLIB_INIT, NULL);
 
+    // Initialize DFU socket and firmware download.
+    // This will erase old firmware as necessary, so do it before connecting.
+    err = lwm2m_firmware_download_init();
+    if (err) {
+        return err;
+    }
+
     // Initialize AT interface
     err = at_if_init();
     if (err) {
@@ -3268,6 +3274,10 @@ int lwm2m_carrier_init(const lwm2m_carrier_config_t * config)
             m_family_type[i] = NRF_AF_INET;
         }
     }
+
+    // Resume modem firmware updates if necessary
+    // Do this when we have a connection.
+    lwm2m_firmware_download_resume();
 
     return 0;
 }

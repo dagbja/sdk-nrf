@@ -280,7 +280,7 @@ void lwm2m_os_log(int level, const char *fmt, ...)
 	}
 }
 
-void lwm2m_os_logdump(const char *data, size_t len, const char *str) {
+void lwm2m_os_logdump(const char *str, const void *data, size_t len) {
 	if (IS_ENABLED(CONFIG_LOG)) {
 		int level = LOG_LEVEL_INF;
 		struct log_msg_ids src_level = {
@@ -575,7 +575,6 @@ int lwm2m_os_download_connect(const char *host,
 	struct download_client_cfg config = {
 		.sec_tag = cfg->sec_tag,
 		.apn = cfg->apn,
-		.port = cfg->port,
 	};
 
 	return download_client_connect(&http_downloader, host, &config);

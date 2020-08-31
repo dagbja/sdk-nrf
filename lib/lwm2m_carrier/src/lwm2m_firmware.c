@@ -10,6 +10,8 @@
 #include <lwm2m_objects.h>
 #include <lwm2m_access_control.h>
 #include <lwm2m_firmware.h>
+#include <lwm2m_firmware_download.h>
+#include <lwm2m_instance_storage.h>
 #include <lwm2m_objects_tlv.h>
 #include <lwm2m_objects_plain_text.h>
 #include <lwm2m_observer.h>
@@ -18,12 +20,14 @@
 #include <operator_check.h>
 #include <lwm2m_server.h>
 
+#include <coap_codes.h>
 #include <coap_option.h>
 #include <coap_observe_api.h>
 #include <coap_message.h>
+#include <coap_block.h>
 
-#include <lwm2m_firmware_download.h>
 #include <app_debug.h>
+#include <dfusock.h>
 
 static lwm2m_object_t   m_object_firmware;
 static lwm2m_firmware_t m_instance_firmware;
@@ -61,21 +65,28 @@ uint32_t lwm2m_firmware_tlv_callback(uint16_t instance_id, lwm2m_tlv_t *tlv)
      * It is not possible to do this directly in the instance callback
      * because it is delivered with a resource ID = LWM2M_OBJECT_INSTANCE.
     */
-
     switch (tlv->id) {
+
+    case LWM2M_FIRMWARE_PACKAGE:
+        if (tlv->length != 0) {
+            return ENOTSUP;
+        }
+        /* Firmware is already deleted */
+        LWM2M_TRC("Deleting firmware...");
+        return 0;
+
     case LWM2M_FIRMWARE_PACKAGE_URI:
         /* Any errors in the URI are reported via a LwM2M resource
          * by lwm2m_firmare_download.
          */
         lwm2m_firmware_download_uri(m_instance_firmware.package_uri.p_val,
                                     m_instance_firmware.package_uri.len);
-        break;
+
+        return 0;
 
     default:
         return ENOTSUP;
     }
-
-    return 0;
 }
 
 uint8_t lwm2m_firmware_state_get(uint16_t instance_id)
@@ -92,7 +103,7 @@ void lwm2m_firmware_state_set(uint16_t instance_id, uint8_t value)
         [LWM2M_FIRMWARE_STATE_DOWNLOADED] = "downloaded",
         [LWM2M_FIRMWARE_STATE_UPDATING] = "updating",
     };
-    LWM2M_INF("Firmware state: %s", state[value]);
+    LWM2M_INF("Firmware state -> %s", state[value]);
 #endif
 
     if (m_instance_firmware.state != value)
@@ -121,7 +132,7 @@ void lwm2m_firmware_update_result_set(uint16_t instance_id, uint8_t value)
         [LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_FIRMWARE_UPDATE_FAILED] = "error firmware update failed",
         [LWM2M_FIRMWARE_UPDATE_RESULT_ERROR_UNSUPPORTED_PROTOCOL] = "error unsupported protocol",
     };
-    LWM2M_INF("Firmware update result: %s", result[value]);
+    LWM2M_INF("Firmware update result -> %s", result[value]);
 #endif
 
     if (m_instance_firmware.update_result != value)
@@ -162,6 +173,30 @@ lwm2m_firmware_t * lwm2m_firmware_get_instance(uint16_t instance_id)
 lwm2m_object_t * lwm2m_firmware_get_object(void)
 {
     return &m_object_firmware;
+}
+
+static int coap_block1_get(coap_block_opt_block1_t *p_block1,
+                            coap_message_t *p_req)
+{
+    uint32_t opt;
+
+    for (size_t i = 0; i < p_req->options_count; i++) {
+        if (p_req->options[i].number == COAP_OPT_BLOCK1) {
+            coap_opt_uint_decode(&opt,
+                         p_req->options[i].length,
+                         p_req->options[i].data);
+
+            coap_block_opt_block1_decode(p_block1, opt);
+
+            LWM2M_INF("CoAP Block1: %d, sz %d, more %s",
+                  p_block1->number, p_block1->size,
+                  p_block1->more ? "y" : "n");
+
+            return 0;
+        }
+    }
+
+    return 1;
 }
 
 static void on_read(const uint16_t path[3], uint8_t path_len,
@@ -304,60 +339,77 @@ static void on_write(const uint16_t path[3], uint8_t path_len,
                      coap_message_t *p_req)
 {
     uint32_t err;
+    uint32_t opt;
     uint32_t mask;
+    coap_message_t *p_rsp;
+    coap_block_opt_block1_t block1;
 
     const uint16_t res = path[2];
 
+    err = lwm2m_coap_rsp_new(&p_rsp, p_req);
+    if (err) {
+        return;
+    }
+
     err = coap_message_ct_mask_get(p_req, &mask);
     if (err) {
-        lwm2m_respond_with_code(COAP_CODE_400_BAD_REQUEST, p_req);
+        lwm2m_coap_rsp_send_with_code(p_rsp, COAP_CODE_400_BAD_REQUEST);
         return;
     }
 
     if (mask & COAP_CT_MASK_APP_LWM2M_TLV) {
-        /* Decode TLV payload */
-        err = lwm2m_tlv_firmware_decode(&m_instance_firmware,
-                                        p_req->payload,
-                                        p_req->payload_len,
-                                        lwm2m_firmware_tlv_callback);
-        /* Download is triggered in the TLV callback */
+        err = coap_block1_get(&block1, p_req);
+        if (err) {
+            /* No block1 option, treat as a simple TLV write */
+            err = lwm2m_tlv_firmware_decode(&m_instance_firmware,
+                p_req->payload, p_req->payload_len, lwm2m_firmware_tlv_callback);
+
+            lwm2m_coap_rsp_send_with_code(p_rsp, err ?
+                COAP_CODE_404_NOT_FOUND : COAP_CODE_204_CHANGED);
+            return;
+        }
+
+        /* Process fragment and fill in response code */
+        lwm2m_firmware_download_inband(p_req, p_rsp, &block1);
+
+        coap_block_opt_block1_encode(&opt, &block1);
+        coap_message_opt_uint_add(p_rsp, COAP_OPT_BLOCK1, opt);
+
+        lwm2m_coap_rsp_send(p_rsp);
+        return;
 
     } else if ((mask & COAP_CT_MASK_PLAIN_TEXT) ||
                (mask & COAP_CT_MASK_APP_OCTET_STREAM)) {
-        /* Decode plaintext / octect stream payload */
         err = lwm2m_plain_text_firmware_decode(&m_instance_firmware,
                                                res, p_req->payload,
                                                p_req->payload_len);
 
         /* Trigger the download here in case of plaintext payload */
         if (!err && res == LWM2M_FIRMWARE_PACKAGE_URI) {
+            p_rsp->header.code = COAP_CODE_204_CHANGED;
             /* We have been able to decode the payload.
              * Any errors in the actual URI are reported via
              * the LwM2M resource by lwm2m_firmware_download.
              */
             lwm2m_firmware_download_uri(m_instance_firmware.package_uri.p_val,
                                         m_instance_firmware.package_uri.len);
+        } else {
+            /* Failed to decode or to process the payload.
+             * We attempted to decode a resource and failed because
+             * - memory contraints or
+             * - the payload contained unexpected data
+             */
+            p_rsp->header.code =
+                (err == ENOTSUP) ? COAP_CODE_404_NOT_FOUND :
+                                   COAP_CODE_400_BAD_REQUEST;
         }
-    } else {
-        lwm2m_respond_with_code(COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT,
-                                p_req);
+
+        lwm2m_coap_rsp_send(p_rsp);
         return;
     }
 
-    if (err) {
-        /* Failed to decode or to process the payload.
-         * We attempted to decode a resource and failed because
-         * - memory contraints or
-         * - the payload contained unexpected data
-         */
-         const coap_msg_code_t code =
-            (err == ENOTSUP) ? COAP_CODE_404_NOT_FOUND :
-                               COAP_CODE_400_BAD_REQUEST;
-        lwm2m_respond_with_code(code, p_req);
-        return;
-    }
-
-    lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_req);
+    lwm2m_coap_rsp_send_with_code(p_rsp, COAP_CODE_415_UNSUPPORTED_CONTENT_FORMAT);
+    return;
 }
 
 static void on_exec(uint16_t res, coap_message_t *p_req)
@@ -366,27 +418,34 @@ static void on_exec(uint16_t res, coap_message_t *p_req)
 
     LWM2M_INF("Exec on /5/0/%d", res);
 
-    switch (res) {
-    case LWM2M_FIRMWARE_UPDATE:
-        /* Respond "Changed" regardless of actual result of operation;
-         * any errors are reported via a dedicated LwM2M resource
-         * by lwm2m_firmware_download.
-         */
-        err = lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_req);
-        if (err) {
-            /* Continue, lwm2m_firmware_download_apply()
-             * will detect and report errors
-             */
-        }
+    if (res != LWM2M_FIRMWARE_UPDATE ) {
+        lwm2m_respond_with_code(COAP_CODE_405_METHOD_NOT_ALLOWED, p_req);
+    }
 
-        err = lwm2m_firmware_download_apply();
-        if (err) {
-            LWM2M_ERR("Failed to schedule update, err %d", err);
-            break;
-        }
+    /* Respond "Changed" regardless of actual result of operation;
+     * any errors are reported via a dedicated LwM2M resource
+     * by lwm2m_firmware_download.
+     */
+    err = lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_req);
+    if (err) {
+        /* Continue, lwm2m_firmware_download_apply()
+        * will detect and report errors
+        */
+    }
 
-        lwm2m_firmware_download_reboot_schedule();
-        break;
+    err = lwm2m_firmware_download_apply();
+    if (err) {
+        LWM2M_ERR("Failed to schedule update, err %d", err);
+        return;
+    }
+
+    /* Verizon will send an observe request on /5/0/3 after
+     * executing /5/0/2, so wait a bit a for it before rebooting.
+     */
+    if (operator_is_vzw(true)) {
+        lwm2m_firmware_download_reboot_schedule(SECONDS(6));
+    } else {
+        lwm2m_firmware_download_reboot_schedule(NO_WAIT);
     }
 }
 
@@ -419,7 +478,7 @@ uint32_t firmware_instance_callback(lwm2m_instance_t *p_instance,
         resource_id
     };
 
-    err_code = lwm2m_access_control_access_remote_get(&access, 
+    err_code = lwm2m_access_control_access_remote_get(&access,
                                                       p_instance->object_id,
                                                       p_instance->instance_id,
                                                       p_request->remote);
@@ -589,18 +648,22 @@ void lwm2m_firmware_init(void)
 
     lwm2m_instance_firmware_init(&m_instance_firmware);
 
-    // Setup of package download state.
-    lwm2m_firmware_state_set(0, LWM2M_FIRMWARE_STATE_IDLE);
-
-    // Setup of update result status.
-    lwm2m_firmware_update_result_set(0, LWM2M_FIRMWARE_UPDATE_RESULT_DEFAULT);
+    // Do not set the update result or the state.
+    // That's set by lwm2m_firmware_download.
 
     // Setup default list of delivery protocols supported. For now HTTP only.
-    uint8_t list[] = {LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT_HTTPS};
+    uint8_t list[] = {
+#ifdef CONFIG_COAP
+        LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT_COAPS,
+#endif
+        LWM2M_FIRMWARE_FIRMWARE_UPDATE_PROTOCOL_SUPPORT_HTTPS,
+    };
+
     lwm2m_firmware_firmware_update_protocol_support_set(0, list, sizeof(list));
 
     // Setup default delivery method.
-    lwm2m_firmware_firmware_delivery_method_set(0, LWM2M_FIRMWARE_FIRMWARE_UPDATE_DELIVERY_METHOD_PULL_ONLY);
+    lwm2m_firmware_firmware_delivery_method_set(0,
+        LWM2M_FIRMWARE_FIRMWARE_UPDATE_DELIVERY_METHOD_PUSH_AND_PULL);
 
     (void)lwm2m_coap_handler_instance_add((lwm2m_instance_t *)&m_instance_firmware);
 }

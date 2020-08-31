@@ -163,6 +163,10 @@ typedef struct {
  *       parameters are valid throughout the application lifetime
  *       (i. e. placed in static memory or in flash).
  *
+ * @note The first time this function is called after a modem firmware update,
+ *       (FOTA) it may take several seconds to return in order to complete
+ *       the procedure.
+ *
  * @return 0 on success, negative error code on error.
  */
 int lwm2m_carrier_init(const lwm2m_carrier_config_t *config);

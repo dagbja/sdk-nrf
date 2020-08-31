@@ -20,7 +20,7 @@
 /**
  * @brief Maximum number of timers that the system must support.
  */
-#define LWM2M_OS_MAX_TIMER_COUNT 8
+#define LWM2M_OS_MAX_TIMER_COUNT 10
 
 #define LWM2M_LOG_LEVEL_NONE 0
 #define LWM2M_LOG_LEVEL_ERR 1
@@ -187,7 +187,14 @@ const char *lwm2m_os_log_strdup(const char *str);
  */
 void lwm2m_os_log(int level, const char *fmt, ...);
 
-void lwm2m_os_logdump(const char *data, size_t len, const char *str);
+/**
+ * @brief Print a data dump via logger.
+ *
+ * @param msg  Log message.
+ * @param data Data to dump.
+ * @param len  Data length.
+ */
+void lwm2m_os_logdump(const char *msg, const void *data, size_t len);
 
 /**
  * @brief Initialize BSD library.

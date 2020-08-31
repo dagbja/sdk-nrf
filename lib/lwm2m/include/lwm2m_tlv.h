@@ -66,6 +66,14 @@ typedef struct
  */
 typedef uint32_t (* lwm2m_tlv_callback_t)(uint16_t instance_id, lwm2m_tlv_t * p_tlv);
 
+/**
+ * @brief Retrieve TLV header size in bytes.
+ *
+ * @param p_buffer TLV data
+ * @return uint32_t TLV header size, in bytes.
+ */
+uint32_t lwm2m_tlv_header_size_get(uint8_t * p_buffer);
+
 /**@brief Decode a LWM2M TLV byte buffer into a TLV structure.
  *
  * @param[out]   p_tlv        This struct will be filled with id, length, type and pointer to value.

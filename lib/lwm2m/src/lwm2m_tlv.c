@@ -461,6 +461,14 @@ uint32_t lwm2m_tlv_list_encode(uint8_t            * p_buffer,
     return err_code;
 }
 
+uint32_t lwm2m_tlv_header_size_get(uint8_t * p_buffer)
+{
+    const uint8_t id_len       = (*p_buffer & TLV_ID_LEN_MASK) >> TLV_ID_LEN_BIT_POS;
+    const uint8_t length_len   = (*p_buffer & TLV_LEN_TYPE_MASK) >> TLV_LEN_TYPE_BIT_POS;
+    const uint8_t id_len_bytes = id_len + 1;
+
+    return id_len_bytes + length_len + 1 /* type */;
+}
 
 uint32_t lwm2m_tlv_decode(lwm2m_tlv_t * p_tlv,
                           uint32_t    * p_index,

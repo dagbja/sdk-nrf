@@ -69,8 +69,10 @@ int lwm2m_last_firmware_version_set(uint8_t *ver, size_t len);
 enum lwm2m_firmware_image_state {
 	/* No valid firmware image, or invalid firmware image */
 	FIRMWARE_NONE,
-	/* Firmware is downloading */
-	FIRMWARE_DOWNLOADING,
+	/* Firmware is downloading (PULL) */
+	FIRMWARE_DOWNLOADING_PULL,
+	/* Firmware is downloading (PUSH) */
+	FIRMWARE_DOWNLOADING_PUSH,
 	/* Firmware has been downloaded */
 	FIRMWARE_READY,
 	/* Force enum size to int */
