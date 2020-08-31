@@ -761,18 +761,10 @@ void lwm2m_device_init(void)
     m_instance_device.firmware_version.len = sizeof(nrf_dfu_fw_version_t);
     m_instance_device.firmware_version.p_val = lwm2m_malloc(m_instance_device.firmware_version.len);
 
-    int err = dfusock_init();
-    if (err)
-    {
-        return;
-    }
-
-    err = dfusock_version_get(m_instance_device.firmware_version.p_val,
-                              m_instance_device.firmware_version.len);
-    if (err)
-    {
-        return;
-    }
+    dfusock_init();
+    dfusock_version_get(m_instance_device.firmware_version.p_val,
+                        m_instance_device.firmware_version.len);
+    dfusock_close();
 
     // Declaration of default resource values.
     uint8_t power_sources[] = { LWM2M_CARRIER_POWER_SOURCE_DC };
