@@ -6,6 +6,7 @@
 
 #include <lwm2m_os.h>
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <zephyr.h>
@@ -276,6 +277,18 @@ void lwm2m_os_log(int level, const char *fmt, ...)
 		va_start(ap, fmt);
 		log_generic(src_level, fmt, ap, LOG_STRDUP_SKIP);
 		va_end(ap);
+	}
+}
+
+void lwm2m_os_logdump(const char *data, size_t len, const char *str) {
+	if (IS_ENABLED(CONFIG_LOG)) {
+		int level = LOG_LEVEL_INF;
+		struct log_msg_ids src_level = {
+			.level = log_level_lut[level],
+			.domain_id = CONFIG_LOG_DOMAIN_ID,
+			.source_id = LOG_CURRENT_MODULE_ID()
+		};
+		log_hexdump(str, data, len, src_level);
 	}
 }
 

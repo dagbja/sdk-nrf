@@ -187,6 +187,8 @@ const char *lwm2m_os_log_strdup(const char *str);
  */
 void lwm2m_os_log(int level, const char *fmt, ...);
 
+void lwm2m_os_logdump(const char *data, size_t len, const char *str);
+
 /**
  * @brief Initialize BSD library.
  *
