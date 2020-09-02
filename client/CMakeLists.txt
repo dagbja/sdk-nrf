@@ -32,6 +32,8 @@ execute_process(
 include($ENV{ZEPHYR_BASE}/cmake/app/boilerplate.cmake NO_POLICY_SCOPE)
 project(NONE)
 
+zephyr_cc_option(-Werror)
+
 target_sources(app PRIVATE src/client_leds.c)
 target_sources(app PRIVATE src/client_shell.c)
 target_sources(app PRIVATE src/modem_logging.c)
