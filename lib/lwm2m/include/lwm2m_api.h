@@ -383,6 +383,8 @@ uint32_t lwm2m_bootstrap(struct nrf_sockaddr     * p_remote,
  * @param[in] p_link_format_string Pointer to a link format encoded string to send in the
  *                                 register request.
  * @param[in] link_format_len      Length of the link format string provided.
+ * @param[in] p_options            Pointer to list of options to include.
+ * @param[in] num_options          Number of options to include.
  *
  * @retval NRF_SUCCESS If registration request to the LWM2M server was sent out successfully.
  */
@@ -391,7 +393,9 @@ uint32_t lwm2m_register(struct nrf_sockaddr     * p_remote,
                         lwm2m_server_config_t   * p_config,
                         coap_transport_handle_t   transport,
                         uint8_t                 * p_link_format_string,
-                        uint16_t                  link_format_len);
+                        uint16_t                  link_format_len,
+                        coap_option_t           * p_options,
+                        uint8_t                   num_options);
 
 /**@brief Update a registration with a remote server.
  *

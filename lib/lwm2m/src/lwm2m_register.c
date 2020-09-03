@@ -198,7 +198,9 @@ uint32_t lwm2m_register(struct nrf_sockaddr     * p_remote,
                         lwm2m_server_config_t   * p_config,
                         coap_transport_handle_t   transport,
                         uint8_t                 * p_link_format_string,
-                        uint16_t                  link_format_len)
+                        uint16_t                  link_format_len,
+                        coap_option_t           * p_options,
+                        uint8_t                   num_options)
 {
     LWM2M_ENTRY();
 
@@ -212,6 +214,7 @@ uint32_t lwm2m_register(struct nrf_sockaddr     * p_remote,
     uint32_t         err_code;
     coap_message_t * p_msg;
     char             buffer[128];
+    uint8_t          i;
 
     lwm2m_string_t uri_path;
 
@@ -266,6 +269,48 @@ uint32_t lwm2m_register(struct nrf_sockaddr     * p_remote,
     if (err_code == 0)
     {
         err_code = internal_server_config_set(p_msg, p_config);
+    }
+
+    if (!p_options)
+    {
+        num_options = 0;
+    }
+
+    for (i = 0; i < num_options; ++i)
+    {
+        if (err_code == 0)
+        {
+            switch (p_options[i].type)
+            {
+            case COAP_OPT_TYPE_EMPTY:
+                err_code = coap_message_opt_empty_add(p_msg,
+                           p_options[i].number);
+                break;
+
+            case COAP_OPT_TYPE_UINT:
+                err_code = coap_message_opt_uint_add(p_msg,
+                           p_options[i].number,
+                           p_options[i].data[0]);
+                break;
+
+            case COAP_OPT_TYPE_STRING:
+                err_code = coap_message_opt_str_add(p_msg,
+                           p_options[i].number,
+                           p_options[i].data,
+                           p_options[i].length);
+                break;
+
+            case COAP_OPT_TYPE_OPAQUE:
+                err_code = coap_message_opt_opaque_add(p_msg,
+                           p_options[i].number,
+                           p_options[i].data,
+                           p_options[i].length);
+                break;
+
+            default:
+                break;
+           }
+        }
     }
 
     if (err_code == 0)
