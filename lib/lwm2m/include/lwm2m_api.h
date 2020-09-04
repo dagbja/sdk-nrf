@@ -80,15 +80,34 @@ typedef enum
     LWM2M_NOTIFCATION_TYPE_DEREGISTER /**< Notification from a deregister request. */
 } lwm2m_notification_type_t;
 
-/**@brief LWM2M server configuration type. */
+/**@brief Enumeration of CoAP option types. */
+typedef enum {
+	COAP_OPT_TYPE_EMPTY = 0, /**< Empty option type. */
+	COAP_OPT_TYPE_UINT,      /**< UINT option type (2 or 4 bytes). */
+	COAP_OPT_TYPE_STRING,    /**< String option type. */
+	COAP_OPT_TYPE_OPAQUE     /**< Opaque type. */
+} coap_option_type_t;
+
+/**@brief Structure to hold a CoAP option, including type. */
+typedef struct {
+	coap_option_t      coap_opts; /**< Regular option values. */
+	coap_option_type_t type;      /**< Option type. */
+} coap_option_with_type_t;
+
+/**@brief LWM2M server configuration type. 
+ * @note: Option numbers must be in ascending order.
+ * @note: Vendor-specific option numbers must be >= 2048.
+ */
 typedef struct
 {
-    uint32_t       lifetime;            /**< Lifetime parameter. */
-    lwm2m_string_t msisdn;              /**< SMS number MSISDN. */
-    uint8_t        lwm2m_version_major; /**< LWM2M major version number. */
-    uint8_t        lwm2m_version_minor; /**< LWM2M minor version number. */
-    uint16_t       short_server_id;     /**< Short server id. */
-    lwm2m_string_t binding;             /**< Binding mode. LWM2M section 5.3.1.1. */
+    uint32_t                 lifetime;            /**< Lifetime parameter. */
+    lwm2m_string_t           msisdn;              /**< SMS number MSISDN. */
+    uint8_t                  lwm2m_version_major; /**< LWM2M major version number. */
+    uint8_t                  lwm2m_version_minor; /**< LWM2M minor version number. */
+    uint16_t                 short_server_id;     /**< Short server id. */
+    lwm2m_string_t           binding;             /**< Binding mode. LWM2M section 5.3.1.1. */
+    coap_option_with_type_t* p_options;           /**< Pointer to list of options to include. */
+    uint8_t                  num_options;         /**< Number of options to include. */
 } lwm2m_server_config_t;
 
 /**@brief LWM2M client identity types. */

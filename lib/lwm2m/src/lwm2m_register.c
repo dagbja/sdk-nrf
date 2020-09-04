@@ -136,6 +136,64 @@ static uint32_t internal_server_config_set(coap_message_t * msg, lwm2m_server_co
     return err_code;
 }
 
+static uint32_t add_vendor_options(coap_message_t          * p_msg,
+                                   coap_option_with_type_t * p_options,
+                                   uint8_t                   num_options)
+{
+    uint32_t err_code = 0;
+    uint16_t last_opt_num = 0;
+
+    if ((p_msg == NULL) ||
+        ((p_options == NULL) && (num_options > 0)))
+    {
+        return EINVAL;
+    }
+
+    for (int i = 0; i < num_options; ++i)
+    {
+        if (err_code == 0)
+        {
+            if (p_options[i].coap_opts.number < last_opt_num) {
+                LWM2M_ERR("vendor_options out of sequence");
+                return EINVAL;
+            }
+            last_opt_num = p_options[i].coap_opts.number;
+
+            switch (p_options[i].type)
+            {
+            case COAP_OPT_TYPE_EMPTY:
+                err_code = coap_message_opt_empty_add(p_msg,
+                    p_options[i].coap_opts.number);
+                break;
+
+            case COAP_OPT_TYPE_UINT:
+                err_code = coap_message_opt_uint_add(p_msg,
+                    p_options[i].coap_opts.number,
+                    p_options[i].coap_opts.data[0]);
+                break;
+
+            case COAP_OPT_TYPE_STRING:
+                err_code = coap_message_opt_str_add(p_msg,
+                    p_options[i].coap_opts.number,
+                    p_options[i].coap_opts.data,
+                    p_options[i].coap_opts.length);
+                break;
+
+            case COAP_OPT_TYPE_OPAQUE:
+                err_code = coap_message_opt_opaque_add(p_msg,
+                    p_options[i].coap_opts.number,
+                    p_options[i].coap_opts.data,
+                    p_options[i].coap_opts.length);
+                break;
+
+            default:
+                break;
+            }
+        }
+    }
+
+    return err_code;
+}
 
 uint32_t internal_lwm2m_register_init(void)
 {
@@ -212,8 +270,7 @@ uint32_t lwm2m_register(struct nrf_sockaddr     * p_remote,
     uint32_t         err_code;
     coap_message_t * p_msg;
     char             buffer[128];
-
-    lwm2m_string_t uri_path;
+    lwm2m_string_t   uri_path;
 
     uri_path.p_val = LWM2M_REGISTER_URI_PATH;
     uri_path.len   = 2;
@@ -266,6 +323,12 @@ uint32_t lwm2m_register(struct nrf_sockaddr     * p_remote,
     if (err_code == 0)
     {
         err_code = internal_server_config_set(p_msg, p_config);
+    }
+
+    if (err_code == 0)
+    {
+        // Add vendor-specific options
+        err_code = add_vendor_options(p_msg, p_config->p_options, p_config->num_options);
     }
 
     if (err_code == 0)
@@ -331,8 +394,7 @@ uint32_t lwm2m_update(struct nrf_sockaddr     * p_remote,
 
     uint32_t         err_code;
     coap_message_t * p_msg;
-
-    lwm2m_string_t uri_path;
+    lwm2m_string_t   uri_path;
 
     uri_path.p_val = LWM2M_REGISTER_URI_PATH;
     uri_path.len   = 2;
@@ -381,6 +443,12 @@ uint32_t lwm2m_update(struct nrf_sockaddr     * p_remote,
     {
         // Sets CoAP queries
         err_code = internal_server_config_set(p_msg, p_config);
+    }
+
+    if (err_code == 0)
+    {
+        // Add vendor-specific options
+        err_code = add_vendor_options(p_msg, p_config->p_options, p_config->num_options);
     }
 
     if (err_code == 0)
