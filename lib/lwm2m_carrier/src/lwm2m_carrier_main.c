@@ -2433,9 +2433,7 @@ static void app_server_register(uint16_t security_instance)
                                   &m_server_conf[security_instance],
                                   m_lwm2m_transport[security_instance],
                                   p_link_format_string,
-                                  (uint16_t)link_format_string_len,
-                                  NULL,
-                                  0);
+                                  (uint16_t)link_format_string_len);
     }
 
     if (p_link_format_string) {

@@ -303,28 +303,18 @@ typedef enum {
 	COAP_TYPE_RST      /**< Reset Message type. */
 } coap_msg_type_t;
 
-/**@brief Enumeration of CoAP option types. */
-typedef enum {
-	COAP_OPT_TYPE_EMPTY = 0, /**< Empty option type. */
-	COAP_OPT_TYPE_UINT,      /**< UINT option type (2 or 4 bytes). */
-	COAP_OPT_TYPE_STRING,    /**< String option type. */
-	COAP_OPT_TYPE_OPAQUE     /**< Opaque type. */
-} coap_option_type_t;
-
 /**@brief Structure to hold a CoAP option. */
 typedef struct {
 	/** Option number (including the extended delta value if any). */
-	uint16_t           number;
+	uint16_t number;
 
 	/** Option length (including the extended length value in any). */
-	uint16_t           length;
+	uint16_t length;
 
 	/** Pointer to the memory where the data of the option is located. */
-	uint8_t           *data;
-
-	/** Option type. */
-	coap_option_type_t type;
+	uint8_t *data;
 } coap_option_t;
+
 
 /**@brief Structure to hold a CoAP message configuration.
  *
