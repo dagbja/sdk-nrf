@@ -270,6 +270,33 @@ static int cmd_server_lifetime(const struct shell *shell, size_t argc, char **ar
 }
 
 
+static int cmd_config_disable_timeout(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 3) {
+        shell_print(shell, "%s <instance> <seconds>", argv[0]);
+        return 0;
+    }
+
+    int instance_id = atoi(argv[1]);
+    lwm2m_time_t timeout = (lwm2m_time_t) atoi(argv[2]);
+
+    if (instance_id < 0 || instance_id >= (1+LWM2M_MAX_SERVERS))
+    {
+        shell_print(shell, "instance must be between 0 and %d", LWM2M_MAX_SERVERS);
+        return 0;
+    }
+
+    if (timeout != lwm2m_server_disable_timeout_get(instance_id)) {
+        lwm2m_server_disable_timeout_set(instance_id, timeout);
+        lwm2m_storage_server_store();
+
+        shell_print(shell, "Set disable timeout %d: %d", instance_id, timeout);
+    }
+
+    return 0;
+}
+
+
 static int cmd_debug_print(const struct shell *shell, size_t argc, char **argv)
 {
     char client_id[LWM2M_CLIENT_ID_TYPE_IMEI_MSISDN+1];
@@ -972,6 +999,30 @@ static int cmd_lwm2m_deregister(const struct shell *shell, size_t argc, char **a
 {
     if (lwm2m_state_get() == LWM2M_STATE_IDLE) {
         lwm2m_request_deregister();
+    } else {
+        shell_print(shell, "Not registered");
+    }
+
+    return 0;
+}
+
+extern void app_server_disable(uint16_t security_instance);
+static int cmd_lwm2m_disable(const struct shell *shell, size_t argc, char **argv)
+{
+    if (argc != 2) {
+        shell_print(shell, "%s <instance>", argv[0]);
+        return 0;
+    }
+
+    uint16_t instance_id = atoi(argv[1]);
+
+    if (instance_id >= (1+LWM2M_MAX_SERVERS)) {
+        shell_print(shell, "instance must be between 0 and %d", LWM2M_MAX_SERVERS);
+        return 0;
+    }
+
+    if (lwm2m_state_get() == LWM2M_STATE_IDLE) {
+        app_server_disable(instance_id);
     } else {
         shell_print(shell, "Not registered");
     }
@@ -2135,6 +2186,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_security,
 );
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_server,
+    SHELL_CMD(disable_timeout, NULL, "Set disable timeout", cmd_config_disable_timeout),
     SHELL_CMD(lifetime, NULL, "Set lifetime", cmd_server_lifetime),
     SHELL_CMD(print, NULL, "Print server objects", cmd_server_print),
     SHELL_SUBCMD_SET_END /* Array terminated. */
@@ -2187,6 +2239,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_flash,
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_lwm2m,
     SHELL_CMD(bootstrap, NULL, "Bootstrap", cmd_lwm2m_bootstrap),
     SHELL_CMD(deregister, NULL, "Deregister server", cmd_lwm2m_deregister),
+    SHELL_CMD(disable, NULL, "Disable server", cmd_lwm2m_disable),
     SHELL_CMD(disconnect, NULL, "Disconnect server", cmd_lwm2m_disconnect),
     SHELL_CMD(register, NULL, "Register server", cmd_lwm2m_register),
     SHELL_CMD(status, NULL, "Connection status", cmd_lwm2m_status),
