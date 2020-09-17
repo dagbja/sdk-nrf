@@ -129,6 +129,7 @@ struct connection_update_t {
 static struct connection_update_t m_connection_update[1+LWM2M_MAX_SERVERS];
 static bool m_use_client_holdoff_timer;
 static bool m_registration_ready;
+static bool m_ack_sms;
 
 /* Resolved server addresses */
 static nrf_sa_family_t m_family_type[1+LWM2M_MAX_SERVERS] = { NRF_AF_INET6, NRF_AF_INET6, NRF_AF_INET6, NRF_AF_INET6 };  /**< Current IP versions, start using IPv6. */
@@ -181,6 +182,11 @@ static int app_event_error(uint32_t error_code, int32_t error_value)
     };
 
     return app_event_notify(LWM2M_CARRIER_EVENT_ERROR, &error_event);
+}
+
+void lwm2m_acknowledge_sms(void)
+{
+    m_ack_sms = true;
 }
 
 static bool lwm2m_state_set(lwm2m_state_t app_state)
@@ -2816,6 +2822,8 @@ static void app_check_server_update(void)
 
 static int app_lwm2m_process(void)
 {
+    int err;
+
 #if APP_USE_SOCKET_POLL
     if (app_coap_socket_poll()) {
         coap_input();
@@ -2823,6 +2831,14 @@ static int app_lwm2m_process(void)
 #else
     coap_input();
 #endif
+
+    if (m_ack_sms) {
+        m_ack_sms = false;
+        err = lwm2m_os_at_cmd_write("AT+CNMA=1", NULL, 0);
+        if (err) {
+            LWM2M_WRN("Acking SMS failed with err %d", err);
+        }
+    }
 
     switch (m_app_state)
     {

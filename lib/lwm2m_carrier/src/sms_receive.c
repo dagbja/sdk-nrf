@@ -63,12 +63,7 @@ int sms_receiver_notif_parse(const char *notif)
 
         receive_count++;
 
-        // Send new message ACK in PDU mode.
-        int err = lwm2m_os_at_cmd_write("AT+CNMA=1", NULL, 0);
-        if(err != 0) {
-            // Ignore error and continue
-            LWM2M_ERR("Unable to ACK SMS notification.");
-        }
+        lwm2m_acknowledge_sms();
 
         // Manually decode the last bytes to get CoAP URI (ignore trailing \r\n)
         uint8_t object = notif[length-11] - '0';

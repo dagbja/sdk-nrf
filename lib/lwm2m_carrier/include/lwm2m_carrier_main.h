@@ -81,6 +81,9 @@ int lwm2m_carrier_apn_get(char *buf, size_t len);
 
 bool lwm2m_carrier_pdn_activate(uint16_t security_instance, int32_t *retry_delay);
 
+/** @brief Acknowledge SMS in library thread. */
+void lwm2m_acknowledge_sms(void);
+
 void lwm2m_request_link_up(void);
 void lwm2m_request_link_down(void);
 void lwm2m_request_bootstrap(void);
