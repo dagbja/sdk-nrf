@@ -574,19 +574,19 @@ void lwm2m_portfolio_init(void)
         for (int j = 0; j < LWM2M_PORTFOLIO_IDENTITY_INSTANCES; j++)
         {
             error = -1;
-            if (LWM2M_PORTFOLIO_LWM2M_VERSION_INSTANCE == i)
+            if (i == LWM2M_PORTFOLIO_LWM2M_VERSION_INSTANCE)
             {
-                if (LWM2M_PORTFOLIO_HOST_DEVICE_MANUFACTURER == j)
+                if (j == LWM2M_PORTFOLIO_HOST_DEVICE_MANUFACTURER)
                 {
                     error = at_read_manufacturer(&m_portfolio_identity[i][j]);
                 }
-                else if (LWM2M_PORTFOLIO_HOST_DEVICE_MODEL == j)
+                else if (j == LWM2M_PORTFOLIO_HOST_DEVICE_MODEL)
                 {
                     error = at_read_model_number(&m_portfolio_identity[i][j]);
                 }
             }
 
-            if (0 > error)
+            if (error < 0)
             {
                 (void)lwm2m_bytebuffer_to_string(m_portfolio_identity_val[i][j],
                                                  strlen(m_portfolio_identity_val[i][j]),

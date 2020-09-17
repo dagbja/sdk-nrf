@@ -2216,10 +2216,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_device,
 
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_portfolio,
+    SHELL_CMD(create, NULL, "Create an instance of the Portfolio object", cmd_portfolio_create),
     SHELL_CMD(print, NULL, "Print portfolio object instances", cmd_portfolio_print),
     SHELL_CMD(read, NULL, "Read the Identity resource of a Portfolio object instance", cmd_portfolio_read),
     SHELL_CMD(write, NULL, "Write into an instance of the Identity resource", cmd_portfolio_write),
-    SHELL_CMD(create, NULL, "Create an instance of the Portfolio object", cmd_portfolio_create),
     SHELL_SUBCMD_SET_END
 );
 
