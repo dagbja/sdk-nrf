@@ -322,15 +322,19 @@ static void lwm2m_conn_ext_update_resource(uint16_t resource_id)
 
 void lwm2m_conn_ext_init(void)
 {
+    int32_t len;
+    char last_used_msisdn[16];
+
     lwm2m_instance_connectivity_extension_init(&m_instance_conn_ext);
 
     m_object_conn_ext.object_id = LWM2M_OBJ_CONN_EXT;
     m_object_conn_ext.callback = lwm2m_conn_ext_object_callback;
     m_instance_conn_ext.proto.callback = conn_ext_instance_callback;
 
-    char last_used_msisdn[16];
-    int32_t len = lwm2m_last_used_msisdn_get(last_used_msisdn, sizeof(last_used_msisdn));
-    lwm2m_bytebuffer_to_string(last_used_msisdn, len, &m_instance_conn_ext.msisdn);
+    len = lwm2m_last_used_msisdn_get(last_used_msisdn, sizeof(last_used_msisdn));
+    if (len > 0) {
+        lwm2m_bytebuffer_to_string(last_used_msisdn, len, &m_instance_conn_ext.msisdn);
+    }
 
     lwm2m_conn_ext_iccid_update();
     lwm2m_conn_ext_imsi_update();
