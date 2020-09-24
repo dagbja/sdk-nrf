@@ -3262,10 +3262,10 @@ void lwm2m_carrier_run(void)
     {
 #if (APP_USE_SOCKET_POLL == 0)
         // If poll is disabled, sleep.
-        lwm2m_os_sleep(10);
+        lwm2m_os_sleep(500);
 #endif
 
-        if (tick_count++ % 100 == 0) {
+        if (tick_count++ % 2 == 0) {
             // Pass a tick to CoAP in order to re-transmit any pending messages.
             ARG_UNUSED(coap_time_tick());
         }
@@ -3277,7 +3277,7 @@ void lwm2m_carrier_run(void)
             break;
         }
 
-        if ((tick_count % 100) == 0)
+        if ((tick_count % 2) == 0)
         {
             lwm2m_observer_process(false);
         }
