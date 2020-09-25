@@ -515,18 +515,6 @@ uint32_t access_control_instance_callback(lwm2m_instance_t * p_instance,
         return 0;
     }
 
-    if (op_code == LWM2M_OPERATION_CODE_WRITE)
-    {
-        uint16_t short_server_id;
-        lwm2m_remote_short_server_id_find(&short_server_id, p_request->remote);
-
-        if (short_server_id != m_instance_acc_control[p_instance->instance_id].control_owner)
-        {
-            lwm2m_respond_with_code(COAP_CODE_401_UNAUTHORIZED, p_request);
-            return 0;
-        }
-    }
-
     switch (op_code) {
     case LWM2M_OPERATION_CODE_READ:
         on_read(path, path_len, p_request);
