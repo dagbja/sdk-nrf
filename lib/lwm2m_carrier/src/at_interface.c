@@ -737,7 +737,7 @@ int at_read_msisdn(char * const p_msisdn, int msisdn_len)
 
     if (err == -ENOEXEC) {
         // An ERROR response is returned if MSISDN is not available on SIM card or if SIM card is not initialized.
-        LWM2M_ERR("No subscriber number (MSISDN) available on this SIM.");
+        LWM2M_WRN("No subscriber number (MSISDN) available on this SIM.");
         retval = EPERM;
     }
     else if(err != 0) {
@@ -900,7 +900,7 @@ void at_subscribe_odis(void)
     retval = lwm2m_os_at_cmd_write("AT+ODISNTF=1", NULL, 0);
 
     if (retval != 0) {
-        LWM2M_ERR("AT+ODISNTF=1 failed: %d", retval);
+        LWM2M_WRN("Subscribe to ODIS (AT+ODISNTF=1) failed: %d", retval);
     }
 }
 
