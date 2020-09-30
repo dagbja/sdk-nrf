@@ -627,10 +627,14 @@ void lwm2m_observer_process(bool reconnect)
 
         if (notification_condition_check(i))
         {
-            // Finding remote should not fail at this stage.
-            lwm2m_short_server_id_remote_find(&remote, m_observables[i]->ssid);
-            observer_notify_path(m_observables[i]->path, m_observables[i]->path_len, remote);
-            update_after_notification(i);
+            // Finding remote may fail when remote is disabled.
+            uint32_t err_code = lwm2m_short_server_id_remote_find(&remote, m_observables[i]->ssid);
+
+            if (err_code == 0)
+            {
+                observer_notify_path(m_observables[i]->path, m_observables[i]->path_len, remote);
+                update_after_notification(i);
+            }
         }
     }
 }
