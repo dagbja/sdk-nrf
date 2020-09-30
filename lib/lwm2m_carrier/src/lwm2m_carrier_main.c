@@ -1600,7 +1600,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             if (!m_registration_ready && lwm2m_is_registration_ready()) {
                 m_use_client_holdoff_timer = false;
                 m_registration_ready = true;
-                app_event_notify(LWM2M_CARRIER_EVENT_READY, NULL);
+                app_event_notify(LWM2M_CARRIER_EVENT_REGISTERED, NULL);
             }
         }
         else
@@ -1672,7 +1672,7 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             if (!m_registration_ready && lwm2m_is_registration_ready()) {
                 m_use_client_holdoff_timer = false;
                 m_registration_ready = true;
-                app_event_notify(LWM2M_CARRIER_EVENT_READY, NULL);
+                app_event_notify(LWM2M_CARRIER_EVENT_REGISTERED, NULL);
             }
 
             if (lwm2m_remote_reconnecting_get(short_server_id)) {
@@ -1842,6 +1842,8 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     app_server_disconnect(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
     lwm2m_retry_delay_connect_reset(LWM2M_BOOTSTRAP_INSTANCE_ID);
 
+    (void)app_event_notify(LWM2M_CARRIER_EVENT_BOOTSTRAPPED, NULL);
+
     if (app_provision_secret_keys() != 0) {
         return 0;
     }
@@ -1861,8 +1863,6 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     lwm2m_storage_access_control_store();
 
     server_instance_update_map();
-
-    (void)app_event_notify(LWM2M_CARRIER_EVENT_BOOTSTRAPPED, NULL);
 
     return 0;
 }
@@ -2078,6 +2078,7 @@ static void app_connect(void)
         } else if (lwm2m_security_bootstrapped_get(LWM2M_BOOTSTRAP_INSTANCE_ID)) {
             lwm2m_state_set(LWM2M_STATE_IDLE);
             app_init_connection_update();
+            (void)app_event_notify(LWM2M_CARRIER_EVENT_LTE_READY, NULL);
         } else {
             int32_t hold_off_time = lwm2m_security_hold_off_timer_get(LWM2M_BOOTSTRAP_INSTANCE_ID);
             if (hold_off_time > 0) {

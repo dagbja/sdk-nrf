@@ -26,10 +26,11 @@ extern "C"
 #define LWM2M_CARRIER_EVENT_DISCONNECTING 4  /**< Disconnecting from the LTE network. */
 #define LWM2M_CARRIER_EVENT_DISCONNECTED  5  /**< Disconnected from the LTE network. */
 #define LWM2M_CARRIER_EVENT_BOOTSTRAPPED  6  /**< LWM2M carrier bootstrapped. */
-#define LWM2M_CARRIER_EVENT_READY         7  /**< LWM2M carrier registered. */
+#define LWM2M_CARRIER_EVENT_REGISTERED    7  /**< LWM2M carrier registered. */
 #define LWM2M_CARRIER_EVENT_DEFERRED      8  /**< LWM2M carrier operation is deferred. */
 #define LWM2M_CARRIER_EVENT_FOTA_START    9  /**< Modem update started. */
 #define LWM2M_CARRIER_EVENT_REBOOT        10 /**< Application will reboot. */
+#define LWM2M_CARRIER_EVENT_LTE_READY     11 /**< LTE network is ready to be used. */
 #define LWM2M_CARRIER_EVENT_ERROR         20 /**< An error occurred. */
 
 /**
