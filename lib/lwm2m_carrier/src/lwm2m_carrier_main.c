@@ -148,6 +148,8 @@ static int app_provision_secret_keys(void);
 static void app_disconnect(void);
 static const char * app_uri_get(char * p_server_uri, uint16_t * p_port, bool * p_secure);
 
+static void app_carrier_objects_setup(void);
+
 extern int cert_provision();
 
 static int app_event_notify(uint32_t type, void * data)
@@ -941,6 +943,7 @@ static int app_generate_client_id(void)
             LWM2M_INF("Carrier change detected: %s -> %s",
                       lwm2m_os_log_strdup(operator_id_string(last_used_operator_id)),
                       lwm2m_os_log_strdup(operator_id_string(operator_id(true))));
+            app_carrier_objects_setup();
         }
         if (lwm2m_factory_bootstrap_update(&m_app_config, m_application_psk_set)) {
             lwm2m_last_used_msisdn_set("", 0);
@@ -1818,34 +1821,34 @@ static void app_init_connection_update(void)
     }
 }
 
-static void app_carrier_objects_init(void)
+static void app_carrier_objects_setup(void)
 {
-    if (operator_is_att(true))
-    {
-        lwm2m_apn_conn_prof_init();
-        lwm2m_portfolio_init();
-        lwm2m_conn_ext_init();
-    }
-}
+    lwm2m_object_t *p_object;
 
-static void app_carrier_objects_add(void)
-{
     if (operator_is_att(true))
     {
         // Add APN connection profile support.
-        (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_apn_conn_prof_get_object());
+        if (lwm2m_lookup_object(&p_object, LWM2M_OBJ_APN_CONNECTION_PROFILE) != 0) {
+            lwm2m_apn_conn_prof_init();
+            (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_apn_conn_prof_get_object());
+            lwm2m_storage_apn_conn_prof_load();
+        }
 
         // Add portfolio support.
-        (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_portfolio_get_object());
+        if (lwm2m_lookup_object(&p_object, LWM2M_OBJ_PORTFOLIO) != 0) {
+            lwm2m_portfolio_init();
+            (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_portfolio_get_object());
+            lwm2m_storage_portfolio_load();
+        }
 
         // Add connectivity extension support.
-        (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_conn_ext_get_object());
+        if (lwm2m_lookup_object(&p_object, LWM2M_OBJ_CONN_EXT) != 0) {
+            lwm2m_conn_ext_init();
+            (void)lwm2m_coap_handler_object_add((lwm2m_object_t *)lwm2m_conn_ext_get_object());
+            lwm2m_storage_conn_ext_load();
+        }
     }
-}
-
-static void app_carrier_objects_delete(void)
-{
-    if (!operator_is_att(true))
+    else
     {
         size_t progress;
         lwm2m_instance_t *p_instance = NULL;
@@ -1853,31 +1856,36 @@ static void app_carrier_objects_delete(void)
         /* Remove all object instances from the request handler. */
         while (lwm2m_instance_next(&p_instance, &progress))
         {
-            if (p_instance->object_id == LWM2M_OBJ_APN_CONNECTION_PROFILE ||
-                p_instance->object_id == LWM2M_OBJ_PORTFOLIO ||
-                p_instance->object_id == LWM2M_OBJ_CONN_EXT)
+            if ((p_instance->object_id == LWM2M_OBJ_APN_CONNECTION_PROFILE) ||
+                (p_instance->object_id == LWM2M_OBJ_PORTFOLIO) ||
+                (p_instance->object_id == LWM2M_OBJ_CONN_EXT))
             {
                 lwm2m_coap_handler_instance_delete(p_instance);
+
+                // Decrease progress by one because delete will move current
+                // last entry into this index position.
+                progress--;
             }
         }
 
-        /* Remove all objects from the request handler. */
-        (void)lwm2m_coap_handler_object_delete((lwm2m_object_t *)lwm2m_apn_conn_prof_get_object());
-        (void)lwm2m_coap_handler_object_delete((lwm2m_object_t *)lwm2m_portfolio_get_object());
-        (void)lwm2m_coap_handler_object_delete((lwm2m_object_t *)lwm2m_conn_ext_get_object());
+        // Remove APN connection profile support.
+        if (lwm2m_lookup_object(&p_object, LWM2M_OBJ_APN_CONNECTION_PROFILE) == 0) {
+            (void)lwm2m_coap_handler_object_delete(p_object);
+            (void)lwm2m_storage_portfolio_delete();
+        }
 
-        /* Delete the corresponding NVS entries. */
-        (void)lwm2m_storage_portfolio_delete();
-        (void)lwm2m_storage_apn_conn_prof_delete();
-        (void)lwm2m_storage_conn_ext_delete();
+        // Remove portfolio support.
+        if (lwm2m_lookup_object(&p_object, LWM2M_OBJ_PORTFOLIO) == 0) {
+            (void)lwm2m_coap_handler_object_delete(p_object);
+            (void)lwm2m_storage_apn_conn_prof_delete();
+        }
+
+        // Remove connectivity extension support.
+        if (lwm2m_lookup_object(&p_object, LWM2M_OBJ_CONN_EXT) == 0) {
+            (void)lwm2m_coap_handler_object_delete(p_object);
+            (void)lwm2m_storage_conn_ext_delete();
+        }
     }
-}
-
-static void app_carrier_objects_setup(void)
-{
-    app_carrier_objects_delete();
-    app_carrier_objects_init();
-    app_carrier_objects_add();
 }
 
 static void app_misc_data_set_bootstrapped(bool bootstrapped)
@@ -1979,16 +1987,6 @@ void lwm2m_factory_reset(void)
     lwm2m_notif_attr_storage_delete_all();
 }
 
-static void app_carrier_objects_load(void)
-{
-    if (operator_is_att(true))
-    {
-        lwm2m_storage_apn_conn_prof_load();
-        lwm2m_storage_portfolio_load();
-        lwm2m_storage_conn_ext_load();
-    }
-}
-
 static void app_load_flash_objects(void)
 {
     LWM2M_INF("Load bootstrap settings");
@@ -2011,9 +2009,6 @@ static void app_load_flash_objects(void)
 
     // Load location
     lwm2m_storage_location_load();
-
-    // Load carrier-specific objects
-    app_carrier_objects_load();
 
     lwm2m_storage_misc_data_t misc_data;
     int32_t result = lwm2m_storage_misc_data_load(&misc_data);
@@ -2042,11 +2037,11 @@ static void app_lwm2m_create_objects(void)
     lwm2m_firmware_init();
     lwm2m_conn_stat_init();
 
-    // Setup operator-specific objects.
-    app_carrier_objects_setup();
-
     // Initialize objects from flash, if they exist in NVS.
     app_load_flash_objects();
+
+    // Setup operator-specific objects.
+    app_carrier_objects_setup();
 }
 
 /**@brief LWM2M initialization.
