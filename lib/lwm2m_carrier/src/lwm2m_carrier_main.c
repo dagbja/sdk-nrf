@@ -141,6 +141,7 @@ typedef enum {
     PSK_FORMAT_HEXSTRING
 } psk_format_t;
 
+static void app_misc_data_set_bootstrapped(bool bootstrapped);
 static void app_server_disconnect(uint16_t security_instance, bool keep_lifetime_timer);
 static int app_provision_psk(int sec_tag, const char * p_identity, uint8_t identity_len,
                              const char * p_psk, uint8_t psk_len, psk_format_t psk_format);
@@ -1603,6 +1604,10 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             if (!m_registration_ready && lwm2m_is_registration_ready()) {
                 m_use_client_holdoff_timer = false;
                 m_registration_ready = true;
+
+                // Set to bootstrapped in case this has not been set before.
+                app_misc_data_set_bootstrapped(true);
+
                 app_event_notify(LWM2M_CARRIER_EVENT_REGISTERED, NULL);
             }
         }
@@ -1675,6 +1680,10 @@ void lwm2m_notification(lwm2m_notification_type_t   type,
             if (!m_registration_ready && lwm2m_is_registration_ready()) {
                 m_use_client_holdoff_timer = false;
                 m_registration_ready = true;
+
+                // Set to bootstrapped in case this has not been set before.
+                app_misc_data_set_bootstrapped(true);
+
                 app_event_notify(LWM2M_CARRIER_EVENT_REGISTERED, NULL);
             }
 
@@ -1891,9 +1900,12 @@ static void app_carrier_objects_setup(void)
 static void app_misc_data_set_bootstrapped(bool bootstrapped)
 {
     lwm2m_storage_misc_data_t misc_data = { 0 };
+
     lwm2m_storage_misc_data_load(&misc_data);
-    misc_data.bootstrapped = bootstrapped ? 1 : 0;
-    lwm2m_storage_misc_data_store(&misc_data);
+    if (misc_data.bootstrapped != (uint8_t) bootstrapped) {
+        misc_data.bootstrapped = bootstrapped;
+        lwm2m_storage_misc_data_store(&misc_data);
+    }
 }
 
 /**@brief Callback function for the named bootstrap complete object. */
@@ -1921,9 +1933,6 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
     lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, true);  // TODO: this should be set by bootstrap server when bootstrapped
     m_did_bootstrap = true;
 
-    // Clean bootstrap.
-    app_misc_data_set_bootstrapped(true);
-
     LWM2M_INF("Store bootstrap settings");
 
     lwm2m_storage_server_store();
@@ -1931,6 +1940,22 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 
     lwm2m_access_control_acl_init();
     lwm2m_storage_access_control_store();
+
+    // For VzW in certification mode we don't set bootstrapped here because
+    // the Motive framework may have issues creating the device correctly,
+    // and we want the device to start doing bootstrap until successfully
+    // registered to all servers.
+
+    // For VzW live and other carriers we set bootstrapped here because
+    // the bootstrapped objects has been stored correctly both on the device
+    // and on the server. This will avoid unnecessary bootstrap.
+
+    if (!operator_is_vzw(true) ||
+        !(m_app_config.certification_mode || lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)))
+    {
+        // Bootstrap is done.
+        app_misc_data_set_bootstrapped(true);
+    }
 
     server_instance_update_map();
 
@@ -2262,6 +2287,7 @@ static void app_bootstrap(void)
     lwm2m_bootstrap_reset();
 
     m_use_client_holdoff_timer = true;
+    m_registration_ready = false;
 
     uint32_t err_code = lwm2m_bootstrap((struct nrf_sockaddr *)&m_remote_server[LWM2M_BOOTSTRAP_INSTANCE_ID],
                                         &m_client_id,
