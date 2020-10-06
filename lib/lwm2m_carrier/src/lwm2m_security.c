@@ -139,10 +139,13 @@ void lwm2m_security_short_server_id_set(uint16_t instance_id, uint16_t value)
 
 static uint32_t tlv_security_vzw_encode(uint16_t instance_id, uint8_t * p_buffer, uint32_t * p_buffer_len)
 {
+    // The order of the list elements is important here because
+    //  0 is HoldOffTimer
+    //  1 is IsBootstrapped
     int32_t list_values[2] =
     {
-        vzw_bootstrap_security_settings.is_bootstrapped,
-        vzw_bootstrap_security_settings.hold_off_timer
+        vzw_bootstrap_security_settings.hold_off_timer,
+        vzw_bootstrap_security_settings.is_bootstrapped
     };
 
     lwm2m_list_t list =
