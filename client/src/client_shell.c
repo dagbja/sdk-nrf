@@ -166,7 +166,6 @@ static int cmd_security_print(const struct shell *shell, size_t argc, char **arg
             shell_print(shell, "  Short Server ID  %d", lwm2m_security_short_server_id_get(i));
             shell_print(shell, "  Server URI       %s", terminated_uri);
             shell_print(shell, "  Bootstrap Server %s", lwm2m_security_is_bootstrap_server_get(i) ? "Yes" : "No");
-            shell_print(shell, "  Client Holdoff   %ld", lwm2m_server_client_hold_off_timer_get(i));
 
             if (operator_is_vzw(true) && lwm2m_security_is_bootstrap_server_get(i)) {
                 shell_print(shell, "  Holdoff          %ld", lwm2m_security_hold_off_timer_get(i));
