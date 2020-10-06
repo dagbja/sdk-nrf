@@ -1930,7 +1930,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
         return 0;
     }
 
-    lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, true);  // TODO: this should be set by bootstrap server when bootstrapped
+    lwm2m_security_bootstrapped_set(true);  // TODO: this should be set by bootstrap server when bootstrapped
     m_did_bootstrap = true;
 
     LWM2M_INF("Store bootstrap settings");
@@ -1965,7 +1965,7 @@ uint32_t bootstrap_object_callback(lwm2m_object_t * p_object,
 void lwm2m_bootstrap_clear(void)
 {
     app_misc_data_set_bootstrapped(false);
-    lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
+    lwm2m_security_bootstrapped_set(false);
 }
 
 void lwm2m_bootstrap_reset(void)
@@ -1975,9 +1975,9 @@ void lwm2m_bootstrap_reset(void)
         lwm2m_storage_security_load();
     }
 
-    if (lwm2m_security_bootstrapped_get(LWM2M_BOOTSTRAP_INSTANCE_ID)) {
+    if (lwm2m_security_bootstrapped_get()) {
         // Security object exists and bootstrap is done
-        lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
+        lwm2m_security_bootstrapped_set(false);
     }
 
     app_misc_data_set_bootstrapped(false);
@@ -2039,13 +2039,13 @@ static void app_load_flash_objects(void)
     int32_t result = lwm2m_storage_misc_data_load(&misc_data);
     if (result == 0 && misc_data.bootstrapped)
     {
-        lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, true);
+        lwm2m_security_bootstrapped_set(true);
         lwm2m_storage_access_control_load();
     }
     else
     {
         // storage reports that bootstrap has not been done, continue with bootstrap.
-        lwm2m_security_bootstrapped_set(LWM2M_BOOTSTRAP_INSTANCE_ID, false);
+        lwm2m_security_bootstrapped_set(false);
     }
 
     server_instance_update_map();
@@ -2139,12 +2139,12 @@ static void app_connect(void)
         // Generate a unique Client ID.
         if (app_generate_client_id() != 0) {
             // Unrecoverable error occurred, unable to continue
-        } else if (lwm2m_security_bootstrapped_get(LWM2M_BOOTSTRAP_INSTANCE_ID)) {
+        } else if (lwm2m_security_bootstrapped_get()) {
             lwm2m_state_set(LWM2M_STATE_IDLE);
             app_init_connection_update();
             (void)app_event_notify(LWM2M_CARRIER_EVENT_LTE_READY, NULL);
         } else {
-            int32_t hold_off_time = lwm2m_security_hold_off_timer_get(LWM2M_BOOTSTRAP_INSTANCE_ID);
+            int32_t hold_off_time = lwm2m_security_hold_off_timer_get();
             if (hold_off_time > 0) {
                 if (lwm2m_state_set(LWM2M_STATE_BS_HOLD_OFF)) {
                     LWM2M_INF("Bootstrap hold off timer [%ld seconds]", hold_off_time);

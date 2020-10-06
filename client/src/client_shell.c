@@ -168,8 +168,8 @@ static int cmd_security_print(const struct shell *shell, size_t argc, char **arg
             shell_print(shell, "  Bootstrap Server %s", lwm2m_security_is_bootstrap_server_get(i) ? "Yes" : "No");
 
             if (operator_is_vzw(true) && lwm2m_security_is_bootstrap_server_get(i)) {
-                shell_print(shell, "  Holdoff          %ld", lwm2m_security_hold_off_timer_get(i));
-                shell_print(shell, "  Is Bootstrapped  %s", lwm2m_security_bootstrapped_get(i) ? "Yes" : "No");
+                shell_print(shell, "  Holdoff          %ld", lwm2m_security_hold_off_timer_get());
+                shell_print(shell, "  Is Bootstrapped  %s", lwm2m_security_bootstrapped_get() ? "Yes" : "No");
             }
         }
     }

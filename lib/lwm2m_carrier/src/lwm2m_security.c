@@ -30,22 +30,22 @@ static lwm2m_security_t  m_instance_security[1+LWM2M_MAX_SERVERS];          /**<
 // Verizon specific resources.
 static vzw_bootstrap_security_settings_t vzw_bootstrap_security_settings;
 
-bool lwm2m_security_bootstrapped_get(uint16_t instance_id)
+bool lwm2m_security_bootstrapped_get(void)
 {
     return vzw_bootstrap_security_settings.is_bootstrapped;
 }
 
-void lwm2m_security_bootstrapped_set(uint16_t instance_id, bool value)
+void lwm2m_security_bootstrapped_set(bool value)
 {
     vzw_bootstrap_security_settings.is_bootstrapped = value;
 }
 
-int32_t lwm2m_security_hold_off_timer_get(uint16_t instance_id)
+int32_t lwm2m_security_hold_off_timer_get(void)
 {
     return vzw_bootstrap_security_settings.hold_off_timer;
 }
 
-void lwm2m_security_hold_off_timer_set(uint16_t instance_id, int32_t value)
+void lwm2m_security_hold_off_timer_set(int32_t value)
 {
     vzw_bootstrap_security_settings.hold_off_timer = value;
 }
@@ -163,7 +163,7 @@ static uint32_t tlv_security_vzw_encode(uint16_t instance_id, uint8_t * p_buffer
 uint32_t tlv_security_carrier_encode(uint16_t instance_id, uint8_t * p_buffer,
                                      uint32_t * p_buffer_len)
 {
-    if (!operator_is_vzw(true)) {
+    if (!operator_is_vzw(true) || (instance_id != 0)) {
         /* Nothing to encode */
         *p_buffer_len = 0;
         return 0;

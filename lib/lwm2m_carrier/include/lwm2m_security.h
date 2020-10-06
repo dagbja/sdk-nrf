@@ -29,13 +29,13 @@ int32_t lwm2m_security_client_hold_off_time_get(uint16_t instance_id);
 
 void lwm2m_security_client_hold_off_time_set(uint16_t instance_id, int32_t value);
 
-bool lwm2m_security_bootstrapped_get(uint16_t instance_id);
+bool lwm2m_security_bootstrapped_get(void);
 
-void lwm2m_security_bootstrapped_set(uint16_t instance_id, bool value);
+void lwm2m_security_bootstrapped_set(bool value);
 
-int32_t lwm2m_security_hold_off_timer_get(uint16_t instance_id);
+int32_t lwm2m_security_hold_off_timer_get(void);
 
-void lwm2m_security_hold_off_timer_set(uint16_t instance_id, int32_t value);
+void lwm2m_security_hold_off_timer_set(int32_t value);
 
 char * lwm2m_security_identity_get(uint16_t instance_id, uint8_t * p_len);
 

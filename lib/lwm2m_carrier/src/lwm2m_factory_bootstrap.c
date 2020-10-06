@@ -55,8 +55,8 @@ static void factory_security_bootstrap_vzw(void)
 
     lwm2m_security_short_server_id_set(instance_id, 100);
     lwm2m_security_is_bootstrap_server_set(instance_id, true);
-    lwm2m_security_bootstrapped_set(instance_id, false);
-    lwm2m_security_hold_off_timer_set(instance_id, 10);
+    lwm2m_security_hold_off_timer_set(10);
+    lwm2m_security_bootstrapped_set(false);
 
     lwm2m_coap_handler_instance_delete(p_instance);
     lwm2m_coap_handler_instance_add(p_instance);
@@ -180,8 +180,6 @@ static void factory_bootstrap_reset(uint16_t instance_id)
     lwm2m_server_reset(instance_id);
 
     // Reset VzW specific values
-    lwm2m_security_hold_off_timer_set(instance_id, false);
-    lwm2m_security_is_bootstrap_server_set(instance_id, false);
     lwm2m_server_registered_set(instance_id, false);
     lwm2m_server_client_hold_off_timer_set(instance_id, 0);
 }
