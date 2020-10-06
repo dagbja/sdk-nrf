@@ -3179,6 +3179,8 @@ void lwm2m_net_reg_stat_cb(uint32_t net_stat)
             // Roaming
             LWM2M_INF("Registered to roaming network");
             lwm2m_request_disconnect();
+
+            (void)app_event_notify(LWM2M_CARRIER_EVENT_LTE_READY, NULL);
         }
         else if (net_stat != APP_NET_REG_STAT_SEARCHING)
         {
