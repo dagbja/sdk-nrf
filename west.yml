@@ -28,7 +28,7 @@ manifest:
     # Source West manifest. Modules are imported from there.
     - name: nrf
       url: https://github.com/nrfconnect/sdk-nrf
-      revision: c11781170d05b19c1624dce87ce5dee9374014fc
+      revision: a7dbf7662fcf546c48e1d8619445b2607c7f3013
       import:
         name-whitelist:
           - zephyr
@@ -38,13 +38,13 @@ manifest:
           - mbedtls-nrf
 
     # Overrides modules/projects versions from nrf import.
-    - name: nrfxlib
-      url: https://github.com/nrfconnect/sdk-nrfxlib
-      revision: f1dd2ee510f39e27ea4102bad369c026c0dad147
-
-    - name: mbedtls-nrf
-      url: https://github.com/ARMmbed/mbedtls
-      revision: mbedtls-2.16.6
+    #- name: nrfxlib
+    #  url: https://github.com/nrfconnect/sdk-nrfxlib
+    #  revision: f1dd2ee510f39e27ea4102bad369c026c0dad147
+    #
+    #- name: mbedtls-nrf
+    #  url: https://github.com/ARMmbed/mbedtls
+    #  revision: mbedtls-2.16.6
 
   # West-related configuration for this repository.
   # This repository should be cloned to lwm2m/lwm2m.
