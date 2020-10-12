@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +33,7 @@
 #include <lwm2m_server.h>
 #include <lwm2m_pdn.h>
 #include <lwm2m_os.h>
+#include <sys/byteorder.h>
 
 #include <app_debug.h>
 #include <at_interface.h>
@@ -3019,9 +3021,18 @@ static int app_lwm2m_process(void)
 static uint32_t app_coap_init(void)
 {
     uint32_t err_code;
+    uint16_t seed;
+    uint32_t stamp;
 
-    err_code = coap_init(lwm2m_os_rand_get(), NULL,
-                         lwm2m_os_malloc, lwm2m_os_free);
+    stamp = lwm2m_os_rand_get();
+    /* Use the digits that vary the most (last two bytes) and swap them
+     * to decrease the chance they will be the same across reboots.
+     * Do not call lwm2m_os_rand_get() inside sys_cpu_to_be16(),
+     * or it will be called twice.
+     */
+    seed = sys_cpu_to_be16(stamp);
+
+    err_code = coap_init(seed, NULL, lwm2m_os_malloc, lwm2m_os_free);
 
     for (uint32_t i = 0; i < 1+LWM2M_MAX_SERVERS; i++)
     {

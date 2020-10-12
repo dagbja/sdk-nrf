@@ -20,7 +20,6 @@
 #include <modem/bsdlib.h>
 #include <modem/modem_key_mgmt.h>
 #include <net/download_client.h>
-#include <random/rand32.h>
 #include <power/reboot.h>
 #include <sys/util.h>
 #include <toolchain.h>
@@ -89,7 +88,7 @@ void lwm2m_os_sys_reset(void)
 
 uint32_t lwm2m_os_rand_get(void)
 {
-	return sys_rand32_get();
+	return k_cycle_get_32();
 }
 
 /* Non volatile storage */
