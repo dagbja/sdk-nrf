@@ -146,11 +146,15 @@ typedef struct {
 typedef struct {
 	/** URI of the bootstrap server, null-terminated string. */
 	const char *bootstrap_uri;
-	/** Pre-Shared Key for the bootstrap server, null-terminated hexadecimal string. */
+	/** Pre-Shared Key for the bootstrap server,
+	 *  null-terminated hexadecimal string.
+	 */
 	const char *psk;
 	/** Optional custom APN, null-terminated string. */
 	const char *apn;
-	/** Connect to certification servers if true, else connect to production servers. */
+	/** Connect to certification servers if true,
+	 *  connect to production servers otherwise.
+	 */
 	bool certification_mode;
 } lwm2m_carrier_config_t;
 
