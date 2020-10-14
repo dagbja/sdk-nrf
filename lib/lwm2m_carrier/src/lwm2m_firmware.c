@@ -57,36 +57,40 @@ void lwm2m_firmware_package_uri_set(uint16_t instance_id, char * p_value, uint8_
 }
 
 /* Callback to trigger FOTA upon receiving the Package URI */
-uint32_t lwm2m_firmware_tlv_callback(uint16_t instance_id, lwm2m_tlv_t *tlv)
+static uint32_t tlv_write_callback(uint16_t instance_id, lwm2m_tlv_t *tlv)
 {
-    /* The package URI has been decoded from the TLV payload and saved
-     * into the instance; the code below will trigger its download.
-     *
-     * It is not possible to do this directly in the instance callback
-     * because it is delivered with a resource ID = LWM2M_OBJECT_INSTANCE.
-    */
-    switch (tlv->id) {
-
-    case LWM2M_FIRMWARE_PACKAGE:
+    /* Trigger download when package URI is written to (pull-FOTA).
+     * In case of push-FOTA, we decode the TLV manually and handle
+     * the download somewhere else, since it is a large TLV sent
+     * via multiple writes.
+     */
+    if (tlv->id == LWM2M_FIRMWARE_PACKAGE) {
         if (tlv->length != 0) {
-            return ENOTSUP;
+            return COAP_CODE_400_BAD_REQUEST;
         }
-        /* Firmware is already deleted */
-        LWM2M_TRC("Deleting firmware...");
-        return 0;
 
-    case LWM2M_FIRMWARE_PACKAGE_URI:
-        /* Any errors in the URI are reported via a LwM2M resource
-         * by lwm2m_firmare_download.
-         */
+        LWM2M_TRC("Deleting firmware...");
+        return COAP_CODE_204_CHANGED;
+    }
+
+    if (tlv->id == LWM2M_FIRMWARE_PACKAGE_URI) {
+        if (tlv->length >= URL_SIZE) {
+            LWM2M_WRN("Package URI is too large (%d, max %d)",
+                      tlv->length, URL_SIZE);
+            return COAP_CODE_413_REQUEST_ENTITY_TOO_LARGE;
+        }
+
+        if (tlv->length == 0) {
+            LWM2M_TRC("Deleting firmware...");
+            return COAP_CODE_204_CHANGED;
+        }
+
         lwm2m_firmware_download_uri(m_instance_firmware.package_uri.p_val,
                                     m_instance_firmware.package_uri.len);
-
-        return 0;
-
-    default:
-        return ENOTSUP;
+        return COAP_CODE_204_CHANGED;
     }
+
+    return COAP_CODE_404_NOT_FOUND;
 }
 
 uint8_t lwm2m_firmware_state_get(uint16_t instance_id)
@@ -360,12 +364,13 @@ static void on_write(const uint16_t path[3], uint8_t path_len,
     if (mask & COAP_CT_MASK_APP_LWM2M_TLV) {
         err = coap_block1_get(&block1, p_req);
         if (err) {
-            /* No block1 option, treat as a simple TLV write */
-            err = lwm2m_tlv_firmware_decode(&m_instance_firmware,
-                p_req->payload, p_req->payload_len, lwm2m_firmware_tlv_callback);
+            uint32_t coap_code;
 
-            lwm2m_coap_rsp_send_with_code(p_rsp, err ?
-                COAP_CODE_404_NOT_FOUND : COAP_CODE_204_CHANGED);
+            /* No block1 option, treat as a simple TLV write */
+            coap_code = lwm2m_tlv_firmware_decode(&m_instance_firmware,
+                p_req->payload, p_req->payload_len, tlv_write_callback);
+
+            lwm2m_coap_rsp_send_with_code(p_rsp, coap_code);
             return;
         }
 
@@ -380,31 +385,35 @@ static void on_write(const uint16_t path[3], uint8_t path_len,
 
     } else if ((mask & COAP_CT_MASK_PLAIN_TEXT) ||
                (mask & COAP_CT_MASK_APP_OCTET_STREAM)) {
+
+        if (res != LWM2M_FIRMWARE_PACKAGE_URI) {
+            lwm2m_coap_rsp_send_with_code(p_rsp, COAP_CODE_404_NOT_FOUND);
+            return;
+        }
+
+        if (p_req->payload_len >= URL_SIZE) {
+            LWM2M_WRN("Package URI is too large (%d, max %d)",
+                      p_req->payload_len, URL_SIZE);
+            lwm2m_coap_rsp_send_with_code(p_rsp, COAP_CODE_413_REQUEST_ENTITY_TOO_LARGE);
+          return;
+        }
+
         err = lwm2m_plain_text_firmware_decode(&m_instance_firmware,
                                                res, p_req->payload,
                                                p_req->payload_len);
-
-        /* Trigger the download here in case of plaintext payload */
-        if (!err && res == LWM2M_FIRMWARE_PACKAGE_URI) {
-            p_rsp->header.code = COAP_CODE_204_CHANGED;
-            /* We have been able to decode the payload.
-             * Any errors in the actual URI are reported via
-             * the LwM2M resource by lwm2m_firmware_download.
-             */
-            lwm2m_firmware_download_uri(m_instance_firmware.package_uri.p_val,
-                                        m_instance_firmware.package_uri.len);
-        } else {
-            /* Failed to decode or to process the payload.
-             * We attempted to decode a resource and failed because
-             * - memory contraints or
-             * - the payload contained unexpected data
-             */
-            p_rsp->header.code =
-                (err == ENOTSUP) ? COAP_CODE_404_NOT_FOUND :
-                                   COAP_CODE_400_BAD_REQUEST;
+        if (err) {
+            lwm2m_coap_rsp_send_with_code(p_rsp, COAP_CODE_413_REQUEST_ENTITY_TOO_LARGE);
+            return;
         }
 
-        lwm2m_coap_rsp_send(p_rsp);
+        /* We have been able to decode the payload.
+         * Any errors in the actual URI are reported via
+         * the LwM2M resource by lwm2m_firmware_download.
+         */
+        lwm2m_firmware_download_uri(m_instance_firmware.package_uri.p_val,
+                                    m_instance_firmware.package_uri.len);
+
+        lwm2m_coap_rsp_send_with_code(p_rsp, COAP_CODE_204_CHANGED);
         return;
     }
 

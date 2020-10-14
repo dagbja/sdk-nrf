@@ -10,6 +10,10 @@
 #ifndef LWM2M_FIRWMARE_H__
 #define LWM2M_FIRMWARE_H__
 
+#define HOST_SIZE CONFIG_DOWNLOAD_CLIENT_MAX_HOSTNAME_SIZE
+#define FILE_SIZE CONFIG_DOWNLOAD_CLIENT_MAX_FILENAME_SIZE
+#define URL_SIZE (HOST_SIZE + FILE_SIZE + 8 /* schema */)
+
 void lwm2m_firmware_init_acl(void);
 void lwm2m_firmware_init(void);
 

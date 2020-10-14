@@ -44,10 +44,6 @@
 /* Number of times to retry a download */
 #define DOWNLOAD_RETRIES 8
 
-#define HOST_SIZE CONFIG_DOWNLOAD_CLIENT_MAX_HOSTNAME_SIZE
-#define FILE_SIZE CONFIG_DOWNLOAD_CLIENT_MAX_FILENAME_SIZE
-#define URL_SIZE (HOST_SIZE + FILE_SIZE + 8 /* schema */)
-
 #define NET_REG_OFFLINE 0
 
 /* TODO: these are used by Pull-FOTA via CoAP only, not by Push-FOTA (inband).
@@ -651,23 +647,27 @@ int lwm2m_firmware_download_uri(char *uri, size_t len)
 {
 	char *p;
 
-	len = MIN(len, sizeof(url) - 1);
-	uri[len] = '\0';
+	if (len >= sizeof(url)) {
+		return -ENOMEM;
+	}
+
+	memcpy(url, uri, len);
+	url[len] = '\0';
 
 	LWM2M_INF("Package URI: %s (%d)",
-		  lwm2m_os_log_strdup(uri), strlen(uri));
+		  lwm2m_os_log_strdup(url), strlen(url));
 
 	/* Find the start of the hostname */
-	p = strstr(uri, "//");
+	p = strstr(url, "//");
 	if (!p) {
 		lwm2m_firmware_update_result_set(0, RESULT_ERROR_UNSUP_PROTO);
 		return -EINVAL;
 	}
 
-	if (!strncmp(uri, "https", strlen("https"))) {
+	if (!strncmp(url, "https", strlen("https"))) {
 		config.sec_tag = CONFIG_NRF_LWM2M_CARRIER_SEC_TAG;
 	} else if (IS_ENABLED(CONFIG_COAP) &&
-		   !strncmp(uri, "coaps", strlen("coaps"))) {
+		   !strncmp(url, "coaps", strlen("coaps"))) {
 		config.sec_tag = operator_is_vzw(true) ? VZW_DM_SEC_TAG :
 							 ATT_DM_SEC_TAG;
 	} else {
@@ -676,8 +676,7 @@ int lwm2m_firmware_download_uri(char *uri, size_t len)
 	}
 
 	/* Save the URL to resume the download on boot after a power loss */
-	lwm2m_firmware_uri_set(uri, strlen(uri));
-	memcpy(url, uri, len);
+	lwm2m_firmware_uri_set(url, strlen(url));
 
 	/* Setup PDN, unless debugging */
 	if (!lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
