@@ -130,6 +130,7 @@ struct connection_update_t {
 
 static struct connection_update_t m_connection_update[1+LWM2M_MAX_SERVERS];
 static bool m_use_client_holdoff_timer;
+static bool m_lte_ready;
 static bool m_registration_ready;
 static bool m_ack_sms;
 
@@ -2144,7 +2145,11 @@ static void app_connect(void)
         } else if (lwm2m_security_bootstrapped_get()) {
             lwm2m_state_set(LWM2M_STATE_IDLE);
             app_init_connection_update();
-            (void)app_event_notify(LWM2M_CARRIER_EVENT_LTE_READY, NULL);
+
+            if (!m_lte_ready) {
+                m_lte_ready = true;
+                (void)app_event_notify(LWM2M_CARRIER_EVENT_LTE_READY, NULL);
+            }
         } else {
             int32_t hold_off_time = lwm2m_security_hold_off_timer_get();
             if (hold_off_time > 0) {
@@ -3191,7 +3196,10 @@ void lwm2m_net_reg_stat_cb(uint32_t net_stat)
             LWM2M_INF("Registered to roaming network");
             lwm2m_request_disconnect();
 
-            (void)app_event_notify(LWM2M_CARRIER_EVENT_LTE_READY, NULL);
+            if (!m_lte_ready) {
+                m_lte_ready = true;
+                (void)app_event_notify(LWM2M_CARRIER_EVENT_LTE_READY, NULL);
+            }
         }
         else if (net_stat != APP_NET_REG_STAT_SEARCHING)
         {
