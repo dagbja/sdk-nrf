@@ -54,7 +54,7 @@
 #define ATT_DM_SEC_TAG 27
 
 static char apn[64];
-static char url[URL_SIZE];
+static char package_url[URL_SIZE];
 static uint32_t flash_size;
 static bool check_file_size;
 
@@ -458,7 +458,7 @@ static void download_task(void *w)
 	/* Offset must be explicitly set when non-zero */
 	dfusock_offset_set(off);
 
-	err = lwm2m_os_download_connect(url, &config);
+	err = lwm2m_os_download_connect(package_url, &config);
 	if (err) {
 		LWM2M_ERR("Failed to connect %d", err);
 		if (err == -ENETUNREACH) {
@@ -482,7 +482,7 @@ static void download_task(void *w)
 		return;
 	}
 
-	err = lwm2m_os_download_start(url, off);
+	err = lwm2m_os_download_start(package_url, off);
 	if (err) {
 		lwm2m_firmware_state_set(0, STATE_IDLE);
 		lwm2m_firmware_update_result_set(0, RESULT_ERROR_CONN_LOST);
@@ -647,27 +647,27 @@ int lwm2m_firmware_download_uri(char *uri, size_t len)
 {
 	char *p;
 
-	if (len >= sizeof(url)) {
+	if (len >= sizeof(package_url)) {
 		return -ENOMEM;
 	}
 
-	memcpy(url, uri, len);
-	url[len] = '\0';
+	memcpy(package_url, uri, len);
+	package_url[len] = '\0';
 
 	LWM2M_INF("Package URI: %s (%d)",
-		  lwm2m_os_log_strdup(url), strlen(url));
+		  lwm2m_os_log_strdup(package_url), strlen(package_url));
 
 	/* Find the start of the hostname */
-	p = strstr(url, "//");
+	p = strstr(package_url, "//");
 	if (!p) {
 		lwm2m_firmware_update_result_set(0, RESULT_ERROR_UNSUP_PROTO);
 		return -EINVAL;
 	}
 
-	if (!strncmp(url, "https", strlen("https"))) {
+	if (!strncmp(package_url, "https", strlen("https"))) {
 		config.sec_tag = CONFIG_NRF_LWM2M_CARRIER_SEC_TAG;
 	} else if (IS_ENABLED(CONFIG_COAP) &&
-		   !strncmp(url, "coaps", strlen("coaps"))) {
+		   !strncmp(package_url, "coaps", strlen("coaps"))) {
 		config.sec_tag = operator_is_vzw(true) ? VZW_DM_SEC_TAG :
 							 ATT_DM_SEC_TAG;
 	} else {
@@ -676,7 +676,7 @@ int lwm2m_firmware_download_uri(char *uri, size_t len)
 	}
 
 	/* Save the URL to resume the download on boot after a power loss */
-	lwm2m_firmware_uri_set(url, strlen(url));
+	lwm2m_firmware_uri_set(package_url, strlen(package_url));
 
 	/* Setup PDN, unless debugging */
 	if (!lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
@@ -699,7 +699,7 @@ int lwm2m_firmware_download_uri(char *uri, size_t len)
 	/* Global flag to check file size */
 	check_file_size = true;
 
-	carrier_evt_send(LWM2M_CARRIER_EVENT_FOTA_START, url);
+	carrier_evt_send(LWM2M_CARRIER_EVENT_FOTA_START, package_url);
 	lwm2m_os_timer_start(download_dwork, NO_WAIT);
 
 	return 0;
