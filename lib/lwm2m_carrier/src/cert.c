@@ -13,8 +13,8 @@
 #define GREEN "\e[0;32m"
 
 static const char ca_chain[] = {
-	#include "../certs/DigiCertGlobalRootCA.pem" /* VzW and AT&T*/
-	#include "../certs/DigiCertGlobalRootG2.pem" /* Motive */
+	#include "../certs/DigiCertGlobalRootG2.pem"	/* VzW and Motive */
+	#include "../certs/DSTRootCA-X3.pem"		/* AT&T interop */
 };
 
 BUILD_ASSERT(sizeof(ca_chain) < 4096, "CA chain is too large");
