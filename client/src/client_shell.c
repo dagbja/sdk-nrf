@@ -1632,6 +1632,16 @@ static int cmd_device_print(const struct shell *shell, size_t argc, char **argv)
     }
     shell_print(shell, "  Error codes       %s", buf);
 
+    offset = 0;
+    for (int i = 0; i < device_obj_instance->ext_dev_info.len; i++)
+    {
+        uint32_t ext_dev_info = (uint32_t)device_obj_instance->ext_dev_info.val.p_int32[i];
+
+        offset += snprintf(&buf[offset], sizeof(buf) - offset, "%d:%d ",
+                           ext_dev_info >> 16, ext_dev_info & 0xffff);
+    }
+    shell_print(shell, "  Ext device info   %s", buf);
+
     return 0;
 }
 

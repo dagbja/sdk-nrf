@@ -24,6 +24,7 @@ static lwm2m_string_t m_apn[LWM2M_CONNECTIVITY_MONITORING_MAX_APNS];
 static uint8_t        m_avail_power_sources[LWM2M_DEVICE_MAX_POWER_SOURCES];
 static int32_t        m_power_source_voltage[LWM2M_DEVICE_MAX_POWER_SOURCES];
 static int32_t        m_power_source_current[LWM2M_DEVICE_MAX_POWER_SOURCES];
+static int32_t        m_ext_dev_info[LWM2M_DEVICE_MAX_DEV_INFO];
 static int32_t        m_error_codes[LWM2M_DEVICE_MAX_ERROR_CODES];
 
 // APN Connection Profile object
@@ -395,6 +396,7 @@ void lwm2m_instance_device_init(lwm2m_device_t * p_instance)
     p_instance->operations[19] = READ | WRATT | DISC | OBSV;
     p_instance->operations[20] = READ | WRATT | DISC | OBSV;
     p_instance->operations[21] = READ | WRATT | DISC | OBSV;
+    p_instance->operations[22] = READ | DISC;
 
     // Set resource IDs.
     p_instance->resource_ids[0]  = LWM2M_DEVICE_MANUFACTURER;
@@ -419,6 +421,7 @@ void lwm2m_instance_device_init(lwm2m_device_t * p_instance)
     p_instance->resource_ids[19] = LWM2M_DEVICE_SOFTWARE_VERSION;
     p_instance->resource_ids[20] = LWM2M_DEVICE_BATTERY_STATUS;
     p_instance->resource_ids[21] = LWM2M_DEVICE_MEMORY_TOTAL;
+    p_instance->resource_ids[22] = LWM2M_DEVICE_EXT_DEV_INFO;
 
     // Setup lists.
     p_instance->avail_power_sources.type          = LWM2M_LIST_TYPE_UINT8;
@@ -435,6 +438,12 @@ void lwm2m_instance_device_init(lwm2m_device_t * p_instance)
     p_instance->power_source_current.p_id         = NULL;
     p_instance->power_source_current.val.p_int32  = m_power_source_current;
     p_instance->power_source_current.max_len      = LWM2M_DEVICE_MAX_POWER_SOURCES;
+
+    p_instance->ext_dev_info.type                 = LWM2M_LIST_TYPE_INT32;
+    p_instance->ext_dev_info.p_id                 = NULL;
+    p_instance->ext_dev_info.val.p_int32          = m_ext_dev_info;
+    p_instance->ext_dev_info.len                  = 0;
+    p_instance->ext_dev_info.max_len              = LWM2M_DEVICE_MAX_DEV_INFO;
 
     p_instance->error_code.type                   = LWM2M_LIST_TYPE_INT32;
     p_instance->error_code.p_id                   = NULL;

@@ -1841,6 +1841,12 @@ static void app_carrier_objects_setup(void)
 
     if (operator_is_att(true))
     {
+        int32_t ext_dev_info;
+
+        // Set ExtDevInfo
+        ext_dev_info = LWM2M_OBJ_PORTFOLIO << 16;
+        lwm2m_device_ext_dev_info_set(&ext_dev_info, 1);
+
         // Add APN connection profile support.
         if (lwm2m_lookup_object(&p_object, LWM2M_OBJ_APN_CONNECTION_PROFILE) != 0) {
             lwm2m_apn_conn_prof_init();
@@ -1866,6 +1872,8 @@ static void app_carrier_objects_setup(void)
     {
         size_t progress;
         lwm2m_instance_t *p_instance = NULL;
+
+        lwm2m_device_ext_dev_info_clear();
 
         /* Remove all object instances from the request handler. */
         while (lwm2m_instance_next(&p_instance, &progress))

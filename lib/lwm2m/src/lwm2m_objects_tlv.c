@@ -1480,6 +1480,15 @@ uint32_t lwm2m_tlv_device_encode(uint8_t        * p_buffer,
             break;
         }
 
+        case LWM2M_DEVICE_EXT_DEV_INFO:
+        {
+            err_code = lwm2m_tlv_list_encode(p_buffer,
+                                             p_buffer_len,
+                                             LWM2M_DEVICE_EXT_DEV_INFO,
+                                             &p_device->ext_dev_info);
+            break;
+        }
+
         case LWM2M_NAMED_OBJECT:
         {
             // This is a callback to the instance, not a specific resource.

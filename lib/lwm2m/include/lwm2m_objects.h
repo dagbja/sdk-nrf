@@ -180,9 +180,11 @@ extern "C" {
 #define LWM2M_DEVICE_SOFTWARE_VERSION           19
 #define LWM2M_DEVICE_BATTERY_STATUS             20
 #define LWM2M_DEVICE_MEMORY_TOTAL               21
+#define LWM2M_DEVICE_EXT_DEV_INFO               22
 
 #define LWM2M_DEVICE_MAX_POWER_SOURCES          8
 #define LWM2M_DEVICE_MAX_ERROR_CODES            8
+#define LWM2M_DEVICE_MAX_DEV_INFO               1
 
 /* LWM2M Location */
 #define LWM2M_LOCATION_LATITUDE                 0
@@ -359,8 +361,8 @@ typedef struct
 typedef struct
 {
     lwm2m_instance_t           proto;
-    uint8_t                    operations[22];
-    uint16_t                   resource_ids[22];
+    uint8_t                    operations[23];
+    uint16_t                   resource_ids[23];
 
     /* Public members. */
     lwm2m_string_t             manufacturer;
@@ -385,6 +387,7 @@ typedef struct
     lwm2m_string_t             software_version;
     int32_t                    battery_status;
     int32_t                    memory_total;
+    lwm2m_list_t               ext_dev_info;
 
 } lwm2m_device_t;
 

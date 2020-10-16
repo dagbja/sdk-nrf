@@ -737,6 +737,26 @@ void lwm2m_device_update_carrier_specific_settings(void)
     }
 }
 
+int lwm2m_device_ext_dev_info_set(const int32_t *ext_dev_info, uint8_t ext_dev_info_count)
+{
+    int retval = 0;
+
+    for (int i = 0; i < ext_dev_info_count; i++)
+    {
+        if (retval == 0)
+        {
+            retval = lwm2m_list_integer_set(&m_instance_device.ext_dev_info, i, ext_dev_info[i]);
+        }
+    }
+
+    return retval;
+}
+
+void lwm2m_device_ext_dev_info_clear(void)
+{
+    m_instance_device.ext_dev_info.len = 0;
+}
+
 void lwm2m_device_init(void)
 {
     lwm2m_instance_device_init(&m_instance_device);
