@@ -477,8 +477,10 @@ void lwm2m_request_reset(void)
         // Trigger full Register at next boot instead of doing Update
         for (int i = 1; i < 1+LWM2M_MAX_SERVERS; i++) {
             lwm2m_server_registered_set(i, false);
+            lwm2m_remote_deregister(lwm2m_server_short_server_id_get(i));
         }
         lwm2m_storage_server_store();
+        lwm2m_storage_location_store();
     }
 
     m_app_state = LWM2M_STATE_RESET;
