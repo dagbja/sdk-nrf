@@ -279,7 +279,8 @@ void lwm2m_os_log(int level, const char *fmt, ...)
 	}
 }
 
-void lwm2m_os_logdump(const char *str, const void *data, size_t len) {
+void lwm2m_os_logdump(const char *str, const void *data, size_t len)
+{
 	if (IS_ENABLED(CONFIG_LOG)) {
 		int level = LOG_LEVEL_INF;
 		struct log_msg_ids src_level = {
