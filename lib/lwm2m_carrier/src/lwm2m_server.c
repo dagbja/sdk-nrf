@@ -91,7 +91,13 @@ void lwm2m_server_max_period_set(uint16_t instance_id, lwm2m_time_t value)
 
 lwm2m_time_t lwm2m_server_disable_timeout_get(uint16_t instance_id)
 {
-    return m_instance_server[instance_id].disable_timeout;
+    lwm2m_time_t disable_timeout = m_instance_server[instance_id].disable_timeout;
+
+    if (disable_timeout == 0) {
+        disable_timeout = 86400; // If disable timeout is not set, a default timeout value is 86400 (1 day).
+    }
+
+    return disable_timeout;
 }
 
 void lwm2m_server_disable_timeout_set(uint16_t instance_id, lwm2m_time_t value)
