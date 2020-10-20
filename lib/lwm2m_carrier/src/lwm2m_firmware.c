@@ -448,13 +448,15 @@ static void on_exec(uint16_t res, coap_message_t *p_req)
         return;
     }
 
-    /* Verizon will send an observe request on /5/0/3 after
-     * executing /5/0/2, so wait a bit a for it before rebooting.
+    /* The server (Motive) will send an observe request on /5/0/3
+     * after executing /5/0/2 during in-band FOTA.
+     * In any case, we should wait a bit in case we have to notify
+     * /5/0/3 to let the packets be sent on air.
      */
     if (operator_is_vzw(true)) {
         lwm2m_firmware_download_reboot_schedule(SECONDS(6));
     } else {
-        lwm2m_firmware_download_reboot_schedule(NO_WAIT);
+        lwm2m_firmware_download_reboot_schedule(SECONDS(3));
     }
 }
 

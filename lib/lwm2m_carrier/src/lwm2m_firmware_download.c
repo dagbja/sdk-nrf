@@ -502,9 +502,6 @@ static void reboot_task(void *w)
 		return;
 	}
 
-	LWM2M_INF("Firmware update scheduled at boot");
-	lwm2m_firmware_state_set(0, STATE_UPDATING);
-
 	/* Reset to continue FOTA update */
 	lwm2m_request_reset();
 }
@@ -763,6 +760,14 @@ int lwm2m_firmware_download_apply(void)
 	if (err) {
 		return err;
 	}
+
+	LWM2M_INF("Firmware update scheduled at boot");
+
+	/* Set resource state now. If it is observed, we should wait a few
+	 * seconds to ensure it is sent on air. That's done by the reboot
+	 * task that is scheduled by the caller of this function.
+	 */
+	lwm2m_firmware_state_set(0, STATE_UPDATING);
 
 	return 0;
 }
