@@ -28,7 +28,7 @@ manifest:
     # Source West manifest. Modules are imported from there.
     - name: nrf
       url: https://github.com/nrfconnect/sdk-nrf
-      revision: v1.4.0-rc1
+      revision: 8d1bb10e0c503bea3d390930b8549efef6fa7d96
       import:
         name-whitelist:
           - zephyr
