@@ -28,7 +28,7 @@ manifest:
     # Source West manifest. Modules are imported from there.
     - name: nrf
       url: https://github.com/nrfconnect/sdk-nrf
-      revision: 8d1bb10e0c503bea3d390930b8549efef6fa7d96
+      revision: v1.4.0
       import:
         name-whitelist:
           - zephyr
@@ -40,8 +40,8 @@ manifest:
     # Overrides modules/projects versions from nrf import.
     #- name: nrfxlib
     #  url: https://github.com/nrfconnect/sdk-nrfxlib
-    #  revision: f1dd2ee510f39e27ea4102bad369c026c0dad147
-    #
+    #  revision: pull/302/head
+
     #- name: mbedtls-nrf
     #  url: https://github.com/ARMmbed/mbedtls
     #  revision: mbedtls-2.16.6
