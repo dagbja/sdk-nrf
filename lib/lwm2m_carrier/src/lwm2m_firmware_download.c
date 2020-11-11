@@ -675,8 +675,8 @@ int lwm2m_firmware_download_uri(char *uri, size_t len)
 	/* Save the URL to resume the download on boot after a power loss */
 	lwm2m_firmware_uri_set(package_url, strlen(package_url));
 
-	/* Setup PDN, unless debugging */
-	if (!lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
+	/* Select an APN when on live network */
+	if (operator_is_supported(false)) {
 		len = lwm2m_carrier_apn_get(apn, sizeof(apn));
 		if (len > 0) {
 			config.apn = apn;
