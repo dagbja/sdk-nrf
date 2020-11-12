@@ -23,43 +23,15 @@
  */
 #define DEFAULT_PDN_FD (-1)
 
-/**@brief Connect to a packet data network.
- *
- * Creates a PDN socket and connect to an access point, if necessary.
- *
- * @param[in,out]	fd			The socket handle.
- * @param[in]		apn			The packet data network name.
- * @param[out]		esm_code	ESM error code in case of failure if not NULL.
- *
- * @return 0 if PDN socket was valid and already connected.
- * @return 1 if PDN socket has been recreated.
- * @return -1 on error.
- */
-int lwm2m_pdn_activate(int *fd, const char *apn, int *esm_code);
-
-/** @brief Get PDN Context ID (CID) of the socket.
- *
- * @param[in]	fd	The socket handle.
- *
- * @return CID or -1 on error.
- */
-int lwm2m_pdn_cid_get(int fd);
-
-/** @brief Get ESM error code by socket handle.
- *
- * @param[in]	fd	The socket handle.
- *
- * @return ESM code or -1 on error.
- */
-int lwm2m_pdn_esm_error_code_get(int fd);
-
-/** @brief Reset ESM error code by socket handle.
- *
- * @param[in]	fd	The socket handle.
- *
- * @return Zero on success, -1 otherwise.
- */
-int lwm2m_pdn_esm_error_code_reset(int fd);
-
+void lwm2m_pdn_init(void);
+bool lwm2m_pdn_activate(bool *p_pdn_activated, nrf_sa_family_t *p_pdn_type_allowed);
+void lwm2m_pdn_deactivate(void);
+void lwm2m_pdn_check_closed(void);
+bool lwm2m_pdn_first_enabled_apn_instance(void);
+bool lwm2m_pdn_next_enabled_apn_instance(void);
+nrf_sa_family_t lwm2m_pdn_type_allowed(void);
+uint16_t lwm2m_apn_instance(void);
+char *lwm2m_pdn_current_apn(void);
+char *lwm2m_pdn_default_apn(void);
 
 #endif /* LWM2M_PDN_H__ */

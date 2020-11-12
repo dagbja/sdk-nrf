@@ -35,6 +35,8 @@
 #include <lwm2m_os.h>
 #include <lwm2m_access_control.h>
 
+#include <lwm2m_carrier_client.h>
+
 #define PLURALIZE(n) (n == 1 ? "" : "s")
 
 static int cmd_at_command(const struct shell *shell, size_t argc, char **argv)
@@ -258,9 +260,9 @@ static int cmd_server_lifetime(const struct shell *shell, size_t argc, char **ar
 
     if (lifetime != lwm2m_server_lifetime_get(instance_id)) {
         // Lifetime changed, send update server
-        lwm2m_request_server_instance_update(instance_id, false);
         lwm2m_server_lifetime_set(instance_id, lifetime);
         lwm2m_storage_server_store();
+        lwm2m_client_update(instance_id);
 
         shell_print(shell, "Set lifetime %d: %d", instance_id, lifetime);
     }
@@ -411,7 +413,7 @@ static int cmd_debug_msisdn(const struct shell *shell, size_t argc, char **argv)
     lwm2m_conn_ext_msisdn_set(p_msisdn, msisdn_len);
 
     for (uint32_t i = 1; i < 1 + LWM2M_MAX_SERVERS; i++) {
-        lwm2m_request_server_update(i, false);
+        lwm2m_client_update(i);
     }
 
     if (msisdn_len) {
@@ -974,38 +976,18 @@ static int cmd_lwm2m_update(const struct shell *shell, size_t argc, char **argv)
 
     uint16_t instance_id = atoi(argv[1]);
 
-    if (instance_id < 1 || instance_id >= (1+LWM2M_MAX_SERVERS))
+    if (instance_id >= (1+LWM2M_MAX_SERVERS))
     {
-        shell_print(shell, "instance must be between 1 and %d", LWM2M_MAX_SERVERS);
+        shell_print(shell, "instance must be between 0 and %d", LWM2M_MAX_SERVERS);
         return 0;
     }
 
-    if (lwm2m_state_get() == LWM2M_STATE_IDLE) {
-        if (lwm2m_server_registered_get(instance_id)) {
-            lwm2m_request_server_instance_update(instance_id, true);
-        } else {
-            shell_print(shell, "instance %u is not registered", instance_id);
-        }
-    } else {
-        shell_print(shell, "Not registered");
-    }
+    lwm2m_client_update(instance_id);
 
     return 0;
 }
 
 
-static int cmd_lwm2m_deregister(const struct shell *shell, size_t argc, char **argv)
-{
-    if (lwm2m_state_get() == LWM2M_STATE_IDLE) {
-        lwm2m_request_deregister();
-    } else {
-        shell_print(shell, "Not registered");
-    }
-
-    return 0;
-}
-
-extern void app_server_disable(uint16_t security_instance);
 static int cmd_lwm2m_disable(const struct shell *shell, size_t argc, char **argv)
 {
     if (argc != 2) {
@@ -1020,160 +1002,7 @@ static int cmd_lwm2m_disable(const struct shell *shell, size_t argc, char **argv
         return 0;
     }
 
-    if (lwm2m_state_get() == LWM2M_STATE_IDLE) {
-        app_server_disable(instance_id);
-    } else {
-        shell_print(shell, "Not registered");
-    }
-
-    return 0;
-}
-
-
-static int cmd_lwm2m_disconnect(const struct shell *shell, size_t argc, char **argv)
-{
-    if (argc == 2) {
-        uint16_t instance_id = atoi(argv[1]);
-
-        if (instance_id < 1 || instance_id >= (1+LWM2M_MAX_SERVERS))
-        {
-            shell_print(shell, "instance must be between 1 and %d", LWM2M_MAX_SERVERS);
-            return 0;
-        }
-
-        lwm2m_request_server_disconnect(instance_id);
-        return 0;
-    }
-
-    if (lwm2m_state_get() != LWM2M_STATE_DISCONNECTED) {
-        lwm2m_request_disconnect();
-    } else {
-        shell_print(shell, "Not connected");
-    }
-
-    return 0;
-}
-
-
-static int cmd_lwm2m_status(const struct shell *shell, size_t argc, char **argv)
-{
-    char ip_version[] = "IPvX";
-    ip_version[3] = (lwm2m_family_type_get(lwm2m_security_instance()) == NRF_AF_INET6) ? '6' : '4';
-    int32_t retry_delay;
-
-    if (lwm2m_did_bootstrap()) {
-        shell_print(shell, "Bootstrap completed [%s]", (lwm2m_family_type_get(0) == NRF_AF_INET6) ? "IPv6" : "IPv4");
-    }
-
-    for (int i = 0; i < (1+LWM2M_MAX_SERVERS); i++) {
-        if (lwm2m_server_registered_get(i)) {
-            shell_print(shell, "Server %d registered [%s]", i, (lwm2m_family_type_get(i) == NRF_AF_INET6) ? "IPv6" : "IPv4");
-        }
-    }
-
-    switch(lwm2m_state_get())
-    {
-        case LWM2M_STATE_BOOTING:
-            shell_print(shell, "Initializing");
-            break;
-        case LWM2M_STATE_IDLE:
-            // Already printed above
-            break;
-        case LWM2M_STATE_REQUEST_CONNECT:
-            shell_print(shell, "Request connect");
-            break;
-        case LWM2M_STATE_BS_HOLD_OFF:
-            shell_print(shell, "Bootstrap hold off");
-            break;
-        case LWM2M_STATE_BS_CONNECT:
-            shell_print(shell, "Bootstrap connecting [%s]", ip_version);
-            break;
-        case LWM2M_STATE_BS_CONNECT_WAIT:
-            shell_print(shell, "Bootstrap connect wait [%s]", ip_version);
-            break;
-        case LWM2M_STATE_BS_CONNECT_RETRY_WAIT:
-            retry_delay = lwm2m_retry_delay_connect_get(0, NULL);
-            if (retry_delay != -1) {
-                int32_t delay = lwm2m_state_update_delay() / SECONDS(1);
-                shell_print(shell, "Bootstrap connect delay: %d minutes (%d seconds left) [%s]",
-                            retry_delay / MINUTES(1), delay, ip_version);
-            } else {
-                shell_print(shell, "Bootstrap connect timed wait [%s]", ip_version);
-            }
-            break;
-        case LWM2M_STATE_BS_CONNECTED:
-            shell_print(shell, "Bootstrap connected [%s]", ip_version);
-            break;
-        case LWM2M_STATE_BOOTSTRAP_REQUESTED:
-            shell_print(shell, "Bootstrap requested [%s]", ip_version);
-            break;
-        case LWM2M_STATE_BOOTSTRAP_WAIT:
-            retry_delay = lwm2m_retry_delay_connect_get(0, NULL);
-            if (retry_delay != -1) {
-                int32_t delay = lwm2m_state_update_delay() / SECONDS(1);
-                shell_print(shell, "Bootstrap delay: %d minutes (%d seconds left) [%s]",
-                            retry_delay / MINUTES(1), delay, ip_version);
-            } else {
-                shell_print(shell, "Bootstrap wait [%s]", ip_version);
-            }
-            break;
-        case LWM2M_STATE_BOOTSTRAPPING:
-            shell_print(shell, "Bootstrapping [%s]", ip_version);
-            break;
-        case LWM2M_STATE_CLIENT_HOLD_OFF:
-            shell_print(shell, "Client hold off (server %d)", lwm2m_security_instance());
-            break;
-        case LWM2M_STATE_SERVER_CONNECT:
-            shell_print(shell, "Server %d connecting [%s]", lwm2m_security_instance(), ip_version);
-            break;
-        case LWM2M_STATE_SERVER_CONNECT_WAIT:
-            shell_print(shell, "Server %d connect wait [%s]", lwm2m_security_instance(), ip_version);
-            break;
-        case LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT:
-            retry_delay = lwm2m_retry_delay_connect_get(lwm2m_security_instance(), NULL);
-            if (retry_delay != -1) {
-                int32_t delay = lwm2m_state_update_delay() / SECONDS(1);
-                shell_print(shell, "Server %d connect delay: %d minutes (%d seconds left) [%s]",
-                            lwm2m_security_instance(), retry_delay / MINUTES(1), delay, ip_version);
-            } else {
-                shell_print(shell, "Server %d connect timed wait [%s]", lwm2m_security_instance(), ip_version);
-            }
-            break;
-        case LWM2M_STATE_SERVER_CONNECTED:
-            shell_print(shell, "Server %d connected [%s]", lwm2m_security_instance(), ip_version);
-            break;
-        case LWM2M_STATE_SERVER_REGISTER_WAIT:
-            retry_delay = lwm2m_retry_delay_connect_get(lwm2m_security_instance(), NULL);
-            if (retry_delay != -1) {
-                int32_t delay = lwm2m_state_update_delay() / SECONDS(1);
-                shell_print(shell, "Server %d register delay: %d minutes (%d seconds left) [%s]",
-                            lwm2m_security_instance(), retry_delay / MINUTES(1), delay, ip_version);
-            } else {
-                shell_print(shell, "Server %d register wait [%s]", lwm2m_security_instance(), ip_version);
-            }
-            break;
-        case LWM2M_STATE_SERVER_DEREGISTER:
-            shell_print(shell, "Server %d deregister", lwm2m_security_instance());
-            break;
-        case LWM2M_STATE_SERVER_DEREGISTERING:
-            shell_print(shell, "Server %d deregistering", lwm2m_security_instance());
-            break;
-        case LWM2M_STATE_REQUEST_DISCONNECT:
-            shell_print(shell, "Request disconnect");
-            break;
-        case LWM2M_STATE_DISCONNECTED:
-            shell_print(shell, "Disconnected");
-            break;
-        case LWM2M_STATE_SHUTDOWN:
-            shell_print(shell, "Shutdown");
-            break;
-        case LWM2M_STATE_ERROR:
-            shell_print(shell, "Error");
-            break;
-        default:
-            shell_print(shell, "Unknown state: %d", lwm2m_state_get());
-            break;
-    };
+    lwm2m_client_disable(instance_id);
 
     return 0;
 }
@@ -2253,11 +2082,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_flash,
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_lwm2m,
     SHELL_CMD(bootstrap, NULL, "Bootstrap", cmd_lwm2m_bootstrap),
-    SHELL_CMD(deregister, NULL, "Deregister server", cmd_lwm2m_deregister),
     SHELL_CMD(disable, NULL, "Disable server", cmd_lwm2m_disable),
-    SHELL_CMD(disconnect, NULL, "Disconnect server", cmd_lwm2m_disconnect),
     SHELL_CMD(register, NULL, "Register server", cmd_lwm2m_register),
-    SHELL_CMD(status, NULL, "Connection status", cmd_lwm2m_status),
     SHELL_CMD(update, NULL, "Update server", cmd_lwm2m_update),
     SHELL_SUBCMD_SET_END /* Array terminated. */
 );

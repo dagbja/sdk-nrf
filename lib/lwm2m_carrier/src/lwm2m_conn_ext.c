@@ -17,6 +17,7 @@
 #include <lwm2m_instance_storage.h>
 #include <at_interface.h>
 #include <lwm2m_access_control.h>
+#include <lwm2m_carrier_client.h>
 
 #define DEFAULT_APN_RETRIES               2
 #define DEFAULT_APN_RETRY_PERIOD          0
@@ -172,9 +173,9 @@ uint32_t conn_ext_instance_callback(lwm2m_instance_t * p_instance,
         {
             lwm2m_last_used_msisdn_set(m_instance_conn_ext.msisdn.p_val, m_instance_conn_ext.msisdn.len);
 
-            for (uint32_t i = 1; i < 1 + LWM2M_MAX_SERVERS; i++)
+            for (uint32_t i = 0; i < 1 + LWM2M_MAX_SERVERS; i++)
             {
-                lwm2m_request_server_update(i, false);
+                lwm2m_client_update(i);
             }
         }
 

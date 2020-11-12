@@ -15,6 +15,7 @@
 #include <lwm2m_apn_conn_prof.h>
 #include <coap_message.h>
 #include <lwm2m_carrier_main.h>
+#include <lwm2m_pdn.h>
 #include <at_interface.h>
 #include <lwm2m_instance_storage.h>
 #include <operator_check.h>
@@ -463,7 +464,7 @@ void lwm2m_apn_conn_prof_init(void)
         char * p_apn = m_apn_default[i];
         if (i == LWM2M_APN_CONN_PROF_DEFAULT_INSTANCE)
         {
-            p_apn = lwm2m_default_apn_get();
+            p_apn = lwm2m_pdn_default_apn();
             m_default_apn_instance = i;
         }
 

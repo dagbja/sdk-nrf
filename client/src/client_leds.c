@@ -32,56 +32,6 @@ static void app_leds_get_state(uint8_t *on, uint8_t *blink)
             *on = DK_LED1_MSK;
             break;
 
-        case LWM2M_STATE_BS_CONNECT:
-        case LWM2M_STATE_BS_CONNECT_WAIT:
-            *blink = (DK_LED1_MSK | DK_LED2_MSK);
-            break;
-
-        case LWM2M_STATE_BS_CONNECT_RETRY_WAIT:
-            *blink = (DK_LED2_MSK | DK_LED4_MSK);
-            break;
-
-        case LWM2M_STATE_BS_CONNECTED:
-        case LWM2M_STATE_BOOTSTRAP_REQUESTED:
-            *on = DK_LED1_MSK;
-            *blink = DK_LED2_MSK;
-            break;
-
-        case LWM2M_STATE_BOOTSTRAP_WAIT:
-            *on = DK_LED1_MSK;
-            *blink = (DK_LED2_MSK | DK_LED4_MSK);
-            break;
-
-        case LWM2M_STATE_BOOTSTRAPPING:
-        case LWM2M_STATE_BOOTSTRAP_TIMEDOUT:
-            *on = (DK_LED1_MSK | DK_LED2_MSK);
-            *blink = DK_LED4_MSK;
-            break;
-
-        case LWM2M_STATE_BS_HOLD_OFF:
-        case LWM2M_STATE_CLIENT_HOLD_OFF:
-            *on = (DK_LED1_MSK | DK_LED2_MSK);
-            break;
-
-        case LWM2M_STATE_SERVER_CONNECT:
-        case LWM2M_STATE_SERVER_CONNECT_WAIT:
-            *blink = (DK_LED1_MSK | DK_LED3_MSK);
-            break;
-
-        case LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT:
-            *blink = (DK_LED3_MSK | DK_LED4_MSK);
-            break;
-
-        case LWM2M_STATE_SERVER_CONNECTED:
-            *on = DK_LED1_MSK;
-            *blink = DK_LED3_MSK;
-            break;
-
-        case LWM2M_STATE_SERVER_REGISTER_WAIT:
-            *on = DK_LED1_MSK;
-            *blink = (DK_LED3_MSK | DK_LED4_MSK);
-            break;
-
         case LWM2M_STATE_IDLE:
             *on = (DK_LED1_MSK | DK_LED3_MSK);
             break;
@@ -89,8 +39,6 @@ static void app_leds_get_state(uint8_t *on, uint8_t *blink)
         case LWM2M_STATE_REQUEST_LINK_UP:
         case LWM2M_STATE_REQUEST_LINK_DOWN:
         case LWM2M_STATE_REQUEST_CONNECT:
-        case LWM2M_STATE_SERVER_DEREGISTER:
-        case LWM2M_STATE_SERVER_DEREGISTERING:
         case LWM2M_STATE_REQUEST_DISCONNECT:
             *on = DK_LED3_MSK;
             *blink = DK_LED1_MSK;

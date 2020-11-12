@@ -10,6 +10,7 @@
 #include <lwm2m.h>
 #include <sms_receive.h>
 #include <lwm2m_carrier_main.h>
+#include <lwm2m_carrier_client.h>
 
 #define SMS_BOOTSTRAP_TEXT_MSG  "E2F79B3EA7CBC370"  // 7bit encoded "bootstrap" as HEX
 #define SMS_BOOTSTRAP_TEXT_LEN  (sizeof(SMS_BOOTSTRAP_TEXT_MSG) - 1)
@@ -82,7 +83,7 @@ int sms_receiver_notif_parse(const char *notif)
         if (object == 1 && instance >= 0 && instance < 4 && resource == 8) {
             // Server Registration Update Trigger
             LWM2M_INF("SMS: Server Registration Update Trigger (server %u)", instance);
-            lwm2m_request_server_instance_update(instance, false);
+            lwm2m_client_update(instance);
         } else if (object == 1 && instance == 0 && resource == 9) {
             // Bootstrap Request Trigger
             LWM2M_INF("SMS: Bootstrap Request Trigger");

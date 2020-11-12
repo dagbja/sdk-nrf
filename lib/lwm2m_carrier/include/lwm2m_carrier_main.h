@@ -17,23 +17,6 @@ typedef enum
     LWM2M_STATE_REQUEST_LINK_UP,
     LWM2M_STATE_REQUEST_LINK_DOWN,
     LWM2M_STATE_REQUEST_CONNECT,
-    LWM2M_STATE_BS_HOLD_OFF,
-    LWM2M_STATE_BS_CONNECT,
-    LWM2M_STATE_BS_CONNECT_WAIT,
-    LWM2M_STATE_BS_CONNECT_RETRY_WAIT,
-    LWM2M_STATE_BS_CONNECTED,
-    LWM2M_STATE_BOOTSTRAP_REQUESTED,
-    LWM2M_STATE_BOOTSTRAP_WAIT,
-    LWM2M_STATE_BOOTSTRAP_TIMEDOUT,
-    LWM2M_STATE_BOOTSTRAPPING,
-    LWM2M_STATE_CLIENT_HOLD_OFF,
-    LWM2M_STATE_SERVER_CONNECT,
-    LWM2M_STATE_SERVER_CONNECT_WAIT,
-    LWM2M_STATE_SERVER_CONNECT_RETRY_WAIT,
-    LWM2M_STATE_SERVER_CONNECTED,
-    LWM2M_STATE_SERVER_REGISTER_WAIT,
-    LWM2M_STATE_SERVER_DEREGISTER,
-    LWM2M_STATE_SERVER_DEREGISTERING,
     LWM2M_STATE_REQUEST_DISCONNECT,
     LWM2M_STATE_DISCONNECTED,
     LWM2M_STATE_MODEM_FIRMWARE_UPDATE,
@@ -43,8 +26,6 @@ typedef enum
 } lwm2m_state_t;
 
 lwm2m_state_t lwm2m_state_get(void);
-
-uint16_t lwm2m_apn_instance(void);
 
 /**
  * @brief Get the device client id.
@@ -66,11 +47,6 @@ char *lwm2m_imei_get(void);
 char *lwm2m_msisdn_get(void);
 
 /**
- * @brief Get default APN.
- */
-char *lwm2m_default_apn_get(void);
-
-/**
  * @brief Get carrier APN.
  *
  * @param[out] buf Buffer to store the APN into.
@@ -79,8 +55,6 @@ char *lwm2m_default_apn_get(void);
  */
 int lwm2m_carrier_apn_get(char *buf, size_t len);
 
-bool lwm2m_carrier_pdn_activate(uint16_t security_instance, int32_t *retry_delay);
-
 /** @brief Acknowledge SMS in library thread. */
 void lwm2m_acknowledge_sms(void);
 
@@ -88,18 +62,18 @@ void lwm2m_request_link_up(void);
 void lwm2m_request_link_down(void);
 void lwm2m_request_bootstrap(void);
 void lwm2m_request_connect(void);
-void lwm2m_request_server_update(uint16_t security_instance, bool reconnect);
-void lwm2m_request_server_instance_update(uint16_t server_instance, bool reconnect);
 bool lwm2m_request_remote_reconnect(struct nrf_sockaddr *p_remote);
-void lwm2m_request_deregister(void);
-void lwm2m_request_server_disconnect(uint16_t security_instance);
 void lwm2m_request_disconnect(void);
 void lwm2m_request_reset(void);
 bool lwm2m_did_bootstrap(void);
-uint16_t lwm2m_security_instance(void);
-nrf_sa_family_t lwm2m_family_type_get(uint16_t security_instance);
 int32_t lwm2m_state_update_delay(void);
 
+void lwm2m_main_bootstrap_reset(void);
+void lwm2m_main_bootstrap_done(void);
+int lwm2m_main_event_notify(uint32_t type, void * data);
+int lwm2m_main_event_error(uint32_t error_code, int32_t error_value);
+
+void lwm2m_set_bootstrapped(bool bootstrapped);
 void lwm2m_bootstrap_clear(void);
 void lwm2m_factory_reset(void);
 void lwm2m_system_shutdown(void);

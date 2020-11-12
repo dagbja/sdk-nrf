@@ -96,7 +96,7 @@ int main(void)
 /* LWM2M background thread - should become a separate module. */
 
 /* These should be configurable. */
-#define LWM2M_CARRIER_THREAD_STACK_SIZE 8192
+#define LWM2M_CARRIER_THREAD_STACK_SIZE 4096
 #define LWLM2_CARRIER_THREAD_PRIORITY K_LOWEST_APPLICATION_THREAD_PRIO
 
 void lwm2m_carrier_thread_run(void)

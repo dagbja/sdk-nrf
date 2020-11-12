@@ -20,13 +20,12 @@
 #include <lwm2m_carrier.h>
 #include <lwm2m_factory_bootstrap.h>
 #include <lwm2m_security.h>
+#include <lwm2m_carrier_client.h>
 
 #include <coap_option.h>
 #include <coap_observe_api.h>
 #include <coap_message.h>
 
-
-extern void app_server_disable(uint16_t instance_id);
 
 #define VERIZON_RESOURCE 30000
 
@@ -432,16 +431,16 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
             return 0;
         }
 
-        if (lwm2m_server_lifetime_get(instance_id) != previous_lifetime)
-        {
-            lwm2m_request_server_instance_update(instance_id, false);
-        }
-
         if (err_code == 0)
         {
             if (lwm2m_storage_server_store() == 0)
             {
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
+
+                if (lwm2m_server_lifetime_get(instance_id) != previous_lifetime)
+                {
+                    lwm2m_client_update(instance_id);
+                }
             }
             else
             {
@@ -478,7 +477,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
             {
                 (void)lwm2m_respond_with_code(COAP_CODE_204_CHANGED, p_request);
 
-                app_server_disable(instance_id);
+                lwm2m_client_disable(instance_id);
                 break;
             }
 
@@ -491,7 +490,7 @@ uint32_t server_instance_callback(lwm2m_instance_t * p_instance,
                     instance_id = 1;
                 }
 #endif
-                lwm2m_request_server_instance_update(instance_id, false);
+                lwm2m_client_update(instance_id);
                 break;
             }
 

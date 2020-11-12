@@ -33,6 +33,8 @@ zephyr_library_sources(
     src/lwm2m_access_control.c
     src/lwm2m_apn_conn_prof.c
     src/lwm2m_carrier_main.c
+    src/lwm2m_carrier_client.c
+    src/lwm2m_client_util.c
     src/lwm2m_conn_ext.c
     src/lwm2m_conn_mon.c
     src/lwm2m_conn_stat.c

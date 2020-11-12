@@ -496,7 +496,11 @@ void lwm2m_deregister_cb(uint32_t status, void * p_arg, coap_message_t * p_messa
                        coap_code,
                        err_code);
 
-    if (p_message)
+   /* Deregister will happen only if a valid response is received upon sending
+    the deregister request. Otherwise, if an empty message (coap_code == 0)
+    is received, the SSID cannot be removed from the database yet, as a deregister
+    timeout will take place to reestablish the connection with the server. */
+    if (p_message && coap_code != 0)
     {
         LWM2M_MUTEX_LOCK();
 

@@ -18,6 +18,7 @@
 #include <lwm2m_apn_conn_prof.h>
 #include <coap_message.h>
 #include <lwm2m_carrier_main.h>
+#include <lwm2m_pdn.h>
 #include <operator_check.h>
 #include <at_interface.h>
 #include <app_debug.h>
