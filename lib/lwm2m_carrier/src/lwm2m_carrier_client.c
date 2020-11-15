@@ -258,6 +258,8 @@ static int32_t client_select_next_apn(client_context_t *ctx)
 {
     int32_t delay = 0;
 
+    k_sem_take(&m_pdn_lock, K_FOREVER);
+
     // Deactivate in case the PDN socket is still open.
     lwm2m_pdn_deactivate();
 
@@ -269,6 +271,8 @@ static int32_t client_select_next_apn(client_context_t *ctx)
         // Moved back to first APN, use retry back off period.
         delay = SECONDS(lwm2m_conn_ext_apn_retry_back_off_period_get(0, lwm2m_apn_instance()));
     }
+
+    k_sem_give(&m_pdn_lock);
 
     return delay;
 }
@@ -294,6 +298,8 @@ static int client_dns_request(client_context_t *ctx)
 
     // Copy to make a 0-terminated string.
     strncpy(uri_copy, p_server_uri, uri_len);
+    uri_copy[uri_len] = '\0';
+
     p_hostname = client_parse_uri(uri_copy, uri_len, &port, &secure);
     if (secure) {
         client_set_secure(ctx);
@@ -412,7 +418,7 @@ static int client_session_setup(client_context_t *ctx)
     coap_sec_config_t setting =
     {
         .role          = 0,    // 0 -> Client role
-        .session_cache = 1,    // 1 -> Enable session cache
+        .session_cache = 0,    // 1 -> Enable session cache
         .sec_tag_count = 1,    // One sec_tag in use.
         .sec_tag_list  = sec_tag_list
     };
@@ -924,9 +930,6 @@ static void client_update_task(struct k_work *work)
 
     LWM2M_INF("Client update [%u]", ctx->short_server_id);
 
-    // Todo: Remove when adding new PDN handling
-    lwm2m_pdn_check_closed();
-
     err_code = client_connect(ctx, &did_connect);
 
     if (err_code != 0) {
@@ -1002,7 +1005,11 @@ static void client_update_task(struct k_work *work)
                 ctx->short_server_id);
 
         client_disconnect(ctx);
-        client_schedule_retry(ctx, &ctx->update_work, lwm2m_os_errno());
+        if (did_connect) {
+            client_schedule_retry(ctx, &ctx->update_work, lwm2m_os_errno());
+        } else {
+            k_delayed_work_submit_to_queue(&ctx->work_q, &ctx->update_work, K_NO_WAIT);
+        }
     } else {
         ctx->retry_count++;
         LWM2M_WRN("Update retry (#%u) [%u]", ctx->retry_count, ctx->short_server_id);
@@ -1072,8 +1079,11 @@ static void client_disable_task(struct k_work *work)
                   ctx->short_server_id);
 
         client_disconnect(ctx);
-        // Todo: Check if we need some retry logic to avoid infinite connect loop
-        k_delayed_work_submit_to_queue(&ctx->work_q, &ctx->disable_work, K_NO_WAIT);
+        if (did_connect) {
+            client_schedule_retry(ctx, &ctx->disable_work, lwm2m_os_errno());
+        } else {
+            k_delayed_work_submit_to_queue(&ctx->work_q, &ctx->disable_work, K_NO_WAIT);
+        }
     } else {
         ctx->retry_count++;
         LWM2M_WRN("Disable retry (#%u) [%u]", ctx->retry_count, ctx->short_server_id);
@@ -1318,7 +1328,9 @@ int lwm2m_client_disconnect(void)
         client_disconnect(ctx);
     }
 
+    k_sem_take(&m_pdn_lock, K_FOREVER);
     lwm2m_pdn_deactivate();
+    k_sem_give(&m_pdn_lock);
 
     return 0;
 }

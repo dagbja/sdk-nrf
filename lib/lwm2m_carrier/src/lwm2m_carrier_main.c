@@ -1154,6 +1154,10 @@ static void app_lwm2m_setup(void)
 
 static void app_connect(void)
 {
+    // First ensure all existing connections are disconnected
+    // because we most likely got a new IP.
+    lwm2m_client_disconnect();
+
     // Read operator ID.
     operator_id_read();
 
@@ -1178,7 +1182,6 @@ static void app_connect(void)
     } else {
         LWM2M_INF("Waiting for home network");
         lwm2m_sms_receiver_disable();
-        lwm2m_client_disconnect();
         m_app_state = LWM2M_STATE_DISCONNECTED;
     }
 }
@@ -1247,8 +1250,6 @@ static int app_lwm2m_process(void)
             break;
         }
     }
-
-    lwm2m_pdn_check_closed();
 
     return 0;
 }
