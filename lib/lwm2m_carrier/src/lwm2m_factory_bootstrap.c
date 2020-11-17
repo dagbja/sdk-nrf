@@ -43,6 +43,8 @@ static void factory_security_bootstrap_default(void)
 
     lwm2m_security_short_server_id_set(instance_id, LWM2M_ACL_BOOTSTRAP_SHORT_SERVER_ID);
     lwm2m_security_is_bootstrap_server_set(instance_id, true);
+    lwm2m_security_hold_off_timer_set(0);
+    lwm2m_security_bootstrapped_set(false);
 
     lwm2m_coap_handler_instance_delete(p_instance);
     lwm2m_coap_handler_instance_add(p_instance);

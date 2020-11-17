@@ -675,7 +675,7 @@ static void client_bootstrap_complete(void)
     lwm2m_main_bootstrap_done();
 }
 
-static bool client_register_deferred(client_context_t *ctx)
+static bool client_is_register_deferred(client_context_t *ctx)
 {
     if (operator_is_vzw(true) &&
         (ctx->flags & CLIENT_FLAG_USE_HOLDOFF_TIMER) &&
@@ -1234,35 +1234,33 @@ int lwm2m_client_connect(void)
 
     for (int i = 0; i < ARRAY_SIZE(m_client_context); i++) {
         client_context_t *ctx = &m_client_context[i];
+        int32_t delay = 0;
 
-        if (client_is_configured(ctx)) {
-            // Start Bootstrap, Registration or Update work
-            int32_t delay = 0;
-
-            if (lwm2m_security_is_bootstrap_server_get(ctx->security_instance)) {
-                delay = lwm2m_security_hold_off_timer_get();
-                LWM2M_INF(": Bootstrap (%ds)", delay);
-                work = &bootstrap_work;
-            } else {
-                if (lwm2m_remote_is_registered(ctx->short_server_id)) {
-                    delay = 0;
-                    LWM2M_INF(": Update [%u]", ctx->short_server_id);
-                    work = &ctx->update_work;
-                } else {
-                    if (client_register_deferred(ctx)) {
-                        continue;
-                    }
-                    if (ctx->flags & CLIENT_FLAG_USE_HOLDOFF_TIMER) {
-                        delay = lwm2m_server_client_hold_off_timer_get(ctx->server_instance);
-                        ctx->flags &= ~CLIENT_FLAG_USE_HOLDOFF_TIMER;
-                    }
-                    LWM2M_INF(": Register (%ds) [%u]", delay, ctx->short_server_id);
-                    work = &ctx->register_work;
-                }
-            }
-
-            k_delayed_work_submit_to_queue(&ctx->work_q, work, K_SECONDS(delay));
+        // Start Bootstrap, Registration or Update work for configured clients
+        if (!client_is_configured(ctx)) {
+            continue;
         }
+
+        if (lwm2m_security_is_bootstrap_server_get(ctx->security_instance)) {
+            delay = lwm2m_security_hold_off_timer_get();
+            LWM2M_INF(": Bootstrap (%ds)", delay);
+            work = &bootstrap_work;
+        } else if (!lwm2m_remote_is_registered(ctx->short_server_id)) {
+            if (client_is_register_deferred(ctx)) {
+                continue;
+            }
+            if (ctx->flags & CLIENT_FLAG_USE_HOLDOFF_TIMER) {
+                delay = lwm2m_server_client_hold_off_timer_get(ctx->server_instance);
+                ctx->flags &= ~CLIENT_FLAG_USE_HOLDOFF_TIMER;
+            }
+            LWM2M_INF(": Register (%ds) [%u]", delay, ctx->short_server_id);
+            work = &ctx->register_work;
+        } else {
+            LWM2M_INF(": Update [%u]", ctx->short_server_id);
+            work = &ctx->update_work;
+        }
+
+        k_delayed_work_submit_to_queue(&ctx->work_q, work, K_SECONDS(delay));
     }
 
     return 0;
@@ -1343,31 +1341,63 @@ static int cmd_client_status(const struct shell *shell, size_t argc, char **argv
     for (int i = 0; i < ARRAY_SIZE(m_client_context); i++) {
         client_context_t *ctx = &m_client_context[i];
 
-        if (client_is_configured(ctx)) {
-            shell_print(shell, "Client SSID %u", ctx->short_server_id);
-            if (ctx->flags & CLIENT_FLAG_IS_CONNECTING) {
-                shell_print(shell, "  Connecting...");
-                continue;
-            }
-            delay = k_delayed_work_remaining_get(&bootstrap_work);
-            if (delay > 0) {
-                shell_print(shell, "  Bootstrap in %d seconds", delay / 1000);
-            }
-            delay = k_delayed_work_remaining_get(&ctx->register_work);
-            if (delay > 0) {
-                shell_print(shell, "  Register in %d seconds", delay / 1000);
-            }
-            delay = k_delayed_work_remaining_get(&ctx->update_work);
-            if (delay > 0) {
-                shell_print(shell, "  Update in %d seconds", delay / 1000);
-            }
-        // } else {
-        //     shell_print(shell, "Client %d:", i);
-        //     shell_print(shell, "  Not configured");
+        // Show status for configured clients
+        if (!client_is_configured(ctx)) {
+            continue;
+        }
+
+        shell_print(shell, "Client SSID %u", ctx->short_server_id);
+        if (ctx->flags & CLIENT_FLAG_IS_CONNECTING) {
+            shell_print(shell, "  Connecting...");
+            continue;
+        }
+        delay = k_delayed_work_remaining_get(&bootstrap_work);
+        if (delay > 0) {
+            shell_print(shell, "  Bootstrap in %d seconds", delay / 1000);
+        }
+        delay = k_delayed_work_remaining_get(&ctx->register_work);
+        if (delay > 0) {
+            shell_print(shell, "  Register in %d seconds", delay / 1000);
+        }
+        delay = k_delayed_work_remaining_get(&ctx->update_work);
+        if (delay > 0) {
+            shell_print(shell, "  Update in %d seconds", delay / 1000);
         }
     }
 
     return 0;
+}
+
+static char *client_flags_string(uint32_t flags)
+{
+    static char flags_str[32];
+    int offset = 0;
+
+    if (flags & CLIENT_FLAG_WORK_Q_STARTED) {
+        flags_str[offset++] = 'Q';
+    }
+    if (flags & CLIENT_FLAG_SECURE_CONNECTION) {
+        flags_str[offset++] = 'S';
+    }
+    if (flags & CLIENT_FLAG_USE_HOLDOFF_TIMER) {
+        flags_str[offset++] = 'H';
+    }
+    if (flags & CLIENT_FLAG_CONNECTION_USE_APN) {
+        flags_str[offset++] = 'A';
+    }
+    if (flags & CLIENT_FLAG_IP_FALLBACK_POSSIBLE) {
+        flags_str[offset++] = 'F';
+    }
+    if (flags & CLIENT_FLAG_IS_CONNECTING) {
+        flags_str[offset++] = 'C';
+    }
+    if (flags & CLIENT_FLAG_IS_REGISTERED) {
+        flags_str[offset++] = 'R';
+    }
+
+    flags_str[offset] = '\0';
+
+    return flags_str;
 }
 
 static int cmd_client_print(const struct shell *shell, size_t argc, char **argv)
@@ -1379,20 +1409,21 @@ static int cmd_client_print(const struct shell *shell, size_t argc, char **argv)
     for (int i = 0; i < ARRAY_SIZE(m_client_context); i++) {
         client_context_t *ctx = &m_client_context[i];
 
-        if (ctx->security_instance != UINT16_MAX) {
-            if (ctx->server_instance != UINT16_MAX) {
-                if (lwm2m_access_control_find(LWM2M_OBJ_SERVER, ctx->server_instance, &access_control) == 0) {
-                    snprintf(objects_str, sizeof(objects_str), "</0/%u> </1/%u> </2/%u>",
-                             ctx->security_instance, ctx->server_instance, access_control);
-                } else {
-                    snprintf(objects_str, sizeof(objects_str), "</0/%u> </1/%u>",
-                             ctx->security_instance, ctx->server_instance);
-                }
-            } else {
-                snprintf(objects_str, sizeof(objects_str), "</0/%u>", ctx->security_instance);
-            }
+        if (ctx->security_instance == UINT16_MAX) {
+            strncpy(objects_str, "<none>", sizeof(objects_str));
         } else {
-            snprintf(objects_str, sizeof(objects_str), "<none>");
+            int objects_ofs = snprintf(objects_str, sizeof(objects_str),
+                                       "</0/%u>", ctx->security_instance);
+
+            if (ctx->server_instance != UINT16_MAX) {
+                objects_ofs += snprintf(&objects_str[objects_ofs], sizeof(objects_str) - objects_ofs,
+                                        " </1/%u>", ctx->server_instance);
+
+                if (lwm2m_access_control_find(LWM2M_OBJ_SERVER, ctx->server_instance, &access_control) == 0) {
+                    snprintf(&objects_str[objects_ofs], sizeof(objects_str) - objects_ofs,
+                             " </2/%u>", access_control);
+                }
+            }
         }
 
         if (ctx->family_type == NRF_AF_INET6) {
@@ -1410,7 +1441,7 @@ static int cmd_client_print(const struct shell *shell, size_t argc, char **argv)
         shell_print(shell, "  Remote server      %s", client_remote_ntop(&ctx->remote_server));
         shell_print(shell, "  Transport handle   %d", ctx->transport_handle);
         shell_print(shell, "  Retry counter      %u", ctx->retry_count);
-        shell_print(shell, "  Flags:             0x%02x", ctx->flags);
+        shell_print(shell, "  Flags:             0x%02x (%s)", ctx->flags, client_flags_string(ctx->flags));
     }
 
     return 0;
