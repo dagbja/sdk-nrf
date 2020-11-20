@@ -5,6 +5,7 @@
  */
 
 #ifndef LWM2M_CARRIER_H__
+#define LWM2M_CARRIER_H__
 
 #include <stdint.h>
 #include <stddef.h>

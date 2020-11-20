@@ -87,7 +87,7 @@ static uint32_t m_net_stat;
 static bool m_lte_ready;
 static bool m_ack_sms;
 
-static volatile uint32_t tick_count;
+static uint32_t tick_count;
 
 typedef enum {
     PSK_FORMAT_BINARY,
@@ -432,16 +432,14 @@ int lwm2m_carrier_apn_get(char *buf, size_t len)
 
 bool lwm2m_request_remote_reconnect(struct nrf_sockaddr *p_remote)
 {
-    bool requested = false;
-
     uint16_t short_server_id = 0;
     uint16_t security_instance = lwm2m_security_instance_from_remote(p_remote, &short_server_id);
 
     if (lwm2m_client_reconnect(security_instance) == 0) {
-        requested = true;
+        return true;
     }
 
-    return requested;
+    return false;
 }
 
 static void app_vzw_sha256_psk(char *p_imei, uint16_t short_server_id, char *p_psk)

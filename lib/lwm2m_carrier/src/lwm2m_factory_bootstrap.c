@@ -55,7 +55,7 @@ static void factory_security_bootstrap_vzw(void)
     const uint16_t instance_id = LWM2M_BOOTSTRAP_INSTANCE_ID;
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_security_get_instance(instance_id);
 
-    lwm2m_security_short_server_id_set(instance_id, 100);
+    lwm2m_security_short_server_id_set(instance_id, LWM2M_VZW_BOOTSTRAP_SSID);
     lwm2m_security_is_bootstrap_server_set(instance_id, true);
     lwm2m_security_hold_off_timer_set(10);
     lwm2m_security_bootstrapped_set(false);
@@ -69,7 +69,7 @@ static void factory_security_diagnostics_vzw(lwm2m_carrier_config_t * p_carrier_
     const uint16_t instance_id = 2;
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_security_get_instance(instance_id);
 
-    lwm2m_security_short_server_id_set(instance_id, 101);
+    lwm2m_security_short_server_id_set(instance_id, LWM2M_VZW_DIAGNOSTICS_SSID);
     if (p_carrier_config->certification_mode || lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_CARRIER_CHECK)) {
         lwm2m_security_server_uri_set(instance_id, DIAGNOSTICS_URI_VZW_TEST, strlen(DIAGNOSTICS_URI_VZW_TEST));
     } else {
@@ -85,7 +85,7 @@ static void factory_server_bootstrap_vzw(void)
     const uint16_t instance_id = LWM2M_BOOTSTRAP_INSTANCE_ID;
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
 
-    lwm2m_server_short_server_id_set(instance_id, 100);
+    lwm2m_server_short_server_id_set(instance_id, LWM2M_VZW_BOOTSTRAP_SSID);
     lwm2m_server_client_hold_off_timer_set(instance_id, 0);
 
     lwm2m_coap_handler_instance_delete(p_instance);
@@ -96,8 +96,8 @@ static void factory_server_management_acl_vzw(void)
 {
     const uint16_t instance_id = 1;
     uint16_t access[] = { rwde_access, rwde_access, rwde_access };
-    uint16_t servers[] = { 101, 102, 1000 };
-    uint16_t owner = 102;
+    uint16_t servers[] = { LWM2M_VZW_DIAGNOSTICS_SSID, LWM2M_VZW_MANAGEMENT_SSID, LWM2M_VZW_REPOSITORY_SSID };
+    uint16_t owner = LWM2M_VZW_MANAGEMENT_SSID;
 
     lwm2m_list_t acl = {
         .p_id = servers,
@@ -119,8 +119,8 @@ static void factory_server_diagnostics_acl_vzw(void)
 {
     const uint16_t instance_id = 2;
     uint16_t access[] = { rwde_access };
-    uint16_t servers[] = { 102 };
-    uint16_t owner = 101;
+    uint16_t servers[] = { LWM2M_VZW_MANAGEMENT_SSID };
+    uint16_t owner = LWM2M_VZW_DIAGNOSTICS_SSID;
 
     lwm2m_list_t acl = {
         .p_id = servers,
@@ -137,7 +137,7 @@ static void factory_server_diagnostics_vzw(void)
     const uint16_t instance_id = 2;
     lwm2m_instance_t *p_instance = (lwm2m_instance_t *)lwm2m_server_get_instance(instance_id);
 
-    lwm2m_server_short_server_id_set(instance_id, 101);
+    lwm2m_server_short_server_id_set(instance_id, LWM2M_VZW_DIAGNOSTICS_SSID);
     lwm2m_server_client_hold_off_timer_set(instance_id, 30);
     lwm2m_server_lifetime_set(instance_id, 86400);
     lwm2m_server_min_period_set(instance_id, 300);
@@ -156,8 +156,8 @@ static void factory_server_repository_acl_vzw(void)
 {
     const uint16_t instance_id = 3;
     uint16_t access[] = { rwde_access, rwde_access, rwde_access };
-    uint16_t servers[] = { 101, 102, 1000 };
-    uint16_t owner = 1000;
+    uint16_t servers[] = { LWM2M_VZW_DIAGNOSTICS_SSID, LWM2M_VZW_MANAGEMENT_SSID, LWM2M_VZW_REPOSITORY_SSID };
+    uint16_t owner = LWM2M_VZW_REPOSITORY_SSID;
 
     lwm2m_list_t acl = {
         .p_id = servers,

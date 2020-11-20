@@ -22,6 +22,7 @@
 #include <lwm2m_apn_conn_prof.h>
 #include <lwm2m_observer_storage.h>
 #include <lwm2m_retry_delay.h>
+#include <lwm2m_factory_bootstrap.h>
 #include <operator_check.h>
 
 #include <lwm2m_carrier.h>
@@ -50,7 +51,7 @@ typedef struct {
     struct k_work_q          work_q;             // Workqueue for tasks in this client context
 
     // Server context values
-    nrf_sa_family_t          family_type;        // NRF_AF_INET or NRF_AF_INET6
+    nrf_sa_family_t          address_family;        // NRF_AF_INET or NRF_AF_INET6
     lwm2m_server_config_t    server_conf;        // LwM2M server configuration.
     struct nrf_sockaddr_in6  remote_server;      // Remote server address (IPv4 or IPv6).
     coap_transport_handle_t  transport_handle;   // CoAP transport handle (socket descriptor).
@@ -69,7 +70,7 @@ typedef struct {
     uint16_t                 security_instance;  // Security object instance
     uint16_t                 server_instance;    // Server object instance
     uint16_t                 short_server_id;
-    uint8_t                  retry_count;        // Found in lwm2m_retry_delay.c
+    uint8_t                  send_retry_cnt;     // send() retry counter
     uint8_t                  flags;              // CLIENT_FLAG settings
 } client_context_t;
 
@@ -77,14 +78,6 @@ static struct k_sem             m_bootstrap_done;
 static struct k_sem             m_connect_lock;
 static struct k_sem             m_pdn_lock;
 static struct k_delayed_work    bootstrap_work;
-
-#define GET_AND_CHECK_CTX(field, value) \
-    client_context_t *ctx = NULL; \
-    for (int i = 0; i < ARRAY_SIZE(m_client_context); i++) \
-        if (m_client_context[i].field == value) \
-            ctx = &m_client_context[i]; \
-    if (ctx == NULL) \
-        return -EINVAL
 
 #define LWM2M_MAX_CONNECTIONS 2                  // Maximum number of server connections.
 K_THREAD_STACK_ARRAY_DEFINE(m_client_stack, LWM2M_MAX_CONNECTIONS, 1536);
@@ -97,43 +90,97 @@ K_THREAD_STACK_ARRAY_DEFINE(m_client_stack, LWM2M_MAX_CONNECTIONS, 1536);
 static client_context_t        m_client_context[LWM2M_MAX_CONNECTIONS];
 extern lwm2m_client_identity_t m_client_id; // Todo: Fix this
 
-static inline bool client_is_work_q_started(client_context_t *ctx)
+static void client_flag_set(client_context_t *ctx, uint8_t flag, bool enable)
+{
+    if (enable) {
+        ctx->flags |= flag;
+    } else {
+        ctx->flags &= ~flag;
+    }
+}
+
+static bool client_is_work_q_started(client_context_t *ctx)
 {
     return (ctx->flags & CLIENT_FLAG_WORK_Q_STARTED);
 }
 
-static inline bool client_is_secure(client_context_t *ctx)
+static bool client_is_secure(client_context_t *ctx)
 {
     return (ctx->flags & CLIENT_FLAG_SECURE_CONNECTION);
 }
 
-static inline bool client_is_registered(client_context_t *ctx)
+static bool client_use_holdoff_timer(client_context_t *ctx)
+{
+    return (ctx->flags & CLIENT_FLAG_USE_HOLDOFF_TIMER);
+}
+
+static bool client_use_apn(client_context_t *ctx)
+{
+    return (ctx->flags & CLIENT_FLAG_CONNECTION_USE_APN);
+}
+
+static bool client_is_ip_fallback_possible(client_context_t *ctx)
+{
+    return (ctx->flags & CLIENT_FLAG_IP_FALLBACK_POSSIBLE);
+}
+
+static bool client_is_connecting(client_context_t *ctx)
+{
+    return (ctx->flags & CLIENT_FLAG_IS_CONNECTING);
+}
+
+static bool client_is_registered(client_context_t *ctx)
 {
     return (ctx->flags & CLIENT_FLAG_IS_REGISTERED);
 }
 
-static inline void client_set_work_q_started(client_context_t *ctx)
+static void client_set_work_q_started(client_context_t *ctx)
 {
-    ctx->flags |= CLIENT_FLAG_WORK_Q_STARTED;
+    client_flag_set(ctx, CLIENT_FLAG_WORK_Q_STARTED, true);
 }
 
-static inline void client_set_secure(client_context_t *ctx)
+static void client_set_secure(client_context_t *ctx)
 {
-    ctx->flags |= CLIENT_FLAG_SECURE_CONNECTION;
+    client_flag_set(ctx, CLIENT_FLAG_SECURE_CONNECTION, true);
 }
 
-static inline bool client_is_configured(client_context_t *ctx)
+static void client_set_use_holdoff_timer(client_context_t *ctx, bool enable)
+{
+    client_flag_set(ctx, CLIENT_FLAG_USE_HOLDOFF_TIMER, enable);
+}
+
+static void client_set_use_apn(client_context_t *ctx, bool enable)
+{
+    client_flag_set(ctx, CLIENT_FLAG_CONNECTION_USE_APN, enable);
+}
+
+static void client_set_ip_fallback_possible(client_context_t *ctx, bool enable)
+{
+    client_flag_set(ctx, CLIENT_FLAG_IP_FALLBACK_POSSIBLE, enable);
+}
+
+static void client_set_is_connecting(client_context_t *ctx, bool enable)
+{
+    client_flag_set(ctx, CLIENT_FLAG_IS_CONNECTING, enable);
+}
+
+static void client_set_is_registered(client_context_t *ctx, bool enable)
+{
+    client_flag_set(ctx, CLIENT_FLAG_IS_REGISTERED, enable);
+}
+
+static bool client_is_configured(client_context_t *ctx)
 {
     return (ctx->security_instance != UINT16_MAX);
 }
 
-static inline bool client_is_registration_done(void)
+static bool client_is_registration_done(void)
 {
     bool is_registered = true;
 
     for (int i = 0; i < ARRAY_SIZE(m_client_context); i++) {
         if (client_is_configured(&m_client_context[i]) &&
-            !(m_client_context[i].flags & CLIENT_FLAG_IS_REGISTERED)) {
+            !client_is_registered(&m_client_context[i])) {
             is_registered = false;
         }
     }
@@ -141,7 +188,7 @@ static inline bool client_is_registration_done(void)
     return is_registered;
 }
 
-static inline void client_set_registered(client_context_t *ctx, bool registered)
+static void client_set_registered(client_context_t *ctx, bool registered)
 {
     if (operator_is_vzw(true) &&
         (lwm2m_server_registered_get(ctx->server_instance) != registered)) {
@@ -151,7 +198,7 @@ static inline void client_set_registered(client_context_t *ctx, bool registered)
     }
 
     if (registered) {
-        ctx->flags |= CLIENT_FLAG_IS_REGISTERED;
+        client_set_is_registered(ctx, true);
 
         if (client_is_registration_done()) {
             // Set to bootstrapped in case this has not been set before.
@@ -160,7 +207,7 @@ static inline void client_set_registered(client_context_t *ctx, bool registered)
             lwm2m_main_event_notify(LWM2M_CARRIER_EVENT_REGISTERED, NULL);
         }
     } else {
-        ctx->flags &= ~CLIENT_FLAG_IS_REGISTERED;
+        client_set_is_registered(ctx, false);
     }
 }
 
@@ -184,7 +231,7 @@ static int client_event_deferred(uint32_t reason, int32_t timeout)
 
 static char *client_apn(client_context_t *ctx)
 {
-    if (ctx->flags & CLIENT_FLAG_CONNECTION_USE_APN) {
+    if (client_use_apn(ctx)) {
         return lwm2m_pdn_current_apn();
     }
 
@@ -193,22 +240,20 @@ static char *client_apn(client_context_t *ctx)
 
 static bool client_use_pdn_connection(client_context_t *ctx)
 {
-    bool use_pdn_connection = false;
-
     if (operator_is_vzw(false)) {
         // VzW: Setup PDN for all servers except Repository
-        if (ctx->short_server_id != 1000) {
-            use_pdn_connection = true;
+        if (ctx->short_server_id != LWM2M_VZW_REPOSITORY_SSID) {
+            return true;
         }
     } else if (operator_is_att(false)) {
         // AT&T: Setup PDN unless using default (CID 0)
         uint16_t default_apn_instance = lwm2m_apn_conn_prof_default_instance();
         if (lwm2m_apn_instance() != default_apn_instance) {
-            use_pdn_connection = true;
+            return true;
         }
     }
 
-    return use_pdn_connection;
+    return false;
 }
 
 static int client_pdn_setup(client_context_t *ctx, bool *pdn_activated)
@@ -224,30 +269,30 @@ static int client_pdn_setup(client_context_t *ctx, bool *pdn_activated)
             return NRF_ENETDOWN;
         }
 
-        ctx->flags |= CLIENT_FLAG_CONNECTION_USE_APN;
+        client_set_use_apn(ctx, true);
     } else {
         pdn_type_allowed = lwm2m_pdn_type_allowed();
-        ctx->flags &= ~CLIENT_FLAG_CONNECTION_USE_APN;
+        client_set_use_apn(ctx, false);
     }
 
-    if (ctx->family_type == 0) {
+    if (ctx->address_family == 0) {
         // Set family type only if not already set for this connection.
         if (pdn_type_allowed != 0) {
             // PDN type restrictions. Use only this.
-            ctx->family_type = pdn_type_allowed;
-            ctx->flags &= ~CLIENT_FLAG_IP_FALLBACK_POSSIBLE;
+            ctx->address_family = pdn_type_allowed;
+            client_set_ip_fallback_possible(ctx, false);
         } else if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_IPv6)) {
             // IPv6 disabled.
-            ctx->family_type = NRF_AF_INET;
-            ctx->flags &= ~CLIENT_FLAG_IP_FALLBACK_POSSIBLE;
+            ctx->address_family = NRF_AF_INET;
+            client_set_ip_fallback_possible(ctx, false);
         } else if (lwm2m_debug_is_set(LWM2M_DEBUG_DISABLE_FALLBACK)) {
             // Fallback disabled.
-            ctx->family_type = NRF_AF_INET6;
-            ctx->flags &= ~CLIENT_FLAG_IP_FALLBACK_POSSIBLE;
+            ctx->address_family = NRF_AF_INET6;
+            client_set_ip_fallback_possible(ctx, false);
         } else {
             // No PDN type restrictions. Start with IPv6.
-            ctx->family_type = NRF_AF_INET6;
-            ctx->flags |= CLIENT_FLAG_IP_FALLBACK_POSSIBLE;
+            ctx->address_family = NRF_AF_INET6;
+            client_set_ip_fallback_possible(ctx, true);
         }
     }
 
@@ -264,8 +309,8 @@ static int32_t client_select_next_apn(client_context_t *ctx)
     lwm2m_pdn_deactivate();
 
     // Supported family type may be different for next APN.
-    ctx->family_type = 0;
-    ctx->flags &= ~CLIENT_FLAG_IP_FALLBACK_POSSIBLE;
+    ctx->address_family = 0;
+    client_set_ip_fallback_possible(ctx, false);
 
     if (lwm2m_pdn_next_enabled_apn_instance()) {
         // Moved back to first APN, use retry back off period.
@@ -280,7 +325,7 @@ static int32_t client_select_next_apn(client_context_t *ctx)
 static int client_dns_request(client_context_t *ctx)
 {
     LWM2M_INF("* DNS request using %s (APN %s) [%u]",
-              (ctx->family_type == NRF_AF_INET6) ? "IPv6" : "IPv4",
+              (ctx->address_family == NRF_AF_INET6) ? "IPv6" : "IPv4",
               lwm2m_os_log_strdup(client_apn(ctx)), ctx->short_server_id);
 
     char uri_copy[128];
@@ -310,14 +355,14 @@ static int client_dns_request(client_context_t *ctx)
     }
 
     struct nrf_addrinfo hints = {
-        .ai_family = ctx->family_type,
+        .ai_family = ctx->address_family,
         .ai_socktype = NRF_SOCK_DGRAM
     };
 
     // Structures that might be pointed to by APN hints.
     struct nrf_addrinfo apn_hints;
 
-    if (ctx->flags & CLIENT_FLAG_CONNECTION_USE_APN) {
+    if (client_use_apn(ctx)) {
         apn_hints.ai_family    = NRF_AF_LTE;
         apn_hints.ai_socktype  = NRF_SOCK_MGMT;
         apn_hints.ai_protocol  = NRF_PROTO_PDN;
@@ -347,7 +392,7 @@ static int client_dns_request(client_context_t *ctx)
     }
 
     if (ret_val == NRF_EINVAL || ret_val == NRF_ETIMEDOUT) {
-        LWM2M_WRN("* No %s address found for \"%s\"", (ctx->family_type == NRF_AF_INET6) ? "IPv6" : "IPv4", lwm2m_os_log_strdup(p_hostname));
+        LWM2M_WRN("* No %s address found for \"%s\"", (ctx->address_family == NRF_AF_INET6) ? "IPv6" : "IPv4", lwm2m_os_log_strdup(p_hostname));
         return NRF_ENETUNREACH;
     } else if (ret_val == NRF_ENETDOWN) {
         LWM2M_ERR("* Failed to lookup \"%s\": PDN down", lwm2m_os_log_strdup(p_hostname));
@@ -430,15 +475,15 @@ static int client_session_setup(client_context_t *ctx)
         .protocol     = (client_is_secure(ctx) ? NRF_SPROTO_DTLS1v2 : NRF_IPPROTO_UDP)
     };
 
-    if (ctx->flags & CLIENT_FLAG_CONNECTION_USE_APN) {
+    if (client_use_apn(ctx)) {
         local_port.interface = lwm2m_pdn_current_apn();
     }
 
     // Modem can only handle one DTLS handshake
     k_sem_take(&m_connect_lock, K_FOREVER);
-    ctx->flags |= CLIENT_FLAG_IS_CONNECTING;
+    client_set_is_connecting(ctx, true);
     uint32_t err_code = coap_security_setup(&local_port, (struct nrf_sockaddr *)&ctx->remote_server);
-    ctx->flags &= ~CLIENT_FLAG_IS_CONNECTING;
+    client_set_is_connecting(ctx, false);
     k_sem_give(&m_connect_lock);
 
     if (err_code == 0) {
@@ -489,7 +534,8 @@ static void client_schedule_retry(client_context_t *ctx, struct k_delayed_work *
 
     if (reason == NRF_EAGAIN) {
         // Retry without delay
-        retry_handled = true;
+        k_delayed_work_submit_to_queue(&ctx->work_q, work, K_NO_WAIT);
+        return;
     }
 
     if (reason == NRF_ENETDOWN) {
@@ -505,7 +551,7 @@ static void client_schedule_retry(client_context_t *ctx, struct k_delayed_work *
     }
 
     if ((reason == NRF_ENETUNREACH) && operator_is_att(true) &&
-        (!(ctx->flags & CLIENT_FLAG_IP_FALLBACK_POSSIBLE) || (ctx->family_type == NRF_AF_INET))) {
+        (!client_is_ip_fallback_possible(ctx) || (ctx->address_family == NRF_AF_INET))) {
         // APN fallback because of no response from server (IPv6 and/or IPv4).
         LWM2M_INF("Next APN fallback (network unreachable)");
         delay = client_select_next_apn(ctx);
@@ -518,10 +564,10 @@ static void client_schedule_retry(client_context_t *ctx, struct k_delayed_work *
         client_event_deferred(LWM2M_CARRIER_DEFERRED_PDN_ACTIVATE, delay);
     }
 
-    if ((reason == NRF_ENETUNREACH) && (ctx->flags & CLIENT_FLAG_IP_FALLBACK_POSSIBLE)) {
+    if ((reason == NRF_ENETUNREACH) && client_is_ip_fallback_possible(ctx)) {
         // Fallback to the other IP version.
-        ctx->family_type = (ctx->family_type == NRF_AF_INET6) ? NRF_AF_INET : NRF_AF_INET6;
-        if (ctx->family_type == NRF_AF_INET) {
+        ctx->address_family = (ctx->address_family == NRF_AF_INET6) ? NRF_AF_INET : NRF_AF_INET6;
+        if (ctx->address_family == NRF_AF_INET) {
             LWM2M_INF("IPv6 to IPv4 fallback");
             retry_handled = true;
         }
@@ -601,7 +647,7 @@ static void client_configure(client_context_t *ctx,
     ctx->security_instance = security_instance;
     ctx->server_instance = UINT16_MAX;
     ctx->short_server_id = short_server_id;
-    ctx->family_type = 0; // Will be set in client_pdn_setup() when connecting
+    ctx->address_family = 0; // Will be set in client_pdn_setup() when connecting
 
     // Todo: Initialize all other context values
 
@@ -613,10 +659,10 @@ static void client_configure(client_context_t *ctx,
                 uint16_t access_control;
                 if (lwm2m_access_control_find(LWM2M_OBJ_SERVER, server_instance, &access_control) == 0) {
                     LWM2M_INF("| </0/%u>,</1/%u>,</2/%u>;ssid=%u",
-                            security_instance, server_instance, access_control, short_server_id);
+                              security_instance, server_instance, access_control, short_server_id);
                 } else {
                     LWM2M_INF("| </0/%u>,</1/%u>;ssid=%u",
-                            security_instance, server_instance, short_server_id);
+                              security_instance, server_instance, short_server_id);
                 }
             }
             break;
@@ -667,7 +713,7 @@ static void client_bootstrap_complete(void)
 
     // Client hold off timer is only used after bootstrap.
     for (int i = 0; i < ARRAY_SIZE(m_client_context); i++) {
-        m_client_context[i].flags |= CLIENT_FLAG_USE_HOLDOFF_TIMER;
+        client_set_use_holdoff_timer(&m_client_context[i], true);
     }
 
     // Main state will trigger lwm2m_client_connect() when
@@ -678,9 +724,9 @@ static void client_bootstrap_complete(void)
 static bool client_is_register_deferred(client_context_t *ctx)
 {
     if (operator_is_vzw(true) &&
-        (ctx->flags & CLIENT_FLAG_USE_HOLDOFF_TIMER) &&
-        (ctx->short_server_id == 1000)) {
-        // VzW ssid 1000 is deferred to be registered after ssid 102
+        client_use_holdoff_timer(ctx) &&
+        (ctx->short_server_id == LWM2M_VZW_REPOSITORY_SSID)) {
+        // VzW repository server is deferred to be registered after management server
         // when using holdoff timer.
         return true;
     }
@@ -690,12 +736,12 @@ static bool client_is_register_deferred(client_context_t *ctx)
 
 static int client_register_done(client_context_t *ctx)
 {
-    if (operator_is_vzw(true) && (ctx->short_server_id == 102)) {
-        ctx = &m_client_context[1]; // Todo: Loop to find ssid 1000
-        if ((ctx->short_server_id == 1000) &&
-            (ctx->flags & CLIENT_FLAG_USE_HOLDOFF_TIMER)) {
+    if (operator_is_vzw(true) && (ctx->short_server_id == LWM2M_VZW_MANAGEMENT_SSID)) {
+        ctx = &m_client_context[1]; // Todo: Loop to find ssid LWM2M_VZW_REPOSITORY_SSID
+        if ((ctx->short_server_id == LWM2M_VZW_REPOSITORY_SSID) &&
+            client_use_holdoff_timer(ctx)) {
             int32_t delay = lwm2m_server_client_hold_off_timer_get(ctx->server_instance);
-            ctx->flags &= ~CLIENT_FLAG_USE_HOLDOFF_TIMER;
+            client_set_use_holdoff_timer(ctx, false);
             LWM2M_INF(": Register (%ds) [%u]", delay, ctx->short_server_id);
             k_delayed_work_submit_to_queue(&ctx->work_q, &ctx->register_work, K_SECONDS(delay));
         }
@@ -751,7 +797,7 @@ static void client_free(client_context_t *ctx)
 
     // Todo: Initialize all context values needed
 
-    ctx->family_type = 0;
+    ctx->address_family = 0;
     memset(&ctx->server_conf, 0, sizeof(ctx->server_conf));
     memset(&ctx->remote_server, 0, sizeof(ctx->remote_server));
     client_disconnect(ctx);
@@ -759,7 +805,7 @@ static void client_free(client_context_t *ctx)
     ctx->security_instance = UINT16_MAX;
     ctx->server_instance = UINT16_MAX;
     ctx->short_server_id = 0;
-    ctx->retry_count = 0;
+    ctx->send_retry_cnt = 0;
     ctx->flags &= CLIENT_FLAG_WORK_Q_STARTED; // Keep WORK_Q_STARTED
 }
 
@@ -787,7 +833,7 @@ static void client_bootstrap_task(struct k_work *work)
                                &m_client_id, ctx->transport_handle, NULL);
 
     if (err_code == 0) {
-        ctx->retry_count = 0;
+        ctx->send_retry_cnt = 0;
 
         // Wait for CoAP response.
         k_sem_take(&ctx->response_received, K_FOREVER);
@@ -820,8 +866,8 @@ static void client_bootstrap_task(struct k_work *work)
             lwm2m_retry_delay_connect_reset(ctx->security_instance);
             lwm2m_main_event_error(LWM2M_CARRIER_ERROR_BOOTSTRAP, 0);
         }
-    } else if (lwm2m_os_errno() != NRF_EAGAIN || ctx->retry_count >= 5) {
-        ctx->retry_count = 0;
+    } else if (lwm2m_os_errno() != NRF_EAGAIN || ctx->send_retry_cnt >= 5) {
+        ctx->send_retry_cnt = 0;
         LWM2M_INF("Bootstrap failed: %s (%d), %s (%d), reconnect [%u]",
                   lwm2m_os_log_strdup(strerror(err_code)), err_code,
                   lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
@@ -830,8 +876,8 @@ static void client_bootstrap_task(struct k_work *work)
         client_disconnect(ctx);
         client_schedule_retry(ctx, &bootstrap_work, lwm2m_os_errno());
     } else {
-        ctx->retry_count++;
-        LWM2M_WRN("Bootstrap retry (#%u) [%u]", ctx->retry_count, ctx->short_server_id);
+        ctx->send_retry_cnt++;
+        LWM2M_WRN("Bootstrap retry (#%u) [%u]", ctx->send_retry_cnt, ctx->short_server_id);
         k_delayed_work_submit_to_queue(&ctx->work_q, &bootstrap_work, K_MSEC(100));
     }
 }
@@ -868,7 +914,7 @@ static void client_register_task(struct k_work *work)
     }
 
     if (err_code == 0) {
-        ctx->retry_count = 0;
+        ctx->send_retry_cnt = 0;
 
         // Wait for CoAP response.
         k_sem_take(&ctx->response_received, K_FOREVER);
@@ -891,7 +937,7 @@ static void client_register_task(struct k_work *work)
             client_register_done(ctx);
             client_schedule_update(ctx);
         } else if (operator_is_vzw(true) &&
-                   (ctx->short_server_id == 102) &&
+                   (ctx->short_server_id == LWM2M_VZW_MANAGEMENT_SSID) &&
                    (ctx->response_coap_code == COAP_CODE_400_BAD_REQUEST)) {
             // Received 4.00 error from VzW DM server, retry in 24 hours.
             // Todo: reset retry delay
@@ -906,8 +952,8 @@ static void client_register_task(struct k_work *work)
             // Received a unknown response code or timeout immediately after connect.
             client_schedule_retry(ctx, &ctx->register_work, NRF_ETIMEDOUT);
         }
-    } else if (lwm2m_os_errno() != NRF_EAGAIN || ctx->retry_count >= 5) {
-        ctx->retry_count = 0;
+    } else if (lwm2m_os_errno() != NRF_EAGAIN || ctx->send_retry_cnt >= 5) {
+        ctx->send_retry_cnt = 0;
         LWM2M_INF("Register failed: %s (%d), %s (%d), reconnect [%u]",
                   lwm2m_os_log_strdup(strerror(err_code)), err_code,
                   lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
@@ -916,8 +962,8 @@ static void client_register_task(struct k_work *work)
         client_disconnect(ctx);
         client_schedule_retry(ctx, &ctx->register_work, lwm2m_os_errno());
     } else {
-        ctx->retry_count++;
-        LWM2M_WRN("Register retry (#%u) [%u]", ctx->retry_count, ctx->short_server_id);
+        ctx->send_retry_cnt++;
+        LWM2M_WRN("Register retry (#%u) [%u]", ctx->send_retry_cnt, ctx->short_server_id);
         k_delayed_work_submit_to_queue(&ctx->work_q, &ctx->register_work, K_MSEC(100));
     }
 }
@@ -955,7 +1001,7 @@ static void client_update_task(struct k_work *work)
                             &ctx->server_conf, ctx->transport_handle);
 
     if (err_code == 0) {
-        ctx->retry_count = 0;
+        ctx->send_retry_cnt = 0;
 
         // Wait for CoAP response.
         k_sem_take(&ctx->response_received, K_FOREVER);
@@ -997,12 +1043,12 @@ static void client_update_task(struct k_work *work)
             // Received a unknown response code or timeout immediately after connect.
             client_schedule_update(ctx);
         }
-    } else if (lwm2m_os_errno() != NRF_EAGAIN || ctx->retry_count >= 5) {
-        ctx->retry_count = 0;
+    } else if (lwm2m_os_errno() != NRF_EAGAIN || ctx->send_retry_cnt >= 5) {
+        ctx->send_retry_cnt = 0;
         LWM2M_INF("Update failed: %s (%d), %s (%d), reconnect [%u]",
-                lwm2m_os_log_strdup(strerror(err_code)), err_code,
-                lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
-                ctx->short_server_id);
+                  lwm2m_os_log_strdup(strerror(err_code)), err_code,
+                  lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
+                  ctx->short_server_id);
 
         client_disconnect(ctx);
         if (did_connect) {
@@ -1011,8 +1057,8 @@ static void client_update_task(struct k_work *work)
             k_delayed_work_submit_to_queue(&ctx->work_q, &ctx->update_work, K_NO_WAIT);
         }
     } else {
-        ctx->retry_count++;
-        LWM2M_WRN("Update retry (#%u) [%u]", ctx->retry_count, ctx->short_server_id);
+        ctx->send_retry_cnt++;
+        LWM2M_WRN("Update retry (#%u) [%u]", ctx->send_retry_cnt, ctx->short_server_id);
         k_delayed_work_submit_to_queue(&ctx->work_q, &ctx->update_work, K_MSEC(100));
     }
 }
@@ -1045,7 +1091,7 @@ static void client_disable_task(struct k_work *work)
     client_remove_observers(ctx);
 
     if (err_code == 0) {
-        ctx->retry_count = 0;
+        ctx->send_retry_cnt = 0;
 
         // Wait for CoAP response.
         k_sem_take(&ctx->response_received, K_FOREVER);
@@ -1071,8 +1117,8 @@ static void client_disable_task(struct k_work *work)
             client_disconnect(ctx);
             k_delayed_work_submit_to_queue(&ctx->work_q, &ctx->disable_work, K_NO_WAIT);
         }
-    } else if (lwm2m_os_errno() != NRF_EAGAIN || ctx->retry_count >= 5) {
-        ctx->retry_count = 0;
+    } else if (lwm2m_os_errno() != NRF_EAGAIN || ctx->send_retry_cnt >= 5) {
+        ctx->send_retry_cnt = 0;
         LWM2M_ERR("Disable failed: %s (%d), %s (%d), reconnect [%u]",
                   lwm2m_os_log_strdup(strerror(err_code)), err_code,
                   lwm2m_os_log_strdup(lwm2m_os_strerror()), lwm2m_os_errno(),
@@ -1085,8 +1131,8 @@ static void client_disable_task(struct k_work *work)
             k_delayed_work_submit_to_queue(&ctx->work_q, &ctx->disable_work, K_NO_WAIT);
         }
     } else {
-        ctx->retry_count++;
-        LWM2M_WRN("Disable retry (#%u) [%u]", ctx->retry_count, ctx->short_server_id);
+        ctx->send_retry_cnt++;
+        LWM2M_WRN("Disable retry (#%u) [%u]", ctx->send_retry_cnt, ctx->short_server_id);
         k_delayed_work_submit_to_queue(&ctx->work_q, &ctx->disable_work, K_MSEC(100));
     }
 }
@@ -1138,8 +1184,8 @@ static void client_init_work_q(int ctx_index)
     client_set_work_q_started(ctx);
 
     k_work_q_start(&ctx->work_q, m_client_stack[ctx_index],
-                    K_THREAD_STACK_SIZEOF(m_client_stack[ctx_index]),
-                    K_LOWEST_APPLICATION_THREAD_PRIO);
+                   K_THREAD_STACK_SIZEOF(m_client_stack[ctx_index]),
+                   K_LOWEST_APPLICATION_THREAD_PRIO);
     k_thread_name_set(&ctx->work_q.thread, "lwm2m_carrier_client");
 
     k_delayed_work_init(&ctx->register_work, client_register_task);
@@ -1174,9 +1220,9 @@ int lwm2m_client_init(void)
 
 int lwm2m_client_configure(void)
 {
-    uint16_t bootstrap_instance = -1;
-
     LWM2M_INF("Client configure");
+
+    uint16_t bootstrap_instance = -1;
 
     // Free all client contexts
     for (int i = 0; i < ARRAY_SIZE(m_client_context); i++) {
@@ -1227,8 +1273,6 @@ int lwm2m_client_configure(void)
 
 int lwm2m_client_connect(void)
 {
-    struct k_delayed_work *work;
-
     LWM2M_INF("Client connect trigger");
     // Todo: Give error if no clients are configured
 
@@ -1244,23 +1288,21 @@ int lwm2m_client_connect(void)
         if (lwm2m_security_is_bootstrap_server_get(ctx->security_instance)) {
             delay = lwm2m_security_hold_off_timer_get();
             LWM2M_INF(": Bootstrap (%ds)", delay);
-            work = &bootstrap_work;
+            k_delayed_work_submit_to_queue(&ctx->work_q, &bootstrap_work, K_SECONDS(delay));
         } else if (!lwm2m_remote_is_registered(ctx->short_server_id)) {
             if (client_is_register_deferred(ctx)) {
                 continue;
             }
-            if (ctx->flags & CLIENT_FLAG_USE_HOLDOFF_TIMER) {
+            if (client_use_holdoff_timer(ctx)) {
                 delay = lwm2m_server_client_hold_off_timer_get(ctx->server_instance);
-                ctx->flags &= ~CLIENT_FLAG_USE_HOLDOFF_TIMER;
+                client_set_use_holdoff_timer(ctx, false);
             }
             LWM2M_INF(": Register (%ds) [%u]", delay, ctx->short_server_id);
-            work = &ctx->register_work;
+            k_delayed_work_submit_to_queue(&ctx->work_q, &ctx->register_work, K_SECONDS(delay));
         } else {
             LWM2M_INF(": Update [%u]", ctx->short_server_id);
-            work = &ctx->update_work;
+            k_delayed_work_submit_to_queue(&ctx->work_q, &ctx->update_work, K_NO_WAIT);
         }
-
-        k_delayed_work_submit_to_queue(&ctx->work_q, work, K_SECONDS(delay));
     }
 
     return 0;
@@ -1268,11 +1310,22 @@ int lwm2m_client_connect(void)
 
 int lwm2m_client_update(uint16_t server_instance)
 {
-    GET_AND_CHECK_CTX(server_instance, server_instance);
-
     LWM2M_INF("Client update trigger");
 
+    client_context_t *ctx = NULL;
+    for (int i = 0; i < ARRAY_SIZE(m_client_context); i++) {
+        if (m_client_context[i].server_instance == server_instance) {
+            ctx = &m_client_context[i];
+        }
+    }
+
+    if (ctx == NULL) {
+        LWM2M_ERR("Invalid server instance");
+        return -EINVAL;
+    }
+
     if (!client_is_registered(ctx)) {
+        LWM2M_WRN("Client is not registered");
         return -ENOENT;
     }
 
@@ -1283,11 +1336,22 @@ int lwm2m_client_update(uint16_t server_instance)
 
 int lwm2m_client_disable(uint16_t server_instance)
 {
-    GET_AND_CHECK_CTX(server_instance, server_instance);
-
     LWM2M_INF("Client disable trigger");
 
+    client_context_t *ctx = NULL;
+    for (int i = 0; i < ARRAY_SIZE(m_client_context); i++) {
+        if (m_client_context[i].server_instance == server_instance) {
+            ctx = &m_client_context[i];
+        }
+    }
+
+    if (ctx == NULL) {
+        LWM2M_ERR("Invalid server instance");
+        return -EINVAL;
+    }
+
     if (!client_is_registered(ctx)) {
+        LWM2M_WRN("Client is not registered");
         return -ENOENT;
     }
 
@@ -1299,11 +1363,22 @@ int lwm2m_client_disable(uint16_t server_instance)
 
 int lwm2m_client_reconnect(uint16_t security_instance)
 {
-    GET_AND_CHECK_CTX(security_instance, security_instance);
-
     LWM2M_INF("Client reconnect trigger");
 
+    client_context_t *ctx = NULL;
+    for (int i = 0; i < ARRAY_SIZE(m_client_context); i++) {
+        if (m_client_context[i].security_instance == security_instance) {
+            ctx = &m_client_context[i];
+        }
+    }
+
+    if (ctx == NULL) {
+        LWM2M_ERR("Invalid security instance");
+        return -EINVAL;
+    }
+
     if (!client_is_registered(ctx)) {
+        LWM2M_WRN("Client is not registered");
         return -ENOENT;
     }
 
@@ -1347,7 +1422,7 @@ static int cmd_client_status(const struct shell *shell, size_t argc, char **argv
         }
 
         shell_print(shell, "Client SSID %u", ctx->short_server_id);
-        if (ctx->flags & CLIENT_FLAG_IS_CONNECTING) {
+        if (client_is_connecting(ctx)) {
             shell_print(shell, "  Connecting...");
             continue;
         }
@@ -1426,12 +1501,12 @@ static int cmd_client_print(const struct shell *shell, size_t argc, char **argv)
             }
         }
 
-        if (ctx->family_type == NRF_AF_INET6) {
+        if (ctx->address_family == NRF_AF_INET6) {
             strcpy(family_str, "IPv6");
-        } else if (ctx->family_type == NRF_AF_INET) {
+        } else if (ctx->address_family == NRF_AF_INET) {
             strcpy(family_str, "IPv4");
         } else {
-            sprintf(family_str, "%u", ctx->family_type);
+            sprintf(family_str, "%u", ctx->address_family);
         }
 
         shell_print(shell, "Client %u", i);
@@ -1440,7 +1515,7 @@ static int cmd_client_print(const struct shell *shell, size_t argc, char **argv)
         shell_print(shell, "  Family type        %s", family_str);
         shell_print(shell, "  Remote server      %s", client_remote_ntop(&ctx->remote_server));
         shell_print(shell, "  Transport handle   %d", ctx->transport_handle);
-        shell_print(shell, "  Retry counter      %u", ctx->retry_count);
+        shell_print(shell, "  Retry counter      %u", ctx->send_retry_cnt);
         shell_print(shell, "  Flags:             0x%02x (%s)", ctx->flags, client_flags_string(ctx->flags));
     }
 

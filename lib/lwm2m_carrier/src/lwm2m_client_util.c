@@ -8,16 +8,15 @@
 #include <string.h>
 #include <errno.h>
 
+#include <zephyr.h> /* For __ASSERT */
 #include <lwm2m_client_util.h>
 
 #define URI_SCHEME_COAPS "coaps://"
 #define URI_SCHEME_COAP  "coap://"
 
-int client_init_sockaddr_in(struct nrf_sockaddr_in6 * p_addr, struct nrf_sockaddr * p_src, nrf_sa_family_t ai_family, uint16_t port)
+void client_init_sockaddr_in(struct nrf_sockaddr_in6 * p_addr, struct nrf_sockaddr * p_src, nrf_sa_family_t ai_family, uint16_t port)
 {
-    if (p_addr == NULL) {
-        return EINVAL;
-    }
+    __ASSERT(p_addr != NULL, "Invalid argument");
 
     memset(p_addr, 0, sizeof(struct nrf_sockaddr_in6));
 
@@ -45,17 +44,14 @@ int client_init_sockaddr_in(struct nrf_sockaddr_in6 * p_addr, struct nrf_sockadd
             memcpy(addr_in6->sin6_addr.s6_addr, ((struct nrf_sockaddr_in6 *)p_src)->sin6_addr.s6_addr, 16);
         }
     }
-
-    return 0;
 }
 
 const char * client_parse_uri(char * p_uri, uint8_t uri_len, uint16_t * p_port, bool * p_secure)
 {
     const char * p_hostname;
 
-    if (p_uri == NULL || uri_len == 0 || p_port == NULL || p_secure == NULL) {
-        return NULL;
-    }
+    __ASSERT(p_uri != NULL && uri_len != 0 && p_port != NULL && p_secure != NULL,
+              "Invalid argument");
 
     if (strncmp(p_uri, URI_SCHEME_COAPS, sizeof(URI_SCHEME_COAPS) - 1) == 0) {
         p_hostname = &p_uri[8];
