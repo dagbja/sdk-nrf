@@ -617,27 +617,32 @@ int lwm2m_firmware_download_init(void)
 int lwm2m_firmware_download_resume(void)
 {
 	int err;
-	char url[URL_SIZE] = {0};
+	char url[URL_SIZE];
+	size_t len = sizeof(url);
 	enum lwm2m_firmware_image_state img = FIRMWARE_NONE;
 
 	/* Check if there is a download to resume.
 	 * We can only resume downloading images which we were pulling.
 	 */
 	err = lwm2m_firmware_image_state_get(&img);
-
-	if (!err && img == FIRMWARE_DOWNLOADING_PULL) {
-		err = lwm2m_firmware_uri_get(url, sizeof(url));
-		if (!err) {
-			/* Resume */
-			LWM2M_INF("Resuming download after power loss");
-			lwm2m_firmware_download_uri(url, sizeof(url));
-		} else {
-			/* Should not happen */
-			LWM2M_WRN("No URI to resume firmware update!");
-		}
+	if (err) {
+		return err;
 	}
 
-	return err;
+	if (img == FIRMWARE_DOWNLOADING_PULL) {
+		err = lwm2m_firmware_uri_get(url, &len);
+		if (err) {
+			/* Should not happen */
+			LWM2M_WRN("No URI to resume firmware update!");
+			return err;
+		}
+
+		/* Resume download. */
+		LWM2M_INF("Resuming download after power loss");
+		lwm2m_firmware_download_uri(url, len);
+	}
+
+	return 0;
 }
 
 int lwm2m_firmware_download_uri(char *uri, size_t len)
@@ -645,6 +650,8 @@ int lwm2m_firmware_download_uri(char *uri, size_t len)
 	char *p;
 
 	if (len >= sizeof(package_url)) {
+		LWM2M_WRN("Package URL too large (%d bytes, max %d)",
+			  len, sizeof(package_url));
 		return -ENOMEM;
 	}
 

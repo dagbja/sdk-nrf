@@ -766,16 +766,18 @@ int lwm2m_firmware_update_state_set(enum lwm2m_firmware_update_state state)
     return 0;
 }
 
-int lwm2m_firmware_uri_get(char *uri, size_t len)
+int lwm2m_firmware_uri_get(char *uri, size_t *len)
 {
     int rc;
 
-    rc = lwm2m_os_storage_read(LWM2M_MODEM_FIRMWARE_URI, uri, len);
+    rc = lwm2m_os_storage_read(LWM2M_MODEM_FIRMWARE_URI, uri, *len);
     if (rc < 0)
     {
         LWM2M_TRC("lwm2m_firmware_uri_get(), err %d", rc);
         return rc;
     }
+
+    *len = rc; /* bytes read */
 
     return 0;
 }

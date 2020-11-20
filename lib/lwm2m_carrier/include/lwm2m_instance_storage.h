@@ -96,7 +96,15 @@ enum lwm2m_firmware_update_state {
 int lwm2m_firmware_update_state_get(enum lwm2m_firmware_update_state *);
 int lwm2m_firmware_update_state_set(enum lwm2m_firmware_update_state);
 
-int lwm2m_firmware_uri_get(char *uri, size_t len);
+/**
+ * @brief Retrieve package URI from flash.
+ *
+ * @param uri Buffer to load the URI into
+ * @param[in,out] len Size of the buffer on input, size of the URI on output
+ * @return 0 on success, an errno otherwise.
+ */
+int lwm2m_firmware_uri_get(char *uri, size_t *len);
+
 int lwm2m_firmware_uri_set(char *uri, size_t len);
 
 int lwm2m_stored_class3_apn_read(char *class3_apn, size_t len);
