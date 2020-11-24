@@ -557,75 +557,64 @@ static void client_disconnect(client_context_t *ctx)
     }
 }
 
-/**
- * @brief Schedule connect failure retry.
- *
- * Todo: Add detailed documentation how retry is handled.
- * - PDN detected down while doing DNS or connect(), EAGAIN to retry immediately
- * - Error activating PDN
- *   - VzW: Use connect retry timeouts?
- *   - AT&T: APN fallback on last retry
- * - APN fallback because of no response from server (AT&T)
- * - Fallback to the other IP version (if both versions supported)
- * - Todo: Figure out retry delay for AT&T. Same as PDN retry? Recreate PDN?
- */
-static void client_schedule_retry(client_context_t *ctx,
-                                  struct k_delayed_work *work, int err)
+static bool client_ip_fallback(client_context_t *ctx)
 {
-    bool retry_handled = false;
-    int32_t delay = 0;
-    bool is_last = false;
+    if (client_is_ip_fallback_possible(ctx)) {
+        ctx->address_family =
+            (ctx->address_family == NRF_AF_INET6) ? NRF_AF_INET : NRF_AF_INET6;
 
-    if (err == -EAGAIN) {
-        /* Retry without delay */
-        k_delayed_work_submit_to_queue(&ctx->work_q, work, K_NO_WAIT);
-        return;
+        if (ctx->address_family == NRF_AF_INET) {
+            LWM2M_INF("IPv6 to IPv4 fallback");
+            return true;
+        }
     }
 
-    if (err == -ENETDOWN) {
-        /* Retry delay because of error activating PDN. */
+    return false;
+}
+
+static void client_schedule_pdn_retry(client_context_t *ctx,
+                                      struct k_delayed_work *work, int err)
+{
+    bool is_last = false;
+    int32_t delay;
+
+    switch (err) {
+    case -ENETDOWN:
         delay = lwm2m_retry_delay_pdn_get(lwm2m_apn_instance(), &is_last);
 
-        if (is_last && operator_is_att(true)) {
+        if (operator_is_att(true) && is_last) {
             /* Last PDN retry has failed, try next APN. */
             LWM2M_INF("Next APN fallback (activate failure)");
             delay = client_select_next_apn(ctx);
         }
-        retry_handled = true;
-    }
+        break;
 
-    if ((err == -ENETUNREACH) && operator_is_att(true) &&
-        (!client_is_ip_fallback_possible(ctx) ||
-         (ctx->address_family == NRF_AF_INET))) {
-        /* APN fallback because of no response from server (IPv6 or IPv4). */
+    case -ENETUNREACH:
         LWM2M_INF("Next APN fallback (network unreachable)");
         delay = client_select_next_apn(ctx);
-        retry_handled = true;
+        break;
+
+    default:
+        LWM2M_ERR("Unhandled PDN retry error: %d", -err);
+        delay = 0;
+        break;
     }
 
-    /* Done handling PDN. */
-    if (retry_handled && delay) {
+    if (delay) {
         LWM2M_INF("PDN retry delay for %ld seconds [%u]", delay / SECONDS(1),
                   ctx->short_server_id);
         client_event_deferred(LWM2M_CARRIER_DEFERRED_PDN_ACTIVATE, delay);
     }
 
-    if ((err == -ENETUNREACH) && client_is_ip_fallback_possible(ctx)) {
-        /* Fallback to the other IP version. */
-        ctx->address_family =
-            (ctx->address_family == NRF_AF_INET6) ? NRF_AF_INET : NRF_AF_INET6;
-        if (ctx->address_family == NRF_AF_INET) {
-            LWM2M_INF("IPv6 to IPv4 fallback");
-            retry_handled = true;
-        }
-    }
+    k_delayed_work_submit_to_queue(&ctx->work_q, work, K_MSEC(delay));
+}
 
-    if (retry_handled) {
-        k_delayed_work_submit_to_queue(&ctx->work_q, work, K_MSEC(delay));
-        return;
-    }
+static void client_schedule_connect_retry(client_context_t *ctx,
+                                          struct k_delayed_work *work, int err)
+{
+    bool is_last = false;
+    int32_t delay;
 
-    /* Connection retry delay. */
     delay = lwm2m_retry_delay_connect_next(ctx->security_instance, &is_last);
 
     if (delay == -1) {
@@ -650,6 +639,52 @@ static void client_schedule_retry(client_context_t *ctx,
     }
 
     k_delayed_work_submit_to_queue(&ctx->work_q, work, K_MSEC(delay));
+}
+
+/**
+ * @brief Schedule connect failure retry.
+ *
+ * Todo: Add detailed documentation how retry is handled.
+ * - PDN detected down while doing DNS or connect(), EAGAIN to retry immediately
+ * - Error activating PDN
+ *   - VzW: Use connect retry timeouts?
+ *   - AT&T: APN fallback on last retry
+ * - APN fallback because of no response from server (AT&T)
+ * - Fallback to the other IP version (if both versions supported)
+ * - Todo: Figure out retry delay for AT&T. Same as PDN retry? Recreate PDN?
+ */
+static void client_schedule_retry(client_context_t *ctx,
+                                  struct k_delayed_work *work, int err)
+{
+    switch (err) {
+    case -EAGAIN:
+        /* Retry without delay. */
+        k_delayed_work_submit_to_queue(&ctx->work_q, work, K_NO_WAIT);
+        break;
+
+    case -ENETDOWN:
+        /* Retry because of error activating PDN. */
+        client_schedule_pdn_retry(ctx, work, err);
+        break;
+
+    case -ENETUNREACH:
+        if (client_ip_fallback(ctx)) {
+            /* Fallback to IPv4. */
+            k_delayed_work_submit_to_queue(&ctx->work_q, work, K_NO_WAIT);
+            break;
+        } else if (operator_is_att(true)) {
+            /* APN fallback because of no response from server (IPv6 or IPv4). */
+            client_schedule_pdn_retry(ctx, work, err);
+            break;
+        }
+        /* else use default connection retry delay. */
+        /* fallthrough */
+
+    default:
+        /* Connection retry delay. */
+        client_schedule_connect_retry(ctx, work, err);
+        break;
+    }
 }
 
 static void client_schedule_update(client_context_t *ctx)
