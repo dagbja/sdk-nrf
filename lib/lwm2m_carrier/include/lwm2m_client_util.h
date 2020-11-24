@@ -12,9 +12,14 @@
 
 #include <nrf_socket.h>
 
-void client_init_sockaddr_in(struct nrf_sockaddr_in6 * p_addr, struct nrf_sockaddr * p_src, nrf_sa_family_t ai_family, uint16_t port);
+void client_init_sockaddr_in(struct nrf_sockaddr_in6 *p_addr,
+                             struct nrf_sockaddr *p_src,
+                             nrf_sa_family_t ai_family, uint16_t port);
 
-const char * client_parse_uri(char * p_uri, uint8_t uri_len, uint16_t * p_port, bool * p_secure);
+const char *client_parse_uri(char *p_uri, uint8_t uri_len, uint16_t *p_port,
+                             bool *p_secure);
+
+int lwm2m_client_errno(uint32_t err_code);
 
 #if CONFIG_NRF_LWM2M_ENABLE_LOGS || CONFIG_SHELL
 const char *client_remote_ntop(struct nrf_sockaddr_in6 *p_addr);
