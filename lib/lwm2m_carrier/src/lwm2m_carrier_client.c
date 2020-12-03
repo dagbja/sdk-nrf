@@ -1418,7 +1418,7 @@ int lwm2m_client_connect(void)
         }
 
         if (lwm2m_security_is_bootstrap_server_get(ctx->security_instance)) {
-            delay = lwm2m_security_hold_off_timer_get();
+            delay = lwm2m_security_client_hold_off_time_get(ctx->security_instance);
             LWM2M_INF(": Bootstrap (%ds)", delay);
             k_delayed_work_submit_to_queue(&ctx->work_q, &bootstrap_work,
                                            K_SECONDS(delay));

@@ -40,16 +40,6 @@ void lwm2m_security_bootstrapped_set(bool value)
     vzw_bootstrap_security_settings.is_bootstrapped = value;
 }
 
-int32_t lwm2m_security_hold_off_timer_get(void)
-{
-    return vzw_bootstrap_security_settings.hold_off_timer;
-}
-
-void lwm2m_security_hold_off_timer_set(int32_t value)
-{
-    vzw_bootstrap_security_settings.hold_off_timer = value;
-}
-
 // LWM2M core resources.
 int32_t lwm2m_security_client_hold_off_time_get(uint16_t instance_id)
 {
@@ -144,7 +134,7 @@ static uint32_t tlv_security_vzw_encode(uint16_t instance_id, uint8_t * p_buffer
     //  1 is IsBootstrapped
     int32_t list_values[2] =
     {
-        vzw_bootstrap_security_settings.hold_off_timer,
+        m_instance_security[instance_id].client_hold_off_time,
         vzw_bootstrap_security_settings.is_bootstrapped
     };
 
@@ -193,7 +183,7 @@ static uint32_t tlv_security_vzw_decode(uint16_t instance_id, lwm2m_tlv_t * p_tl
             {
                 err_code = lwm2m_tlv_bytebuffer_to_int32(tlv.value,
                                                          tlv.length,
-                                                         &vzw_bootstrap_security_settings.hold_off_timer);
+                                                         &m_instance_security[instance_id].client_hold_off_time);
                 break;
             }
 
