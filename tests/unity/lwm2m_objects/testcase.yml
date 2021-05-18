@@ -1,0 +1,3 @@
+tests:
+  unity.example_test:
+    tags: lwm2m_objects

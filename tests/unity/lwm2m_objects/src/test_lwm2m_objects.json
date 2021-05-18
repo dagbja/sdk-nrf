@@ -1,0 +1,24 @@
+{
+	"_config_overrides": [
+		{
+			"COAP_PORT_COUNT": 2
+		}
+	],
+	"_links": [
+		"appskeleton_unity_alta",
+		"alta_simulator_fp1",
+		"alta_sdk_common",
+		"sdk_socket_api:portable",
+		"nrf_socket",
+		"sdk_lwm2m_core:cmock",
+		"sdk_lwm2m_objects:file_included_by_test",
+		"sdk_lwm2m_config",
+		"sdk_iot_errors:headers_only",
+		"sdk_coap_config",
+		"sdk_coap_message:cmock"
+	],
+	"_include": [
+		"."
+	],
+	"_name": "test_lwm2m_objects"
+}
